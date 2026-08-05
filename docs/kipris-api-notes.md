@@ -99,8 +99,162 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 우리 파이프라인은 위 서버를 그대로 붙여 쓸지, 아니면 `api-client.ts`의 호출 방식만 참고해서
 이 저장소 안에 직접 fetch 스크립트를 만들지 추후 결정.
 
-## 참고 소스 (레퍼런스 리포, MIT)
+## 재사용 가능한 핵심 로직 (원본 코드, MIT)
 
-- `src/lib/api-client.ts` — `trademarkSearch()`: `ServiceKey` 기반 쿼리 빌드, `getWordSearch` 호출
-- `src/lib/xml-parser.ts` — `parseTrademarkList()`, `checkHeader()`, `parseTotalCount()`
-- `src/tools/trademark.ts` — Zod 스키마, 캐시 키, `[NOT_FOUND]` 처리
+우리 파이프라인을 직접 구현할 때 그대로 참고/포팅할 만한 부분은 코드로 박아둔다.
+
+### 응답 타입 (`src/lib/types.ts`)
+
+```ts
+/** 상표 검색 결과 1건 (trademarkInfoSearchService) */
+export interface TrademarkHit {
+  title: string
+  applicant: string
+  applicationNumber: string
+  applicationDate: string
+  applicationStatus: string
+  classificationCode: string
+  registrationNumber: string
+  registrationDate: string
+  publicationNumber: string
+  publicationDate: string
+  rightHolder: string
+  agent: string
+  drawing: string
+}
+```
+
+### 재시도 + 타임아웃 + 키 마스킹 (`src/lib/fetch-with-retry.ts`)
+
+KIPRIS가 가끔 빈 본문/5xx를 반환하는 것에 대한 방어 로직. 우리 fetch 스크립트에도 그대로 이식할 가치가 있음.
+
+```ts
+export function maskSensitiveUrl(url: string): string {
+  if (!url) return url
+  return url.replace(
+    /([?&](?:accessKey|ServiceKey|serviceKey|apikey|apiKey|api_key|key)=)[^&]+/g,
+    "$1***"
+  )
+}
+
+export interface FetchWithRetryOptions extends RequestInit {
+  timeout?: number
+  retries?: number
+  retryDelay?: number
+  retryOn?: number[]
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function getRetryDelay(response: Response | null, retryDelay: number, attempt: number): number {
+  if (response) {
+    const retryAfter = response.headers.get("Retry-After")
+    if (retryAfter && !isNaN(Number(retryAfter))) return Number(retryAfter) * 1000
+  }
+  const base = retryDelay * Math.pow(2, attempt)
+  return base + Math.random() * base * 0.5
+}
+
+export async function fetchWithRetry(url: string, options: FetchWithRetryOptions = {}): Promise<Response> {
+  const { timeout = 30000, retries = 3, retryDelay = 1000, retryOn = [429, 500, 502, 503, 504], ...fetchOptions } = options
+  let lastError: Error | null = null
+
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeout)
+    const headers = new Headers(fetchOptions.headers)
+    if (!headers.has("user-agent")) {
+      headers.set("user-agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+    }
+    try {
+      const response = await fetch(url, { ...fetchOptions, headers, signal: controller.signal })
+      clearTimeout(timeoutId)
+      if (response.ok || !retryOn.includes(response.status)) return response
+      if (attempt < retries) { await sleep(getRetryDelay(response, retryDelay, attempt)); continue }
+      return response
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error) {
+        lastError = error.name === "AbortError"
+          ? new Error(`요청 타임아웃(${timeout}ms) - ${maskSensitiveUrl(url)}`)
+          : new Error(maskSensitiveUrl(error.message))
+      }
+      if (attempt < retries) { await sleep(getRetryDelay(null, retryDelay, attempt)); continue }
+    }
+  }
+  throw lastError || new Error("재시도 소진")
+}
+```
+
+### resultCode 표준화 + 0건 처리 (`src/lib/errors.ts`)
+
+```ts
+export const KIPRIS_RESULT_CODES: Record<string, string> = {
+  "00": "정상",
+  "10": "잘못된 요청 파라미터",
+  "11": "필수 파라미터 누락",
+  "20": "검색 결과 없음",
+  "30": "등록되지 않은 인증키(해당 서비스 미신청)",
+  "31": "인증키 사용기한 만료",
+  "99": "서버 오류",
+}
+
+export class KiprisApiError extends Error {
+  code: string
+  resultCode: string
+  constructor(resultCode: string, resultMsg?: string) {
+    const desc = KIPRIS_RESULT_CODES[resultCode] || "알 수 없는 오류"
+    super(`[${resultCode}] ${desc}${resultMsg ? ` (${resultMsg})` : ""}`)
+    this.name = "KiprisApiError"
+    this.resultCode = resultCode
+    if (resultCode === "30") this.code = "ACCESS_KEY_NOT_REGISTERED"
+    else if (resultCode === "31") this.code = "DEADLINE_EXPIRED"
+    else if (resultCode === "10" || resultCode === "11") this.code = "INVALID_PARAMETER"
+    else this.code = "KIPRIS_API_ERROR"
+  }
+}
+```
+
+- `resultCode`가 `20`(결과 없음)이면 에러가 아니라 빈 배열로 정상 처리 — 지역+품목 매칭 결과 "출원 없음"을
+  판별하는 핵심 신호가 된다.
+- 그 외 코드는 `KiprisApiError`로 던져서 재시도/알림 로직에서 구분 처리.
+
+### 상표 검색 호출부 (`src/lib/api-client.ts` 발췌)
+
+```ts
+async trademarkSearch(
+  p: { searchString: string; numOfRows?: number; pageNo?: number },
+  apiKey?: string
+): Promise<string> {
+  const q = this.buildQuery(
+    {
+      searchString: p.searchString,
+      numOfRows: p.numOfRows ?? 10,
+      docsCount: p.numOfRows ?? 10,
+      pageNo: p.pageNo ?? 1,
+    },
+    "ServiceKey",
+    this.getApiKey(apiKey)
+  )
+  return this.get(`${TRADEMARK_BASE}/getWordSearch?${q}`, "trademarkSearch")
+}
+```
+
+`TRADEMARK_BASE = https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService`
+
+## 이 문서로 충분한가 — 커버리지 정리
+
+**포함됨** (더 이상 리포 방문 불필요):
+- 인증 방식, 상표 검색 엔드포인트/파라미터, 응답 XML 필드 전체, resultCode 표
+- 재사용할 핵심 로직 원본: 재시도/타임아웃/키마스킹, resultCode 에러 클래스, `TrademarkHit` 타입
+- 지역 필드 부재라는 결정적 제약과 우회 후보
+
+**의도적으로 제외함** (우리가 MCP 서버 자체를 만드는 게 아니라 독립 파이프라인을 만들 것이므로
+불필요 — 필요해지면 그때 다시 방문):
+- `tool-registry.ts`, `index.ts`, `server/http-server.ts` — MCP 프로토콜/STDIO/HTTP 서버 배선
+- `format.ts` — MCP 텍스트 응답 포맷팅 (우리는 대시보드용 JSON/구조화 데이터가 필요하므로 별도 설계)
+- `cache.ts`, `session-state.ts`, `schemas.ts` — 범용 TTL 캐시/요청별 키 격리/응답 크기 제한 (표준 패턴이라
+  그대로 재구현 가능, 원본 포팅 불필요)
+- 특허·디자인·출원인·권리자 검색 도구 5종(`tools/search.ts` 등) — 상표 전용 파이프라인에는 불필요
