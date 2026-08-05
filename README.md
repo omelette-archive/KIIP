@@ -21,7 +21,7 @@ flowchart LR
     classDef partial fill:#eda100,stroke:#c98500,color:#fff
     classDef todo fill:#e1e0d9,stroke:#c3c2b7,color:#52514e
     class P1 todo
-    class P2 todo
+    class P2 partial
     class P3 partial
     class P4 todo
     class P5 todo
@@ -36,7 +36,7 @@ flowchart LR
 | # | 단계 | 폴더 | 상태 | 한 줄 요약 |
 |---|---|---|---|---|
 | ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | ⚪ 예정 | 226개 기초지자체 특산품 목록 자동 수집 |
-| ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | ⚪ 예정 | 특산품명 정제 + NICE 상품분류 자동 매핑 |
+| ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 고시명칭·NICE분류 사전 확보 완료, 매핑 파이프라인은 TODO |
 | ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 상표 검색 — **품목 매칭은 동작, 지역 매칭은 TODO** |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | ⚪ 예정 | 지역별·품목별 출원 현황 통계 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | ⚪ 예정 | 상표 활용도 낮은 지역/품목 탐지 |
