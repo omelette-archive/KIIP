@@ -88,6 +88,27 @@ async function run() {
     ok("품목(classCode) 필터링 정상 동작, 미지정 시 전체 반환");
   }
 
+  console.log("2-1) filterByClassCode — 실제 KIPRIS 응답 형태(다중 류/zero-padding)");
+  {
+    const multiClassHits = [
+      { title: "다중류상표", classificationCode: "09|35|42" },
+      { title: "제로패딩상표", classificationCode: "008" },
+      { title: "무관상표", classificationCode: "12" },
+    ];
+    assert.strictEqual(
+      filterByClassCode(multiClassHits, "35").length,
+      1,
+      "파이프로 묶인 다중 류 중 하나로 검색해도 매칭돼야 함"
+    );
+    assert.strictEqual(
+      filterByClassCode(multiClassHits, "8").length,
+      1,
+      "zero-padding된 코드(008)도 8로 검색하면 매칭돼야 함"
+    );
+    assert.strictEqual(filterByClassCode(multiClassHits, "99").length, 0);
+    ok("다중 류(파이프 구분)·zero-padding 코드 정규화 후 매칭 정상 동작");
+  }
+
   console.log("3) createClient().trademarkSearch (fetch 모킹, 정상 응답)");
   {
     const fakeFetch = async (url) => {
