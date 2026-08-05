@@ -22,8 +22,8 @@ cp .env.example .env
 ## 사용법
 
 ```bash
-node pipeline/matchTrademarks.js --region "서울특별시 강남구" --item "커피" --classCode 30
-node pipeline/matchTrademarks.js --region "경기도 성남시 분당구" --item "코리아" --out pipeline/output/result.json
+node 03-match-trademarks/matchTrademarks.js --region "서울특별시 강남구" --item "커피" --classCode 30
+node 03-match-trademarks/matchTrademarks.js --region "경기도 성남시 분당구" --item "코리아" --out 03-match-trademarks/output/result.json
 ```
 
 옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1), `--apiKey`(환경변수 대신 직접 전달).
@@ -31,7 +31,7 @@ node pipeline/matchTrademarks.js --region "경기도 성남시 분당구" --item
 ## 구조
 
 ```
-pipeline/
+03-match-trademarks/
 ├── matchTrademarks.js     CLI 진입점
 ├── selftest.js            fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
 ├── lib/
@@ -50,5 +50,5 @@ pipeline/
 검증한다:
 
 ```bash
-node pipeline/selftest.js
+node 03-match-trademarks/selftest.js
 ```

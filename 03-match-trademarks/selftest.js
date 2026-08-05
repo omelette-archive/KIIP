@@ -2,7 +2,7 @@
 "use strict";
 /**
  * 실제 KIPRIS API 키 없이 파이프라인(XML 파싱 -> 클라이언트 -> 품목 필터)을 검증하는 자체 테스트.
- * fetch를 모킹해서 네트워크 없이 돌린다. 실행: node pipeline/selftest.js
+ * fetch를 모킹해서 네트워크 없이 돌린다. 실행: node 03-match-trademarks/selftest.js
  */
 
 const assert = require("assert");

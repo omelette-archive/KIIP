@@ -1,3 +1,3 @@
 .env
 node_modules/
-pipeline/output/*.json
+03-match-trademarks/output/*.json

@@ -10,8 +10,8 @@
  * TODO 부분을 채운다.
  *
  * 사용법:
- *   node pipeline/matchTrademarks.js --region "서울특별시 강남구" --item "커피" [--classCode 30]
- *                                    [--numOfRows 20] [--pageNo 1] [--out pipeline/output/result.json]
+ *   node 03-match-trademarks/matchTrademarks.js --region "서울특별시 강남구" --item "커피" [--classCode 30]
+ *                                    [--numOfRows 20] [--pageNo 1] [--out 03-match-trademarks/output/result.json]
  *
  * 인증키: .env 의 KIPRIS_API_KEY, 또는 --apiKey 로 직접 전달.
  */
@@ -43,7 +43,7 @@ function printUsageAndExit(message) {
   console.error(
     [
       "사용법:",
-      "  node pipeline/matchTrademarks.js --region <지역명> --item <품목/키워드> [옵션]",
+      "  node 03-match-trademarks/matchTrademarks.js --region <지역명> --item <품목/키워드> [옵션]",
       "",
       "옵션:",
       "  --classCode <1-45>   NICE 상품류 코드로 결과 필터링 (응답의 classificationCode 기준)",

@@ -7,8 +7,8 @@ KIPRIS Plus 오픈API를 MCP 도구로 감싼 서버. 상표 파이프라인을 
 향후 파이프라인은 **{지역, 품목} 입력 → 실제 상표 출원 여부 확인**을 목표로 한다. 이 문서는 그
 전 단계로 KIPRIS API 호출 방식을 정리해두는 것이 목적.
 
-**진행 상황**: `pipeline/matchTrademarks.js`(v1)에서 품목 검색+필터는 실동작한다.
-지역 매칭은 아직 미구현 — 자세한 건 `pipeline/README.md` 참고.
+**진행 상황**: `03-match-trademarks/matchTrademarks.js`(v1)에서 품목 검색+필터는 실동작한다.
+지역 매칭은 아직 미구현 — 자세한 건 `03-match-trademarks/README.md` 참고.
 
 ## 인증
 
