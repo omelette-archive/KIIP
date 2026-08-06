@@ -23,7 +23,7 @@ flowchart LR
     class P1 partial
     class P2 partial
     class P3 partial
-    class P4 todo
+    class P4 partial
     class P5 todo
     class P6 todo
     class P7 todo
@@ -38,7 +38,7 @@ flowchart LR
 | ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | 법정동코드 마스터 검증 완료, 지리적표시/농사로는 API 클라이언트 구현+실키 대기 |
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 파이프라인 구현+자체테스트 완료, 실키 스모크 테스트 대기 |
 | ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 상표 검색 — **품목 매칭은 동작, 지역 매칭은 TODO** |
-| ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | ⚪ 예정 | 지역별·품목별 출원 현황 통계 |
+| ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역·품목별 집계와 시계열 분석 동작, 지역 내·외 비중은 주소 데이터 대기 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | ⚪ 예정 | 상표 활용도 낮은 지역/품목 탐지 |
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | ⚪ 예정 | 분석 결과 → 비즈니스 확장 전략 브리핑 자동 생성 |
 | ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | ⚪ 예정 | 지역별 현황 + 브랜드 공백 지도 |

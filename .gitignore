@@ -1,6 +1,7 @@
 .env
 node_modules/
 03-match-trademarks/output/*.json
+04-analyze-brand/output/*.json
 02-normalize-items/output/*.csv
 02-normalize-items/output/*.json
 01-collect-specialties/output/*.csv
