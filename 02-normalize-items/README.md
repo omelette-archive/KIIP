@@ -37,7 +37,8 @@
 │   ├── loadEnv.js          .env 로더 (03에서 포팅)
 │   ├── fetchWithRetry.js   재시도/타임아웃/키마스킹 (03에서 포팅)
 │   ├── noticeDictionary.js 사전 CSV 로더 (quote-aware 파서, bigram 사전계산)
-│   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외)
+│   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외,
+│   │                       bigram 역색인 캐싱으로 대량 처리 시 57k건 전체 스캔 회피)
 │   ├── ruleNormalizer.js   보수적 규칙 매칭과 검토 대상 분리
 │   ├── llmClient.js        선택적 개별 AI 검토용 Anthropic 클라이언트(기본 실행에서는 미사용)
 │   └── filters.js          isServiceClass()
@@ -54,7 +55,7 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
   --review-out 02-normalize-items/output/review-required.csv
 ```
 
-입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]`.
+입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]` — 01단계 출력을 그대로 넣을 수 있다.
 
 기본 실행은 Anthropic API를 호출하지 않는다. `status=ok`은 규칙으로 확정된 행,
 `status=review_required`는 개별 검토가 필요한 행이다. 검토 파일에는 `reviewReason`과

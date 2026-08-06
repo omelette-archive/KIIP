@@ -5,7 +5,21 @@
  * adminCodes.js가 만든 시군구 마스터 목록과 지역 문자열을 대조해서 sido/sigungu를
  * 분리한다 — 못 찾아도 하드 실패는 아니고 경고만 남긴다(소스마다 지역 표기 형식이
  * "경상북도 안동시" / "안동시" / "안동" 등으로 제각각이라 완벽한 매칭은 기대하기 어려움).
+ *
+ * ⚠️ 시군구명은 시도 경계 없이 중복되는 경우가 실제로 있다 — 중구(서울/부산/대구/대전/
+ * 울산), 동구·서구·남구·북구(광역시 여러 곳), 고성군(강원/경남) 등. 시군구명만으로
+ * 매칭하면 배열 순서상 우연히 먼저 걸리는 시도로 잘못 태깅된다(실제로 "대전광역시 중구"가
+ * "서울특별시 중구"로, "강원도 고성군"이 "경상남도 고성군"으로 잘못 매칭되는 걸 확인함).
+ * 그래서 시군구명이 여러 시도에 중복되면, 지역 문자열에 시도명(핵심어)이 함께 있는지로
+ * 한 번 더 좁히고, 그래도 못 좁히면 틀린 시도를 단정하지 않고 matched:false + ambiguous:true로
+ * 남긴다.
  */
+
+const SIDO_SUFFIX_RE = /(특별자치시|특별자치도|광역시|특별시|도)$/;
+
+function sidoCoreName(sido) {
+  return (sido || "").replace(SIDO_SUFFIX_RE, "");
+}
 
 /**
  * @param {string} regionText
@@ -19,36 +33,39 @@ function splitRegion(regionText, adminList) {
   if (candidates.length === 0) {
     return { sido: "", sigungu: normalized, matched: false };
   }
-
-  // "중구", "강서구", "고성군"처럼 여러 시도에 같은 시군구명이 존재한다. 입력에
-  // 시도가 함께 있으면 반드시 시도까지 일치하는 후보를 우선해야 한다.
-  const exactRegion = candidates.find((admin) => normalized.includes(admin.sido));
-  if (exactRegion) {
-    return { sido: exactRegion.sido, sigungu: exactRegion.sigungu, matched: true };
+  if (candidates.length === 1) {
+    return { sido: candidates[0].sido, sigungu: candidates[0].sigungu, matched: true };
   }
 
-  // 시도가 생략된 입력은 시군구명이 전국에서 유일할 때만 확정한다. 여러 후보 중 첫
-  // 항목을 고르면 서울 중구/부산 중구 같은 지역이 조용히 오분류된다.
-  const uniqueRegions = new Map(
-    candidates.map((admin) => [`${admin.sido}\u0000${admin.sigungu}`, admin])
-  );
-  if (uniqueRegions.size === 1) {
-    const [only] = uniqueRegions.values();
-    return { sido: only.sido, sigungu: only.sigungu, matched: true };
+  // 동명 시군구 — 지역 문자열에 시도명(핵심어)이 같이 있으면 그걸로 좁힌다.
+  const narrowed = candidates.filter((admin) => normalized.includes(sidoCoreName(admin.sido)));
+  if (narrowed.length === 1) {
+    return { sido: narrowed[0].sido, sigungu: narrowed[0].sigungu, matched: true };
   }
 
-  return { sido: "", sigungu: normalized, matched: false };
+  // 그래도 못 좁히면 틀린 시도를 단정짓지 않는다.
+  return {
+    sido: "",
+    sigungu: normalized,
+    matched: false,
+    ambiguous: true,
+    candidateSidos: candidates.map((c) => c.sido),
+  };
 }
 
 function toRows(entries, { adminList, source, itemNameOf, regionOf, now = new Date().toISOString() }) {
   const warnings = [];
   const rows = entries.map((entry) => {
     const region = regionOf(entry);
-    const { sido, sigungu, matched } = splitRegion(region, adminList);
-    if (!matched) {
+    const split = splitRegion(region, adminList);
+    if (split.ambiguous) {
+      warnings.push(
+        `${source}: 시군구명이 여러 시도에 중복돼 확정 못함 - "${region}" (후보: ${split.candidateSidos.join(", ")}) (품목: ${itemNameOf(entry)})`
+      );
+    } else if (!split.matched) {
       warnings.push(`${source}: 지역명 매칭 실패 - "${region}" (품목: ${itemNameOf(entry)})`);
     }
-    return { sido, sigungu, rawItemName: itemNameOf(entry), source, collectedAt: now };
+    return { sido: split.sido, sigungu: split.sigungu, rawItemName: itemNameOf(entry), source, collectedAt: now };
   });
   return { rows, warnings };
 }

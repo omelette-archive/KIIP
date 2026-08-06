@@ -19,18 +19,28 @@ function createClient({ apiKey, baseUrl, operation = "getGeoIndiCertInfoList", f
   const client = createDataGoKrClient({ apiKey, fetchImpl });
 
   /**
-   * @param {{pageNo?:number, numOfRows?:number, limit?:number, baseUrl?:string}} [p]
+   * 기본적으로 totalCount까지 모든 페이지를 순회해서 전체 목록을 가져온다
+   * (193건 정도라 한 번에 다 받아도 부담 없음). maxItems를 두고 싶으면 limit을,
+   * 한 페이지만 보고 싶으면 { allPages:false, pageNo, numOfRows }를 넘긴다.
+   * @param {{pageNo?:number, numOfRows?:number, limit?:number, baseUrl?:string, allPages?:boolean}} [p]
    * @returns {Promise<{registrationNumber:string, registeredName:string, region:string, registrationDate:string, raw:object}[]>}
    */
   async function listRegistrations(p = {}) {
     const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result = await client.callAllPages({
-      baseUrl: effectiveBaseUrl,
-      operation,
-      pageNo: p.pageNo || 1,
-      numOfRows: p.numOfRows || 100,
-      maxItems: p.limit,
-    });
+    const result =
+      p.allPages === false
+        ? await client.callOperation({
+            baseUrl: effectiveBaseUrl,
+            operation,
+            params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
+          })
+        : await client.callAllPages({
+            baseUrl: effectiveBaseUrl,
+            operation,
+            pageNo: p.pageNo || 1,
+            numOfRows: p.numOfRows || 100,
+            maxItems: p.limit,
+          });
     // 필드명은 활용가이드 확인 전까지 추정치라 여러 후보를 시도하고, raw로 원본도 함께 남긴다.
     return result.items.map((item) => ({
       registrationNumber: item.registNo || item.regNo || item.registrationNumber || "",

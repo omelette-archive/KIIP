@@ -4,8 +4,12 @@
  * 유사도로 뽑는다. 임베딩/외부 API 없이 순수 로컬 계산이라 API 키 없이도 동작·
  * 테스트 가능하다. 확정하지 못한 행은 이 후보 목록과 함께 별도 AI/사람 검토로 보낸다.
  *
- * 57,000건이 넘는 사전을 매번 전체 순회하지 않도록 bigram 역색인을 dictionary별로
- * 한 번 만들고 WeakMap에 캐시한다.
+ * 성능: 사전이 57,000건이 넘어서 매 쿼리마다 전체를 선형 스캔하면 01→02 파이프라인이
+ * 실제로 수백~수천 행을 처리할 때 느려진다. bigram 역색인(bigram -> 해당 bigram을 가진
+ * 사전 항목 인덱스 목록)을 만들어서, 쿼리와 최소 하나의 bigram이라도 겹치는 항목만
+ * 스코어링 대상으로 좁힌다. 이 색인은 dictionary 배열마다 한 번만 만들고 WeakMap에
+ * 캐싱해서 재사용한다(같은 dictionary로 여러 번 findCandidates를 부르는 배치 처리에서
+ * 특히 효과적 — normalizeItems.js가 정확히 이 패턴).
  */
 
 const { bigrams } = require("./noticeDictionary");
@@ -50,6 +54,16 @@ function jaccard(setA, setB) {
 
 const indexCache = new WeakMap();
 
+/**
+ * dictionary에 대한 bigram 역색인을 만들고(또는 캐시에서 꺼내고) 반환한다.
+ * - invertedIndex: bigram -> 그 bigram을 가진 entries 인덱스 배열
+ * - shortEntryIndices: item 길이가 1인 항목의 인덱스 목록. 1글자 항목(예: "탈", "밀")은
+ *   자기 자신이 곧 bigram 토큰이라, 그보다 긴 쿼리의 실제 2글자 bigram과는 절대 안
+ *   겹친다("하회탈"의 bigram은 {"하회","회탈"}뿐 — "탈"이라는 토큰 자체가 없음). 그래서
+ *   substring 매칭을 위해 항상 별도로 후보에 넣어야 한다. 2글자 이상 항목은 자신이
+ *   쿼리의 연속 부분문자열이면 그 bigram이 쿼리의 bigram이기도 해서 역색인만으로
+ *   자동으로 걸린다.
+ */
 function getIndex(dictionary) {
   let cached = indexCache.get(dictionary);
   if (cached) return cached;
@@ -89,6 +103,9 @@ function findCandidates(rawItemName, dictionary, region = {}, options = {}) {
   const queryBigrams = bigrams(cleaned);
   const { invertedIndex, shortEntryIndices } = getIndex(dictionary);
 
+  // 후보를 "쿼리와 bigram이 하나라도 겹치는 항목" + "1글자 사전 항목 전체"로 좁힌다.
+  // 쿼리 자체가 1글자면(드문 케이스) bigram이 없어 색인으로 못 좁히므로 전체 스캔으로
+  // 안전하게 물러난다.
   let indicesToScore;
   if (cleaned.length <= 1) {
     indicesToScore = dictionary.keys();

@@ -1,7 +1,7 @@
 # KIIP — AI 기반 지역 특산품 브랜드 정책지원 플랫폼
 
 특허청 상표 빅데이터와 생성형 AI를 결합해, 지역 특산품의 브랜드(상표) 활용 수준을 자동으로
-분석하고 브랜드 공백지역·정책 우선순위를 도출하는 파이프라인. 전체 기획은
+분석하고 브랜드 공백지역을 발굴해 비즈니스 확장 전략을 제안하는 파이프라인. 전체 기획은
 [`docs/project-plan.md`](docs/project-plan.md) 참고.
 
 ## 파이프라인 (7단계)
@@ -12,7 +12,7 @@ flowchart LR
     P2 --> P3["③ 상표 매칭"]
     P3 --> P4["④ 브랜드 분석"]
     P4 --> P5["⑤ 브랜드 공백 발굴"]
-    P5 --> P6["⑥ 정책 인사이트"]
+    P5 --> P6["⑥ 비즈니스 확장 전략"]
     P4 --> P7["⑦ 대시보드"]
     P5 --> P7
     P6 --> P7
@@ -40,7 +40,7 @@ flowchart LR
 | ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | ② CSV 배치 검색·품목 매칭 동작, **지역 매칭은 TODO** |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | ⚪ 예정 | 지역별·품목별 출원 현황 통계 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | ⚪ 예정 | 상표 활용도 낮은 지역/품목 탐지 |
-| ⑥ | AI 정책 인사이트 생성 | [`06-generate-policy-insight/`](06-generate-policy-insight/) | ⚪ 예정 | 분석 결과 → 정책 브리핑 자동 생성 |
+| ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | ⚪ 예정 | 분석 결과 → 비즈니스 확장 전략 브리핑 자동 생성 |
 | ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | ⚪ 예정 | 지역별 현황 + 브랜드 공백 지도 |
 
 각 폴더의 `README.md`에 해당 단계의 목표·할 일·입출력 스키마가 정리되어 있다.
