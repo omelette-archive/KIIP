@@ -15,16 +15,25 @@ function createClient({ apiKey, baseUrl, operation = "getSpcltyMaterialsList", f
   const client = createDataGoKrClient({ apiKey, fetchImpl });
 
   /**
-   * @param {{pageNo?:number, numOfRows?:number, baseUrl?:string}} [p]
+   * 기본적으로 totalCount까지 모든 페이지를 순회해서 전체 목록을 가져온다. 한 페이지만
+   * 보고 싶으면 { allPages:false, pageNo, numOfRows }를 넘긴다.
+   * @param {{pageNo?:number, numOfRows?:number, baseUrl?:string, allPages?:boolean}} [p]
    * @returns {Promise<{title:string, region:string, registrationDate:string, raw:object}[]>}
    */
   async function listSpecialties(p = {}) {
     const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result = await client.callOperation({
-      baseUrl: effectiveBaseUrl,
-      operation,
-      params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
-    });
+    const result =
+      p.allPages === false
+        ? await client.callOperation({
+            baseUrl: effectiveBaseUrl,
+            operation,
+            params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
+          })
+        : await client.fetchAllPages({
+            baseUrl: effectiveBaseUrl,
+            operation,
+            pageSize: p.numOfRows || 100,
+          });
     return result.items.map((item) => ({
       title: item.title || item.prdlstNm || item.name || "",
       region: item.area || item.sigungu || item.region || "",

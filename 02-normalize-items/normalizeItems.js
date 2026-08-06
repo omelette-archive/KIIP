@@ -131,10 +131,28 @@ async function main() {
   const dictionary = loadDictionary();
   console.error(`[normalizeItems] 고시상품명칭 사전 ${dictionary.length.toLocaleString()}건 로드`);
 
+  // 같은 (지역, 원시 품목명) 조합이 여러 행에서 중복되면(다른 소스에서 같은 품목이
+  // 중복 수집되는 경우 등) 후보검색+LLM 호출을 매번 새로 하지 않고 결과를 재사용한다.
+  // 진행 중인 호출도 Promise로 캐싱해서 동시에 들어온 중복 요청이 API를 두 번 타지
+  // 않게 한다.
+  const normalizeCache = new Map();
+  let cacheHits = 0;
   let processed = 0;
+
   const results = await runWithConcurrency(rawRows, concurrency, async (row) => {
-    const candidates = findCandidates(row.rawItemName, dictionary, { sido: row.sido, sigungu: row.sigungu }, { topK });
-    const normalized = await client.normalizeItem({ rawItemName: row.rawItemName, candidates });
+    const cacheKey = `${row.sido}|${row.sigungu}|${row.rawItemName}`;
+    let normalizedPromise = normalizeCache.get(cacheKey);
+    if (normalizedPromise) {
+      cacheHits++;
+    } else {
+      normalizedPromise = (async () => {
+        const candidates = findCandidates(row.rawItemName, dictionary, { sido: row.sido, sigungu: row.sigungu }, { topK });
+        return client.normalizeItem({ rawItemName: row.rawItemName, candidates });
+      })();
+      normalizeCache.set(cacheKey, normalizedPromise);
+    }
+    const normalized = await normalizedPromise;
+
     processed++;
     if (processed % 20 === 0) {
       console.error(`[normalizeItems] processed=${processed}/${rawRows.length}`);
@@ -153,7 +171,9 @@ async function main() {
 
   writeOutputCsv(outPath, results);
   const matched = results.filter((r) => r.noticeName).length;
-  console.error(`[normalizeItems] done. matched=${matched}/${results.length} -> ${outPath}`);
+  console.error(
+    `[normalizeItems] done. matched=${matched}/${results.length} (캐시 재사용 ${cacheHits}건) -> ${outPath}`
+  );
 }
 
 main().catch((err) => {

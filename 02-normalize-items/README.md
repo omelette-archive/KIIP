@@ -36,7 +36,8 @@
 │   ├── loadEnv.js          .env 로더 (03에서 포팅)
 │   ├── fetchWithRetry.js   재시도/타임아웃/키마스킹 (03에서 포팅)
 │   ├── noticeDictionary.js 사전 CSV 로더 (quote-aware 파서, bigram 사전계산)
-│   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외)
+│   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외,
+│   │                       bigram 역색인 캐싱으로 대량 처리 시 57k건 전체 스캔 회피)
 │   ├── llmClient.js        Anthropic API 클라이언트 (claude-haiku-4-5, forced tool_choice)
 │   └── filters.js          isServiceClass()
 ├── normalizeItems.js       CLI 진입점
@@ -54,7 +55,9 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
   --out 02-normalize-items/output/normalized.csv
 ```
 
-입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]`.
+입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]` — 01단계 출력을 그대로 넣을 수 있다.
+같은 (지역, 원시 품목명) 조합이 중복되면 후보검색+LLM 호출을 재사용한다(캐시 히트 수를
+실행 로그에 표시).
 
 ## 테스트
 

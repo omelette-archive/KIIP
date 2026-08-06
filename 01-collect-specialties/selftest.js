@@ -56,6 +56,9 @@ async function run() {
     { code: "1111000000", sido: "서울특별시", sigungu: "종로구" },
     { code: "4721000000", sido: "경상북도", sigungu: "안동시" },
     { code: "4682000000", sido: "경상남도", sigungu: "합천군" },
+    // 동명 시군구 회귀 테스트용 — 실제로 고성군은 강원/경남에 둘 다 있음.
+    { code: "4280000000", sido: "강원특별자치도", sigungu: "고성군" },
+    { code: "4872000000", sido: "경상남도", sigungu: "고성군" },
   ];
 
   console.log("3) normalize.splitRegion");
@@ -69,6 +72,21 @@ async function run() {
     assert.strictEqual(splitRegion("존재하지않는지역", adminList).matched, false);
     assert.strictEqual(splitRegion("", adminList).matched, false);
     ok("시도 접두어 유무와 무관하게 시군구명으로 매칭, 못 찾으면 matched:false");
+  }
+
+  console.log("3-1) normalize.splitRegion — 동명 시군구(고성군: 강원/경남) 오매칭 회귀 테스트");
+  {
+    assert.deepStrictEqual(splitRegion("강원도 고성군", adminList), {
+      sido: "강원특별자치도", sigungu: "고성군", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("경상남도 고성군", adminList), {
+      sido: "경상남도", sigungu: "고성군", matched: true,
+    });
+    const ambiguous = splitRegion("고성군", adminList);
+    assert.strictEqual(ambiguous.matched, false);
+    assert.strictEqual(ambiguous.ambiguous, true);
+    assert.deepStrictEqual(ambiguous.candidateSidos.sort(), ["강원특별자치도", "경상남도"]);
+    ok("시도명이 함께 있으면 정확히 좁히고, 없으면 틀린 시도를 단정짓지 않고 ambiguous로 표시");
   }
 
   console.log("4) normalize.fromGiRegistrations / fromNongsaro");
@@ -156,6 +174,32 @@ async function run() {
       /SERVICE_ACCESS_DENIED_ERROR/
     );
     ok("resultCode 30(서비스 미승인 등) 응답은 에러로 던져짐");
+  }
+
+  console.log("8-1) dataGoKrClient.fetchAllPages — totalCount까지 여러 페이지 순회");
+  {
+    const callsByPage = [];
+    const fakeFetch = async (url) => {
+      const pageNo = Number(new URL(url).searchParams.get("pageNo"));
+      callsByPage.push(pageNo);
+      const itemsByPage = { 1: [{ id: 1 }, { id: 2 }], 2: [{ id: 3 }, { id: 4 }], 3: [{ id: 5 }] };
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          response: {
+            header: { resultCode: "00", resultMsg: "OK" },
+            body: { totalCount: 5, items: { item: itemsByPage[pageNo] || [] } },
+          },
+        }),
+      };
+    };
+    const client = createDataGoKrClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const result = await client.fetchAllPages({ baseUrl: "http://x", operation: "op", pageSize: 2 });
+    assert.deepStrictEqual(callsByPage, [1, 2, 3]);
+    assert.strictEqual(result.items.length, 5);
+    assert.strictEqual(result.totalCount, 5);
+    ok("pageSize=2, totalCount=5 -> 3페이지 순회해서 5건 전부 수집 (numOfRows:200 한 페이지만 받던 이전 버그 수정)");
   }
 
   console.log("9) giClient/nongsaroClient — baseUrl 없이 호출하면 에러");

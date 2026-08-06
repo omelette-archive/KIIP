@@ -62,7 +62,25 @@ function createClient({ apiKey, fetchImpl } = {}) {
     };
   }
 
-  return { callOperation };
+  /**
+   * totalCount까지 모든 페이지를 순회해서 items를 모아 반환한다. 목록형 데이터를 통째로
+   * 로컬 데이터셋으로 만드는 게 목적이라, 소스별 클라이언트는 기본적으로 이걸 쓴다.
+   * @param {{baseUrl:string, operation:string, params?:object, pageSize?:number, maxPages?:number}} p
+   * @returns {Promise<{totalCount:number, items:object[]}>}
+   */
+  async function fetchAllPages({ baseUrl, operation, params = {}, pageSize = 100, maxPages = 100 }) {
+    const first = await callOperation({ baseUrl, operation, params: { ...params, pageNo: 1, numOfRows: pageSize } });
+    const items = first.items.slice();
+    const totalPages = Math.min(maxPages, Math.max(1, Math.ceil(first.totalCount / pageSize)));
+    for (let pageNo = 2; pageNo <= totalPages; pageNo++) {
+      const page = await callOperation({ baseUrl, operation, params: { ...params, pageNo, numOfRows: pageSize } });
+      if (page.items.length === 0) break; // totalCount를 못 믿을 수도 있으니 빈 페이지 나오면 조기 종료
+      items.push(...page.items);
+    }
+    return { totalCount: first.totalCount, items };
+  }
+
+  return { callOperation, fetchAllPages };
 }
 
 module.exports = { createClient, buildQuery };
