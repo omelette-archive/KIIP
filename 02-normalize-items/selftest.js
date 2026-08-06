@@ -11,6 +11,7 @@ const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
 const { createClient, TOOL, MESSAGES_URL } = require("./lib/llmClient");
+const { normalizeRow } = require("./normalizeItems");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -182,6 +183,33 @@ async function run() {
     });
     assert.strictEqual(result.noticeName, null, "범위 밖 인덱스는 -1(고시명칭 없음)로 취급돼야 함");
     ok("범위를 벗어난 candidateIndex를 안전하게 -1로 처리");
+  }
+
+  console.log("9) normalizeRow — 행별 실패를 결과로 보존");
+  {
+    const row = {
+      sido: "경상북도",
+      sigungu: "안동시",
+      rawItemName: "안동사과",
+      source: "농사로",
+    };
+    const client = {
+      normalizeItem: async () => {
+        throw new Error("일시적 LLM 오류");
+      },
+    };
+    const result = await normalizeRow(row, {
+      dictionary: makeDictionary([
+        { item: "사과", niceClass: "31", similarGroupCode: "G0101" },
+      ]),
+      client,
+      topK: 5,
+    });
+    assert.strictEqual(result.status, "error");
+    assert.strictEqual(result.error, "일시적 LLM 오류");
+    assert.strictEqual(result.source, "농사로");
+    assert.strictEqual(result.rawItemName, "안동사과");
+    ok("한 행이 실패해도 원본·출처·오류가 결과 행에 남아 나머지 배치를 계속할 수 있음");
   }
 
   console.log("\n모든 자체 테스트 통과");

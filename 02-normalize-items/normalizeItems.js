@@ -87,7 +87,19 @@ function csvEscape(value) {
 }
 
 function writeOutputCsv(outPath, rows) {
-  const fields = ["sido", "sigungu", "rawItemName", "itemName", "noticeName", "niceClass", "similarGroupCode", "excluded"];
+  const fields = [
+    "sido",
+    "sigungu",
+    "rawItemName",
+    "source",
+    "itemName",
+    "noticeName",
+    "niceClass",
+    "similarGroupCode",
+    "excluded",
+    "status",
+    "error",
+  ];
   const lines = [fields.join(",")];
   for (const row of rows) {
     lines.push(fields.map((f) => csvEscape(row[f])).join(","));
@@ -112,6 +124,49 @@ async function runWithConcurrency(items, concurrency, worker) {
   return results;
 }
 
+async function normalizeRow(row, { dictionary, client, topK }) {
+  const base = {
+    sido: row.sido,
+    sigungu: row.sigungu,
+    rawItemName: row.rawItemName,
+    source: row.source || "",
+  };
+
+  try {
+    const candidates = findCandidates(
+      row.rawItemName,
+      dictionary,
+      { sido: row.sido, sigungu: row.sigungu },
+      { topK }
+    );
+    const normalized = await client.normalizeItem({
+      rawItemName: row.rawItemName,
+      candidates,
+    });
+    return {
+      ...base,
+      itemName: normalized.itemName,
+      noticeName: normalized.noticeName || "",
+      niceClass: normalized.niceClass || "",
+      similarGroupCode: normalized.similarGroupCode || "",
+      excluded: normalized.excluded,
+      status: "ok",
+      error: "",
+    };
+  } catch (err) {
+    return {
+      ...base,
+      itemName: "",
+      noticeName: "",
+      niceClass: "",
+      similarGroupCode: "",
+      excluded: "",
+      status: "error",
+      error: err instanceof Error ? err.message : String(err),
+    };
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h) printUsageAndExit();
@@ -121,6 +176,12 @@ async function main() {
   const outPath = path.resolve(args.out || path.join(__dirname, "output", "normalized.csv"));
   const concurrency = Number(args.concurrency);
   const topK = Number(args.topK);
+  if (!Number.isInteger(concurrency) || concurrency < 1) {
+    printUsageAndExit("--concurrency 는 1 이상의 정수여야 합니다.");
+  }
+  if (!Number.isInteger(topK) || topK < 1) {
+    printUsageAndExit("--topK 는 1 이상의 정수여야 합니다.");
+  }
 
   const apiKey = args.apiKey || process.env.ANTHROPIC_API_KEY;
   const client = createClient({ apiKey, model: args.model });
@@ -133,30 +194,34 @@ async function main() {
 
   let processed = 0;
   const results = await runWithConcurrency(rawRows, concurrency, async (row) => {
-    const candidates = findCandidates(row.rawItemName, dictionary, { sido: row.sido, sigungu: row.sigungu }, { topK });
-    const normalized = await client.normalizeItem({ rawItemName: row.rawItemName, candidates });
+    const result = await normalizeRow(row, { dictionary, client, topK });
     processed++;
     if (processed % 20 === 0) {
       console.error(`[normalizeItems] processed=${processed}/${rawRows.length}`);
     }
-    return {
-      sido: row.sido,
-      sigungu: row.sigungu,
-      rawItemName: row.rawItemName,
-      itemName: normalized.itemName,
-      noticeName: normalized.noticeName || "",
-      niceClass: normalized.niceClass || "",
-      similarGroupCode: normalized.similarGroupCode || "",
-      excluded: normalized.excluded,
-    };
+    return result;
   });
 
   writeOutputCsv(outPath, results);
-  const matched = results.filter((r) => r.noticeName).length;
-  console.error(`[normalizeItems] done. matched=${matched}/${results.length} -> ${outPath}`);
+  const succeeded = results.filter((r) => r.status === "ok");
+  const failed = results.length - succeeded.length;
+  const matched = succeeded.filter((r) => r.noticeName).length;
+  console.error(
+    `[normalizeItems] done. success=${succeeded.length}, failed=${failed}, matched=${matched}/${results.length} -> ${outPath}`
+  );
+  if (failed > 0) process.exitCode = 2;
 }
 
-main().catch((err) => {
-  console.error(`[normalizeItems] 실패: ${err.message}`);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error(`[normalizeItems] 실패: ${err.message}`);
+    process.exit(1);
+  });
+}
+
+module.exports = {
+  normalizeRow,
+  runWithConcurrency,
+  readInputCsv,
+  writeOutputCsv,
+};

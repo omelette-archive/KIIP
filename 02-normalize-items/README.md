@@ -56,6 +56,10 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
 
 입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]`.
 
+행별 LLM 오류는 전체 배치를 중단시키지 않고 출력의 `status=error`, `error=<메시지>`로
+보존한다. 하나라도 실패하면 부분 결과 CSV를 쓴 뒤 종료 코드 2를 반환하므로 재처리 대상을
+구분할 수 있다. ① 단계의 `source`도 출력까지 유지한다.
+
 ## 테스트
 
 실제 API 키 없이 파이프라인 전체(사전 CSV 파싱 → 후보 검색 → LLM 요청/응답 파싱)를
@@ -67,6 +71,7 @@ node 02-normalize-items/selftest.js
 
 ## 입력 → 출력
 
-`01-collect-specialties/`의 원시 목록 → `{ sido, sigungu, rawItemName, itemName(정제됨),
-noticeName(고시명칭|null), niceClass(|null), similarGroupCode(|null), excluded }[]`
+`01-collect-specialties/`의 원시 목록 → `{ sido, sigungu, rawItemName, source,
+itemName(정제됨), noticeName(고시명칭|null), niceClass(|null), similarGroupCode(|null),
+excluded, status, error }[]`
 (다음 단계 ③의 입력)
