@@ -36,7 +36,7 @@ node 03-match-trademarks/matchTrademarks.js \
 `--concurrency`(배치 기본 2), `--apiKey`(환경변수 대신 직접 전달).
 
 배치 모드는 `noticeName || itemName || rawItemName`을 검색어로, `niceClass`를 필터로 사용한다.
-② 단계의 `status=error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
+② 단계의 `status=review_required|error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
 `status=error`로 남긴다. 검색 오류가 하나라도 있으면 결과 JSON을 저장한 뒤 종료 코드 2를
 반환한다.
 

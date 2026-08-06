@@ -2,7 +2,10 @@
 /**
  * 원시 품목명(rawItemName)과 고시상품명칭 사전 사이의 후보를 문자 bigram Jaccard
  * 유사도로 뽑는다. 임베딩/외부 API 없이 순수 로컬 계산이라 API 키 없이도 동작·
- * 테스트 가능 — LLM은 이 후보 목록 중에서만 고르게 해서 환각을 막는 데 쓴다.
+ * 테스트 가능하다. 확정하지 못한 행은 이 후보 목록과 함께 별도 AI/사람 검토로 보낸다.
+ *
+ * 57,000건이 넘는 사전을 매번 전체 순회하지 않도록 bigram 역색인을 dictionary별로
+ * 한 번 만들고 WeakMap에 캐시한다.
  */
 
 const { bigrams } = require("./noticeDictionary");
@@ -45,6 +48,31 @@ function jaccard(setA, setB) {
   return union === 0 ? 0 : intersection / union;
 }
 
+const indexCache = new WeakMap();
+
+function getIndex(dictionary) {
+  let cached = indexCache.get(dictionary);
+  if (cached) return cached;
+
+  const invertedIndex = new Map();
+  const shortEntryIndices = [];
+  dictionary.forEach((entry, index) => {
+    if (entry.item.length === 1) shortEntryIndices.push(index);
+    for (const bigram of entry.bigrams) {
+      let bucket = invertedIndex.get(bigram);
+      if (!bucket) {
+        bucket = [];
+        invertedIndex.set(bigram, bucket);
+      }
+      bucket.push(index);
+    }
+  });
+
+  cached = { invertedIndex, shortEntryIndices };
+  indexCache.set(dictionary, cached);
+  return cached;
+}
+
 /**
  * @param {string} rawItemName
  * @param {ReturnType<typeof import("./noticeDictionary").loadDictionary>} dictionary
@@ -59,9 +87,23 @@ function findCandidates(rawItemName, dictionary, region = {}, options = {}) {
   if (!cleaned) cleaned = normalize(rawItemName);
 
   const queryBigrams = bigrams(cleaned);
+  const { invertedIndex, shortEntryIndices } = getIndex(dictionary);
+
+  let indicesToScore;
+  if (cleaned.length <= 1) {
+    indicesToScore = dictionary.keys();
+  } else {
+    const candidateIndices = new Set(shortEntryIndices);
+    for (const bigram of queryBigrams) {
+      const bucket = invertedIndex.get(bigram);
+      if (bucket) for (const index of bucket) candidateIndices.add(index);
+    }
+    indicesToScore = candidateIndices;
+  }
 
   const scored = [];
-  for (const entry of dictionary) {
+  for (const index of indicesToScore) {
+    const entry = dictionary[index];
     if (!includeServiceClass && isServiceClass(entry.niceClass)) continue;
     // substring 포함 관계(예: "하회탈" ⊃ "탈")는 bigram이 하나도 안 겹쳐도(1글자
     // 사전 항목 등) 유효한 신호이므로, bigram 점수가 0이어도 먼저 확인해서 살려둔다.

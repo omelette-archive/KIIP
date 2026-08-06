@@ -192,10 +192,14 @@ async function run() {
       /상위 단계/
     );
     assert.match(
+      makeBatchQuery({ status: "review_required", rawItemName: "안동하회탈" }).skipReason,
+      /상위 단계/
+    );
+    assert.match(
       makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
       /분석 제외/
     );
-    ok("② 출력의 고시명칭/NICE류를 사용하고 오류·제외 행은 건너뜀");
+    ok("② 출력의 고시명칭/NICE류를 사용하고 검토필요·오류·제외 행은 건너뜀");
   }
 
   console.log("8) buildSearchOutput — 키워드 전체와 현재 페이지 필터 건수 분리");

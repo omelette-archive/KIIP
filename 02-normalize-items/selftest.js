@@ -1,17 +1,21 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * 실제 API 키 없이 파이프라인(사전 CSV 파싱 -> 후보 검색 -> LLM 클라이언트 요청/응답
- * 파싱)을 검증하는 자체 테스트. fetch를 모킹해서 네트워크 없이 돌린다.
+ * 실제 API 키 없이 규칙 기반 정규화와 선택적 AI 검토 클라이언트를 검증한다.
  * 실행: node 02-normalize-items/selftest.js
  */
 
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
+const { spawnSync } = require("child_process");
 const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
 const { createClient, TOOL, MESSAGES_URL } = require("./lib/llmClient");
 const { normalizeRow } = require("./normalizeItems");
+const { cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -185,31 +189,90 @@ async function run() {
     ok("범위를 벗어난 candidateIndex를 안전하게 -1로 처리");
   }
 
-  console.log("9) normalizeRow — 행별 실패를 결과로 보존");
+  console.log("9) ruleNormalizer — 정확 매칭과 검토 대기열 분리");
   {
-    const row = {
-      sido: "경상북도",
-      sigungu: "안동시",
-      rawItemName: "안동사과",
-      source: "농사로",
-    };
-    const client = {
-      normalizeItem: async () => {
-        throw new Error("일시적 LLM 오류");
-      },
-    };
-    const result = await normalizeRow(row, {
-      dictionary: makeDictionary([
-        { item: "사과", niceClass: "31", similarGroupCode: "G0101" },
-      ]),
-      client,
-      topK: 5,
-    });
+    const dictionary = makeDictionary([
+      { item: "신선한 사과", niceClass: "31", similarGroupCode: "G0211" },
+      { item: "사과나무", niceClass: "31", similarGroupCode: "G0102" },
+      { item: "탈", niceClass: "28", similarGroupCode: "G0301" },
+    ]);
+    const region = { sido: "경상북도", sigungu: "안동시" };
+    assert.strictEqual(cleanItemName("안동사과, 부사", region), "사과");
+
+    const exact = normalizeByRules(
+      { ...region, rawItemName: "안동사과, 부사", source: "농사로" },
+      dictionary,
+      { topK: 5 }
+    );
+    assert.strictEqual(exact.status, "ok");
+    assert.strictEqual(exact.noticeName, "신선한 사과");
+    assert.strictEqual(exact.niceClass, "31");
+    assert.strictEqual(exact.matchMethod, "rule_fresh");
+    assert.strictEqual(exact.source, "농사로");
+
+    const excluded = normalizeByRules(
+      { ...region, rawItemName: "안동사과나무" },
+      dictionary,
+      { topK: 5 }
+    );
+    assert.strictEqual(excluded.status, "ok");
+    assert.strictEqual(excluded.excluded, true);
+    assert.strictEqual(excluded.matchMethod, "rule_excluded");
+
+    const unresolved = normalizeByRules(
+      { ...region, rawItemName: "안동하회탈" },
+      dictionary,
+      { topK: 5 }
+    );
+    assert.strictEqual(unresolved.status, "review_required");
+    assert.match(unresolved.reviewCandidates, /"item":"탈"/);
+    ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김");
+  }
+
+  console.log("10) normalizeRow — 규칙 처리 오류를 행별로 보존");
+  {
+    const result = normalizeRow(
+      { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", source: "농사로" },
+      { dictionary: null, topK: 5 }
+    );
     assert.strictEqual(result.status, "error");
-    assert.strictEqual(result.error, "일시적 LLM 오류");
+    assert.ok(result.error);
     assert.strictEqual(result.source, "농사로");
-    assert.strictEqual(result.rawItemName, "안동사과");
-    ok("한 행이 실패해도 원본·출처·오류가 결과 행에 남아 나머지 배치를 계속할 수 있음");
+    ok("규칙 처리 오류도 원본·출처와 함께 결과 행에 보존됨");
+  }
+
+  console.log("11) normalizeItems CLI — API 키 없이 결과와 검토 대기열 생성");
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-normalize-rules-"));
+    const inputPath = path.join(tempDir, "input.csv");
+    const outputPath = path.join(tempDir, "normalized.csv");
+    const reviewPath = path.join(tempDir, "review-required.csv");
+    try {
+      fs.writeFileSync(
+        inputPath,
+        "\ufeffsido,sigungu,rawItemName,source\n경상북도,안동시,\"안동사과, 부사\",test\n경상북도,안동시,안동하회탈,test\n",
+        "utf8"
+      );
+      const result = spawnSync(
+        process.execPath,
+        [
+          path.join(__dirname, "normalizeItems.js"),
+          "--input", inputPath,
+          "--out", outputPath,
+          "--review-out", reviewPath,
+        ],
+        { encoding: "utf8", env: { ...process.env, ANTHROPIC_API_KEY: "" } }
+      );
+      assert.strictEqual(result.status, 0, result.stderr);
+      const output = fs.readFileSync(outputPath, "utf8");
+      const review = fs.readFileSync(reviewPath, "utf8");
+      assert.match(output, /rule_fresh/);
+      assert.match(output, /review_required/);
+      assert.strictEqual(review.trim().split(/\r?\n/).length, 2, "검토 CSV에는 헤더와 미확정 1행만 있어야 함");
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    ok("Anthropic 키 없이 규칙 결과와 검토 전용 CSV를 분리 생성함");
   }
 
   console.log("\n모든 자체 테스트 통과");
