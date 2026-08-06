@@ -2,26 +2,22 @@
 "use strict";
 /**
  * 원시 특산품 목록(sido, sigungu, rawItemName[, source])을 받아, 사전 후보 검색
- * (candidateSearch) + LLM 정제(llmClient)를 거쳐 고시명칭/NICE류/유사군코드를 붙인
- * CSV를 출력한다.
+ * (candidateSearch) + 규칙 기반 매칭(ruleBasedMatch)을 거쳐 고시명칭/NICE류/유사군코드를
+ * 붙인 CSV를 출력한다. LLM을 호출하지 않는 결정론적 코드로만 동작한다 — 애매해서 자동
+ * 확정하지 못한 행은 noticeName이 빈 값으로 남고, 필요하면 별도로 reviewWithAi.js를 돌려
+ * AI에게 검토를 맡긴다.
  *
  * 사용법:
  *   node 02-normalize-items/normalizeItems.js --input path/to/raw.csv --out 02-normalize-items/output/result.csv
- *
- * 인증키: .env 의 ANTHROPIC_API_KEY, 또는 --apiKey 로 직접 전달.
  */
 
 const fs = require("fs");
 const path = require("path");
-const { loadEnv } = require("./lib/loadEnv");
 const { loadDictionary, parseCsvLine } = require("./lib/noticeDictionary");
-const { findCandidates } = require("./lib/candidateSearch");
-const { createClient } = require("./lib/llmClient");
-
-loadEnv();
+const { matchItem } = require("./lib/ruleBasedMatch");
 
 function parseArgs(argv) {
-  const args = { concurrency: 4, topK: 20 };
+  const args = { topK: 20 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
@@ -45,10 +41,9 @@ function printUsageAndExit(message) {
       "",
       "옵션:",
       "  --out <path>          결과 CSV 저장 경로 (기본: 02-normalize-items/output/normalized.csv)",
-      "  --concurrency <n>     동시 LLM 호출 수 (기본 4)",
       "  --topK <n>            후보 검색 개수 (기본 20)",
-      "  --model <id>          Anthropic 모델 ID (기본 claude-haiku-4-5)",
-      "  --apiKey <key>        ANTHROPIC_API_KEY 대신 직접 인증키 전달",
+      "",
+      "AI 검토가 필요하면 이 스크립트 실행 후 reviewWithAi.js를 별도로 실행한다.",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -96,87 +91,51 @@ function writeOutputCsv(outPath, rows) {
   fs.writeFileSync(outPath, "﻿" + lines.join("\n") + "\n", "utf8");
 }
 
-async function runWithConcurrency(items, concurrency, worker) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-
-  async function runOne() {
-    while (nextIndex < items.length) {
-      const current = nextIndex++;
-      results[current] = await worker(items[current], current);
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => runOne());
-  await Promise.all(workers);
-  return results;
-}
-
-async function main() {
+function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h) printUsageAndExit();
   if (!args.input) printUsageAndExit("--input 은 필수입니다.");
 
   const inputPath = path.resolve(args.input);
   const outPath = path.resolve(args.out || path.join(__dirname, "output", "normalized.csv"));
-  const concurrency = Number(args.concurrency);
   const topK = Number(args.topK);
 
-  const apiKey = args.apiKey || process.env.ANTHROPIC_API_KEY;
-  const client = createClient({ apiKey, model: args.model });
-
   const rawRows = readInputCsv(inputPath);
-  console.error(`[normalizeItems] input=${rawRows.length}행`, { flush: true });
+  console.error(`[normalizeItems] input=${rawRows.length}행`);
 
   const dictionary = loadDictionary();
   console.error(`[normalizeItems] 고시상품명칭 사전 ${dictionary.length.toLocaleString()}건 로드`);
 
-  // 같은 (지역, 원시 품목명) 조합이 여러 행에서 중복되면(다른 소스에서 같은 품목이
-  // 중복 수집되는 경우 등) 후보검색+LLM 호출을 매번 새로 하지 않고 결과를 재사용한다.
-  // 진행 중인 호출도 Promise로 캐싱해서 동시에 들어온 중복 요청이 API를 두 번 타지
-  // 않게 한다.
-  const normalizeCache = new Map();
-  let cacheHits = 0;
-  let processed = 0;
-
-  const results = await runWithConcurrency(rawRows, concurrency, async (row) => {
-    const cacheKey = `${row.sido}|${row.sigungu}|${row.rawItemName}`;
-    let normalizedPromise = normalizeCache.get(cacheKey);
-    if (normalizedPromise) {
-      cacheHits++;
-    } else {
-      normalizedPromise = (async () => {
-        const candidates = findCandidates(row.rawItemName, dictionary, { sido: row.sido, sigungu: row.sigungu }, { topK });
-        return client.normalizeItem({ rawItemName: row.rawItemName, candidates });
-      })();
-      normalizeCache.set(cacheKey, normalizedPromise);
-    }
-    const normalized = await normalizedPromise;
-
-    processed++;
-    if (processed % 20 === 0) {
-      console.error(`[normalizeItems] processed=${processed}/${rawRows.length}`);
-    }
+  const results = rawRows.map((row) => {
+    const matched = matchItem(row.rawItemName, dictionary, { sido: row.sido, sigungu: row.sigungu }, { topK });
     return {
       sido: row.sido,
       sigungu: row.sigungu,
       rawItemName: row.rawItemName,
-      itemName: normalized.itemName,
-      noticeName: normalized.noticeName || "",
-      niceClass: normalized.niceClass || "",
-      similarGroupCode: normalized.similarGroupCode || "",
-      excluded: normalized.excluded,
+      itemName: matched.itemName,
+      noticeName: matched.noticeName || "",
+      niceClass: matched.niceClass || "",
+      similarGroupCode: matched.similarGroupCode || "",
+      excluded: matched.excluded,
     };
   });
 
   writeOutputCsv(outPath, results);
   const matched = results.filter((r) => r.noticeName).length;
+  const unmatched = results.length - matched;
   console.error(
-    `[normalizeItems] done. matched=${matched}/${results.length} (캐시 재사용 ${cacheHits}건) -> ${outPath}`
+    `[normalizeItems] done. matched=${matched}/${results.length} (미확정 ${unmatched}건) -> ${outPath}`
   );
+  if (unmatched > 0) {
+    console.error(
+      `[normalizeItems] 미확정 ${unmatched}건은 필요 시 reviewWithAi.js로 AI 검토를 돌려 확인하세요.`
+    );
+  }
 }
 
-main().catch((err) => {
+try {
+  main();
+} catch (err) {
   console.error(`[normalizeItems] 실패: ${err.message}`);
   process.exit(1);
-});
+}

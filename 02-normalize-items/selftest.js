@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * 실제 API 키 없이 파이프라인(사전 CSV 파싱 -> 후보 검색 -> LLM 클라이언트 요청/응답
- * 파싱)을 검증하는 자체 테스트. fetch를 모킹해서 네트워크 없이 돌린다.
+ * 실제 API 키 없이 파이프라인을 검증하는 자체 테스트. 두 축으로 나뉜다:
+ * - normalizeItems.js가 쓰는 규칙 기반 매칭(ruleBasedMatch)은 네트워크 없이 동기 로직만
+ *   검증한다.
+ * - reviewWithAi.js가 쓰는 reviewClient는 fetch를 모킹해서 요청/응답 파싱만 검증한다
+ *   (llmClient.js 테스트와 동일한 패턴, 역할만 "결정"에서 "검토"로 바뀜).
  * 실행: node 02-normalize-items/selftest.js
  */
 
@@ -10,7 +13,8 @@ const assert = require("assert");
 const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
-const { createClient, TOOL, MESSAGES_URL } = require("./lib/llmClient");
+const { matchItem, EXCLUDE_KEYWORD_RE, JACCARD_ONLY_THRESHOLD } = require("./lib/ruleBasedMatch");
+const { createClient, TOOL, MESSAGES_URL } = require("./lib/reviewClient");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -80,18 +84,60 @@ async function run() {
     ok("NICE 35류 이상 판별 정상 동작 (zero-padding 값 포함)");
   }
 
-  console.log("5) llmClient.createClient — apiKey 없으면 즉시 throw");
+  console.log("5) ruleBasedMatch.matchItem — substring 매칭은 LLM 없이 결정론적으로 확정");
   {
-    assert.throws(() => createClient({}), /ANTHROPIC_API_KEY/);
-    ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (kiprisClient.js와 동일 패턴)");
-  }
-
-  console.log("6) llmClient.normalizeItem — 요청 구성(forced tool_choice + strict) 확인");
-  {
-    const candidates = [
+    const dictionary = makeDictionary([
       { item: "사과", niceClass: "31", similarGroupCode: "G0101" },
       { item: "사과나무", niceClass: "31", similarGroupCode: "G0102" },
-    ];
+    ]);
+    const result = matchItem("안동사과, 부사", dictionary, { sido: "경상북도", sigungu: "안동" }, {});
+    assert.strictEqual(result.noticeName, "사과", "지역명·품종 접미어를 제거하면 '사과'가 substring으로 확정돼야 함");
+    assert.strictEqual(result.niceClass, "31");
+    assert.strictEqual(result.itemName, "사과");
+    assert.strictEqual(result.excluded, false);
+    assert.strictEqual(typeof result.matchScore, "number");
+    ok("원문에 후보 품목명이 그대로 포함되면 AI 호출 없이 매칭 확정");
+  }
+
+  console.log("6) ruleBasedMatch.matchItem — 애매한 건 noticeName:null로 남겨 AI 검토 대상으로 넘김");
+  {
+    const dictionary = makeDictionary([{ item: "밀가루", niceClass: "30", similarGroupCode: "G0401" }]);
+    const result = matchItem("정체불명특산품, 참고사항", dictionary, {}, {});
+    assert.strictEqual(result.noticeName, null, "관련 없는 사전 항목만 있으면 자동 확정하면 안 됨");
+    assert.strictEqual(result.niceClass, null);
+    assert.strictEqual(result.itemName, "정체불명특산품", "매칭 실패해도 콤마 뒤 부가정보는 잘라 최소 정제");
+    assert.strictEqual(result.matchScore, null);
+    ok("확신 없는 매칭은 자동 확정하지 않고 콤마 기준 최소 정제만 수행");
+  }
+
+  console.log("7) ruleBasedMatch.matchItem — 재배용 파생 형태는 규칙으로 즉시 제외");
+  {
+    const dictionary = makeDictionary([{ item: "사과", niceClass: "31", similarGroupCode: "G0101" }]);
+    const treeResult = matchItem("안동사과나무", dictionary, { sido: "경상북도", sigungu: "안동" }, {});
+    assert.strictEqual(treeResult.excluded, true, "'나무'가 포함되면 매칭 성공 여부와 무관하게 제외돼야 함");
+    const seedlingResult = matchItem("고흥유자묘목", dictionary, { sido: "전라남도", sigungu: "고흥" }, {});
+    assert.strictEqual(seedlingResult.excluded, true);
+    assert.strictEqual(matchItem("안동사과", dictionary, { sido: "경상북도", sigungu: "안동" }, {}).excluded, false);
+    assert.ok(EXCLUDE_KEYWORD_RE.test("사과묘목"));
+    ok("묘목/나무 등 파생 형태 키워드가 있으면 excluded:true, 일반 품목은 false");
+  }
+
+  console.log("8) ruleBasedMatch — jaccard-only 임계값 상수 노출 확인");
+  {
+    assert.strictEqual(JACCARD_ONLY_THRESHOLD, 0.8);
+    ok("substring이 아닌 순수 유사도 매칭은 0.8 이상일 때만 자동 확정(오탐 방지)");
+  }
+
+  console.log("9) reviewClient.createClient — apiKey 없으면 즉시 throw");
+  {
+    assert.throws(() => createClient({}), /ANTHROPIC_API_KEY/);
+    ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (llmClient.js/kiprisClient.js와 동일 패턴)");
+  }
+
+  console.log("10) reviewClient.reviewItem — 요청 구성(forced tool_choice + strict) + ok 판정");
+  {
+    const row = { rawItemName: "안동사과, 부사", itemName: "사과", noticeName: "사과", niceClass: "31", excluded: false };
+    const candidates = [{ item: "사과", niceClass: "31", similarGroupCode: "G0101" }];
     let capturedUrl;
     let capturedBody;
     const fakeFetch = async (url, options) => {
@@ -105,34 +151,33 @@ async function run() {
             {
               type: "tool_use",
               id: "toolu_1",
-              name: "submit_normalization",
-              input: { itemName: "사과", candidateIndex: 0, excluded: false },
+              name: "submit_review",
+              input: { verdict: "ok", note: "", suggestedCandidateIndex: -1, suggestedExcluded: false },
             },
           ],
         }),
       };
     };
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({ rawItemName: "안동사과, 부사", candidates });
+    const result = await client.reviewItem(row, candidates);
 
     assert.strictEqual(capturedUrl, MESSAGES_URL);
     assert.strictEqual(capturedBody.model, "claude-haiku-4-5");
     assert.deepStrictEqual(capturedBody.tool_choice, { type: "tool", name: TOOL.name });
     assert.strictEqual(capturedBody.tools[0].strict, true);
     assert.strictEqual(capturedBody.tools[0].input_schema.additionalProperties, false);
-    assert.strictEqual(capturedBody.output_config, undefined, "Haiku 4.5는 effort를 지원하지 않으므로 output_config를 보내면 안 됨");
-    assert.strictEqual(capturedBody.thinking, undefined, "Haiku 4.5는 thinking 파라미터도 보내지 않음");
-
-    assert.strictEqual(result.itemName, "사과");
-    assert.strictEqual(result.noticeName, "사과");
-    assert.strictEqual(result.niceClass, "31");
-    assert.strictEqual(result.similarGroupCode, "G0101");
-    assert.strictEqual(result.excluded, false);
-    ok("forced tool_choice + strict 스키마로 요청 구성, candidateIndex로 후보를 정확히 매칭");
+    assert.strictEqual(result.verdict, "ok");
+    assert.strictEqual(result.suggestedNoticeName, null);
+    ok("이미 확정된 결과를 검토만 하는 요청 구성 정상 동작, ok 판정 정상 파싱");
   }
 
-  console.log("7) llmClient.normalizeItem — candidateIndex -1 (고시명칭 없음)");
+  console.log("11) reviewClient.reviewItem — flag 판정 시 대안 후보 제안");
   {
+    const row = { rawItemName: "정체불명특산품", itemName: "정체불명특산품", noticeName: "", niceClass: "", excluded: false };
+    const candidates = [
+      { item: "밀가루", niceClass: "30", similarGroupCode: "G0401" },
+      { item: "정체불명나물", niceClass: "31", similarGroupCode: "G0102" },
+    ];
     const fakeFetch = async () => ({
       ok: true,
       status: 200,
@@ -141,24 +186,21 @@ async function run() {
           {
             type: "tool_use",
             id: "toolu_2",
-            name: "submit_normalization",
-            input: { itemName: "희귀품목", candidateIndex: -1, excluded: false },
+            name: "submit_review",
+            input: { verdict: "flag", note: "후보 중 정체불명나물이 더 적절함", suggestedCandidateIndex: 1, suggestedExcluded: false },
           },
         ],
       }),
     });
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({
-      rawItemName: "희귀품목",
-      candidates: [{ item: "무관항목", niceClass: "01", similarGroupCode: "G0001" }],
-    });
-    assert.strictEqual(result.itemName, "희귀품목");
-    assert.strictEqual(result.noticeName, null);
-    assert.strictEqual(result.niceClass, null);
-    ok("후보 중 일치하는 게 없으면 noticeName/niceClass가 null (비고시명칭으로 단순화)");
+    const result = await client.reviewItem(row, candidates);
+    assert.strictEqual(result.verdict, "flag");
+    assert.strictEqual(result.suggestedNoticeName, "정체불명나물");
+    assert.strictEqual(result.suggestedNiceClass, "31");
+    ok("flag 판정 시 후보 목록에서 고른 대안이 결과에 반영됨");
   }
 
-  console.log("8) llmClient.normalizeItem — 모델이 범위 밖 인덱스를 보내도 방어적으로 -1 처리");
+  console.log("12) reviewClient.reviewItem — 모델이 범위 밖 인덱스를 보내도 방어적으로 처리");
   {
     const fakeFetch = async () => ({
       ok: true,
@@ -168,20 +210,19 @@ async function run() {
           {
             type: "tool_use",
             id: "toolu_3",
-            name: "submit_normalization",
-            // strict:true라도 방어적으로 검증 — candidates 길이(1)를 벗어난 인덱스
-            input: { itemName: "품목", candidateIndex: 5, excluded: false },
+            name: "submit_review",
+            input: { verdict: "flag", note: "이상한 응답", suggestedCandidateIndex: 5, suggestedExcluded: false },
           },
         ],
       }),
     });
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({
-      rawItemName: "품목",
-      candidates: [{ item: "후보1", niceClass: "01", similarGroupCode: "G0001" }],
-    });
-    assert.strictEqual(result.noticeName, null, "범위 밖 인덱스는 -1(고시명칭 없음)로 취급돼야 함");
-    ok("범위를 벗어난 candidateIndex를 안전하게 -1로 처리");
+    const result = await client.reviewItem(
+      { rawItemName: "품목", itemName: "품목", noticeName: "", niceClass: "", excluded: false },
+      [{ item: "후보1", niceClass: "01", similarGroupCode: "G0001" }]
+    );
+    assert.strictEqual(result.suggestedNoticeName, null, "범위 밖 인덱스는 제안 없음으로 취급돼야 함");
+    ok("범위를 벗어난 suggestedCandidateIndex를 안전하게 무시");
   }
 
   console.log("\n모든 자체 테스트 통과");
