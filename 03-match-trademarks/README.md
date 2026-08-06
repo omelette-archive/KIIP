@@ -30,13 +30,20 @@ node 03-match-trademarks/matchTrademarks.js --region "경기도 성남시 분당
 node 03-match-trademarks/matchTrademarks.js \
   --input 02-normalize-items/output/normalized.csv \
   --out 03-match-trademarks/output/result.json
+
+# 샘플 입력의 호출 계획만 검증(API 키·호출량 사용 없음)
+node 03-match-trademarks/matchTrademarks.js \
+  --input 02-normalize-items/output/sample-normalized.csv \
+  --dry-run \
+  --out 03-match-trademarks/output/sample-plan.json
 ```
 
 옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1),
 `--concurrency`(배치 기본 2), `--max-requests`(배치 1회 기본 100),
-`--apiKey`(환경변수 대신 직접 전달).
+`--dry-run`(배치 계약/호출 계획만 검증), `--apiKey`(환경변수 대신 직접 전달).
 
 배치 모드는 `noticeName || itemName || rawItemName`을 검색어로, `niceClass`를 필터로 사용한다.
+① 원시 CSV가 정규화를 건너뛰고 호출량을 쓰지 않도록 ② 출력 필드를 필수로 검증한다.
 ② 단계의 `status=review_required|error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
 `status=error`로 남긴다. 검색 오류가 하나라도 있으면 결과 JSON을 저장한 뒤 종료 코드 2를
 반환한다.

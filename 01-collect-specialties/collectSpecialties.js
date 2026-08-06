@@ -49,6 +49,7 @@ function printUsageAndExit(message) {
       "옵션:",
       "  --sources <목록>   콤마로 구분된 소스 목록 (기본 gi,nongsaro)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
+      "  --limit <n>        소스별 최대 수집 건수 (샘플 검증용)",
       "  --allow-empty      모든 소스가 실패해도 빈 CSV를 쓰고 성공 처리",
     ].join("\n")
   );
@@ -69,13 +70,13 @@ function writeOutputCsv(outPath, rows) {
   fs.writeFileSync(outPath, "﻿" + lines.join("\n") + "\n", "utf8");
 }
 
-async function collectGi(adminList, warnings) {
+async function collectGi(adminList, warnings, options = {}) {
   try {
     const client = createGiClient({
       apiKey: process.env.GI_API_KEY,
       baseUrl: process.env.GI_API_BASE_URL,
     });
-    const registrations = await client.listRegistrations({ numOfRows: 200 });
+    const registrations = await client.listRegistrations({ numOfRows: 200, limit: options.limit });
     const { rows, warnings: w } = fromGiRegistrations(registrations, adminList);
     warnings.push(...w);
     return { rows, succeeded: true };
@@ -85,13 +86,13 @@ async function collectGi(adminList, warnings) {
   }
 }
 
-async function collectNongsaro(adminList, warnings) {
+async function collectNongsaro(adminList, warnings, options = {}) {
   try {
     const client = createNongsaroClient({
       apiKey: process.env.NONGSARO_API_KEY,
       baseUrl: process.env.NONGSARO_API_BASE_URL,
     });
-    const specialties = await client.listSpecialties({ numOfRows: 200 });
+    const specialties = await client.listSpecialties({ numOfRows: 200, limit: options.limit });
     const { rows, warnings: w } = fromNongsaro(specialties, adminList);
     warnings.push(...w);
     return { rows, succeeded: true };
@@ -110,6 +111,10 @@ async function main() {
   const outPath = path.resolve(args.out || path.join(__dirname, "output", "specialties.csv"));
   const sources = String(args.sources).split(",").map((s) => s.trim()).filter(Boolean);
   const sourceRegistry = loadSourceRegistry();
+  const limit = args.limit === undefined ? undefined : Number(args.limit);
+  if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
+    printUsageAndExit("--limit 는 1 이상의 정수여야 합니다.");
+  }
 
   const adminList = loadAdminCodes();
   console.error(`[collectSpecialties] 법정동코드 마스터 ${adminList.length.toLocaleString()}건 로드`);
@@ -124,7 +129,7 @@ async function main() {
       warnings.push(`알 수 없는 소스: ${source}`);
       continue;
     }
-    const { rows: sourceRows, succeeded } = await collector(adminList, warnings);
+    const { rows: sourceRows, succeeded } = await collector(adminList, warnings, { limit });
     if (succeeded) succeededSources++;
     console.error(`[collectSpecialties] ${source} (${definition.name}) -> ${sourceRows.length}행`);
     rows = rows.concat(sourceRows);

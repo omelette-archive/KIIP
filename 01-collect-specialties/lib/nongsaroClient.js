@@ -1,35 +1,75 @@
 "use strict";
 /**
- * 농촌진흥청 지역특산물 OpenAPI(data.go.kr) 클라이언트 — 기획서의 "농사로 특산물 정보"에
- * 해당. 참고: https://www.data.go.kr/data/15101361/openapi.do (제목/지역/이미지/등록일 등
- * 지역특산물 정보 제공, 개발단계는 자동승인).
- *
- * ⚠️ giClient.js와 동일한 이유로 baseUrl/오퍼레이션명/응답 필드명은 활용신청 승인 후
- * 마이페이지에서 확인해야 확정된다. 임의로 지어낸 값을 기본값으로 넣지 않고, 호출 시
- * baseUrl을 넘기지 않으면 에러가 나도록 만들어뒀다.
+ * 농촌진흥청 농사로 지역특산물 OpenAPI 클라이언트.
+ * 공식 매뉴얼의 localSpcprd/localSpcprdLst 계약(apiKey + XML)을 따른다.
  */
 
-const { createClient: createDataGoKrClient } = require("./dataGoKrClient");
+const { fetchWithRetry } = require("./fetchWithRetry");
+const { parseNongsaroResponse } = require("./xmlLite");
 
-function createClient({ apiKey, baseUrl, operation = "getSpcltyMaterialsList", fetchImpl } = {}) {
-  const client = createDataGoKrClient({ apiKey, fetchImpl });
+const DEFAULT_BASE_URL = "https://api.nongsaro.go.kr/service/localSpcprd";
+
+function createClient({
+  apiKey,
+  baseUrl,
+  operation = "localSpcprdLst",
+  fetchImpl,
+} = {}) {
+  if (!apiKey) {
+    throw new Error("농사로 Open API 인증키(apiKey)가 필요합니다.");
+  }
+  const serviceBaseUrl = baseUrl || DEFAULT_BASE_URL;
 
   /**
-   * @param {{pageNo?:number, numOfRows?:number, baseUrl?:string}} [p]
+   * @param {{pageNo?:number, numOfRows?:number, limit?:number, sText?:string, sAreaNm?:string, sAreaCode?:string}} [p]
    * @returns {Promise<{title:string, region:string, registrationDate:string, raw:object}[]>}
    */
   async function listSpecialties(p = {}) {
-    const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result = await client.callAllPages({
-      baseUrl: effectiveBaseUrl,
-      operation,
-      pageNo: p.pageNo || 1,
-      numOfRows: p.numOfRows || 100,
-    });
-    return result.items.map((item) => ({
-      title: item.title || item.prdlstNm || item.name || "",
-      region: item.area || item.sigungu || item.region || "",
-      registrationDate: item.regDate || item.registrationDate || "",
+    let pageNo = Number(p.pageNo || 1);
+    const numOfRows = Number(p.numOfRows || 100);
+    const limit = p.limit === undefined ? null : Number(p.limit);
+    if (!Number.isInteger(pageNo) || pageNo < 1) throw new Error("pageNo는 1 이상의 정수여야 합니다.");
+    if (!Number.isInteger(numOfRows) || numOfRows < 1) throw new Error("numOfRows는 1 이상의 정수여야 합니다.");
+    if (limit !== null && (!Number.isInteger(limit) || limit < 1)) {
+      throw new Error("limit은 1 이상의 정수여야 합니다.");
+    }
+
+    const items = [];
+    let totalCount = 0;
+    while (true) {
+      const remaining = limit === null ? numOfRows : Math.min(numOfRows, limit - items.length);
+      const query = new URLSearchParams({
+        apiKey,
+        pageNo: String(pageNo),
+        numOfRows: String(remaining),
+      });
+      for (const key of ["sText", "sAreaNm", "sAreaCode"]) {
+        if (p[key]) query.set(key, String(p[key]));
+      }
+      const url = `${String(serviceBaseUrl).replace(/\/$/, "")}/${operation}?${query}`;
+      const response = await fetchWithRetry(url, {}, fetchImpl);
+      if (!response.ok) throw new Error(`nongsaro(${operation}): API 오류 (${response.status})`);
+      const parsed = parseNongsaroResponse(await response.text());
+      if (parsed.resultCode !== "00" && parsed.resultCode !== "0") {
+        throw new Error(
+          `nongsaro(${operation}): [${parsed.resultCode || "unknown"}] ${parsed.resultMsg || "알 수 없는 오류"}`
+        );
+      }
+      items.push(...parsed.items);
+      totalCount = Math.max(totalCount, parsed.totalCount);
+      if (
+        parsed.items.length === 0 ||
+        (limit !== null && items.length >= limit) ||
+        (totalCount > 0 && items.length >= totalCount) ||
+        (totalCount <= 0 && parsed.items.length < remaining)
+      ) break;
+      pageNo++;
+    }
+
+    return items.slice(0, limit || items.length).map((item) => ({
+      title: item.title,
+      region: item.region,
+      registrationDate: item.registrationDate,
       raw: item,
     }));
   }
@@ -37,4 +77,4 @@ function createClient({ apiKey, baseUrl, operation = "getSpcltyMaterialsList", f
   return { listSpecialties };
 }
 
-module.exports = { createClient };
+module.exports = { createClient, DEFAULT_BASE_URL };

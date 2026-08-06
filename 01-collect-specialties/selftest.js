@@ -16,7 +16,11 @@ const { splitRegion, fromGiRegistrations, fromNongsaro } = require("./lib/normal
 const { createClient: createDataGoKrClient } = require("./lib/dataGoKrClient");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createClient: createGiClient } = require("./lib/giClient");
-const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
+const {
+  createClient: createNongsaroClient,
+  DEFAULT_BASE_URL: NONGSARO_BASE_URL,
+} = require("./lib/nongsaroClient");
+const { parseNongsaroResponse } = require("./lib/xmlLite");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -178,13 +182,12 @@ async function run() {
     ok("resultCode 30(서비스 미승인 등) 응답은 에러로 던져짐");
   }
 
-  console.log("9) giClient/nongsaroClient — baseUrl 없이 호출하면 에러");
+  console.log("9) 소스별 필수 설정 검증");
   {
     const gi = createGiClient({ apiKey: "test-key" });
     await assert.rejects(() => gi.listRegistrations(), /baseUrl/);
-    const nongsaro = createNongsaroClient({ apiKey: "test-key" });
-    await assert.rejects(() => nongsaro.listSpecialties(), /baseUrl/);
-    ok("활용신청 승인 전(baseUrl 미확정) 상태에서는 명확한 에러로 실패함");
+    assert.throws(() => createNongsaroClient({}), /인증키/);
+    ok("지리적표시는 baseUrl, 농사로는 apiKey 누락 시 명확한 에러로 실패함");
   }
 
   console.log("9-1) dataGoKrClient.callAllPages — totalCount까지 페이지 순회");
@@ -235,6 +238,66 @@ async function run() {
     ok("응답 필드를 registeredName/region 등으로 정상 매핑, raw 원본도 보존");
   }
 
+  console.log("10-1) nongsaroClient — 공식 XML 계약 파싱 + 샘플 제한");
+  {
+    const requestedUrls = [];
+    const fakeFetch = async (url) => {
+      requestedUrls.push(url);
+      const pageNo = Number(new URL(url).searchParams.get("pageNo"));
+      const items = pageNo === 1
+        ? [
+            { areaCode: "4717000000", title: "안동사과", region: "경상북도 안동시", date: "2026-01-01" },
+            { areaCode: "4678000000", title: "보성녹차", region: "전라남도 보성군", date: "2026-01-02" },
+          ]
+        : [{ areaCode: "4889000000", title: "합천딸기", region: "경상남도 합천군", date: "2026-01-03" }];
+      const itemXml = items.map((item) => [
+        "<item>",
+        `<areaCode>${item.areaCode}</areaCode>`,
+        `<cntntsSj><![CDATA[${item.title}]]></cntntsSj>`,
+        `<areaNm>${item.region}</areaNm>`,
+        `<svcDt>${item.date}</svcDt>`,
+        "</item>",
+      ].join("")).join("");
+      return {
+        ok: true,
+        status: 200,
+        text: async () => [
+          "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+          "<response><header><resultCode>00</resultCode><resultMsg>OK</resultMsg></header>",
+          `<body><totalCount>3</totalCount><items>${itemXml}</items></body></response>`,
+        ].join(""),
+      };
+    };
+    const client = createNongsaroClient({ apiKey: "test-key", baseUrl: "", fetchImpl: fakeFetch });
+    const rows = await client.listSpecialties({ numOfRows: 2, limit: 3 });
+    assert.strictEqual(rows.length, 3);
+    assert.strictEqual(rows[0].title, "안동사과");
+    assert.strictEqual(rows[2].region, "경상남도 합천군");
+    assert.deepStrictEqual(requestedUrls.map((url) => Number(new URL(url).searchParams.get("pageNo"))), [1, 2]);
+    assert.ok(requestedUrls[0].startsWith(`${NONGSARO_BASE_URL}/localSpcprdLst?`));
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("apiKey"), "test-key");
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.has("serviceKey"), false);
+    ok("빈 환경변수에도 공식 URL을 사용하고 apiKey/XML 계약으로 2페이지, limit=3에서 중단함");
+  }
+
+  console.log("10-2) nongsaro XML — API 결과코드 오류 감지");
+  {
+    const parsed = parseNongsaroResponse(
+      "<response><header><resultCode>11</resultCode><resultMsg>인증키 오류</resultMsg></header></response>"
+    );
+    assert.strictEqual(parsed.resultCode, "11");
+    const client = createNongsaroClient({
+      apiKey: "bad-key",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => "<response><header><resultCode>11</resultCode><resultMsg>인증키 오류</resultMsg></header></response>",
+      }),
+    });
+    await assert.rejects(() => client.listSpecialties({ limit: 1 }), /\[11\] 인증키 오류/);
+    ok("HTTP 200이어도 농사로 resultCode가 00이 아니면 실패 처리됨");
+  }
+
   console.log("11) collectSpecialties CLI — 모든 소스 실패 시 non-zero 종료");
   {
     const outPath = path.join(os.tmpdir(), `specialties_empty_${Date.now()}.csv`);
@@ -271,7 +334,7 @@ async function run() {
     assert.strictEqual(gi.quota.type, "provider_policy");
     assert.ok(gi.catalogUrl.startsWith("https://www.data.go.kr/"));
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
-    assert.strictEqual(nongsaro.implementation.status, "xml_live_validation_required");
+    assert.strictEqual(nongsaro.implementation.status, "xml_sample_validated_live_key_required");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
   }
 

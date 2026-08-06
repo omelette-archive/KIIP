@@ -64,7 +64,7 @@ function createClient({ apiKey, fetchImpl } = {}) {
 
   /**
    * data.go.kr 목록형 API를 totalCount까지 페이지 순회해 모두 가져온다.
-   * @param {{baseUrl:string, operation:string, params?:object, pageNo?:number, numOfRows?:number}} p
+   * @param {{baseUrl:string, operation:string, params?:object, pageNo?:number, numOfRows?:number, maxItems?:number}} p
    */
   async function callAllPages({
     baseUrl,
@@ -72,6 +72,7 @@ function createClient({ apiKey, fetchImpl } = {}) {
     params = {},
     pageNo = 1,
     numOfRows = 100,
+    maxItems,
   }) {
     let currentPage = Number(pageNo);
     const pageSize = Number(numOfRows);
@@ -81,16 +82,21 @@ function createClient({ apiKey, fetchImpl } = {}) {
     if (!Number.isInteger(pageSize) || pageSize < 1) {
       throw new Error("callAllPages: numOfRows는 1 이상의 정수여야 합니다.");
     }
+    const itemLimit = maxItems === undefined ? null : Number(maxItems);
+    if (itemLimit !== null && (!Number.isInteger(itemLimit) || itemLimit < 1)) {
+      throw new Error("callAllPages: maxItems는 1 이상의 정수여야 합니다.");
+    }
 
     const items = [];
     let totalCount = 0;
     let resultMsg = "";
 
     while (true) {
+      const requestSize = itemLimit === null ? pageSize : Math.min(pageSize, itemLimit - items.length);
       const result = await callOperation({
         baseUrl,
         operation,
-        params: { ...params, pageNo: currentPage, numOfRows: pageSize },
+        params: { ...params, pageNo: currentPage, numOfRows: requestSize },
       });
       items.push(...result.items);
       totalCount = Math.max(totalCount, result.totalCount);
@@ -99,12 +105,18 @@ function createClient({ apiKey, fetchImpl } = {}) {
       // 서버가 요청한 numOfRows보다 작은 자체 상한을 적용할 수 있으므로 페이지 번호가
       // 아니라 실제 누적 건수로 완료 여부를 판단한다.
       const reachedReportedTotal = totalCount > 0 && items.length >= totalCount;
-      const reachedUnreportedEnd = totalCount <= 0 && result.items.length < pageSize;
-      if (result.items.length === 0 || reachedReportedTotal || reachedUnreportedEnd) break;
+      const reachedUnreportedEnd = totalCount <= 0 && result.items.length < requestSize;
+      const reachedLimit = itemLimit !== null && items.length >= itemLimit;
+      if (result.items.length === 0 || reachedReportedTotal || reachedUnreportedEnd || reachedLimit) break;
       currentPage++;
     }
 
-    return { resultCode: "00", resultMsg, totalCount, items };
+    return {
+      resultCode: "00",
+      resultMsg,
+      totalCount,
+      items: itemLimit === null ? items : items.slice(0, itemLimit),
+    };
   }
 
   return { callOperation, callAllPages };

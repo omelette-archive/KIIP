@@ -150,7 +150,7 @@ async function main() {
   }
 
   const rawRows = readInputCsv(inputPath);
-  console.error(`[normalizeItems] input=${rawRows.length}행`, { flush: true });
+  console.error(`[normalizeItems] input=${rawRows.length}행`);
 
   const dictionary = loadDictionary();
   console.error(`[normalizeItems] 고시상품명칭 사전 ${dictionary.length.toLocaleString()}건 로드`);

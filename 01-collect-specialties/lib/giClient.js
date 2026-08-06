@@ -19,7 +19,7 @@ function createClient({ apiKey, baseUrl, operation = "getGeoIndiCertInfoList", f
   const client = createDataGoKrClient({ apiKey, fetchImpl });
 
   /**
-   * @param {{pageNo?:number, numOfRows?:number, baseUrl?:string}} [p]
+   * @param {{pageNo?:number, numOfRows?:number, limit?:number, baseUrl?:string}} [p]
    * @returns {Promise<{registrationNumber:string, registeredName:string, region:string, registrationDate:string, raw:object}[]>}
    */
   async function listRegistrations(p = {}) {
@@ -29,6 +29,7 @@ function createClient({ apiKey, baseUrl, operation = "getGeoIndiCertInfoList", f
       operation,
       pageNo: p.pageNo || 1,
       numOfRows: p.numOfRows || 100,
+      maxItems: p.limit,
     });
     // 필드명은 활용가이드 확인 전까지 추정치라 여러 후보를 시도하고, raw로 원본도 함께 남긴다.
     return result.items.map((item) => ({

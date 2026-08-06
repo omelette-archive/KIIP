@@ -1,8 +1,9 @@
 # ① 지역 특산품 데이터 자동 구축
 
 **상태**: 🟡 진행중 — 법정동코드 마스터와 소스 레지스트리/데이터 계약 구현 완료. 지리적표시는
-클라이언트 모킹 테스트까지 통과했고 실키 대기 중이다. 농사로는 공식 응답 포맷이 XML로 확인돼
-실키 기반 XML 어댑터 검증이 필요하다. 지자체 홈페이지/뉴스 기사 수집은 이번 범위 밖.
+클라이언트 모킹 테스트까지 통과했고 실키 대기 중이다. 농사로는 공식 매뉴얼의
+`localSpcprd/localSpcprdLst` XML 계약으로 샘플 검증을 마쳤고 실키 스모크 테스트가 필요하다.
+지자체 홈페이지/뉴스 기사 수집은 이번 범위 밖.
 
 전국 17개 광역 및 226개 기초지자체를 대상으로 특산품 목록을 자동 수집한다.
 전체 기획은 [`docs/project-plan.md`](../docs/project-plan.md)의 ① 참고.
@@ -13,7 +14,7 @@
 |---|---|---|
 | 법정동코드(시군구 마스터 목록) | 무료, 인증 불필요 — data.go.kr 파일 다운로드 | ✅ 구현+검증 완료 |
 | 지리적표시 등록정보(국립농산물품질관리원) | data.go.kr 활용신청 필요 | 🟡 클라이언트 구현, 실키 대기 |
-| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | 🟡 XML 어댑터 실키 검증 필요 |
+| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | 🟡 공식 XML 계약 샘플 검증, 실키 검증 필요 |
 | 지자체 홈페이지 / 뉴스 기사 | 226개 사이트마다 제각각 / 별도 인프라 필요 | ⚪ 범위 밖 |
 
 CSV 직접 다운로드가 가능해 보였던 지리적표시관리정보(data.mafra.go.kr)는 실제로 다운로드를
@@ -44,12 +45,15 @@ CSV 직접 다운로드가 가능해 보였던 지리적표시관리정보(data.
 
 ```bash
 cp .env.example .env
-# .env 에 GI_API_KEY/GI_API_BASE_URL, NONGSARO_API_KEY/NONGSARO_API_BASE_URL 입력
-# (data.go.kr 활용신청 승인 후 마이페이지에서 정확한 baseUrl 확인 필요)
+# .env 에 GI_API_KEY/GI_API_BASE_URL, NONGSARO_API_KEY 입력
+# 농사로 base URL은 공식값이 기본이며 NONGSARO_API_BASE_URL은 테스트/변경 대응 때만 사용
 
 node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro \
+  --limit 10 \
   --out 01-collect-specialties/output/specialties.csv
 ```
+
+`--limit`은 소스별 최대 건수를 제한한다. 샘플 검증에서는 반드시 작은 값으로 지정한다.
 
 각 목록 API는 `totalCount`까지 자동으로 페이지를 순회한다. 키가 없는 소스는 경고를 남기고
 건너뛰되, 선택한 소스가 모두 실패하면 빈 수집 결과를 성공으로 오인하지 않도록 종료 코드 1로

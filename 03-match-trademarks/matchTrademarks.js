@@ -46,6 +46,7 @@ function printUsageAndExit(message) {
       "  --pageNo <n>         페이지 번호 (기본 1)",
       "  --concurrency <n>    배치 모드 동시 요청 수 (기본 2)",
       "  --max-requests <n>   배치 1회 검색 요청 상한 (기본 100)",
+      "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --out <path>         결과를 JSON 파일로 저장",
       "  --apiKey <key>       KIPRIS_API_KEY 대신 직접 인증키 전달",
     ].join("\n")
@@ -90,7 +91,16 @@ function readNormalizedCsv(inputPath) {
   if (lines.length === 0) return [];
 
   const header = parseCsvLine(lines[0]);
-  const required = ["sido", "sigungu", "rawItemName"];
+  const required = [
+    "sido",
+    "sigungu",
+    "rawItemName",
+    "itemName",
+    "noticeName",
+    "niceClass",
+    "excluded",
+    "status",
+  ];
   for (const field of required) {
     if (!header.includes(field)) {
       throw new Error(`정규화 CSV에 ${required.join("/")} 컬럼이 필요합니다: ${header.join(",")}`);
@@ -124,6 +134,16 @@ function makeBatchQuery(row) {
 
 function countSearchableRows(rows) {
   return rows.reduce((count, row) => count + (makeBatchQuery(row).skipReason ? 0 : 1), 0);
+}
+
+function buildBatchPlan(rows) {
+  return rows.map((row, inputIndex) => {
+    const query = makeBatchQuery(row);
+    if (query.skipReason) {
+      return { status: "skipped", inputIndex, reason: query.skipReason, input: row };
+    }
+    return { status: "planned", inputIndex, query };
+  });
 }
 
 function buildSearchOutput(query, result, hits, { pageNo, numOfRows }) {
@@ -240,10 +260,12 @@ async function main() {
   if (args.input && (args.region || args.item)) {
     printUsageAndExit("--input 과 --region/--item 은 함께 사용할 수 없습니다.");
   }
+  if (args["dry-run"] && !args.input) {
+    printUsageAndExit("--dry-run 은 --input 배치 모드에서만 사용할 수 있습니다.");
+  }
 
   const numeric = validateNumericArgs(args);
   const apiKey = args.apiKey || process.env.KIPRIS_API_KEY;
-  const client = createClient({ apiKey });
 
   if (args.input) {
     const inputPath = path.resolve(args.input);
@@ -255,6 +277,24 @@ async function main() {
         "무료 KIPRISPlus 월간 호출량을 확인한 뒤 --max-requests를 명시적으로 조정하세요."
       );
     }
+    if (args["dry-run"]) {
+      const results = buildBatchPlan(rows);
+      const output = {
+        mode: "batch-dry-run",
+        inputFile: inputPath,
+        inputCount: rows.length,
+        plannedRequestCount: plannedRequests,
+        skippedCount: results.filter((row) => row.status === "skipped").length,
+        completedAt: new Date().toISOString(),
+        results,
+      };
+      const outPath = writeJson(output, args.out);
+      console.error(
+        `[matchTrademarks] dry-run. requests=${plannedRequests}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
+      );
+      return;
+    }
+    const client = createClient({ apiKey });
     console.error(`[matchTrademarks] batch input=${rows.length}행, requests=${plannedRequests}/${numeric.maxRequests}`);
     const results = await runBatch(rows, client, numeric);
     const output = {
@@ -283,6 +323,7 @@ async function main() {
   console.error(
     `[matchTrademarks] item="${query.item}" region="${query.region}" (지역은 아직 미검증 태그만 부여)`
   );
+  const client = createClient({ apiKey });
   const output = await searchOne(client, query, numeric);
   const outPath = writeJson(output, args.out);
   console.error(
@@ -303,6 +344,7 @@ module.exports = {
   readNormalizedCsv,
   makeBatchQuery,
   countSearchableRows,
+  buildBatchPlan,
   buildSearchOutput,
   searchOne,
   runBatch,

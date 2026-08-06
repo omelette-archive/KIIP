@@ -6,14 +6,19 @@
  */
 
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
 const { filterByClassCode } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const {
   parseCsvLine,
+  readNormalizedCsv,
   makeBatchQuery,
   countSearchableRows,
+  buildBatchPlan,
   buildSearchOutput,
   runBatch,
 } = require("./matchTrademarks");
@@ -257,6 +262,39 @@ async function run() {
     assert.deepStrictEqual(results.map((row) => row.status), ["ok", "skipped", "skipped"]);
     assert.strictEqual(results[0].page.filteredCount, 1);
     ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함");
+  }
+
+  console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-trademark-contract-"));
+    const rawInputPath = path.join(tempDir, "stage1.csv");
+    const normalizedInputPath = path.join(tempDir, "stage2.csv");
+    try {
+      fs.writeFileSync(
+        rawInputPath,
+        "sido,sigungu,rawItemName\n경상북도,안동시,안동사과\n",
+        "utf8"
+      );
+      assert.throws(() => readNormalizedCsv(rawInputPath), /itemName.*status/);
+
+      fs.writeFileSync(
+        normalizedInputPath,
+        [
+          "sido,sigungu,rawItemName,itemName,noticeName,niceClass,excluded,status",
+          "경상북도,안동시,안동사과,사과,신선한 사과,31,false,ok",
+          "경상북도,안동시,안동하회탈,하회탈,,,false,review_required",
+        ].join("\n") + "\n",
+        "utf8"
+      );
+      const rows = readNormalizedCsv(normalizedInputPath);
+      const plan = buildBatchPlan(rows);
+      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "skipped"]);
+      assert.strictEqual(plan[0].query.item, "신선한 사과");
+      assert.match(plan[1].reason, /review_required/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
   }
 
   console.log("\n모든 자체 테스트 통과");

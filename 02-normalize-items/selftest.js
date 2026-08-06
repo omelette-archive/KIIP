@@ -264,6 +264,7 @@ async function run() {
         { encoding: "utf8", env: { ...process.env, ANTHROPIC_API_KEY: "" } }
       );
       assert.strictEqual(result.status, 0, result.stderr);
+      assert.doesNotMatch(result.stderr, /flush/, "Node 로그에 Python식 flush 옵션이 출력되면 안 됨");
       const output = fs.readFileSync(outputPath, "utf8");
       const review = fs.readFileSync(reviewPath, "utf8");
       assert.match(output, /rule_fresh/);

@@ -59,6 +59,7 @@
         "required": true,
         "keyEnv": "NONGSARO_API_KEY",
         "baseUrlEnv": "NONGSARO_API_BASE_URL",
+        "defaultBaseUrl": "https://api.nongsaro.go.kr/service/localSpcprd",
         "approval": "development_auto_production_review"
       },
       "quota": {
@@ -67,7 +68,7 @@
         "verification": "승인 후 제공기관 마이페이지의 계정별 트래픽 확인 필요"
       },
       "implementation": {
-        "status": "xml_live_validation_required",
+        "status": "xml_sample_validated_live_key_required",
         "adapter": "lib/nongsaroClient.js"
       }
     }
