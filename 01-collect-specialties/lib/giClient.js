@@ -24,10 +24,11 @@ function createClient({ apiKey, baseUrl, operation = "getGeoIndiCertInfoList", f
    */
   async function listRegistrations(p = {}) {
     const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result = await client.callOperation({
+    const result = await client.callAllPages({
       baseUrl: effectiveBaseUrl,
       operation,
-      params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
+      pageNo: p.pageNo || 1,
+      numOfRows: p.numOfRows || 100,
     });
     // 필드명은 활용가이드 확인 전까지 추정치라 여러 후보를 시도하고, raw로 원본도 함께 남긴다.
     return result.items.map((item) => ({

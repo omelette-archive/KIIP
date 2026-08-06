@@ -49,7 +49,9 @@ node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro \
   --out 01-collect-specialties/output/specialties.csv
 ```
 
-키가 없는 소스는 에러로 전체를 죽이지 않고, 경고만 남기고 건너뛴다.
+각 목록 API는 `totalCount`까지 자동으로 페이지를 순회한다. 키가 없는 소스는 경고를 남기고
+건너뛰되, 선택한 소스가 모두 실패하면 빈 수집 결과를 성공으로 오인하지 않도록 종료 코드 1로
+끝난다. 빈 CSV가 의도된 경우에만 `--allow-empty`를 명시한다.
 
 ## 테스트
 

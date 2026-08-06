@@ -48,6 +48,7 @@ function printUsageAndExit(message) {
       "옵션:",
       "  --sources <목록>   콤마로 구분된 소스 목록 (기본 gi,nongsaro)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
+      "  --allow-empty      모든 소스가 실패해도 빈 CSV를 쓰고 성공 처리",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -76,10 +77,10 @@ async function collectGi(adminList, warnings) {
     const registrations = await client.listRegistrations({ numOfRows: 200 });
     const { rows, warnings: w } = fromGiRegistrations(registrations, adminList);
     warnings.push(...w);
-    return rows;
+    return { rows, succeeded: true };
   } catch (err) {
     warnings.push(`gi 소스 건너뜀: ${err.message}`);
-    return [];
+    return { rows: [], succeeded: false };
   }
 }
 
@@ -92,10 +93,10 @@ async function collectNongsaro(adminList, warnings) {
     const specialties = await client.listSpecialties({ numOfRows: 200 });
     const { rows, warnings: w } = fromNongsaro(specialties, adminList);
     warnings.push(...w);
-    return rows;
+    return { rows, succeeded: true };
   } catch (err) {
     warnings.push(`nongsaro 소스 건너뜀: ${err.message}`);
-    return [];
+    return { rows: [], succeeded: false };
   }
 }
 
@@ -113,15 +114,24 @@ async function main() {
 
   const warnings = [];
   let rows = [];
+  let succeededSources = 0;
   for (const source of sources) {
     const collector = COLLECTORS[source];
     if (!collector) {
       warnings.push(`알 수 없는 소스: ${source}`);
       continue;
     }
-    const sourceRows = await collector(adminList, warnings);
+    const { rows: sourceRows, succeeded } = await collector(adminList, warnings);
+    if (succeeded) succeededSources++;
     console.error(`[collectSpecialties] ${source} -> ${sourceRows.length}행`);
     rows = rows.concat(sourceRows);
+  }
+
+  if (succeededSources === 0 && !args["allow-empty"]) {
+    const details = warnings.length ? ` 원인: ${warnings.slice(0, 5).join("; ")}` : "";
+    throw new Error(
+      `선택한 수집 소스가 모두 실패했습니다. 빈 결과를 의도했다면 --allow-empty를 사용하세요.${details}`
+    );
   }
 
   writeOutputCsv(outPath, rows);

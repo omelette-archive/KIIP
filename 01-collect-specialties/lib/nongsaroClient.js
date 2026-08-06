@@ -20,10 +20,11 @@ function createClient({ apiKey, baseUrl, operation = "getSpcltyMaterialsList", f
    */
   async function listSpecialties(p = {}) {
     const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result = await client.callOperation({
+    const result = await client.callAllPages({
       baseUrl: effectiveBaseUrl,
       operation,
-      params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
+      pageNo: p.pageNo || 1,
+      numOfRows: p.numOfRows || 100,
     });
     return result.items.map((item) => ({
       title: item.title || item.prdlstNm || item.name || "",

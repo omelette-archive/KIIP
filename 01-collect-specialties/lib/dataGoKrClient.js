@@ -62,7 +62,52 @@ function createClient({ apiKey, fetchImpl } = {}) {
     };
   }
 
-  return { callOperation };
+  /**
+   * data.go.kr 목록형 API를 totalCount까지 페이지 순회해 모두 가져온다.
+   * @param {{baseUrl:string, operation:string, params?:object, pageNo?:number, numOfRows?:number}} p
+   */
+  async function callAllPages({
+    baseUrl,
+    operation,
+    params = {},
+    pageNo = 1,
+    numOfRows = 100,
+  }) {
+    let currentPage = Number(pageNo);
+    const pageSize = Number(numOfRows);
+    if (!Number.isInteger(currentPage) || currentPage < 1) {
+      throw new Error("callAllPages: pageNo는 1 이상의 정수여야 합니다.");
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1) {
+      throw new Error("callAllPages: numOfRows는 1 이상의 정수여야 합니다.");
+    }
+
+    const items = [];
+    let totalCount = 0;
+    let resultMsg = "";
+
+    while (true) {
+      const result = await callOperation({
+        baseUrl,
+        operation,
+        params: { ...params, pageNo: currentPage, numOfRows: pageSize },
+      });
+      items.push(...result.items);
+      totalCount = Math.max(totalCount, result.totalCount);
+      resultMsg = result.resultMsg;
+
+      // 서버가 요청한 numOfRows보다 작은 자체 상한을 적용할 수 있으므로 페이지 번호가
+      // 아니라 실제 누적 건수로 완료 여부를 판단한다.
+      const reachedReportedTotal = totalCount > 0 && items.length >= totalCount;
+      const reachedUnreportedEnd = totalCount <= 0 && result.items.length < pageSize;
+      if (result.items.length === 0 || reachedReportedTotal || reachedUnreportedEnd) break;
+      currentPage++;
+    }
+
+    return { resultCode: "00", resultMsg, totalCount, items };
+  }
+
+  return { callOperation, callAllPages };
 }
 
 module.exports = { createClient, buildQuery };

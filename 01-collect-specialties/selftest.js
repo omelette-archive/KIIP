@@ -10,6 +10,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { parseCsvLine, loadAdminCodes } = require("./lib/adminCodes");
 const { splitRegion, fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { createClient: createDataGoKrClient } = require("./lib/dataGoKrClient");
@@ -69,6 +70,24 @@ async function run() {
     assert.strictEqual(splitRegion("존재하지않는지역", adminList).matched, false);
     assert.strictEqual(splitRegion("", adminList).matched, false);
     ok("시도 접두어 유무와 무관하게 시군구명으로 매칭, 못 찾으면 matched:false");
+  }
+
+  console.log("3-1) normalize.splitRegion — 중복 시군구는 시도까지 검증");
+  {
+    const duplicateAdminList = [
+      { code: "1114000000", sido: "서울특별시", sigungu: "중구" },
+      { code: "2611000000", sido: "부산광역시", sigungu: "중구" },
+      { code: "1150000000", sido: "서울특별시", sigungu: "강서구" },
+      { code: "2644000000", sido: "부산광역시", sigungu: "강서구" },
+    ];
+    assert.deepStrictEqual(splitRegion("부산광역시 중구", duplicateAdminList), {
+      sido: "부산광역시", sigungu: "중구", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("부산광역시 강서구", duplicateAdminList), {
+      sido: "부산광역시", sigungu: "강서구", matched: true,
+    });
+    assert.strictEqual(splitRegion("중구", duplicateAdminList).matched, false);
+    ok("시도가 있으면 정확한 후보를 고르고, 시도 없는 중복 시군구는 미검증 처리됨");
   }
 
   console.log("4) normalize.fromGiRegistrations / fromNongsaro");
@@ -167,6 +186,35 @@ async function run() {
     ok("활용신청 승인 전(baseUrl 미확정) 상태에서는 명확한 에러로 실패함");
   }
 
+  console.log("9-1) dataGoKrClient.callAllPages — totalCount까지 페이지 순회");
+  {
+    const requestedPages = [];
+    const fakeFetch = async (url) => {
+      const pageNo = Number(new URL(url).searchParams.get("pageNo"));
+      requestedPages.push(pageNo);
+      const items = pageNo === 1 ? [{ a: 1 }, { a: 2 }] : [{ a: 3 }];
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          response: {
+            header: { resultCode: "00", resultMsg: "OK" },
+            body: { totalCount: 3, items: { item: items } },
+          },
+        }),
+      };
+    };
+    const client = createDataGoKrClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const result = await client.callAllPages({
+      baseUrl: "http://x",
+      operation: "op",
+      numOfRows: 2,
+    });
+    assert.deepStrictEqual(requestedPages, [1, 2]);
+    assert.deepStrictEqual(result.items, [{ a: 1 }, { a: 2 }, { a: 3 }]);
+    ok("한 페이지를 초과하는 목록도 totalCount까지 모두 수집됨");
+  }
+
   console.log("10) giClient — baseUrl 지정 시 정상 매핑");
   {
     const fakeFetch = async () => ({
@@ -184,6 +232,33 @@ async function run() {
     assert.strictEqual(rows[0].registeredName, "보성녹차");
     assert.strictEqual(rows[0].region, "전라남도 보성군");
     ok("응답 필드를 registeredName/region 등으로 정상 매핑, raw 원본도 보존");
+  }
+
+  console.log("11) collectSpecialties CLI — 모든 소스 실패 시 non-zero 종료");
+  {
+    const outPath = path.join(os.tmpdir(), `specialties_empty_${Date.now()}.csv`);
+    const scriptPath = path.join(__dirname, "collectSpecialties.js");
+    const result = spawnSync(
+      process.execPath,
+      [scriptPath, "--sources", "unknown", "--out", outPath],
+      { encoding: "utf8" }
+    );
+    assert.strictEqual(result.status, 1);
+    assert.match(result.stderr, /모두 실패/);
+    assert.strictEqual(fs.existsSync(outPath), false);
+
+    const allowed = spawnSync(
+      process.execPath,
+      [scriptPath, "--sources", "unknown", "--allow-empty", "--out", outPath],
+      { encoding: "utf8" }
+    );
+    try {
+      assert.strictEqual(allowed.status, 0);
+      assert.match(fs.readFileSync(outPath, "utf8"), /sido,sigungu,rawItemName,source,collectedAt/);
+    } finally {
+      if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+    }
+    ok("기본은 종료 코드 1, --allow-empty를 명시한 경우에만 빈 CSV를 허용함");
   }
 
   console.log("\n모든 자체 테스트 통과");
