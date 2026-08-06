@@ -10,6 +10,12 @@ const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
 const { filterByClassCode } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
+const {
+  parseCsvLine,
+  makeBatchQuery,
+  buildSearchOutput,
+  runBatch,
+} = require("./matchTrademarks");
 
 const SAMPLE_OK_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <response>
@@ -162,6 +168,82 @@ async function run() {
     assert.strictEqual(attempts, 3);
     assert.strictEqual(result.hits.length, 2);
     ok("503 두 번 -> 세 번째 시도에서 성공 (지수 백오프 재시도 확인)");
+  }
+
+  console.log("7) 배치 CSV 행 -> 검색 쿼리 변환");
+  {
+    assert.deepStrictEqual(parseCsvLine('안동시,"안동사과, 부사",31'), [
+      "안동시", "안동사과, 부사", "31",
+    ]);
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동사과",
+        itemName: "사과",
+        noticeName: "사과",
+        niceClass: "31",
+        status: "ok",
+      }),
+      { region: "경상북도 안동시", item: "사과", classCode: "31" }
+    );
+    assert.match(
+      makeBatchQuery({ status: "error", rawItemName: "실패품목" }).skipReason,
+      /상위 단계/
+    );
+    assert.match(
+      makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
+      /분석 제외/
+    );
+    ok("② 출력의 고시명칭/NICE류를 사용하고 오류·제외 행은 건너뜀");
+  }
+
+  console.log("8) buildSearchOutput — 키워드 전체와 현재 페이지 필터 건수 분리");
+  {
+    const result = { totalCount: 10000, hits: [{ classificationCode: "31" }, { classificationCode: "30" }] };
+    const hits = filterByClassCode(result.hits, "31");
+    const output = buildSearchOutput(
+      { region: "경상북도 안동시", item: "사과", classCode: "31" },
+      result,
+      hits,
+      { pageNo: 1, numOfRows: 20 }
+    );
+    assert.strictEqual(output.keywordTotalCount, 10000);
+    assert.strictEqual(output.page.unfilteredCount, 2);
+    assert.strictEqual(output.page.filteredCount, 1);
+    assert.strictEqual(output.page.hasMore, true);
+    assert.strictEqual(output.totalCount, undefined);
+    assert.strictEqual(output.returnedCount, undefined);
+    ok("서로 다른 모집단의 카운트를 이름과 페이지 메타데이터로 명확히 구분함");
+  }
+
+  console.log("9) runBatch — 행별 성공/오류/건너뜀 보존");
+  {
+    let calls = 0;
+    const client = {
+      trademarkSearch: async () => {
+        calls++;
+        return {
+          resultCode: "00",
+          resultMsg: "OK",
+          totalCount: 1,
+          hits: [{ title: "사과상표", classificationCode: "31" }],
+        };
+      },
+    };
+    const results = await runBatch(
+      [
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok" },
+        { rawItemName: "실패품목", status: "error" },
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과나무", excluded: "true", status: "ok" },
+      ],
+      client,
+      { pageNo: 1, numOfRows: 20, concurrency: 2 }
+    );
+    assert.strictEqual(calls, 1);
+    assert.deepStrictEqual(results.map((row) => row.status), ["ok", "skipped", "skipped"]);
+    assert.strictEqual(results[0].page.filteredCount, 1);
+    ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함");
   }
 
   console.log("\n모든 자체 테스트 통과");

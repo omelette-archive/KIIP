@@ -22,11 +22,34 @@ cp .env.example .env
 ## 사용법
 
 ```bash
+# 단일 검색
 node 03-match-trademarks/matchTrademarks.js --region "서울특별시 강남구" --item "커피" --classCode 30
 node 03-match-trademarks/matchTrademarks.js --region "경기도 성남시 분당구" --item "코리아" --out 03-match-trademarks/output/result.json
+
+# ② 단계 출력 전체를 배치 검색
+node 03-match-trademarks/matchTrademarks.js \
+  --input 02-normalize-items/output/normalized.csv \
+  --out 03-match-trademarks/output/result.json
 ```
 
-옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1), `--apiKey`(환경변수 대신 직접 전달).
+옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1),
+`--concurrency`(배치 기본 2), `--apiKey`(환경변수 대신 직접 전달).
+
+배치 모드는 `noticeName || itemName || rawItemName`을 검색어로, `niceClass`를 필터로 사용한다.
+② 단계의 `status=error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
+`status=error`로 남긴다. 검색 오류가 하나라도 있으면 결과 JSON을 저장한 뒤 종료 코드 2를
+반환한다.
+
+## 건수 필드의 의미
+
+- `keywordTotalCount`: KIPRIS 키워드 검색 전체 건수. NICE류 필터 전이며 모든 페이지 합계다.
+- `page.unfilteredCount`: 현재 받아온 페이지의 필터 전 건수.
+- `page.filteredCount`: 현재 페이지에서 NICE류까지 맞는 건수.
+- `page.hasMore`: 키워드 검색의 다음 페이지 존재 여부.
+
+범용 품목은 결과가 수만~수백만 건이므로 v1에서 무조건 전 페이지를 다운로드하지 않는다.
+따라서 `page.filteredCount`를 전체 상표 건수로 사용하면 안 되며, ④ 집계 전에 지정상품 기반
+검색 조건과 전체 수집 상한/증분 갱신 정책을 확정해야 한다.
 
 ## 구조
 
