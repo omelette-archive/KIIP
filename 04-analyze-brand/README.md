@@ -56,7 +56,7 @@ node 04-analyze-brand/analyzeBrands.js \
 - `recentPeriod`, `previousPeriod`, `recentChange`, `recentChangeRate`, `recentTrend`
 - `recentBrands`
 - `regionCounts`, `regionVerificationRate`, `localApplicantShare`
-- `queryCount`, `erroredQueryCount`, `sourceTotalCount`, `returnedHitCount`
+- `queryCount`, `successfulQueryCount`, `erroredQueryCount`, `skippedQueryCount`, `sourceTotalCount`, `returnedHitCount`
 
 `recentTrend`는 `new`, `increase`, `flat`, `decrease`, `no_activity` 중 하나다.
 `localApplicantShare`는 `inside / (inside + outside)`로 계산하며, 지역 검증 건이 없으면 `null`이다.
@@ -70,6 +70,9 @@ node 04-analyze-brand/analyzeBrands.js \
   `true`/`false` 또는 `inside`/`outside`로 넣으면 코드 변경 없이 계산된다.
 - 같은 출원번호가 여러 품목이나 지역에 걸쳐 검색되면 각 세부 집계에서는 관계별로 포함되지만,
   전체 `summary`에서는 한 번만 센다.
+- ③단계 배치 결과의 `status=skipped`(②단계에서 검토대기·제외된 행) 항목은 상표 검색 자체가
+  일어나지 않은 것이라 `skippedQueryCount`로만 집계하고 성공/오류에는 넣지 않는다. `input`에
+  담긴 ②단계 원본 지역·품목으로 버킷팅하므로 "미지정 지역" 같은 가짜 집계는 생기지 않는다.
 
 ## 테스트
 

@@ -56,20 +56,40 @@ function normalizeInput(parsed) {
   throw new Error("입력 JSON은 03단계 결과 객체, 결과 배열, 또는 { results: [] } 형태여야 합니다.");
 }
 
+// ③단계 배치 출력의 status=skipped 행은 query가 없고, ②단계 원본 행이 input에 그대로
+// 담겨 있다(sido/sigungu/itemName/noticeName/niceClass 등). 여기서 안 읽으면 지역·품목
+// 정보가 있는데도 "미지정 지역 × 미지정 품목"이라는 가짜 버킷이 생긴다.
 function entryDimensions(entry) {
-  const sido = clean(entry.sido);
-  const sigungu = clean(entry.sigungu);
   const query = entry.query || {};
-  const region = clean(query.region) || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
-  const itemName = clean(entry.itemName) || clean(query.item) || clean(query.searchString) || "미지정 품목";
+  const input = entry.input || {};
+  const sido = clean(entry.sido) || clean(input.sido);
+  const sigungu = clean(entry.sigungu) || clean(input.sigungu);
+  const region =
+    clean(query.region) || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
+  const itemName =
+    clean(entry.itemName) ||
+    clean(query.item) ||
+    clean(query.searchString) ||
+    clean(input.noticeName) ||
+    clean(input.itemName) ||
+    clean(input.rawItemName) ||
+    "미지정 품목";
   return {
     sido,
     sigungu,
     region,
     itemName,
-    noticeName: clean(entry.noticeName) || null,
-    niceClass: clean(entry.niceClass) || clean(query.classCode) || null,
+    noticeName: clean(entry.noticeName) || clean(input.noticeName) || null,
+    niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
   };
+}
+
+// ③단계 신 계약은 전체 건수를 keywordTotalCount로 준다(구 계약/다른 소스 대비 totalCount·
+// returnedCount도 대비용으로 허용).
+function entryTotalCount(entry) {
+  const raw = entry.keywordTotalCount ?? entry.totalCount ?? entry.returnedCount;
+  const n = Number(raw);
+  return Number.isFinite(n) ? n : 0;
 }
 
 function createBucket(dimensions) {
@@ -78,20 +98,33 @@ function createBucket(dimensions) {
     queryCount: 0,
     successfulQueryCount: 0,
     erroredQueryCount: 0,
+    skippedQueryCount: 0,
     sourceTotalCount: 0,
     returnedHitCount: 0,
     hits: new Map(),
   };
 }
 
+// status가 없는 입력(구 형식/다른 소스 대비)은 error 필드 유무로 추정한다.
+function entryStatus(entry) {
+  return clean(entry.status) || (entry.error ? "error" : "ok");
+}
+
 function addEntry(bucket, entry) {
   bucket.queryCount++;
-  if (entry.error) {
+  const status = entryStatus(entry);
+  // ②단계에서 검토대기·제외로 걸러진 행(status=skipped, dry-run의 planned)은 상표 검색
+  // 자체가 안 일어난 것이라, 성공/오류 어느 쪽에도 넣지 않고 별도로만 센다.
+  if (status === "skipped" || status === "planned") {
+    bucket.skippedQueryCount++;
+    return;
+  }
+  if (status === "error") {
     bucket.erroredQueryCount++;
     return;
   }
   bucket.successfulQueryCount++;
-  bucket.sourceTotalCount += Number.isFinite(Number(entry.totalCount)) ? Number(entry.totalCount) : 0;
+  bucket.sourceTotalCount += entryTotalCount(entry);
   const hits = Array.isArray(entry.hits) ? entry.hits : [];
   bucket.returnedHitCount += hits.length;
   for (const hit of hits) {
@@ -104,6 +137,7 @@ function mergeBucket(target, source) {
   target.queryCount += source.queryCount;
   target.successfulQueryCount += source.successfulQueryCount;
   target.erroredQueryCount += source.erroredQueryCount;
+  target.skippedQueryCount += source.skippedQueryCount;
   target.sourceTotalCount += source.sourceTotalCount;
   target.returnedHitCount += source.returnedHitCount;
   for (const [key, hit] of source.hits) {
@@ -252,6 +286,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const warnings = [];
   if (summary.erroredQueryCount > 0) {
     warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
+  }
+  if (summary.skippedQueryCount > 0) {
+    warnings.push(
+      `${summary.skippedQueryCount}개 행이 ②단계에서 검토대기·제외 처리되어 상표 검색 자체가 건너뛰어졌습니다(집계에서 제외).`
+    );
   }
   if (summary.regionVerificationRate !== 1 && summary.uniqueTrademarkCount > 0) {
     warnings.push("출원인 주소 기반 지역 매칭이 끝나지 않은 상표가 있어 지역 내·외 비중은 검증된 건만 기준으로 계산했습니다.");

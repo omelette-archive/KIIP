@@ -117,4 +117,64 @@ assert.strictEqual(andongApple.localApplicantShare, 0.5);
 assert.strictEqual(andongApple.recentBrands.length, 2);
 ok("현재 연도 제외 최근/직전 기간 비교와 검증된 지역 비중");
 
+console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.input) 호환");
+{
+  // PR #1의 실제 matchTrademarks.js 배치 출력 형태를 그대로 재현한다:
+  // ok는 query.region(문자열)+keywordTotalCount, skipped는 query 없이 input에 ②단계
+  // 원본 행이 그대로 들어있다.
+  const newFormatInput = [
+    {
+      status: "ok",
+      inputIndex: 0,
+      query: { region: "전라남도 나주시", regionMatch: "unverified", item: "신선한 배", classCode: "31" },
+      keywordTotalCount: 12345,
+      page: { number: 1, size: 5, unfilteredCount: 1, filteredCount: 1, hasMore: true },
+      hits: [hit("40-2025-9", "나주햇배", "20250501", "등록", "unverified")],
+    },
+    {
+      status: "error",
+      inputIndex: 1,
+      query: { region: "전라남도 나주시", item: "신선한 배", classCode: "31" },
+      error: "API 오류",
+    },
+    {
+      status: "skipped",
+      inputIndex: 2,
+      reason: "② 단계 status=review_required",
+      input: {
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동하회탈",
+        itemName: "하회탈",
+        noticeName: "",
+        niceClass: "",
+        excluded: "false",
+        status: "review_required",
+      },
+    },
+  ];
+  const r = analyzeEntries(newFormatInput, { asOfYear: 2026 });
+  assert.strictEqual(r.summary.queryCount, 3);
+  assert.strictEqual(r.summary.successfulQueryCount, 1);
+  assert.strictEqual(r.summary.erroredQueryCount, 1);
+  assert.strictEqual(r.summary.skippedQueryCount, 1, "skipped는 성공/오류와 분리된 별도 카운트여야 함");
+  assert.strictEqual(r.summary.sourceTotalCount, 12345, "keywordTotalCount를 읽어야 함(구 totalCount 아님)");
+
+  const unassigned = r.regionItems.find((row) => row.region === "미지정 지역");
+  assert.strictEqual(unassigned, undefined, "skipped 행이 가짜 '미지정 지역' 버킷을 만들면 안 됨");
+
+  const skippedRow = r.regionItems.find(
+    (row) => row.region === "경상북도 안동시" && row.itemName === "하회탈"
+  );
+  assert.ok(skippedRow, "skipped 행도 input의 실제 지역·품목으로 버킷팅되어야 함");
+  assert.strictEqual(skippedRow.skippedQueryCount, 1);
+  assert.strictEqual(skippedRow.successfulQueryCount, 0);
+
+  assert.ok(
+    r.warnings.some((w) => w.includes("검토대기·제외")),
+    "skipped 건수에 대한 경고 문구가 있어야 함"
+  );
+  ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
+}
+
 console.log("\n모든 자체 테스트 통과");
