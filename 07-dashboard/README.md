@@ -14,15 +14,15 @@
 - 실시간 신규 출원 모니터링
 - 브랜드 공백 지도(Brand Gap Map)
 - 지역 간 비교 분석
-- AI 정책 브리핑 자동 제공
+- AI 비즈니스 확장 전략 브리핑 자동 제공
 
 ## 할 일
 
 - [ ] 개발 방법(기획 문서: Python + Streamlit) 확정 또는 재검토
-- [ ] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-policy-insight/` 출력을 읽어오는 데이터 계층 설계
+- [ ] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-business-strategy/` 출력을 읽어오는 데이터 계층 설계
 - [ ] 브랜드 공백 지도 시각화 방식 결정 (지도 기반 vs 표 기반)
 - [ ] 실시간 신규 출원 모니터링 갱신 주기/알림 방식 결정
 
 ## 입력
 
-`04-analyze-brand/`, `05-detect-brand-gap/`, `06-generate-policy-insight/`의 모든 출력
+`04-analyze-brand/`, `05-detect-brand-gap/`, `06-generate-business-strategy/`의 모든 출력
