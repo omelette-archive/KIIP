@@ -14,6 +14,7 @@ const { spawnSync } = require("child_process");
 const { parseCsvLine, loadAdminCodes } = require("./lib/adminCodes");
 const { splitRegion, fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { createClient: createDataGoKrClient } = require("./lib/dataGoKrClient");
+const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createClient: createGiClient } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 
@@ -259,6 +260,19 @@ async function run() {
       if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
     }
     ok("기본은 종료 코드 1, --allow-empty를 명시한 경우에만 빈 CSV를 허용함");
+  }
+
+  console.log("12) sourceRegistry — 수집 URL·인증·트래픽 정책 중앙 관리");
+  {
+    const registry = loadSourceRegistry();
+    const gi = getSourceDefinition("gi", registry);
+    const nongsaro = getSourceDefinition("nongsaro", registry);
+    assert.strictEqual(gi.authentication.keyEnv, "GI_API_KEY");
+    assert.strictEqual(gi.quota.type, "provider_policy");
+    assert.ok(gi.catalogUrl.startsWith("https://www.data.go.kr/"));
+    assert.deepStrictEqual(nongsaro.formats, ["XML"]);
+    assert.strictEqual(nongsaro.implementation.status, "xml_live_validation_required");
+    ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
   }
 
   console.log("\n모든 자체 테스트 통과");

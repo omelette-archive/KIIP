@@ -13,6 +13,7 @@ const { KiprisApiError } = require("./lib/errors");
 const {
   parseCsvLine,
   makeBatchQuery,
+  countSearchableRows,
   buildSearchOutput,
   runBatch,
 } = require("./matchTrademarks");
@@ -198,6 +199,14 @@ async function run() {
     assert.match(
       makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
       /분석 제외/
+    );
+    assert.strictEqual(
+      countSearchableRows([
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", status: "ok" },
+        { rawItemName: "검토", status: "review_required" },
+        { rawItemName: "제외", excluded: "true", status: "ok" },
+      ]),
+      1
     );
     ok("② 출력의 고시명칭/NICE류를 사용하고 검토필요·오류·제외 행은 건너뜀");
   }

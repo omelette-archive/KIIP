@@ -4,6 +4,7 @@
 
 ①에서 수집한 특산품 원시 목록을 정제하고 NICE 상품분류(13판)로 자동 매핑한다.
 전체 기획은 [`docs/project-plan.md`](../docs/project-plan.md)의 ② 참고.
+필드와 정제 규칙의 기준 문서는 [`docs/data-pipeline-contracts.md`](../docs/data-pipeline-contracts.md)다.
 
 ## 규칙 (기획 문서 기준)
 

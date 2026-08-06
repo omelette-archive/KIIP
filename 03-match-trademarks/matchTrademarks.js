@@ -19,7 +19,7 @@ const { createClient } = require("./lib/kiprisClient");
 const { filterByClassCode } = require("./lib/filters");
 
 function parseArgs(argv) {
-  const args = { numOfRows: 20, pageNo: 1, concurrency: 2 };
+  const args = { numOfRows: 20, pageNo: 1, concurrency: 2, "max-requests": 100 };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
@@ -45,6 +45,7 @@ function printUsageAndExit(message) {
       "  --numOfRows <n>      페이지당 결과 수 (기본 20, 최대 100)",
       "  --pageNo <n>         페이지 번호 (기본 1)",
       "  --concurrency <n>    배치 모드 동시 요청 수 (기본 2)",
+      "  --max-requests <n>   배치 1회 검색 요청 상한 (기본 100)",
       "  --out <path>         결과를 JSON 파일로 저장",
       "  --apiKey <key>       KIPRIS_API_KEY 대신 직접 인증키 전달",
     ].join("\n")
@@ -119,6 +120,10 @@ function makeBatchQuery(row) {
   if (!region) return { skipReason: "지역 정보 없음" };
   if (!item) return { skipReason: "검색 품목 없음" };
   return { region, item, classCode: row.niceClass || null };
+}
+
+function countSearchableRows(rows) {
+  return rows.reduce((count, row) => count + (makeBatchQuery(row).skipReason ? 0 : 1), 0);
 }
 
 function buildSearchOutput(query, result, hits, { pageNo, numOfRows }) {
@@ -210,6 +215,7 @@ function validateNumericArgs(args) {
   const numOfRows = Number(args.numOfRows);
   const pageNo = Number(args.pageNo);
   const concurrency = Number(args.concurrency);
+  const maxRequests = Number(args["max-requests"]);
   if (!Number.isInteger(numOfRows) || numOfRows < 1 || numOfRows > 100) {
     printUsageAndExit("--numOfRows 는 1~100 사이의 정수여야 합니다.");
   }
@@ -219,7 +225,10 @@ function validateNumericArgs(args) {
   if (!Number.isInteger(concurrency) || concurrency < 1) {
     printUsageAndExit("--concurrency 는 1 이상의 정수여야 합니다.");
   }
-  return { numOfRows, pageNo, concurrency };
+  if (!Number.isInteger(maxRequests) || maxRequests < 1) {
+    printUsageAndExit("--max-requests 는 1 이상의 정수여야 합니다.");
+  }
+  return { numOfRows, pageNo, concurrency, maxRequests };
 }
 
 async function main() {
@@ -239,7 +248,14 @@ async function main() {
   if (args.input) {
     const inputPath = path.resolve(args.input);
     const rows = readNormalizedCsv(inputPath);
-    console.error(`[matchTrademarks] batch input=${rows.length}행`);
+    const plannedRequests = countSearchableRows(rows);
+    if (plannedRequests > numeric.maxRequests) {
+      throw new Error(
+        `배치 검색 예정 ${plannedRequests}건이 요청 상한 ${numeric.maxRequests}건을 초과합니다. ` +
+        "무료 KIPRISPlus 월간 호출량을 확인한 뒤 --max-requests를 명시적으로 조정하세요."
+      );
+    }
+    console.error(`[matchTrademarks] batch input=${rows.length}행, requests=${plannedRequests}/${numeric.maxRequests}`);
     const results = await runBatch(rows, client, numeric);
     const output = {
       mode: "batch",
@@ -286,6 +302,7 @@ module.exports = {
   parseCsvLine,
   readNormalizedCsv,
   makeBatchQuery,
+  countSearchableRows,
   buildSearchOutput,
   searchOne,
   runBatch,

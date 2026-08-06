@@ -33,7 +33,8 @@ node 03-match-trademarks/matchTrademarks.js \
 ```
 
 옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1),
-`--concurrency`(배치 기본 2), `--apiKey`(환경변수 대신 직접 전달).
+`--concurrency`(배치 기본 2), `--max-requests`(배치 1회 기본 100),
+`--apiKey`(환경변수 대신 직접 전달).
 
 배치 모드는 `noticeName || itemName || rawItemName`을 검색어로, `niceClass`를 필터로 사용한다.
 ② 단계의 `status=review_required|error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
@@ -50,6 +51,10 @@ node 03-match-trademarks/matchTrademarks.js \
 범용 품목은 결과가 수만~수백만 건이므로 v1에서 무조건 전 페이지를 다운로드하지 않는다.
 따라서 `page.filteredCount`를 전체 상표 건수로 사용하면 안 되며, ④ 집계 전에 지정상품 기반
 검색 조건과 전체 수집 상한/증분 갱신 정책을 확정해야 한다.
+
+KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 실행 전 잔여량을 확인한다.
+`--max-requests` 기본값은 한 번의 실수로 월간 한도를 소진하지 않게 하는 실행 단위 보호선이며,
+상세 근거는 [`docs/open-api-limits.md`](../docs/open-api-limits.md)에 정리했다.
 
 ## 구조
 

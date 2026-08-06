@@ -21,6 +21,7 @@ const { loadAdminCodes } = require("./lib/adminCodes");
 const { createClient: createGiClient } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
+const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 
 loadEnv();
 
@@ -108,6 +109,7 @@ async function main() {
 
   const outPath = path.resolve(args.out || path.join(__dirname, "output", "specialties.csv"));
   const sources = String(args.sources).split(",").map((s) => s.trim()).filter(Boolean);
+  const sourceRegistry = loadSourceRegistry();
 
   const adminList = loadAdminCodes();
   console.error(`[collectSpecialties] 법정동코드 마스터 ${adminList.length.toLocaleString()}건 로드`);
@@ -116,14 +118,15 @@ async function main() {
   let rows = [];
   let succeededSources = 0;
   for (const source of sources) {
+    const definition = getSourceDefinition(source, sourceRegistry);
     const collector = COLLECTORS[source];
-    if (!collector) {
+    if (!definition || definition.role !== "collector" || !collector) {
       warnings.push(`알 수 없는 소스: ${source}`);
       continue;
     }
     const { rows: sourceRows, succeeded } = await collector(adminList, warnings);
     if (succeeded) succeededSources++;
-    console.error(`[collectSpecialties] ${source} -> ${sourceRows.length}행`);
+    console.error(`[collectSpecialties] ${source} (${definition.name}) -> ${sourceRows.length}행`);
     rows = rows.concat(sourceRows);
   }
 
