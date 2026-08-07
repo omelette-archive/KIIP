@@ -23,7 +23,10 @@
       공개 파일 다운로드 완료, API 키/가입 불필요. [`data/README.md`](data/README.md) 참고
 - [x] 규칙 기반 1차 정규화 — 지역명/부연 설명 제거 후 고시명칭 정확 일치만 자동 확정
 - [x] 별도 검토 대기열 — 미확정 행에 상위 후보와 사유를 보존해 AI 또는 사람이 개별 검토
-- [ ] 검토 결과를 원본 CSV에 병합하는 승인 워크플로 — 실제 검토 방식이 정해지면 추가
+- [x] 검토 대기열 AI 개별 검토 — [`reviewWithAi.js`](reviewWithAi.js). 규칙 기반 결과는
+      건드리지 않고 `ai*` 컬럼에 제안만 추가
+- [ ] 검토 결과를 원본 CSV에 병합하는 승인 워크플로 — 지금은 사람이 `ai*` 컬럼을 보고
+      수작업으로 반영. 반영 방식(자동 병합 기준 등)이 정해지면 추가
 - [x] 35류 이상 필터링 규칙 구현 — `lib/filters.js`의 `isServiceClass()`로 후보 검색
       단계에서 기본 제외. 원본 xlsx의 35류 파생 시트 6개까지 별도 로드하는 건 v1 범위 밖으로
       뺌(메인 시트의 NICE분류 값만으로 충분)
@@ -40,14 +43,16 @@
 │   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외,
 │   │                       bigram 역색인 캐싱으로 대량 처리 시 57k건 전체 스캔 회피)
 │   ├── ruleNormalizer.js   보수적 규칙 매칭과 검토 대상 분리
-│   ├── llmClient.js        선택적 개별 AI 검토용 Anthropic 클라이언트(기본 실행에서는 미사용)
 │   └── filters.js          isServiceClass()
-├── normalizeItems.js       CLI 진입점
+├── normalizeItems.js       ① 규칙 기반 정제 CLI (API 키 불필요)
+├── reviewWithAi.js         ② 검토 대기열만 개별 AI 검토하는 CLI (ANTHROPIC_API_KEY 필요)
 ├── selftest.js             fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
 └── output/                 --out 결과 저장 위치 (git-ignored)
 ```
 
 ## 사용법
+
+### 1) 규칙 기반 정제 (API 키 불필요)
 
 ```bash
 node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
@@ -57,15 +62,30 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
 
 입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]` — 01단계 출력을 그대로 넣을 수 있다.
 
-기본 실행은 Anthropic API를 호출하지 않는다. `status=ok`은 규칙으로 확정된 행,
-`status=review_required`는 개별 검토가 필요한 행이다. 검토 파일에는 `reviewReason`과
-`reviewCandidates`가 함께 기록된다. 처리 오류는 `status=error`로 보존하며 하나라도 있으면
-부분 결과를 쓴 뒤 종료 코드 2를 반환한다. ① 단계의 `source`도 출력까지 유지한다.
+`status=ok`는 규칙으로 확정된 행, `status=review_required`는 개별 검토가 필요한 행이다.
+검토 파일에는 `reviewReason`과 `reviewCandidates`가 함께 기록된다. 처리 오류는
+`status=error`로 보존하며 하나라도 있으면 부분 결과를 쓴 뒤 종료 코드 2를 반환한다.
+① 단계의 `source`도 출력까지 유지한다.
+
+### 2) 검토 대기열 AI 개별 검토 (선택, ANTHROPIC_API_KEY 필요)
+
+```bash
+cp .env.example .env
+# .env 에 ANTHROPIC_API_KEY=발급받은키 입력 (console.anthropic.com)
+
+node 02-normalize-items/reviewWithAi.js --input 02-normalize-items/output/review-required.csv \
+  --out 02-normalize-items/output/review-required-ai.csv
+```
+
+`review-required.csv`의 각 행에 대해서만 AI가 `reviewCandidates` 중 하나를 고르거나
+"해당 없음"으로 확정한다 — 전체 데이터를 다시 처리하지 않고, 규칙 기반이 이미 걸러낸
+소수의 애매한 행만 개별 검토하는 구조다. 원본 규칙 기반 컬럼은 그대로 두고 `aiNoticeName`
+등 `ai` 접두 컬럼에 제안만 추가하므로, 최종 반영 여부는 사람이 확인 후 결정한다.
 
 ## 테스트
 
-실제 API 키 없이 규칙 기반 파이프라인 전체를 검증한다. 선택적 Anthropic 클라이언트는
-네트워크 모킹으로만 검증한다:
+실제 API 키 없이 규칙 기반 파이프라인과 AI 검토 클라이언트의 요청/응답 파싱을 모두
+검증한다:
 
 ```bash
 node 02-normalize-items/selftest.js

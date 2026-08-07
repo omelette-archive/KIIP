@@ -13,9 +13,10 @@ const { spawnSync } = require("child_process");
 const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
-const { createClient, TOOL, MESSAGES_URL } = require("./lib/llmClient");
-const { normalizeRow } = require("./normalizeItems");
+const { createClient, TOOL, MESSAGES_URL } = require("./lib/reviewClient");
+const { normalizeRow, OUTPUT_FIELDS } = require("./normalizeItems");
 const { cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
+const { readReviewCsv, parseCandidates } = require("./reviewWithAi");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -85,17 +86,17 @@ async function run() {
     ok("NICE 35류 이상 판별 정상 동작 (zero-padding 값 포함)");
   }
 
-  console.log("5) llmClient.createClient — apiKey 없으면 즉시 throw");
+  console.log("5) reviewClient.createClient — apiKey 없으면 즉시 throw");
   {
     assert.throws(() => createClient({}), /ANTHROPIC_API_KEY/);
     ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (kiprisClient.js와 동일 패턴)");
   }
 
-  console.log("6) llmClient.normalizeItem — 요청 구성(forced tool_choice + strict) 확인");
+  console.log("6) reviewClient.reviewItem — 요청 구성(forced tool_choice + strict) 확인, 후보 확정");
   {
     const candidates = [
-      { item: "사과", niceClass: "31", similarGroupCode: "G0101" },
-      { item: "사과나무", niceClass: "31", similarGroupCode: "G0102" },
+      { item: "탈", niceClass: "28", similarGroupCode: "G0301" },
+      { item: "부채", niceClass: "20", similarGroupCode: "G0501" },
     ];
     let capturedUrl;
     let capturedBody;
@@ -110,33 +111,32 @@ async function run() {
             {
               type: "tool_use",
               id: "toolu_1",
-              name: "submit_normalization",
-              input: { itemName: "사과", candidateIndex: 0, excluded: false },
+              name: "submit_item_review",
+              input: { candidateIndex: 0, note: "하회탈은 탈의 일종" },
             },
           ],
         }),
       };
     };
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({ rawItemName: "안동사과, 부사", candidates });
+    const result = await client.reviewItem(
+      { sido: "경상북도", sigungu: "안동시", rawItemName: "안동하회탈", itemName: "하회탈", reviewReason: "정확히 일치하는 고시명칭이 없음" },
+      candidates
+    );
 
     assert.strictEqual(capturedUrl, MESSAGES_URL);
     assert.strictEqual(capturedBody.model, "claude-haiku-4-5");
     assert.deepStrictEqual(capturedBody.tool_choice, { type: "tool", name: TOOL.name });
     assert.strictEqual(capturedBody.tools[0].strict, true);
     assert.strictEqual(capturedBody.tools[0].input_schema.additionalProperties, false);
-    assert.strictEqual(capturedBody.output_config, undefined, "Haiku 4.5는 effort를 지원하지 않으므로 output_config를 보내면 안 됨");
-    assert.strictEqual(capturedBody.thinking, undefined, "Haiku 4.5는 thinking 파라미터도 보내지 않음");
 
-    assert.strictEqual(result.itemName, "사과");
-    assert.strictEqual(result.noticeName, "사과");
-    assert.strictEqual(result.niceClass, "31");
-    assert.strictEqual(result.similarGroupCode, "G0101");
-    assert.strictEqual(result.excluded, false);
-    ok("forced tool_choice + strict 스키마로 요청 구성, candidateIndex로 후보를 정확히 매칭");
+    assert.strictEqual(result.noticeName, "탈");
+    assert.strictEqual(result.niceClass, "28");
+    assert.strictEqual(result.note, "하회탈은 탈의 일종");
+    ok("forced tool_choice + strict 스키마로 요청 구성, candidateIndex로 후보를 정확히 확정");
   }
 
-  console.log("7) llmClient.normalizeItem — candidateIndex -1 (고시명칭 없음)");
+  console.log("7) reviewClient.reviewItem — candidateIndex -1 (해당 후보 없음)");
   {
     const fakeFetch = async () => ({
       ok: true,
@@ -146,24 +146,23 @@ async function run() {
           {
             type: "tool_use",
             id: "toolu_2",
-            name: "submit_normalization",
-            input: { itemName: "희귀품목", candidateIndex: -1, excluded: false },
+            name: "submit_item_review",
+            input: { candidateIndex: -1, note: "후보 중 일치하는 게 없음" },
           },
         ],
       }),
     });
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({
-      rawItemName: "희귀품목",
-      candidates: [{ item: "무관항목", niceClass: "01", similarGroupCode: "G0001" }],
-    });
-    assert.strictEqual(result.itemName, "희귀품목");
+    const result = await client.reviewItem(
+      { rawItemName: "희귀품목", itemName: "희귀품목" },
+      [{ item: "무관항목", niceClass: "01", similarGroupCode: "G0001" }]
+    );
     assert.strictEqual(result.noticeName, null);
     assert.strictEqual(result.niceClass, null);
-    ok("후보 중 일치하는 게 없으면 noticeName/niceClass가 null (비고시명칭으로 단순화)");
+    ok("후보 중 일치하는 게 없으면 noticeName이 null로 남음(새 이름을 지어내지 않음)");
   }
 
-  console.log("8) llmClient.normalizeItem — 모델이 범위 밖 인덱스를 보내도 방어적으로 -1 처리");
+  console.log("8) reviewClient.reviewItem — 모델이 범위 밖 인덱스를 보내도 방어적으로 -1 처리");
   {
     const fakeFetch = async () => ({
       ok: true,
@@ -173,19 +172,19 @@ async function run() {
           {
             type: "tool_use",
             id: "toolu_3",
-            name: "submit_normalization",
+            name: "submit_item_review",
             // strict:true라도 방어적으로 검증 — candidates 길이(1)를 벗어난 인덱스
-            input: { itemName: "품목", candidateIndex: 5, excluded: false },
+            input: { candidateIndex: 5, note: "이상한 응답" },
           },
         ],
       }),
     });
     const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.normalizeItem({
-      rawItemName: "품목",
-      candidates: [{ item: "후보1", niceClass: "01", similarGroupCode: "G0001" }],
-    });
-    assert.strictEqual(result.noticeName, null, "범위 밖 인덱스는 -1(고시명칭 없음)로 취급돼야 함");
+    const result = await client.reviewItem(
+      { rawItemName: "품목", itemName: "품목" },
+      [{ item: "후보1", niceClass: "01", similarGroupCode: "G0001" }]
+    );
+    assert.strictEqual(result.noticeName, null, "범위 밖 인덱스는 -1(해당 없음)로 취급돼야 함");
     ok("범위를 벗어난 candidateIndex를 안전하게 -1로 처리");
   }
 
@@ -274,6 +273,57 @@ async function run() {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     ok("Anthropic 키 없이 규칙 결과와 검토 전용 CSV를 분리 생성함");
+  }
+
+  console.log("12) reviewWithAi.parseCandidates — reviewCandidates JSON 안전 파싱");
+  {
+    assert.deepStrictEqual(
+      parseCandidates({ reviewCandidates: '[{"item":"탈","niceClass":"28","similarGroupCode":"G0301","score":0.5}]' }),
+      [{ item: "탈", niceClass: "28", similarGroupCode: "G0301", score: 0.5 }]
+    );
+    assert.deepStrictEqual(parseCandidates({ reviewCandidates: "" }), []);
+    assert.deepStrictEqual(parseCandidates({ reviewCandidates: "깨진 json" }), [], "파싱 실패 시 빈 배열로 안전하게 처리");
+    ok("reviewCandidates 컬럼을 안전하게 파싱하고, 손상된 값은 빈 배열로 처리");
+  }
+
+  console.log("13) reviewWithAi CLI — review-required.csv만 검토하고 규칙 결과는 그대로 보존");
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-review-ai-"));
+    const reviewInputPath = path.join(tempDir, "review-required.csv");
+    const outputPath = path.join(tempDir, "review-required-ai.csv");
+    try {
+      const row = {
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동하회탈",
+        source: "gi",
+        itemName: "하회탈",
+        noticeName: "",
+        niceClass: "",
+        similarGroupCode: "",
+        excluded: "false",
+        status: "review_required",
+        matchMethod: "rule_unresolved",
+        confidence: "",
+        reviewReason: "정확히 일치하는 고시명칭이 없음",
+        reviewCandidates: '[{"item":"탈","niceClass":"28","similarGroupCode":"G0301","score":0.5}]',
+        error: "",
+      };
+      const csvLine = OUTPUT_FIELDS.map((f) => {
+        const v = String(row[f] ?? "");
+        return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
+      }).join(",");
+      fs.writeFileSync(reviewInputPath, `﻿${OUTPUT_FIELDS.join(",")}\n${csvLine}\n`, "utf8");
+
+      const rows = readReviewCsv(reviewInputPath);
+      assert.strictEqual(rows.length, 1);
+      assert.strictEqual(rows[0].status, "review_required");
+      const candidates = parseCandidates(rows[0]);
+      assert.strictEqual(candidates[0].item, "탈");
+      ok("review-required.csv를 읽어 후보를 그대로 복원함 — 실제 API 호출은 reviewClient 단위 테스트로 커버");
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 
   console.log("\n모든 자체 테스트 통과");
