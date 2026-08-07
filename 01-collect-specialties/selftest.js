@@ -151,7 +151,7 @@ async function run() {
   console.log("5) dataGoKrClient.createClient — apiKey 없으면 즉시 throw");
   {
     assert.throws(() => createDataGoKrClient({}), /서비스키/);
-    ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (kiprisClient.js/llmClient.js와 동일 패턴)");
+    ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (kiprisClient.js와 동일 패턴)");
   }
 
   console.log("6) dataGoKrClient.callOperation — 요청 구성 + 표준 응답 파싱");

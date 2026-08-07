@@ -1,7 +1,9 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * 실제 API 키 없이 규칙 기반 정규화와 선택적 AI 검토 클라이언트를 검증한다.
+ * 실제 API 키 없이 규칙 기반 정규화 파이프라인을 검증한다. 외부 AI 호출은 이 단계에
+ * 전혀 쓰지 않는다 — review_required로 남는 행은 별도 사람 검토 대상이며, 이 저장소는
+ * 그 검토를 자동화하지 않는다(이유: docs/data-pipeline-contracts.md 참고).
  * 실행: node 02-normalize-items/selftest.js
  */
 
@@ -13,10 +15,8 @@ const { spawnSync } = require("child_process");
 const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
-const { createClient, TOOL, MESSAGES_URL } = require("./lib/reviewClient");
-const { normalizeRow, OUTPUT_FIELDS } = require("./normalizeItems");
+const { normalizeRow } = require("./normalizeItems");
 const { cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
-const { readReviewCsv, parseCandidates } = require("./reviewWithAi");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -86,109 +86,7 @@ async function run() {
     ok("NICE 35류 이상 판별 정상 동작 (zero-padding 값 포함)");
   }
 
-  console.log("5) reviewClient.createClient — apiKey 없으면 즉시 throw");
-  {
-    assert.throws(() => createClient({}), /ANTHROPIC_API_KEY/);
-    ok("apiKey 누락 시 첫 호출 전에 즉시 에러 발생 (kiprisClient.js와 동일 패턴)");
-  }
-
-  console.log("6) reviewClient.reviewItem — 요청 구성(forced tool_choice + strict) 확인, 후보 확정");
-  {
-    const candidates = [
-      { item: "탈", niceClass: "28", similarGroupCode: "G0301" },
-      { item: "부채", niceClass: "20", similarGroupCode: "G0501" },
-    ];
-    let capturedUrl;
-    let capturedBody;
-    const fakeFetch = async (url, options) => {
-      capturedUrl = url;
-      capturedBody = JSON.parse(options.body);
-      return {
-        ok: true,
-        status: 200,
-        json: async () => ({
-          content: [
-            {
-              type: "tool_use",
-              id: "toolu_1",
-              name: "submit_item_review",
-              input: { candidateIndex: 0, note: "하회탈은 탈의 일종" },
-            },
-          ],
-        }),
-      };
-    };
-    const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.reviewItem(
-      { sido: "경상북도", sigungu: "안동시", rawItemName: "안동하회탈", itemName: "하회탈", reviewReason: "정확히 일치하는 고시명칭이 없음" },
-      candidates
-    );
-
-    assert.strictEqual(capturedUrl, MESSAGES_URL);
-    assert.strictEqual(capturedBody.model, "claude-haiku-4-5");
-    assert.deepStrictEqual(capturedBody.tool_choice, { type: "tool", name: TOOL.name });
-    assert.strictEqual(capturedBody.tools[0].strict, true);
-    assert.strictEqual(capturedBody.tools[0].input_schema.additionalProperties, false);
-
-    assert.strictEqual(result.noticeName, "탈");
-    assert.strictEqual(result.niceClass, "28");
-    assert.strictEqual(result.note, "하회탈은 탈의 일종");
-    ok("forced tool_choice + strict 스키마로 요청 구성, candidateIndex로 후보를 정확히 확정");
-  }
-
-  console.log("7) reviewClient.reviewItem — candidateIndex -1 (해당 후보 없음)");
-  {
-    const fakeFetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        content: [
-          {
-            type: "tool_use",
-            id: "toolu_2",
-            name: "submit_item_review",
-            input: { candidateIndex: -1, note: "후보 중 일치하는 게 없음" },
-          },
-        ],
-      }),
-    });
-    const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.reviewItem(
-      { rawItemName: "희귀품목", itemName: "희귀품목" },
-      [{ item: "무관항목", niceClass: "01", similarGroupCode: "G0001" }]
-    );
-    assert.strictEqual(result.noticeName, null);
-    assert.strictEqual(result.niceClass, null);
-    ok("후보 중 일치하는 게 없으면 noticeName이 null로 남음(새 이름을 지어내지 않음)");
-  }
-
-  console.log("8) reviewClient.reviewItem — 모델이 범위 밖 인덱스를 보내도 방어적으로 -1 처리");
-  {
-    const fakeFetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        content: [
-          {
-            type: "tool_use",
-            id: "toolu_3",
-            name: "submit_item_review",
-            // strict:true라도 방어적으로 검증 — candidates 길이(1)를 벗어난 인덱스
-            input: { candidateIndex: 5, note: "이상한 응답" },
-          },
-        ],
-      }),
-    });
-    const client = createClient({ apiKey: "test-key", fetchImpl: fakeFetch });
-    const result = await client.reviewItem(
-      { rawItemName: "품목", itemName: "품목" },
-      [{ item: "후보1", niceClass: "01", similarGroupCode: "G0001" }]
-    );
-    assert.strictEqual(result.noticeName, null, "범위 밖 인덱스는 -1(해당 없음)로 취급돼야 함");
-    ok("범위를 벗어난 candidateIndex를 안전하게 -1로 처리");
-  }
-
-  console.log("9) ruleNormalizer — 정확 매칭과 검토 대기열 분리");
+  console.log("5) ruleNormalizer — 정확 매칭과 검토 대기열 분리");
   {
     const dictionary = makeDictionary([
       { item: "신선한 사과", niceClass: "31", similarGroupCode: "G0211" },
@@ -225,10 +123,10 @@ async function run() {
     );
     assert.strictEqual(unresolved.status, "review_required");
     assert.match(unresolved.reviewCandidates, /"item":"탈"/);
-    ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김");
+    ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김(AI 호출 없음)");
   }
 
-  console.log("10) normalizeRow — 규칙 처리 오류를 행별로 보존");
+  console.log("6) normalizeRow — 규칙 처리 오류를 행별로 보존");
   {
     const result = normalizeRow(
       { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", source: "농사로" },
@@ -240,7 +138,7 @@ async function run() {
     ok("규칙 처리 오류도 원본·출처와 함께 결과 행에 보존됨");
   }
 
-  console.log("11) normalizeItems CLI — API 키 없이 결과와 검토 대기열 생성");
+  console.log("7) normalizeItems CLI — 외부 API 키 전혀 없이 결과와 검토 대기열 생성");
   {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-normalize-rules-"));
     const inputPath = path.join(tempDir, "input.csv");
@@ -249,7 +147,7 @@ async function run() {
     try {
       fs.writeFileSync(
         inputPath,
-        "\ufeffsido,sigungu,rawItemName,source\n경상북도,안동시,\"안동사과, 부사\",test\n경상북도,안동시,안동하회탈,test\n",
+        "﻿sido,sigungu,rawItemName,source\n경상북도,안동시,\"안동사과, 부사\",test\n경상북도,안동시,안동하회탈,test\n",
         "utf8"
       );
       const result = spawnSync(
@@ -260,7 +158,7 @@ async function run() {
           "--out", outputPath,
           "--review-out", reviewPath,
         ],
-        { encoding: "utf8", env: { ...process.env, ANTHROPIC_API_KEY: "" } }
+        { encoding: "utf8" }
       );
       assert.strictEqual(result.status, 0, result.stderr);
       assert.doesNotMatch(result.stderr, /flush/, "Node 로그에 Python식 flush 옵션이 출력되면 안 됨");
@@ -272,58 +170,7 @@ async function run() {
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    ok("Anthropic 키 없이 규칙 결과와 검토 전용 CSV를 분리 생성함");
-  }
-
-  console.log("12) reviewWithAi.parseCandidates — reviewCandidates JSON 안전 파싱");
-  {
-    assert.deepStrictEqual(
-      parseCandidates({ reviewCandidates: '[{"item":"탈","niceClass":"28","similarGroupCode":"G0301","score":0.5}]' }),
-      [{ item: "탈", niceClass: "28", similarGroupCode: "G0301", score: 0.5 }]
-    );
-    assert.deepStrictEqual(parseCandidates({ reviewCandidates: "" }), []);
-    assert.deepStrictEqual(parseCandidates({ reviewCandidates: "깨진 json" }), [], "파싱 실패 시 빈 배열로 안전하게 처리");
-    ok("reviewCandidates 컬럼을 안전하게 파싱하고, 손상된 값은 빈 배열로 처리");
-  }
-
-  console.log("13) reviewWithAi CLI — review-required.csv만 검토하고 규칙 결과는 그대로 보존");
-  {
-    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-review-ai-"));
-    const reviewInputPath = path.join(tempDir, "review-required.csv");
-    const outputPath = path.join(tempDir, "review-required-ai.csv");
-    try {
-      const row = {
-        sido: "경상북도",
-        sigungu: "안동시",
-        rawItemName: "안동하회탈",
-        source: "gi",
-        itemName: "하회탈",
-        noticeName: "",
-        niceClass: "",
-        similarGroupCode: "",
-        excluded: "false",
-        status: "review_required",
-        matchMethod: "rule_unresolved",
-        confidence: "",
-        reviewReason: "정확히 일치하는 고시명칭이 없음",
-        reviewCandidates: '[{"item":"탈","niceClass":"28","similarGroupCode":"G0301","score":0.5}]',
-        error: "",
-      };
-      const csvLine = OUTPUT_FIELDS.map((f) => {
-        const v = String(row[f] ?? "");
-        return /[",\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v;
-      }).join(",");
-      fs.writeFileSync(reviewInputPath, `﻿${OUTPUT_FIELDS.join(",")}\n${csvLine}\n`, "utf8");
-
-      const rows = readReviewCsv(reviewInputPath);
-      assert.strictEqual(rows.length, 1);
-      assert.strictEqual(rows[0].status, "review_required");
-      const candidates = parseCandidates(rows[0]);
-      assert.strictEqual(candidates[0].item, "탈");
-      ok("review-required.csv를 읽어 후보를 그대로 복원함 — 실제 API 호출은 reviewClient 단위 테스트로 커버");
-    } finally {
-      fs.rmSync(tempDir, { recursive: true, force: true });
-    }
+    ok("규칙 결과와 검토 전용 CSV를 API 키 없이 분리 생성함 — review-required.csv는 사람이 별도로 검토");
   }
 
   console.log("\n모든 자체 테스트 통과");
