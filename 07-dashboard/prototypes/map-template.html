@@ -1,0 +1,398 @@
+<title>지역 특산품 브랜드 지도 — 샘플</title>
+<style>
+  :root {
+    --bg: #f6f4ef;
+    --surface: #ffffff;
+    --surface-2: #efece3;
+    --ink: #1d2621;
+    --ink-muted: #5b6960;
+    --ink-faint: #8b9186;
+    --line: #e2ddd0;
+    --accent: #2f6f5e;
+    --accent-ink: #0f2a22;
+    --accent-tint: #e2ede8;
+    --status-good: #0ca30c;
+    --status-good-ink: #0a7a0a;
+    --status-good-tint: #dff3de;
+    --status-warning: #fab219;
+    --status-warning-ink: #8a5c12;
+    --status-warning-tint: #fdf0d7;
+    --status-serious: #ec835a;
+    --status-serious-tint: #fbe5da;
+    --map-nodata: #e6e1d2;
+    --map-nodata-line: #cfc9b6;
+    --seq-100: #d7ebe4;
+    --seq-200: #a9d2c4;
+    --seq-300: #6fb29d;
+    --seq-400: #3f8b75;
+    --seq-500: #235a4a;
+    --shadow: 0 1px 2px rgba(29, 38, 33, 0.06), 0 8px 24px -12px rgba(29, 38, 33, 0.18);
+    color-scheme: light;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #151713;
+      --surface: #1c1f1a;
+      --surface-2: #23261f;
+      --ink: #ebe7dd;
+      --ink-muted: #a3ab9f;
+      --ink-faint: #6f7a71;
+      --line: #34382f;
+      --accent: #5fb89a;
+      --accent-ink: #d9f2e7;
+      --accent-tint: #203330;
+      --status-good: #0ca30c;
+      --status-good-ink: #3ec93e;
+      --status-good-tint: #16321a;
+      --status-warning: #fab219;
+      --status-warning-ink: #fab219;
+      --status-warning-tint: #3a2f18;
+      --status-serious: #ec835a;
+      --status-serious-tint: #3a271e;
+      --map-nodata: #262920;
+      --map-nodata-line: #3a3d32;
+      --seq-100: #1c2b26;
+      --seq-200: #2a4038;
+      --seq-300: #3f6358;
+      --seq-400: #59a68c;
+      --seq-500: #7fd4b4;
+      --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+      color-scheme: dark;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #151713;
+    --surface: #1c1f1a;
+    --surface-2: #23261f;
+    --ink: #ebe7dd;
+    --ink-muted: #a3ab9f;
+    --ink-faint: #6f7a71;
+    --line: #34382f;
+    --accent: #5fb89a;
+    --accent-ink: #d9f2e7;
+    --accent-tint: #203330;
+    --status-good: #0ca30c;
+    --status-good-ink: #3ec93e;
+    --status-good-tint: #16321a;
+    --status-warning: #fab219;
+    --status-warning-ink: #fab219;
+    --status-warning-tint: #3a2f18;
+    --status-serious: #ec835a;
+    --status-serious-tint: #3a271e;
+    --map-nodata: #262920;
+    --map-nodata-line: #3a3d32;
+    --seq-100: #1c2b26;
+    --seq-200: #2a4038;
+    --seq-300: #3f6358;
+    --seq-400: #59a68c;
+    --seq-500: #7fd4b4;
+    --shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px -12px rgba(0, 0, 0, 0.5);
+    color-scheme: dark;
+  }
+
+  :root[data-theme="light"] {
+    --bg: #f6f4ef;
+    --surface: #ffffff;
+    --surface-2: #efece3;
+    --ink: #1d2621;
+    --ink-muted: #5b6960;
+    --ink-faint: #8b9186;
+    --line: #e2ddd0;
+    --accent: #2f6f5e;
+    --accent-ink: #0f2a22;
+    --accent-tint: #e2ede8;
+    --status-good: #0ca30c;
+    --status-good-ink: #0a7a0a;
+    --status-good-tint: #dff3de;
+    --status-warning: #fab219;
+    --status-warning-ink: #8a5c12;
+    --status-warning-tint: #fdf0d7;
+    --status-serious: #ec835a;
+    --status-serious-tint: #fbe5da;
+    --map-nodata: #e6e1d2;
+    --map-nodata-line: #cfc9b6;
+    --seq-100: #d7ebe4;
+    --seq-200: #a9d2c4;
+    --seq-300: #6fb29d;
+    --seq-400: #3f8b75;
+    --seq-500: #235a4a;
+    --shadow: 0 1px 2px rgba(29, 38, 33, 0.06), 0 8px 24px -12px rgba(29, 38, 33, 0.18);
+    color-scheme: light;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Malgun Gothic", "Apple SD Gothic Neo", "Segoe UI", sans-serif;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 40px 24px 80px; display: flex; flex-direction: column; gap: 28px; }
+
+  header.page-head { display: flex; flex-direction: column; gap: 12px; border-bottom: 1px solid var(--line); padding-bottom: 24px; }
+  .eyebrow { font-size: 12.5px; font-weight: 700; letter-spacing: 0.09em; color: var(--accent); text-transform: uppercase; }
+  .head-row { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+  h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+  .lede { font-size: 14.5px; color: var(--ink-muted); max-width: 62ch; margin: 6px 0 0; }
+
+  .live-pill {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12px; font-weight: 600; color: var(--ink-muted);
+    background: var(--surface); border: 1px solid var(--line);
+    padding: 6px 12px 6px 10px; border-radius: 999px; white-space: nowrap;
+  }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--status-good); position: relative; }
+  .live-dot::after {
+    content: ""; position: absolute; inset: -4px; border-radius: 50%;
+    border: 1.5px solid var(--status-good); opacity: 0.55;
+    animation: pulse 2.2s ease-out infinite;
+  }
+  @media (prefers-reduced-motion: reduce) { .live-dot::after { animation: none; } }
+  @keyframes pulse { 0% { transform: scale(0.6); opacity: 0.7; } 100% { transform: scale(1.9); opacity: 0; } }
+
+  .layout { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(280px, 0.85fr); gap: 22px; align-items: start; }
+  @media (max-width: 860px) { .layout { grid-template-columns: 1fr; } }
+
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; box-shadow: var(--shadow); }
+
+  .map-card { padding: 18px 18px 14px; }
+  .map-card .card-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+  .card-head h2 { font-size: 12.5px; font-weight: 700; letter-spacing: 0.07em; text-transform: uppercase; color: var(--ink-muted); margin: 0; }
+  .card-head .hint { font-size: 12px; color: var(--ink-faint); }
+
+  .breadcrumb { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 600; margin-bottom: 10px; }
+  .breadcrumb .crumb { color: var(--ink-faint); }
+  .breadcrumb .crumb.link { color: var(--accent); cursor: pointer; }
+  .breadcrumb .crumb.link:hover { text-decoration: underline; }
+  .breadcrumb .crumb.current { color: var(--ink); }
+  .breadcrumb .sep { color: var(--ink-faint); font-size: 11px; }
+
+  svg#kmap { width: 100%; height: auto; display: block; }
+  .province {
+    stroke: var(--surface); stroke-width: 1.4; cursor: pointer;
+    transition: filter 0.12s ease, transform 0.12s ease;
+    transform-origin: center;
+    transform-box: fill-box;
+  }
+  .province:hover { filter: brightness(1.08); }
+  .province.selected { stroke: var(--ink); stroke-width: 2; }
+  .province.nodata { fill: var(--map-nodata); }
+  .province.nodata:hover { filter: brightness(0.97); }
+
+  .map-label {
+    font-size: 9.5px; fill: var(--ink-muted); text-anchor: middle;
+    pointer-events: none; font-weight: 600;
+    paint-order: stroke; stroke: var(--surface); stroke-width: 3px; stroke-linejoin: round;
+  }
+
+  .legend-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--line); margin-top: 10px; }
+  .seq-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-faint); }
+  .seq-swatch { display: flex; border-radius: 4px; overflow: hidden; border: 1px solid var(--line); }
+  .seq-swatch span { width: 20px; height: 12px; }
+  .nodata-legend { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--ink-faint); }
+  .nodata-legend .sw { width: 12px; height: 12px; border-radius: 3px; background: var(--map-nodata); border: 1px solid var(--map-nodata-line); }
+
+  .detail-card { padding: 20px 22px; display: flex; flex-direction: column; gap: 14px; min-height: 320px; position: sticky; top: 20px; }
+  .detail-empty { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 8px; flex: 1; color: var(--ink-faint); padding: 30px 10px; }
+  .detail-empty .glyph { font-size: 26px; }
+  .detail-empty p { margin: 0; font-size: 13px; max-width: 24ch; }
+
+  .detail-head { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+  .detail-head h3 { font-size: 19px; font-weight: 800; margin: 0; }
+  .detail-head .count { font-size: 12px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+
+  .item-list { display: flex; flex-direction: column; gap: 10px; }
+  .item-row { display: flex; flex-direction: column; gap: 6px; padding: 12px 14px; background: var(--surface-2); border-radius: 10px; }
+  .item-row .top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .item-row .sigungu { font-size: 11px; color: var(--ink-faint); }
+  .item-row .name { font-size: 14px; font-weight: 700; }
+  .item-row .stat-badge { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .stat-badge.data { background: var(--status-good-tint); color: var(--status-good-ink); }
+  .stat-badge.pending { background: var(--status-warning-tint); color: var(--status-warning-ink); }
+  .item-mini { display: flex; gap: 12px; font-size: 11.5px; color: var(--ink-faint); font-variant-numeric: tabular-nums; }
+  .item-mini b { color: var(--ink); font-weight: 700; }
+
+  footer { border-top: 1px solid var(--line); padding-top: 18px; font-size: 12px; color: var(--ink-faint); display: flex; flex-direction: column; gap: 5px; }
+</style>
+
+<div class="wrap">
+  <header class="page-head">
+    <span class="eyebrow">⑦ 대시보드 목업 · 지도 인터랙션 샘플</span>
+    <div class="head-row">
+      <div>
+        <h1>지역 특산품 브랜드 지도</h1>
+        <p class="lede">
+          시도를 클릭하면 그 지역의 시군구 지도로 내려갑니다. 시군구를 다시 클릭하면 그
+          지역 특산품의 상표 등록 현황이 오른쪽에 나타납니다. 색이 진할수록 검색된 고유
+          상표가 많고, 회색은 아직 샘플 데이터가 없는 지역입니다.
+        </p>
+      </div>
+      <span class="live-pill"><span class="live-dot"></span>마지막 갱신 · 방금 전</span>
+    </div>
+  </header>
+
+  <div class="layout">
+    <div class="card map-card">
+      <div class="card-head">
+        <h2 id="map-title">시도별 상표 활동 밀도</h2>
+        <span class="hint" id="map-hint">클릭해서 시군구까지 내려가 보기</span>
+      </div>
+      <div class="breadcrumb" id="breadcrumb">
+        <span class="crumb current" data-level="national">전국</span>
+      </div>
+      <svg id="kmap" xmlns="http://www.w3.org/2000/svg"></svg>
+      <div class="legend-row">
+        <div class="seq-legend">
+          적음
+          <span class="seq-swatch"><span style="background:var(--seq-100)"></span><span style="background:var(--seq-200)"></span><span style="background:var(--seq-300)"></span><span style="background:var(--seq-400)"></span><span style="background:var(--seq-500)"></span></span>
+          많음 (고유 상표 수)
+        </div>
+        <div class="nodata-legend"><span class="sw"></span>샘플 데이터 없음</div>
+      </div>
+    </div>
+
+    <div class="card detail-card" id="detail">
+      <div class="detail-empty" id="detail-empty">
+        <span class="glyph">🗺️</span>
+        <p>지도에서 시도 → 시군구 순으로 클릭하면 특산품별 상표 현황이 여기 나타납니다.</p>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    <span>지도 경계: southkorea/southkorea-maps(2013, KOSTAT 기준, 시도·시군구 단위) · 시도명은 2026년 현재 파이프라인 표기(강원특별자치도·전북특별자치도·전남광주통합특별시 등)로 맞춤 · 시군구 지도는 시도별로 각각 다시 투영해 확대했습니다.</span>
+    <span>지도·상세 패널 데이터: 04-analyze-brand 실제 출력 7개 시도 샘플. "마지막 갱신" 표시와 점멸 효과는 실시간 연동 목업이며 실제 자동 갱신은 아직 구현돼 있지 않습니다.</span>
+  </footer>
+</div>
+
+<script>
+  const NATIONAL_VIEWBOX = "__VIEWBOX__";
+  const PROVINCES = __PROVINCES__;
+  const MUNI = __MUNI__;
+  const DATA = __DATA__;
+
+  const svg = document.getElementById("kmap");
+  const breadcrumbEl = document.getElementById("breadcrumb");
+  const mapTitleEl = document.getElementById("map-title");
+  const mapHintEl = document.getElementById("map-hint");
+  const detailEl = document.getElementById("detail");
+  const emptyEl = document.getElementById("detail-empty");
+
+  function fillVarFor(bucket) {
+    return bucket === "nodata" ? "var(--map-nodata)" : "var(--" + bucket + ")";
+  }
+
+  function shortLabel(name) {
+    return name.replace(/(특별자치시|특별자치도|광역시|특별시|통합특별시|도|시|군|구)$/, "") || name;
+  }
+
+  // ---- 상세 패널 ----
+  function renderDetail(title, items, countLabel) {
+    if (!items || items.length === 0) {
+      detailEl.innerHTML = "";
+      detailEl.appendChild(emptyEl);
+      return;
+    }
+    const totalUnique = items.reduce((s, it) => s + it.unique, 0);
+    const rows = items.map((it) => {
+      const badge = it.searched
+        ? '<span class="stat-badge data">등록 ' + it.registered + '/' + it.unique + '</span>'
+        : '<span class="stat-badge pending">검토대기</span>';
+      return (
+        '<div class="item-row">' +
+          '<div class="top"><div><div class="sigungu">' + (it.sigungu || '') + '</div><div class="name">' + it.item + '</div></div>' + badge + '</div>' +
+          (it.searched
+            ? '<div class="item-mini"><span>고유 상표 <b>' + it.unique + '</b></span><span>등록 <b>' + it.registered + '</b></span></div>'
+            : '<div class="item-mini">②단계에서 아직 확정 못한 품목 — ③ 상표 검색 대상 아님</div>') +
+        '</div>'
+      );
+    }).join("");
+
+    detailEl.innerHTML =
+      '<div class="detail-head"><h3>' + title + '</h3><span class="count">' + (countLabel || (items.length + '개 품목 · 고유 상표 ' + totalUnique + '건')) + '</span></div>' +
+      '<div class="item-list">' + rows + '</div>';
+  }
+
+  // ---- 지도 렌더링 ----
+  let currentProvince = null;
+
+  function renderNational() {
+    currentProvince = null;
+    svg.setAttribute("viewBox", NATIONAL_VIEWBOX);
+    mapTitleEl.textContent = "시도별 상표 활동 밀도";
+    mapHintEl.textContent = "클릭해서 시군구까지 내려가 보기";
+    breadcrumbEl.innerHTML = '<span class="crumb current" data-level="national">전국</span>';
+
+    const paths = PROVINCES.map((p) =>
+      '<path class="province' + (p.bucket === "nodata" ? " nodata" : "") + '" data-name="' + p.name + '" d="' + p.d + '" style="fill:' + fillVarFor(p.bucket) + '">' +
+        '<title>' + p.name + (p.value !== null ? ' — 고유 상표 ' + p.value + '건 (클릭해서 시군구 보기)' : ' — 샘플 데이터 없음 (클릭해서 시군구 보기)') + '</title>' +
+      '</path>'
+    ).join("");
+    const labels = PROVINCES.map((p) =>
+      '<text class="map-label" x="' + p.labelX + '" y="' + p.labelY + '">' + shortLabel(p.name) + '</text>'
+    ).join("");
+    svg.innerHTML = paths + labels;
+
+    svg.querySelectorAll(".province").forEach((path) => {
+      path.addEventListener("click", () => renderProvince(path.dataset.name));
+    });
+
+    renderDetail(null, null);
+  }
+
+  function renderProvince(provinceName) {
+    const muni = MUNI[provinceName];
+    if (!muni) return;
+    currentProvince = provinceName;
+    svg.setAttribute("viewBox", muni.viewBox);
+    mapTitleEl.textContent = provinceName + " 시군구별 상표 활동";
+    mapHintEl.textContent = "시군구를 클릭해서 품목 상세 보기";
+    breadcrumbEl.innerHTML =
+      '<span class="crumb link" data-level="national">전국</span>' +
+      '<span class="sep">›</span>' +
+      '<span class="crumb current">' + provinceName + '</span>';
+    breadcrumbEl.querySelector('[data-level="national"]').addEventListener("click", renderNational);
+
+    const paths = muni.items.map((m) =>
+      '<path class="province' + (m.bucket === "nodata" ? " nodata" : "") + '" data-name="' + m.sigunguKey + '" d="' + m.d + '" style="fill:' + fillVarFor(m.bucket) + '">' +
+        '<title>' + m.name + (m.value !== null ? ' — 고유 상표 ' + m.value + '건' : ' — 샘플 데이터 없음') + '</title>' +
+      '</path>'
+    ).join("");
+    const labels = muni.items.map((m) =>
+      '<text class="map-label" x="' + m.labelX + '" y="' + m.labelY + '">' + shortLabel(m.name) + '</text>'
+    ).join("");
+    svg.innerHTML = paths + labels;
+
+    svg.querySelectorAll(".province").forEach((path) => {
+      path.addEventListener("click", () => {
+        svg.querySelectorAll(".province.selected").forEach((p) => p.classList.remove("selected"));
+        path.classList.add("selected");
+        renderMuniDetail(provinceName, path.dataset.name);
+      });
+    });
+
+    // 시도 전체 요약을 기본으로 보여준다
+    const entry = DATA[provinceName];
+    renderDetail(provinceName + " 전체", entry ? entry.items : null);
+  }
+
+  function renderMuniDetail(provinceName, sigunguKey) {
+    const entry = DATA[provinceName];
+    const items = entry ? entry.items.filter((it) => it.sigungu === sigunguKey) : [];
+    if (items.length === 0) {
+      detailEl.innerHTML =
+        '<div class="detail-head"><h3>' + sigunguKey + '</h3><span class="count">샘플 데이터 없음</span></div>' +
+        '<div class="detail-empty" style="flex:1; padding:20px 0;"><span class="glyph">📭</span><p>이 시군구는 이번 샘플에 포함되지 않았습니다.</p></div>';
+      return;
+    }
+    renderDetail(sigunguKey, items);
+  }
+
+  renderNational();
+</script>

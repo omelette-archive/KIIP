@@ -6,6 +6,11 @@ node_modules/
 02-normalize-items/output/*.json
 01-collect-specialties/output/*.csv
 
+# buildmap.js/buildmuni.js가 07-dashboard/prototypes/data/skorea_*.json에서 재생성하는
+# 중간 산출물 — vendored 원본만 커밋하고 빌드 결과물은 커밋하지 않는다.
+07-dashboard/prototypes/data/provinces.json
+07-dashboard/prototypes/data/muniByProvince.json
+
 # Orca 플랫폼 로컬 스킬 동기화 메타데이터 (프로젝트 코드 아님)
 .agents/
 .claude/
