@@ -63,8 +63,66 @@ function createClient({ apiKey, fetchImpl } = {}) {
   }
 
   /**
-   * totalCount까지 모든 페이지를 순회해서 items를 모아 반환한다. 목록형 데이터를 통째로
-   * 로컬 데이터셋으로 만드는 게 목적이라, 소스별 클라이언트는 기본적으로 이걸 쓴다.
+   * data.go.kr 목록형 API를 totalCount까지 페이지 순회해 모두 가져온다.
+   * @param {{baseUrl:string, operation:string, params?:object, pageNo?:number, numOfRows?:number, maxItems?:number}} p
+   */
+  async function callAllPages({
+    baseUrl,
+    operation,
+    params = {},
+    pageNo = 1,
+    numOfRows = 100,
+    maxItems,
+  }) {
+    let currentPage = Number(pageNo);
+    const pageSize = Number(numOfRows);
+    if (!Number.isInteger(currentPage) || currentPage < 1) {
+      throw new Error("callAllPages: pageNo는 1 이상의 정수여야 합니다.");
+    }
+    if (!Number.isInteger(pageSize) || pageSize < 1) {
+      throw new Error("callAllPages: numOfRows는 1 이상의 정수여야 합니다.");
+    }
+    const itemLimit = maxItems === undefined ? null : Number(maxItems);
+    if (itemLimit !== null && (!Number.isInteger(itemLimit) || itemLimit < 1)) {
+      throw new Error("callAllPages: maxItems는 1 이상의 정수여야 합니다.");
+    }
+
+    const items = [];
+    let totalCount = 0;
+    let resultMsg = "";
+
+    while (true) {
+      const requestSize = itemLimit === null ? pageSize : Math.min(pageSize, itemLimit - items.length);
+      const result = await callOperation({
+        baseUrl,
+        operation,
+        params: { ...params, pageNo: currentPage, numOfRows: requestSize },
+      });
+      items.push(...result.items);
+      totalCount = Math.max(totalCount, result.totalCount);
+      resultMsg = result.resultMsg;
+
+      // 서버가 요청한 numOfRows보다 작은 자체 상한을 적용할 수 있으므로 페이지 번호가
+      // 아니라 실제 누적 건수로 완료 여부를 판단한다.
+      const reachedReportedTotal = totalCount > 0 && items.length >= totalCount;
+      const reachedUnreportedEnd = totalCount <= 0 && result.items.length < requestSize;
+      const reachedLimit = itemLimit !== null && items.length >= itemLimit;
+      if (result.items.length === 0 || reachedReportedTotal || reachedUnreportedEnd || reachedLimit) break;
+      currentPage++;
+    }
+
+    return {
+      resultCode: "00",
+      resultMsg,
+      totalCount,
+      items: itemLimit === null ? items : items.slice(0, itemLimit),
+    };
+  }
+
+  /**
+   * totalCount까지 모든 페이지를 순회해서 items를 모아 반환한다. callAllPages와 달리
+   * maxPages(페이지 수) 기준으로 상한을 둔다 — 호출부가 항목 수가 아니라 페이지 수로
+   * 제한하고 싶을 때 사용.
    * @param {{baseUrl:string, operation:string, params?:object, pageSize?:number, maxPages?:number}} p
    * @returns {Promise<{totalCount:number, items:object[]}>}
    */
@@ -80,7 +138,7 @@ function createClient({ apiKey, fetchImpl } = {}) {
     return { totalCount: first.totalCount, items };
   }
 
-  return { callOperation, fetchAllPages };
+  return { callOperation, callAllPages, fetchAllPages };
 }
 
 module.exports = { createClient, buildQuery };

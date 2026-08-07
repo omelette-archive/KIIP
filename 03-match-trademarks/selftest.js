@@ -6,10 +6,22 @@
  */
 
 const assert = require("assert");
+const fs = require("fs");
+const os = require("os");
+const path = require("path");
 const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
 const { filterByClassCode } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
+const {
+  parseCsvLine,
+  readNormalizedCsv,
+  makeBatchQuery,
+  countSearchableRows,
+  buildBatchPlan,
+  buildSearchOutput,
+  runBatch,
+} = require("./matchTrademarks");
 
 const SAMPLE_OK_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <response>
@@ -162,6 +174,127 @@ async function run() {
     assert.strictEqual(attempts, 3);
     assert.strictEqual(result.hits.length, 2);
     ok("503 두 번 -> 세 번째 시도에서 성공 (지수 백오프 재시도 확인)");
+  }
+
+  console.log("7) 배치 CSV 행 -> 검색 쿼리 변환");
+  {
+    assert.deepStrictEqual(parseCsvLine('안동시,"안동사과, 부사",31'), [
+      "안동시", "안동사과, 부사", "31",
+    ]);
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동사과",
+        itemName: "사과",
+        noticeName: "사과",
+        niceClass: "31",
+        status: "ok",
+      }),
+      { region: "경상북도 안동시", item: "사과", classCode: "31" }
+    );
+    assert.match(
+      makeBatchQuery({ status: "error", rawItemName: "실패품목" }).skipReason,
+      /상위 단계/
+    );
+    assert.match(
+      makeBatchQuery({ status: "review_required", rawItemName: "안동하회탈" }).skipReason,
+      /상위 단계/
+    );
+    assert.match(
+      makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
+      /분석 제외/
+    );
+    assert.strictEqual(
+      countSearchableRows([
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", status: "ok" },
+        { rawItemName: "검토", status: "review_required" },
+        { rawItemName: "제외", excluded: "true", status: "ok" },
+      ]),
+      1
+    );
+    ok("② 출력의 고시명칭/NICE류를 사용하고 검토필요·오류·제외 행은 건너뜀");
+  }
+
+  console.log("8) buildSearchOutput — 키워드 전체와 현재 페이지 필터 건수 분리");
+  {
+    const result = { totalCount: 10000, hits: [{ classificationCode: "31" }, { classificationCode: "30" }] };
+    const hits = filterByClassCode(result.hits, "31");
+    const output = buildSearchOutput(
+      { region: "경상북도 안동시", item: "사과", classCode: "31" },
+      result,
+      hits,
+      { pageNo: 1, numOfRows: 20 }
+    );
+    assert.strictEqual(output.keywordTotalCount, 10000);
+    assert.strictEqual(output.page.unfilteredCount, 2);
+    assert.strictEqual(output.page.filteredCount, 1);
+    assert.strictEqual(output.page.hasMore, true);
+    assert.strictEqual(output.totalCount, undefined);
+    assert.strictEqual(output.returnedCount, undefined);
+    ok("서로 다른 모집단의 카운트를 이름과 페이지 메타데이터로 명확히 구분함");
+  }
+
+  console.log("9) runBatch — 행별 성공/오류/건너뜀 보존");
+  {
+    let calls = 0;
+    const client = {
+      trademarkSearch: async () => {
+        calls++;
+        return {
+          resultCode: "00",
+          resultMsg: "OK",
+          totalCount: 1,
+          hits: [{ title: "사과상표", classificationCode: "31" }],
+        };
+      },
+    };
+    const results = await runBatch(
+      [
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok" },
+        { rawItemName: "실패품목", status: "error" },
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과나무", excluded: "true", status: "ok" },
+      ],
+      client,
+      { pageNo: 1, numOfRows: 20, concurrency: 2 }
+    );
+    assert.strictEqual(calls, 1);
+    assert.deepStrictEqual(results.map((row) => row.status), ["ok", "skipped", "skipped"]);
+    assert.strictEqual(results[0].page.filteredCount, 1);
+    ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함");
+  }
+
+  console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-trademark-contract-"));
+    const rawInputPath = path.join(tempDir, "stage1.csv");
+    const normalizedInputPath = path.join(tempDir, "stage2.csv");
+    try {
+      fs.writeFileSync(
+        rawInputPath,
+        "sido,sigungu,rawItemName\n경상북도,안동시,안동사과\n",
+        "utf8"
+      );
+      assert.throws(() => readNormalizedCsv(rawInputPath), /itemName.*status/);
+
+      fs.writeFileSync(
+        normalizedInputPath,
+        [
+          "sido,sigungu,rawItemName,itemName,noticeName,niceClass,excluded,status",
+          "경상북도,안동시,안동사과,사과,신선한 사과,31,false,ok",
+          "경상북도,안동시,안동하회탈,하회탈,,,false,review_required",
+        ].join("\n") + "\n",
+        "utf8"
+      );
+      const rows = readNormalizedCsv(normalizedInputPath);
+      const plan = buildBatchPlan(rows);
+      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "skipped"]);
+      assert.strictEqual(plan[0].query.item, "신선한 사과");
+      assert.match(plan[1].reason, /review_required/);
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+    ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
   }
 
   console.log("\n모든 자체 테스트 통과");

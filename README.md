@@ -35,9 +35,9 @@ flowchart LR
 
 | # | 단계 | 폴더 | 상태 | 한 줄 요약 |
 |---|---|---|---|---|
-| ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | 법정동코드 마스터 검증 완료, 지리적표시/농사로는 API 클라이언트 구현+실키 대기 |
-| ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 파이프라인 구현+자체테스트 완료, 실키 스모크 테스트 대기 |
-| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 상표 검색 — **품목 매칭은 동작, 지역 매칭은 TODO** |
+| ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | 법정동코드 검증, OpenAPI 전체 페이지 수집·실패 감지 구현, 실키 대기 |
+| ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 1차 정규화 + 애매한 행 별도 AI 검토 대기열 구현 |
+| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | ② CSV 배치 검색·품목 매칭 동작, **지역 매칭은 TODO** |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역·품목별 집계와 시계열 분석 동작, 지역 내·외 비중은 주소 데이터 대기 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | ⚪ 예정 | 상표 활용도 낮은 지역/품목 탐지 |
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | ⚪ 예정 | 분석 결과 → 비즈니스 확장 전략 브리핑 자동 생성 |
@@ -45,10 +45,16 @@ flowchart LR
 
 각 폴더의 `README.md`에 해당 단계의 목표·할 일·입출력 스키마가 정리되어 있다.
 
+수집 URL·데이터 구조·정제 기준은 [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md),
+Open API 계정/호출 제한은 [`docs/open-api-limits.md`](docs/open-api-limits.md)를 기준으로 관리한다.
+외부 API 전체 호출 전에는 [`samples/`](samples/)의 고정 소량 데이터로 단계 간 계약을 검증한다.
+
 ## 문서
 
 - [`docs/project-plan.md`](docs/project-plan.md) — 전체 기획 원문 정리 (프로젝트명·목표·7단계 상세·기대효과)
 - [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
+- [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
+- [`docs/open-api-limits.md`](docs/open-api-limits.md) — 계정 승인·호출 제한과 운영 체크리스트
 
 ## 개발 방법 (기획 기준)
 

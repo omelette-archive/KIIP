@@ -2,7 +2,7 @@
 /**
  * 원시 품목명(rawItemName)과 고시상품명칭 사전 사이의 후보를 문자 bigram Jaccard
  * 유사도로 뽑는다. 임베딩/외부 API 없이 순수 로컬 계산이라 API 키 없이도 동작·
- * 테스트 가능 — LLM은 이 후보 목록 중에서만 고르게 해서 환각을 막는 데 쓴다.
+ * 테스트 가능하다. 확정하지 못한 행은 이 후보 목록과 함께 별도 AI/사람 검토로 보낸다.
  *
  * 성능: 사전이 57,000건이 넘어서 매 쿼리마다 전체를 선형 스캔하면 01→02 파이프라인이
  * 실제로 수백~수천 행을 처리할 때 느려진다. bigram 역색인(bigram -> 해당 bigram을 가진
@@ -70,15 +70,15 @@ function getIndex(dictionary) {
 
   const invertedIndex = new Map();
   const shortEntryIndices = [];
-  dictionary.forEach((entry, i) => {
-    if (entry.item.length === 1) shortEntryIndices.push(i);
-    for (const bg of entry.bigrams) {
-      let bucket = invertedIndex.get(bg);
+  dictionary.forEach((entry, index) => {
+    if (entry.item.length === 1) shortEntryIndices.push(index);
+    for (const bigram of entry.bigrams) {
+      let bucket = invertedIndex.get(bigram);
       if (!bucket) {
         bucket = [];
-        invertedIndex.set(bg, bucket);
+        invertedIndex.set(bigram, bucket);
       }
-      bucket.push(i);
+      bucket.push(index);
     }
   });
 
@@ -111,16 +111,16 @@ function findCandidates(rawItemName, dictionary, region = {}, options = {}) {
     indicesToScore = dictionary.keys();
   } else {
     const candidateIndices = new Set(shortEntryIndices);
-    for (const bg of queryBigrams) {
-      const bucket = invertedIndex.get(bg);
-      if (bucket) for (const i of bucket) candidateIndices.add(i);
+    for (const bigram of queryBigrams) {
+      const bucket = invertedIndex.get(bigram);
+      if (bucket) for (const index of bucket) candidateIndices.add(index);
     }
     indicesToScore = candidateIndices;
   }
 
   const scored = [];
-  for (const i of indicesToScore) {
-    const entry = dictionary[i];
+  for (const index of indicesToScore) {
+    const entry = dictionary[index];
     if (!includeServiceClass && isServiceClass(entry.niceClass)) continue;
     // substring 포함 관계(예: "하회탈" ⊃ "탈")는 bigram이 하나도 안 겹쳐도(1글자
     // 사전 항목 등) 유효한 신호이므로, bigram 점수가 0이어도 먼저 확인해서 살려둔다.
