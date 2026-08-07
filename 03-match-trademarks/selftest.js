@@ -11,7 +11,7 @@ const os = require("os");
 const path = require("path");
 const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
-const { filterByClassCode } = require("./lib/filters");
+const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const {
   parseCsvLine,
@@ -20,6 +20,7 @@ const {
   countSearchableRows,
   buildBatchPlan,
   buildSearchOutput,
+  searchOne,
   runBatch,
 } = require("./matchTrademarks");
 
@@ -233,6 +234,39 @@ async function run() {
     assert.strictEqual(output.totalCount, undefined);
     assert.strictEqual(output.returnedCount, undefined);
     ok("서로 다른 모집단의 카운트를 이름과 페이지 메타데이터로 명확히 구분함");
+  }
+
+  console.log("8-1) searchOne — NICE류 미상 시 식품 관련 기본 류로 좁힘(무필터 아님)");
+  {
+    const mixedClassXml = `<?xml version="1.0" encoding="UTF-8"?>
+<response>
+  <header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE.</resultMsg></header>
+  <body>
+    <items>
+      <totalCount>3</totalCount>
+      <item><title>식품상표</title><applicationNumber>1</applicationNumber><classificationCode>30</classificationCode></item>
+      <item><title>전자상표</title><applicationNumber>2</applicationNumber><classificationCode>09</classificationCode></item>
+      <item><title>다류상표</title><applicationNumber>3</applicationNumber><classificationCode>09|43</classificationCode></item>
+    </items>
+  </body>
+</response>`;
+    const client = createClient({
+      apiKey: "test-key",
+      fetchImpl: async () => ({ ok: true, status: 200, text: async () => mixedClassXml }),
+    });
+
+    const withoutClass = await searchOne(client, { region: "경상북도 안동시", item: "품목" }, { pageNo: 1, numOfRows: 20 });
+    assert.strictEqual(withoutClass.page.unfilteredCount, 3);
+    assert.strictEqual(withoutClass.page.filteredCount, 2, "09류 단독 상표만 제외되고 30류·09|43류(43 포함)는 남아야 함");
+    assert.strictEqual(withoutClass.query.classCode, null, "실제 요청 류는 여전히 null(정확한 메타데이터)");
+    assert.strictEqual(withoutClass.query.classCodeFallbackApplied, true);
+
+    const withClass = await searchOne(client, { region: "경상북도 안동시", item: "품목", classCode: "09" }, { pageNo: 1, numOfRows: 20 });
+    assert.strictEqual(withClass.page.filteredCount, 2, "명시적으로 09류를 요청하면 09류 상표만 남아야 함");
+    assert.strictEqual(withClass.query.classCodeFallbackApplied, false);
+
+    assert.deepStrictEqual(FOOD_RELATED_CLASSES, ["29", "30", "31", "32", "33", "40", "43"]);
+    ok("NICE류를 모르면 무필터 대신 식품·음료 기본 류로 좁혀 노이즈를 줄이고, 메타데이터로 구분 표시");
   }
 
   console.log("9) runBatch — 행별 성공/오류/건너뜀 보존");

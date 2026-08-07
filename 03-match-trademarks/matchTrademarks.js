@@ -16,7 +16,7 @@ const { loadEnv } = require("./lib/loadEnv");
 loadEnv();
 
 const { createClient } = require("./lib/kiprisClient");
-const { filterByClassCode } = require("./lib/filters");
+const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 
 function parseArgs(argv) {
   const args = { numOfRows: 20, pageNo: 1, concurrency: 2, "max-requests": 100 };
@@ -146,7 +146,7 @@ function buildBatchPlan(rows) {
   });
 }
 
-function buildSearchOutput(query, result, hits, { pageNo, numOfRows }) {
+function buildSearchOutput(query, result, hits, { pageNo, numOfRows, classCodeFallbackApplied }) {
   const pageNumber = Number(pageNo);
   const pageSize = Number(numOfRows);
   return {
@@ -155,7 +155,11 @@ function buildSearchOutput(query, result, hits, { pageNo, numOfRows }) {
       region: query.region,
       regionMatch: "unverified",
       item: query.item,
+      // 요청 시점에 실제로 알고 있던 류만 기록한다(메타데이터 정확성). 미상일 때 적용한
+      // 기본 류 집합은 classCodeFallbackApplied로 따로 표시한다 — 필터는 됐지만 이
+      // 특정 류를 "지정해서" 검색한 게 아님을 구분하기 위함.
       classCode: query.classCode || null,
+      classCodeFallbackApplied,
     },
     // KIPRIS가 반환한 키워드 전체 건수이며 classCode 필터 전 값이다.
     keywordTotalCount: result.totalCount,
@@ -177,8 +181,11 @@ async function searchOne(client, query, options) {
     numOfRows: Number(options.numOfRows),
     pageNo: Number(options.pageNo),
   });
-  const hits = filterByClassCode(result.hits, query.classCode);
-  return buildSearchOutput(query, result, hits, options);
+  // NICE류를 모르면 무필터 대신 식품·음료 관련 기본 류 집합으로 좁힌다(FOOD_RELATED_CLASSES
+  // 참고 — 무필터 시 노이즈가 수만 건까지 나오는 게 실측으로 확인됨).
+  const classCodeFallbackApplied = !query.classCode;
+  const hits = filterByClassCode(result.hits, query.classCode || FOOD_RELATED_CLASSES);
+  return buildSearchOutput(query, result, hits, { ...options, classCodeFallbackApplied });
 }
 
 async function runWithConcurrency(items, concurrency, worker) {
