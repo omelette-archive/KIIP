@@ -21,6 +21,18 @@ function sidoCoreName(sido) {
   return (sido || "").replace(SIDO_SUFFIX_RE, "");
 }
 
+// 행정구역 통합으로 마스터에서 사라진 옛 시도명. 소스 데이터(뉴스, 오래된 공공데이터 등)는
+// 통합 전 표기를 계속 쓸 수 있어, 동명 시군구 좁히기에서 신구 명칭을 함께 인정한다.
+// 실제 마스터(법정동코드_전국)에 "전남광주통합특별시"만 있고 "전라남도"/"광주광역시"는
+// 더 이상 없는 것을 확인하고 추가함 — 새 통합 사례가 생기면 여기만 추가하면 된다.
+const LEGACY_SIDO_ALIASES = {
+  전남광주통합특별시: ["전라남도", "전남", "광주광역시", "광주"],
+};
+
+function sidoMatchTokens(sido) {
+  return [sidoCoreName(sido), ...(LEGACY_SIDO_ALIASES[sido] || [])].filter(Boolean);
+}
+
 /**
  * @param {string} regionText
  * @param {{sido:string, sigungu:string}[]} adminList
@@ -37,8 +49,10 @@ function splitRegion(regionText, adminList) {
     return { sido: candidates[0].sido, sigungu: candidates[0].sigungu, matched: true };
   }
 
-  // 동명 시군구 — 지역 문자열에 시도명(핵심어)이 같이 있으면 그걸로 좁힌다.
-  const narrowed = candidates.filter((admin) => normalized.includes(sidoCoreName(admin.sido)));
+  // 동명 시군구 — 지역 문자열에 시도명(핵심어, 통합 전 옛 이름 포함)이 같이 있으면 그걸로 좁힌다.
+  const narrowed = candidates.filter((admin) =>
+    sidoMatchTokens(admin.sido).some((token) => normalized.includes(token))
+  );
   if (narrowed.length === 1) {
     return { sido: narrowed[0].sido, sigungu: narrowed[0].sigungu, matched: true };
   }

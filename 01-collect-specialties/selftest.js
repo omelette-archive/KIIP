@@ -113,6 +113,24 @@ async function run() {
     ok("시도가 있으면 정확한 후보를 고르고, 시도 없는 중복 시군구는 미검증 처리됨");
   }
 
+  console.log("3-3) normalize.splitRegion — 통합 시도(전남광주통합특별시)의 옛 이름(전라남도/광주) 인식");
+  {
+    const mergedSidoAdminList = [
+      { code: "X1", sido: "전남광주통합특별시", sigungu: "테스트구" },
+      { code: "X2", sido: "경기도", sigungu: "테스트구" },
+    ];
+    assert.deepStrictEqual(splitRegion("전라남도 테스트구", mergedSidoAdminList), {
+      sido: "전남광주통합특별시", sigungu: "테스트구", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("광주 테스트구", mergedSidoAdminList), {
+      sido: "전남광주통합특별시", sigungu: "테스트구", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("경기도 테스트구", mergedSidoAdminList), {
+      sido: "경기도", sigungu: "테스트구", matched: true,
+    });
+    ok("마스터엔 통합 후 이름만 있어도, 소스가 통합 전 옛 시도명을 써도 정확히 좁혀짐");
+  }
+
   console.log("4) normalize.fromGiRegistrations / fromNongsaro");
   {
     const gi = fromGiRegistrations(
