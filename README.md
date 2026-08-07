@@ -49,6 +49,18 @@ flowchart LR
 Open API 계정/호출 제한은 [`docs/open-api-limits.md`](docs/open-api-limits.md)를 기준으로 관리한다.
 외부 API 전체 호출 전에는 [`samples/`](samples/)의 고정 소량 데이터로 단계 간 계약을 검증한다.
 
+## 지속 검증
+
+외부 API 키 없이 JavaScript 구문, ①~④ 자체 테스트, ②→③ 샘플 dry-run, ③→④ 분석 계약을
+한 번에 검증한다.
+
+```bash
+node scripts/validatePipeline.js
+```
+
+동일한 검증은 모든 push와 pull request에서 GitHub Actions로 자동 실행된다. 실제 API 호출은
+포함하지 않아 키나 호출량을 사용하지 않는다.
+
 ## 문서
 
 - [`docs/project-plan.md`](docs/project-plan.md) — 전체 기획 원문 정리 (프로젝트명·목표·7단계 상세·기대효과)
