@@ -63,31 +63,18 @@ KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 �
 `--max-requests` 기본값은 한 번의 실수로 월간 한도를 소진하지 않게 하는 실행 단위 보호선이며,
 상세 근거는 [`docs/open-api-limits.md`](../docs/open-api-limits.md)에 정리했다.
 
-### 배치 실행 (02단계 출력 연결)
-
-`matchTrademarks.js`는 {지역,품목} 한 쌍만 처리해서, 02단계 출력(수십~수백 행)을 실제로
-흘려보내려면 매번 수동으로 반복 호출해야 했다. `matchTrademarksBatch.js`가 그 공백을 메운다 —
-02의 출력 CSV를 그대로 입력으로 받아 행마다 상표 검색을 돌린다.
-
-```bash
-node 03-match-trademarks/matchTrademarksBatch.js \
-  --input 02-normalize-items/output/normalized.csv \
-  --out 03-match-trademarks/output/batch-result.json
-```
-
-- 검색어는 `noticeName`(고시명칭)이 있으면 우선 쓰고, 없으면 `itemName`을 쓴다.
-- `niceClass`가 있으면 그 값으로 결과를 필터링한다.
-- `excluded`가 true인 행(묘목/나무 등)은 건너뛴다.
-- 동시 요청 수는 기본 3(`--concurrency`) — 실제 정부 API라 보수적으로 잡았다.
-- 실제 KIPRIS 키로 검증 완료: `noticeName` 우선 검색과 `niceClass` 필터가 함께 정확히
-  동작함(예: "기장미역 지리적표시품" 정확 매칭, "무주머루와인" 정확 매칭).
+> 과거 `matchTrademarksBatch.js`라는 별도 배치 스크립트가 있었으나, ②단계의 신 계약
+> (`status`)을 읽지 않고 `excluded`/`noticeName || itemName`만 봐서 `review_required`
+> 행까지 검색 대상에 넣는 문제가 있었다(이슈 #9). 위 "② 단계 출력 전체를 배치 검색"이
+> 그 자리를 완전히 대체하므로 삭제했다 — `noticeName` 우선 검색 + `niceClass` 필터
+> 조합은 실제 KIPRIS 키로 검증된 바 있다(예: "기장미역 지리적표시품", "무주머루와인" 정확
+> 매칭).
 
 ## 구조
 
 ```
 03-match-trademarks/
-├── matchTrademarks.js       CLI 진입점 (단건: {지역,품목} 한 쌍)
-├── matchTrademarksBatch.js  배치 CLI (02단계 출력 CSV -> 행마다 검색)
+├── matchTrademarks.js       CLI 진입점 (단건: {지역,품목} 한 쌍 / --input: ②단계 출력 배치)
 ├── selftest.js            fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
 ├── lib/
 │   ├── kiprisClient.js     trademarkSearch() — ServiceKey 쿼리 빌드, resultCode 처리
