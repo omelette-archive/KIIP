@@ -80,6 +80,7 @@ function csvEscape(value) {
 }
 
 const OUTPUT_FIELDS = [
+  "inputIndex",
   "sido",
   "sigungu",
   "rawItemName",
@@ -94,6 +95,11 @@ const OUTPUT_FIELDS = [
   "confidence",
   "reviewReason",
   "reviewCandidates",
+  "reviewDecision",
+  "selectedCandidateIndex",
+  "reviewNote",
+  "reviewedBy",
+  "reviewedAt",
   "error",
 ];
 
@@ -155,7 +161,15 @@ async function main() {
   const dictionary = loadDictionary();
   console.error(`[normalizeItems] 고시상품명칭 사전 ${dictionary.length.toLocaleString()}건 로드`);
 
-  const results = rawRows.map((row) => normalizeRow(row, { dictionary, topK }));
+  const results = rawRows.map((row, inputIndex) => ({
+    inputIndex,
+    ...normalizeRow(row, { dictionary, topK }),
+    reviewDecision: "",
+    selectedCandidateIndex: "",
+    reviewNote: "",
+    reviewedBy: "",
+    reviewedAt: "",
+  }));
   const reviewRows = results.filter((row) => row.status === "review_required");
 
   writeOutputCsv(outPath, results);

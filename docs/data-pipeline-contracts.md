@@ -54,5 +54,21 @@
 8. 사람이 개별 검토해 승인하기 전에는 ③ 상표 검색이 해당 행을 건너뛴다 — 이 검토를
    AI로 자동화하지 않는다(의도적 결정).
 
+### 수동 검토 중간산출물 계약
+
+`normalizeItems.js`는 모든 행에 원본 순서를 나타내는 `inputIndex`를 부여하고,
+`status=review_required` 행을 별도 CSV로 복사한다. 검토자는 다음 결정만 기록할 수 있다.
+
+| 결정 | 의미 | 추가 필드 |
+|---|---|---|
+| `approve_candidate` | 생성된 `reviewCandidates` 중 하나를 승인 | `selectedCandidateIndex`, `reviewedBy`, `reviewedAt` |
+| `exclude` | 분석 대상에서 제외 | `reviewedBy`, `reviewedAt` |
+| `keep_pending` 또는 빈 값 | 아직 확정하지 않음 | `reviewNote` 선택 |
+
+`applyManualReviews.js`는 결정의 유효성만 검증해 전체 결과에 병합한다. 후보 밖의 자유 입력은
+허용하지 않으며, 승인·제외 결과에는 `matchMethod=manual_candidate|manual_excluded`와 검토자,
+ISO-8601 검토 시각을 보존한다. DB 도입 시 이 값은 `specialty_normalizations`와 분리된
+`normalization_reviews` 이력 테이블에 append-only로 저장한다.
+
 규칙이 바뀌면 자체 테스트 사례와 이 문서를 함께 갱신한다. 의미 추론이 필요한 매핑은 자동 규칙에
 추가하지 않고 검토 사례가 반복될 때만 명시적 규칙/사전으로 승격한다.

@@ -16,6 +16,7 @@ const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
 const { normalizeRow } = require("./normalizeItems");
+const { applyManualReviews } = require("./applyManualReviews");
 const { cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
 
 function ok(label) {
@@ -138,7 +139,77 @@ async function run() {
     ok("규칙 처리 오류도 원본·출처와 함께 결과 행에 보존됨");
   }
 
-  console.log("7) normalizeItems CLI — 외부 API 키 전혀 없이 결과와 검토 대기열 생성");
+  console.log("7) 수동 검토 결정 — 후보 승인/제외/감사 이력 검증");
+  {
+    const pending = {
+      inputIndex: "3",
+      sido: "경상북도",
+      sigungu: "안동시",
+      rawItemName: "안동하회탈",
+      itemName: "하회탈",
+      noticeName: "",
+      niceClass: "",
+      similarGroupCode: "",
+      excluded: "false",
+      status: "review_required",
+      matchMethod: "rule_unresolved",
+      confidence: "",
+      reviewReason: "정확히 일치하는 고시명칭이 없음",
+      reviewCandidates: JSON.stringify([
+        { item: "탈", niceClass: "28", similarGroupCode: "G0301", score: 0.5 },
+      ]),
+      reviewDecision: "",
+      selectedCandidateIndex: "",
+      reviewNote: "",
+      reviewedBy: "",
+      reviewedAt: "",
+      error: "",
+    };
+    const approved = applyManualReviews([pending], [{
+      inputIndex: "3",
+      reviewDecision: "approve_candidate",
+      selectedCandidateIndex: "0",
+      reviewNote: "고시명칭 후보 확인",
+      reviewedBy: "reviewer@example.org",
+      reviewedAt: "2026-08-07T01:00:00Z",
+    }])[0];
+    assert.strictEqual(approved.status, "ok");
+    assert.strictEqual(approved.noticeName, "탈");
+    assert.strictEqual(approved.matchMethod, "manual_candidate");
+    assert.strictEqual(approved.reviewedBy, "reviewer@example.org");
+
+    const excluded = applyManualReviews([pending], [{
+      inputIndex: "3",
+      reviewDecision: "exclude",
+      reviewedBy: "reviewer@example.org",
+      reviewedAt: "2026-08-07T01:00:00Z",
+    }])[0];
+    assert.strictEqual(excluded.status, "ok");
+    assert.strictEqual(excluded.excluded, true);
+    assert.strictEqual(excluded.matchMethod, "manual_excluded");
+
+    assert.throws(
+      () => applyManualReviews([pending], [{
+        inputIndex: "3",
+        reviewDecision: "approve_candidate",
+        selectedCandidateIndex: "9",
+        reviewedBy: "reviewer@example.org",
+        reviewedAt: "2026-08-07T01:00:00Z",
+      }]),
+      /후보 9가 존재하지 않습니다/
+    );
+    assert.throws(
+      () => applyManualReviews([pending], [{
+        inputIndex: "3",
+        reviewDecision: "exclude",
+        reviewedAt: "2026-08-07T01:00:00Z",
+      }]),
+      /reviewedBy가 필요합니다/
+    );
+    ok("사람은 기존 후보 승인·제외·보류만 가능하고 최종 결정에는 검토자와 시각이 필수");
+  }
+
+  console.log("8) normalizeItems CLI — 외부 API 키 전혀 없이 결과와 검토 대기열 생성");
   {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-normalize-rules-"));
     const inputPath = path.join(tempDir, "input.csv");
@@ -166,6 +237,8 @@ async function run() {
       const review = fs.readFileSync(reviewPath, "utf8");
       assert.match(output, /rule_fresh/);
       assert.match(output, /review_required/);
+      assert.match(output, /^﻿?inputIndex,/);
+      assert.match(output, /reviewDecision,selectedCandidateIndex,reviewNote,reviewedBy,reviewedAt/);
       assert.strictEqual(review.trim().split(/\r?\n/).length, 2, "검토 CSV에는 헤더와 미확정 1행만 있어야 함");
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
