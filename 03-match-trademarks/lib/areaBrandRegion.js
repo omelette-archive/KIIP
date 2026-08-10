@@ -114,14 +114,21 @@ function joinAreaBrandEvidence({ entries, areaBrands, adminList }) {
 
       const brand = brandMatches[0];
       const brandRegion = normalizeAreaBrandRegion(brand.regionName, adminList);
+      const regionMatch = computeRegionMatch(brandRegion, queryRegion);
       matchedHitCount++;
       return {
         ...hit,
+        // 04-analyze-brand/lib/analyzer.js의 regionCategory()가 이미
+        // hit.applicantRegionMatch(boolean)를 읽도록 설계돼 있다(04 README: "추후 각 hit에
+        // applicantRegionMatch를 true/false로 넣으면 코드 변경 없이 계산된다"). inside/outside로
+        // 확신할 때만 채우고, unverified면 그대로 비워 04가 기본값(unverified)으로 집계하게 한다.
+        ...(regionMatch === "inside" ? { applicantRegionMatch: true } : {}),
+        ...(regionMatch === "outside" ? { applicantRegionMatch: false } : {}),
         areaBrandMatch: {
           applicationNumber: brand.applicationNumber,
           brandName: brand.brandName,
           region: brandRegion,
-          regionMatch: computeRegionMatch(brandRegion, queryRegion),
+          regionMatch,
         },
       };
     });
