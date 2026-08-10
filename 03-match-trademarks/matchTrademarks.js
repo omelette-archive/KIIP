@@ -2,7 +2,7 @@
 "use strict";
 /**
  * 단일 {지역, 품목} 또는 ② 단계의 정규화 CSV를 받아 KIPRIS 상표 검색
- * (getWordSearch)을 호출하고 품목(NICE 상품류 코드)으로 현재 페이지 결과를 필터링한다.
+ * (getWordSearch)을 호출하고 품목(NICE 상품류 코드)으로 결과를 필터링한다.
  *
  * 지역 매칭은 아직 구현되어 있지 않다. getWordSearch 응답에 출원인 주소/지역 필드가 없기
  * 때문에 요청 지역을 unverified 태그로만 보존한다.
@@ -16,10 +16,21 @@ const { loadEnv } = require("./lib/loadEnv");
 loadEnv();
 
 const { createClient } = require("./lib/kiprisClient");
-const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
+const {
+  filterByClassCode,
+  normalizeClassCode,
+  FOOD_RELATED_CLASSES,
+} = require("./lib/filters");
 
 function parseArgs(argv) {
-  const args = { numOfRows: 20, pageNo: 1, concurrency: 2, "max-requests": 100 };
+  const args = {
+    numOfRows: 20,
+    pageNo: 1,
+    concurrency: 2,
+    "max-requests": 100,
+    "max-pages": 5,
+    "max-hits-per-query": 100,
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
@@ -46,6 +57,10 @@ function printUsageAndExit(message) {
       "  --pageNo <n>         페이지 번호 (기본 1)",
       "  --concurrency <n>    배치 모드 동시 요청 수 (기본 2)",
       "  --max-requests <n>   배치 1회 검색 요청 상한 (기본 100)",
+      "  --max-pages <n>      쿼리당 페이지 상한 (기본 5)",
+      "  --max-hits-per-query <n> 쿼리당 필터 통과 hit 상한 (기본 100)",
+      "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
+      "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --out <path>         결과를 JSON 파일로 저장",
       "  --apiKey <key>       KIPRIS_API_KEY 대신 직접 인증키 전달",
@@ -136,14 +151,45 @@ function countSearchableRows(rows) {
   return rows.reduce((count, row) => count + (makeBatchQuery(row).skipReason ? 0 : 1), 0);
 }
 
+function normalizeQueryClasses(classCode) {
+  if (!classCode) return `fallback:${FOOD_RELATED_CLASSES.map(normalizeClassCode).join("|")}`;
+  return String(classCode)
+    .split(/[|,;\s]+/)
+    .filter(Boolean)
+    .map(normalizeClassCode)
+    .sort((a, b) => Number(a) - Number(b) || a.localeCompare(b))
+    .join("|");
+}
+
+function makeSearchKey(query) {
+  const item = String(query.item || "").normalize("NFC").trim().replace(/\s+/g, " ").toLowerCase();
+  return `${item}\u001f${normalizeQueryClasses(query.classCode)}`;
+}
+
 function buildBatchPlan(rows) {
   return rows.map((row, inputIndex) => {
     const query = makeBatchQuery(row);
     if (query.skipReason) {
       return { status: "skipped", inputIndex, reason: query.skipReason, input: row };
     }
-    return { status: "planned", inputIndex, query };
+    return { status: "planned", inputIndex, queryKey: makeSearchKey(query), query };
   });
+}
+
+function groupPlannedQueries(plan) {
+  const groups = new Map();
+  for (const entry of plan) {
+    if (entry.status !== "planned") continue;
+    if (!groups.has(entry.queryKey)) {
+      groups.set(entry.queryKey, {
+        queryKey: entry.queryKey,
+        query: { item: entry.query.item, classCode: entry.query.classCode },
+        inputIndexes: [],
+      });
+    }
+    groups.get(entry.queryKey).inputIndexes.push(entry.inputIndex);
+  }
+  return [...groups.values()];
 }
 
 function buildSearchOutput(query, result, hits, { pageNo, numOfRows, classCodeFallbackApplied }) {
@@ -176,16 +222,159 @@ function buildSearchOutput(query, result, hits, { pageNo, numOfRows, classCodeFa
 }
 
 async function searchOne(client, query, options) {
-  const result = await client.trademarkSearch({
-    searchString: String(query.item),
-    numOfRows: Number(options.numOfRows),
-    pageNo: Number(options.pageNo),
-  });
-  // NICE류를 모르면 무필터 대신 식품·음료 관련 기본 류 집합으로 좁힌다(FOOD_RELATED_CLASSES
-  // 참고 — 무필터 시 노이즈가 수만 건까지 나오는 게 실측으로 확인됨).
+  const effectiveOptions = {
+    numOfRows: 20,
+    pageNo: 1,
+    maxPages: 1,
+    maxHitsPerQuery: 100,
+    maxRequests: 1,
+    ...options,
+  };
+  const budget = createRequestBudget(effectiveOptions.maxRequests);
+  const collected = await collectSearchPages(client, query, effectiveOptions, budget);
+  return mapCollectedQuery(query, collected);
+}
+
+function createRequestBudget(maxRequests) {
+  let used = 0;
+  return {
+    reserve() {
+      if (used >= maxRequests) return false;
+      used++;
+      return true;
+    },
+    get used() {
+      return used;
+    },
+    get remaining() {
+      return Math.max(0, maxRequests - used);
+    },
+  };
+}
+
+function checkpointSeed(query, initial, startPage = 1) {
+  if (!initial || !["partial", "error"].includes(initial.collectionStatus)) {
+    return {
+      keywordTotalCount: 0,
+      hits: [],
+      pagesFetched: 0,
+      nextPage: startPage,
+      unfilteredCount: 0,
+      filteredCount: 0,
+    };
+  }
+  return {
+    keywordTotalCount: Number(initial.keywordTotalCount) || 0,
+    hits: Array.isArray(initial.hits) ? [...initial.hits] : [],
+    pagesFetched: Number(initial.pages?.fetchedCount) || 0,
+    nextPage: Number(initial.pages?.nextPage) || 1,
+    unfilteredCount: Number(initial.pages?.unfilteredCount) || 0,
+    filteredCount: Number(initial.pages?.filteredCount) || 0,
+  };
+}
+
+async function collectSearchPages(client, query, options, budget, initial) {
+  const numOfRows = Number(options.numOfRows);
+  const maxPages = Number(options.maxPages);
+  const maxHitsPerQuery = Number(options.maxHitsPerQuery);
+  const state = checkpointSeed(query, initial, Number(options.pageNo) || 1);
   const classCodeFallbackApplied = !query.classCode;
-  const hits = filterByClassCode(result.hits, query.classCode || FOOD_RELATED_CLASSES);
-  return buildSearchOutput(query, result, hits, { ...options, classCodeFallbackApplied });
+  const allowedClasses = query.classCode || FOOD_RELATED_CLASSES;
+  const startedAt = initial?.startedAt || new Date().toISOString();
+  let collectionStatus = "partial";
+  let stopReason = "max_pages";
+  let error = null;
+
+  while (state.pagesFetched < maxPages) {
+    if (state.hits.length >= maxHitsPerQuery) {
+      stopReason = "max_hits_per_query";
+      break;
+    }
+    if (!budget.reserve()) {
+      stopReason = "request_budget";
+      break;
+    }
+
+    const pageNo = state.nextPage;
+    let result;
+    try {
+      result = await client.trademarkSearch({
+        searchString: String(query.item),
+        numOfRows,
+        pageNo,
+      });
+    } catch (err) {
+      collectionStatus = "error";
+      stopReason = "api_error";
+      error = err instanceof Error ? err.message : String(err);
+      break;
+    }
+
+    const pageHits = filterByClassCode(result.hits, allowedClasses);
+    const remaining = maxHitsPerQuery - state.hits.length;
+    state.hits.push(...pageHits.slice(0, remaining));
+    state.keywordTotalCount = Number(result.totalCount) || 0;
+    state.pagesFetched++;
+    state.nextPage = pageNo + 1;
+    state.unfilteredCount += result.hits.length;
+    state.filteredCount += pageHits.length;
+
+    const hasMore = pageNo * numOfRows < state.keywordTotalCount && result.hits.length > 0;
+    if (!hasMore) {
+      collectionStatus = "complete";
+      stopReason = "source_exhausted";
+      break;
+    }
+    if (state.hits.length >= maxHitsPerQuery) {
+      stopReason = "max_hits_per_query";
+      break;
+    }
+  }
+
+  return {
+    collectionStatus,
+    stopReason,
+    error,
+    search: {
+      item: query.item,
+      classCode: query.classCode || null,
+      classCodeFallbackApplied,
+    },
+    keywordTotalCount: state.keywordTotalCount,
+    pages: {
+      size: numOfRows,
+      fetchedCount: state.pagesFetched,
+      nextPage: state.nextPage,
+      unfilteredCount: state.unfilteredCount,
+      filteredCount: state.filteredCount,
+      hasMore: collectionStatus !== "complete",
+    },
+    startedAt,
+    fetchedAt: new Date().toISOString(),
+    hits: state.hits,
+  };
+}
+
+function mapCollectedQuery(query, collected, extra = {}) {
+  const output = {
+    status: collected.collectionStatus === "error" ? "error" : "ok",
+    collectionStatus: collected.collectionStatus,
+    stopReason: collected.stopReason,
+    query: {
+      region: query.region,
+      regionMatch: "unverified",
+      item: query.item,
+      classCode: query.classCode || null,
+      classCodeFallbackApplied: !query.classCode,
+    },
+    keywordTotalCount: collected.keywordTotalCount,
+    pages: collected.pages,
+    fetchedAt: collected.fetchedAt,
+    hits: collected.hits,
+    ...extra,
+  };
+  if (collected.error) output.error = collected.error;
+  return output;
 }
 
 async function runWithConcurrency(items, concurrency, worker) {
@@ -208,22 +397,59 @@ async function runWithConcurrency(items, concurrency, worker) {
 }
 
 async function runBatch(rows, client, options) {
-  return runWithConcurrency(rows, options.concurrency, async (row, inputIndex) => {
-    const query = makeBatchQuery(row);
-    if (query.skipReason) {
-      return { status: "skipped", inputIndex, reason: query.skipReason, input: row };
+  options = {
+    numOfRows: 20,
+    pageNo: 1,
+    maxPages: 1,
+    maxHitsPerQuery: 100,
+    maxRequests: 100,
+    concurrency: 2,
+    ...options,
+  };
+  const plan = buildBatchPlan(rows);
+  const groups = groupPlannedQueries(plan);
+  const budget = options.requestBudget || createRequestBudget(options.maxRequests);
+  const checkpointQueries = options.checkpointQueries || {};
+  let resumedQueryCount = 0;
+
+  const collectedGroups = await runWithConcurrency(groups, options.concurrency, async (group) => {
+    const saved = checkpointQueries[group.queryKey];
+    let collected;
+    if (options.resume && saved?.collectionStatus === "complete") {
+      collected = saved;
+      resumedQueryCount++;
+    } else {
+      collected = await collectSearchPages(
+        client,
+        group.query,
+        options,
+        budget,
+        options.resume ? saved : null
+      );
+      checkpointQueries[group.queryKey] = collected;
+      if (options.saveCheckpoint) options.saveCheckpoint(checkpointQueries);
     }
-    try {
-      return { inputIndex, ...(await searchOne(client, query, options)) };
-    } catch (err) {
-      return {
-        status: "error",
-        inputIndex,
-        query,
-        error: err instanceof Error ? err.message : String(err),
-      };
-    }
+    return { ...group, collected, reusedFromCheckpoint: collected === saved };
   });
+
+  const byKey = new Map(collectedGroups.map((group) => [group.queryKey, group]));
+  const results = plan.map((entry) => {
+    if (entry.status === "skipped") return entry;
+    const group = byKey.get(entry.queryKey);
+    return {
+      inputIndex: entry.inputIndex,
+      queryKey: entry.queryKey,
+      sharedQueryInputCount: group.inputIndexes.length,
+      reusedFromCheckpoint: group.reusedFromCheckpoint,
+      ...mapCollectedQuery(entry.query, group.collected),
+    };
+  });
+  return {
+    results,
+    uniqueQueryCount: groups.length,
+    requestCount: budget.used,
+    resumedQueryCount,
+  };
 }
 
 function writeJson(output, outArg) {
@@ -238,11 +464,36 @@ function writeJson(output, outArg) {
   return outPath;
 }
 
+function writeJsonAtomic(filePath, output) {
+  fs.mkdirSync(path.dirname(filePath), { recursive: true });
+  const tempPath = `${filePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(output, null, 2), "utf8");
+  fs.renameSync(tempPath, filePath);
+}
+
+function loadCheckpoint(filePath, options) {
+  if (!fs.existsSync(filePath)) throw new Error(`재개할 체크포인트가 없습니다: ${filePath}`);
+  const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
+  const expected = {
+    numOfRows: options.numOfRows,
+    maxPages: options.maxPages,
+    maxHitsPerQuery: options.maxHitsPerQuery,
+  };
+  for (const [key, value] of Object.entries(expected)) {
+    if (Number(parsed.options?.[key]) !== Number(value)) {
+      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${value}와 다릅니다.`);
+    }
+  }
+  return parsed;
+}
+
 function validateNumericArgs(args) {
   const numOfRows = Number(args.numOfRows);
   const pageNo = Number(args.pageNo);
   const concurrency = Number(args.concurrency);
   const maxRequests = Number(args["max-requests"]);
+  const maxPages = Number(args["max-pages"]);
+  const maxHitsPerQuery = Number(args["max-hits-per-query"]);
   if (!Number.isInteger(numOfRows) || numOfRows < 1 || numOfRows > 100) {
     printUsageAndExit("--numOfRows 는 1~100 사이의 정수여야 합니다.");
   }
@@ -255,7 +506,13 @@ function validateNumericArgs(args) {
   if (!Number.isInteger(maxRequests) || maxRequests < 1) {
     printUsageAndExit("--max-requests 는 1 이상의 정수여야 합니다.");
   }
-  return { numOfRows, pageNo, concurrency, maxRequests };
+  if (!Number.isInteger(maxPages) || maxPages < 1) {
+    printUsageAndExit("--max-pages 는 1 이상의 정수여야 합니다.");
+  }
+  if (!Number.isInteger(maxHitsPerQuery) || maxHitsPerQuery < 1) {
+    printUsageAndExit("--max-hits-per-query 는 1 이상의 정수여야 합니다.");
+  }
+  return { numOfRows, pageNo, concurrency, maxRequests, maxPages, maxHitsPerQuery };
 }
 
 async function main() {
@@ -277,46 +534,86 @@ async function main() {
   if (args.input) {
     const inputPath = path.resolve(args.input);
     const rows = readNormalizedCsv(inputPath);
-    const plannedRequests = countSearchableRows(rows);
-    if (plannedRequests > numeric.maxRequests) {
-      throw new Error(
-        `배치 검색 예정 ${plannedRequests}건이 요청 상한 ${numeric.maxRequests}건을 초과합니다. ` +
-        "무료 KIPRISPlus 월간 호출량을 확인한 뒤 --max-requests를 명시적으로 조정하세요."
-      );
-    }
+    const plan = buildBatchPlan(rows);
+    const uniqueQueries = groupPlannedQueries(plan);
+    const searchableRows = countSearchableRows(rows);
+    const estimatedMinRequests = Math.min(uniqueQueries.length, numeric.maxRequests);
+    const estimatedMaxRequests = Math.min(
+      uniqueQueries.length * numeric.maxPages,
+      numeric.maxRequests
+    );
     if (args["dry-run"]) {
-      const results = buildBatchPlan(rows);
       const output = {
         mode: "batch-dry-run",
         inputFile: inputPath,
         inputCount: rows.length,
-        plannedRequestCount: plannedRequests,
-        skippedCount: results.filter((row) => row.status === "skipped").length,
+        searchableRowCount: searchableRows,
+        uniqueQueryCount: uniqueQueries.length,
+        duplicateQueryRowCount: searchableRows - uniqueQueries.length,
+        estimatedMinRequestCount: estimatedMinRequests,
+        estimatedMaxRequestCount: estimatedMaxRequests,
+        maxRequestCount: numeric.maxRequests,
+        skippedCount: plan.filter((row) => row.status === "skipped").length,
         completedAt: new Date().toISOString(),
-        results,
+        results: plan,
       };
       const outPath = writeJson(output, args.out);
       console.error(
-        `[matchTrademarks] dry-run. requests=${plannedRequests}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
+        `[matchTrademarks] dry-run. rows=${searchableRows}, uniqueQueries=${uniqueQueries.length}, requests=${estimatedMinRequests}~${estimatedMaxRequests}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
       );
       return;
     }
     const client = createClient({ apiKey });
-    console.error(`[matchTrademarks] batch input=${rows.length}행, requests=${plannedRequests}/${numeric.maxRequests}`);
-    const results = await runBatch(rows, client, numeric);
+    const outPathArg = args.out ? path.resolve(args.out) : null;
+    const checkpointPath = path.resolve(
+      args.checkpoint ||
+        (outPathArg ? `${outPathArg}.checkpoint.json` : path.join(__dirname, "output", "batch-checkpoint.json"))
+    );
+    const checkpoint = args.resume
+      ? loadCheckpoint(checkpointPath, numeric)
+      : { schemaVersion: "1.0", options: numeric, queries: {} };
+    const saveCheckpoint = (queries) =>
+      writeJsonAtomic(checkpointPath, {
+        schemaVersion: "1.0",
+        options: {
+          numOfRows: numeric.numOfRows,
+          maxPages: numeric.maxPages,
+          maxHitsPerQuery: numeric.maxHitsPerQuery,
+        },
+        updatedAt: new Date().toISOString(),
+        queries,
+      });
+    console.error(
+      `[matchTrademarks] batch input=${rows.length}행, searchable=${searchableRows}, uniqueQueries=${uniqueQueries.length}, requestBudget=${numeric.maxRequests}`
+    );
+    const batch = await runBatch(rows, client, {
+      ...numeric,
+      resume: Boolean(args.resume),
+      checkpointQueries: checkpoint.queries || {},
+      saveCheckpoint,
+    });
+    const results = batch.results;
     const output = {
+      schemaVersion: "1.1",
       mode: "batch",
       inputFile: inputPath,
       inputCount: rows.length,
+      searchableRowCount: searchableRows,
+      uniqueQueryCount: batch.uniqueQueryCount,
+      duplicateQueryRowCount: searchableRows - batch.uniqueQueryCount,
+      requestCount: batch.requestCount,
+      resumedQueryCount: batch.resumedQueryCount,
       successCount: results.filter((row) => row.status === "ok").length,
+      partialCount: results.filter((row) => row.collectionStatus === "partial").length,
       errorCount: results.filter((row) => row.status === "error").length,
       skippedCount: results.filter((row) => row.status === "skipped").length,
+      checkpointFile: checkpointPath,
       completedAt: new Date().toISOString(),
       results,
     };
     const outPath = writeJson(output, args.out);
     console.error(
-      `[matchTrademarks] batch done. success=${output.successCount}, error=${output.errorCount}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
+      `[matchTrademarks] batch done. requests=${output.requestCount}, success=${output.successCount}, partial=${output.partialCount}, error=${output.errorCount}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
     );
     if (output.errorCount > 0) process.exitCode = 2;
     return;
@@ -334,7 +631,7 @@ async function main() {
   const output = await searchOne(client, query, numeric);
   const outPath = writeJson(output, args.out);
   console.error(
-    `[matchTrademarks] pageFiltered=${output.page.filteredCount}, keywordTotal=${output.keywordTotalCount}${outPath ? ` -> ${outPath}` : ""}`
+    `[matchTrademarks] pages=${output.pages.fetchedCount}, filtered=${output.hits.length}, collection=${output.collectionStatus}, keywordTotal=${output.keywordTotalCount}${outPath ? ` -> ${outPath}` : ""}`
   );
 }
 
@@ -351,9 +648,15 @@ module.exports = {
   readNormalizedCsv,
   makeBatchQuery,
   countSearchableRows,
+  makeSearchKey,
   buildBatchPlan,
+  groupPlannedQueries,
   buildSearchOutput,
   searchOne,
+  collectSearchPages,
+  createRequestBudget,
+  mapCollectedQuery,
   runBatch,
   runWithConcurrency,
+  loadCheckpoint,
 };

@@ -97,6 +97,7 @@ function createBucket(dimensions) {
     ...dimensions,
     queryCount: 0,
     successfulQueryCount: 0,
+    partialQueryCount: 0,
     erroredQueryCount: 0,
     skippedQueryCount: 0,
     sourceTotalCount: 0,
@@ -124,6 +125,7 @@ function addEntry(bucket, entry) {
     return;
   }
   bucket.successfulQueryCount++;
+  if (clean(entry.collectionStatus) === "partial") bucket.partialQueryCount++;
   bucket.sourceTotalCount += entryTotalCount(entry);
   const hits = Array.isArray(entry.hits) ? entry.hits : [];
   bucket.returnedHitCount += hits.length;
@@ -136,6 +138,7 @@ function addEntry(bucket, entry) {
 function mergeBucket(target, source) {
   target.queryCount += source.queryCount;
   target.successfulQueryCount += source.successfulQueryCount;
+  target.partialQueryCount += source.partialQueryCount;
   target.erroredQueryCount += source.erroredQueryCount;
   target.skippedQueryCount += source.skippedQueryCount;
   target.sourceTotalCount += source.sourceTotalCount;
@@ -286,6 +289,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const warnings = [];
   if (summary.erroredQueryCount > 0) {
     warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
+  }
+  if (summary.partialQueryCount > 0) {
+    warnings.push(
+      `${summary.partialQueryCount}개 검색은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.`
+    );
   }
   if (summary.skippedQueryCount > 0) {
     warnings.push(

@@ -40,6 +40,12 @@ node 03-match-trademarks/matchTrademarks.js \
   --input 02-normalize-items/output/normalized.csv \
   --out 03-match-trademarks/output/result.json
 
+# 중단된 배치를 체크포인트에서 재개
+node 03-match-trademarks/matchTrademarks.js \
+  --input 02-normalize-items/output/normalized.csv \
+  --out 03-match-trademarks/output/result.json \
+  --resume
+
 # 샘플 입력의 호출 계획만 검증(API 키·호출량 사용 없음)
 node 03-match-trademarks/matchTrademarks.js \
   --input 02-normalize-items/output/sample-normalized.csv \
@@ -49,6 +55,8 @@ node 03-match-trademarks/matchTrademarks.js \
 
 옵션: `--numOfRows`(기본 20, 최대 100), `--pageNo`(기본 1),
 `--concurrency`(배치 기본 2), `--max-requests`(배치 1회 기본 100),
+`--max-pages`(고유 쿼리당 기본 5), `--max-hits-per-query`(필터 통과 hit 기본 100),
+`--checkpoint`(기본 `<out>.checkpoint.json`), `--resume`(완료 쿼리 재사용·부분 쿼리 재개),
 `--dry-run`(배치 계약/호출 계획만 검증), `--apiKey`(환경변수 대신 직접 전달).
 
 배치 모드는 `noticeName || itemName || rawItemName`을 검색어로, `niceClass`를 필터로 사용한다.
@@ -57,16 +65,24 @@ node 03-match-trademarks/matchTrademarks.js \
 `status=error`로 남긴다. 검색 오류가 하나라도 있으면 결과 JSON을 저장한 뒤 종료 코드 2를
 반환한다.
 
+지역만 다르고 검색어와 NICE류가 같은 행은 `(검색어, 정규화 NICE류)` 고유 키로 묶어 API를
+한 번만 호출한 뒤 각 원본 행에 결과를 연결한다. 고유 쿼리가 끝날 때마다 체크포인트를 갱신하며,
+`--resume`은 `collectionStatus=complete` 쿼리를 재호출하지 않고 `partial|error` 쿼리의 다음
+페이지부터 이어간다. 체크포인트의 페이지 크기·페이지 상한·hit 상한이 현재 실행값과 다르면
+잘못된 혼합을 막기 위해 재개를 거부한다.
+
 ## 건수 필드의 의미
 
 - `keywordTotalCount`: KIPRIS 키워드 검색 전체 건수. NICE류 필터 전이며 모든 페이지 합계다.
-- `page.unfilteredCount`: 현재 받아온 페이지의 필터 전 건수.
-- `page.filteredCount`: 현재 페이지에서 NICE류까지 맞는 건수.
-- `page.hasMore`: 키워드 검색의 다음 페이지 존재 여부.
+- `pages.unfilteredCount`: 수집한 모든 페이지의 필터 전 건수.
+- `pages.filteredCount`: 수집한 모든 페이지에서 NICE류까지 맞는 건수.
+- `pages.fetchedCount`, `pages.nextPage`: 수집 페이지 수와 재개할 페이지.
+- `collectionStatus`: `complete|partial|error`. 부분 수집이면 `stopReason`에
+  `max_pages|max_hits_per_query|request_budget` 중단 사유가 남는다.
 
-범용 품목은 결과가 수만~수백만 건이므로 v1에서 무조건 전 페이지를 다운로드하지 않는다.
-따라서 `page.filteredCount`를 전체 상표 건수로 사용하면 안 되며, ④ 집계 전에 지정상품 기반
-검색 조건과 전체 수집 상한/증분 갱신 정책을 확정해야 한다.
+범용 품목은 결과가 수만~수백만 건이므로 상한 없이 전 페이지를 다운로드하지 않는다.
+`collectionStatus=partial`의 hit를 완전한 모집단으로 해석하면 안 되며, ④는 이를 집계에 포함하되
+`partialQueryCount`와 경고를 함께 출력한다.
 
 KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 실행 전 잔여량을 확인한다.
 `--max-requests` 기본값은 한 번의 실수로 월간 한도를 소진하지 않게 하는 실행 단위 보호선이며,

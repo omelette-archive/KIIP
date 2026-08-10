@@ -56,7 +56,7 @@ node 04-analyze-brand/analyzeBrands.js \
 - `recentPeriod`, `previousPeriod`, `recentChange`, `recentChangeRate`, `recentTrend`
 - `recentBrands`
 - `regionCounts`, `regionVerificationRate`, `localApplicantShare`
-- `queryCount`, `successfulQueryCount`, `erroredQueryCount`, `skippedQueryCount`, `sourceTotalCount`, `returnedHitCount`
+- `queryCount`, `successfulQueryCount`, `partialQueryCount`, `erroredQueryCount`, `skippedQueryCount`, `sourceTotalCount`, `returnedHitCount`
 
 `recentTrend`는 `new`, `increase`, `flat`, `decrease`, `no_activity` 중 하나다.
 `localApplicantShare`는 `inside / (inside + outside)`로 계산하며, 지역 검증 건이 없으면 `null`이다.
@@ -65,6 +65,8 @@ node 04-analyze-brand/analyzeBrands.js \
 
 - 분석 건수는 ③단계 JSON의 `hits`에 실제 저장된 결과 기준이다. KIPRIS의 `totalCount`는
   키워드 전체 검색 건수이며 상품류 필터 적용 전 값이므로 상표 수로 대신 사용하지 않는다.
+- `collectionStatus=partial` 검색의 저장된 hit는 집계에 포함하지만 `partialQueryCount`와 경고를
+  남긴다. 따라서 상한에 걸린 결과를 완전한 모집단으로 해석하면 안 된다.
 - 현재 ③단계는 출원인 주소를 제공하지 않아 대부분 `regionMatch: unverified`다. 따라서 지금은
   `localApplicantShare`가 `null`인 것이 정상이다. 추후 각 hit에 `applicantRegionMatch`를
   `true`/`false` 또는 `inside`/`outside`로 넣으면 코드 변경 없이 계산된다.
