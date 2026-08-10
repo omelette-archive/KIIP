@@ -67,6 +67,7 @@ node scripts/validatePipeline.js
 - [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
 - [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
 - [`docs/open-api-limits.md`](docs/open-api-limits.md) — 계정 승인·호출 제한과 운영 체크리스트
+- [`docs/open-api-onboarding-checklist.md`](docs/open-api-onboarding-checklist.md) — 신규 Open API 소스 연동 시 반복되는 시행착오를 줄이는 체크리스트 (KIPRIS/GI/농사로 실사례 기준)
 - [`docs/decisions/0001-deterministic-normalization-manual-review.md`](docs/decisions/0001-deterministic-normalization-manual-review.md) — ②단계 외부 AI 제거와 수동 검토 결정
 
 ## 개발 방법 (기획 기준)
