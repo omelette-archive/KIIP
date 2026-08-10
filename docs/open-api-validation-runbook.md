@@ -50,7 +50,7 @@ DATA_GO_KR_API_KEY
 | `KIPRIS_API_KEY` | KIPRISPlus | `ServiceKey` 쿼리 + XML | ③에서 사용·실키 검증 완료 |
 | `GI_API_KEY` | 농식품 공공데이터포털 | URL 경로 키 + MAFRA Grid JSON | ①에서 사용·실키 검증 완료 |
 | `NONGSARO_API_KEY` | 농사로 | `apiKey` 쿼리 + XML | 지역특산물 ①에서 사용·실키 검증 완료 |
-| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 | `areaBrand` 서비스 + XML | 키 실호출 완료, 파이프라인 미연결(#24) |
+| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 | `areaBrand` 서비스 + XML | 3건 수집 CLI 구현, KIPRIS 자동 조인 미연결(#24) |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 | 표준 REST API용 일반 서비스키 | 현재 실행 코드에서는 미사용 |
 
 주의할 구분:
@@ -213,8 +213,7 @@ node 01-collect-specialties/collectSpecialties.js `
 2. `지역 브랜드` 행의 샘플은 `areaBrand`, 공식 매뉴얼은 `areaBrand.zip`이다.
 3. 샘플의 첫 operation은 `selectSclCodeLst`인데, 이건 **실제 브랜드 목록이 아니라 품목
    대분류 코드표**다(공통·식량작물·채소류·과채류·과실류·축산물·특작류·화훼류·농산가공·기타
-   10개 코드). 진짜 602건 목록을 주는 operation은 같은 서비스의 `areaBrandLst`다
-   (2026-08-10 교차검증, 이슈 #24 코멘트).
+   10개 코드). 실제 목록 operation은 같은 서비스의 `areaBrandLst`다.
 
 공식 자료:
 
@@ -222,31 +221,40 @@ node 01-collect-specialties/collectSpecialties.js `
   <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344>
 - 공식 매뉴얼 ZIP: <https://www.nongsaro.go.kr/portal/apiManual/areaBrand.zip>
 - service base: `https://api.nongsaro.go.kr/service/areaBrand`
-- 코드표 operation: `selectSclCodeLst` (품목 대분류 코드, 참고용)
-- **목록 operation: `areaBrandLst`** (실제 602건 데이터)
+- 코드표 operation: `selectSclCodeLst` — `code`, `codeNm` 10건
+- 브랜드 목록 operation: `areaBrandLst` — `totalCount=602`
 
 ### 실키 결과
 
-`NONGSARO_LOCAL_BRAND_API_KEY`로 두 operation 모두 다음 요청 계약을 확인했다.
+`NONGSARO_LOCAL_BRAND_API_KEY`로 두 operation을 교차검증했다.
 
 ```text
 HTTP status       200
 resultCode        00
 resultMsg         정상적으로 처리되었습니다.
 응답              XML
+selectSclCodeLst   code, codeNm (10개 품목 대분류)
+areaBrandLst       aplcnoInfo, rgnoInfo, brandRgsde, cntntsNo,
+                   cntntsSj, imgUrl, mainPrdlstNm, signguNm
+totalCount         602
 ```
 
-`selectSclCodeLst` 확인 필드: `code`, `codeNm`(품목 대분류 코드/명).
+샘플 3건은 다음 명령으로 별도 JSON에 저장한다. 기본 상한이 3이므로 실수로 602건 전체를 받지
+않는다.
 
-`areaBrandLst` 확인 필드: `aplcnoInfo`(출원번호 — **KIPRIS `applicationNumber`와 동일 포맷**,
-예: `4020190126184`), `rgnoInfo`(등록번호), `brandRgsde`(브랜드 등록일), `cntntsSj`(브랜드명),
-`mainPrdlstNm`(주요 품목명), `signguNm`(지역명 — 응답 안에서 시군구/광역 표기가 섞여 나와 정규화
-필요), `totalCount`(602, 공개 화면 수치와 일치).
+```powershell
+node 03-match-trademarks/fetchAreaBrands.js `
+  --limit 3 `
+  --out 03-match-trademarks/output/area-brand-sample.json
+```
 
-이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 데이터이므로 ① 특산물 목록에
-바로 섞지 않는다. `aplcnoInfo`가 KIPRIS 출원번호와 같은 포맷이라, 이 602건에 한해 ③ 결과와
-출원번호로 직접 조인해 #11(지역 매칭)의 그라운드 트루스로 쓸 수 있어 보인다. 조인·품목 대조
-설계는 #24에서 진행한다.
+`aplcnoInfo`는 구분자를 제거하면 KIPRIS `applicationNumber`와 같은 숫자 포맷이 된다. 클라이언트는
+이 정규화와 출원번호 인덱스 함수를 제공하지만 아직 KIPRIS hit를 자동 변경하지 않는다.
+첫 지역브랜드 샘플의 브랜드명으로 KIPRIS를 1회 직접 조회한 결과, 첫 페이지 3건 중
+`applicationNumber`가 정확히 일치하는 1건을 확인해 출원번호 조인 가능성도 실데이터로 검증했다.
+`signguNm`은 `구미`처럼 접미사 없는 기초지역과 `경상북도` 같은 광역명이 섞여 있어 행정구역
+정규화가 선행돼야 한다. 이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드
+검증자료이므로 ① 특산물 목록에 섞지 않는다. 실제 조인·④ 통계 반영은 #24에서 진행한다.
 
 ## 7. 생성된 로컬 검증 산출물
 
@@ -262,6 +270,7 @@ resultMsg         정상적으로 처리되었습니다.
 03-match-trademarks/output/nongsaro-key-smoke-plan.json
 03-match-trademarks/output/nongsaro-key-smoke-result.json
 03-match-trademarks/output/nongsaro-key-smoke-result.json.checkpoint.json
+03-match-trademarks/output/area-brand-sample.json
 04-analyze-brand/output/nongsaro-key-smoke-analysis.json
 ```
 

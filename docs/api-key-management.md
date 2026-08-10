@@ -24,12 +24,13 @@ Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
 | `KIPRIS_API_KEY` | KIPRISPlus 상표 검색 | 사용 |
 | `GI_API_KEY` | 농식품 공공데이터포털 지리적표시 API | 사용 |
 | `NONGSARO_API_KEY` | 농사로 지역특산물 API | 사용 |
-| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 실호출 검증 완료·파이프라인 미연결 |
+| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 별도 수집 CLI 사용·KIPRIS 조인 미연결 |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 일반 서비스키 | 현재 미사용·보관만 |
 
 농사로의 지역특산물과 지역 브랜드에 동일한 회원 API 키가 발급돼도 용도를 잊지 않도록 두
 환경변수명을 유지한다. 현재 파이프라인 코드는 `NONGSARO_API_KEY`만 읽고, 지역 브랜드 키는
-공식 `areaBrand/selectSclCodeLst` 실호출까지만 검증했다.
+`03-match-trademarks/fetchAreaBrands.js`가 공식 `areaBrand/areaBrandLst` 목록을 소량 조회할 때
+읽는다. 이 목록은 아직 ③ KIPRIS 결과나 ④ 통계에 자동 반영되지 않는다.
 
 ## 취급 규칙
 

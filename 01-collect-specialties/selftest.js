@@ -349,6 +349,7 @@ async function run() {
     const registry = loadSourceRegistry();
     const gi = getSourceDefinition("gi", registry);
     const nongsaro = getSourceDefinition("nongsaro", registry);
+    const areaBrand = getSourceDefinition("nongsaro_area_brand", registry);
     assert.strictEqual(gi.authentication.keyEnv, "GI_API_KEY");
     assert.strictEqual(gi.authentication.defaultBaseUrl, GI_BASE_URL);
     assert.strictEqual(gi.quota.type, "provider_documented_unlimited");
@@ -356,6 +357,9 @@ async function run() {
     assert.strictEqual(gi.implementation.status, "live_key_validated");
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
     assert.strictEqual(nongsaro.implementation.status, "live_key_validated");
+    assert.strictEqual(areaBrand.role, "trademark_validation_reference");
+    assert.strictEqual(areaBrand.authentication.keyEnv, "NONGSARO_LOCAL_BRAND_API_KEY");
+    assert.strictEqual(areaBrand.implementation.status, "live_contract_validated_not_joined");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
   }
 

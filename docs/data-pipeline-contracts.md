@@ -63,8 +63,13 @@ URL 경로에 들어가고 JSON 본문은 `Grid_20141225000000000157_1` 객체�
 | `GGRPH_INDICT_SFE` | 특징 설명 | raw 보존 후보 |
 | `HMPG_IMAGE_FILE_NO` | 이미지 파일번호 | raw 보존 후보 |
 
-현재 CSV에는 다음 단계가 사용하는 5개 공통 필드만 기록한다. 위 부가 필드와 원문은 향후
-`specialty_raw_records`에 저장하고, 키 값은 어떤 산출물에도 저장하지 않는다.
+현재 CSV에는 다음 단계가 사용하는 5개 공통 필드만 기록한다. 위 부가 필드와 원문은 이미
+`specialty_raw_records`·`specialty_raw_versions`에 저장하며, 키 값은 어떤 산출물에도 저장하지
+않는다.
+
+농사로 `areaBrand/areaBrandLst`는 특산품 수집 원본이 아니라 KIPRIS 결과의 지역·품목 검증자료다.
+따라서 ① CSV/SQLite에 섞지 않고 `03-match-trademarks/fetchAreaBrands.js`로 별도 JSON을 만든다.
+현재는 출원번호 정규화와 인덱스까지만 제공하며 KIPRIS hit·④ 통계 자동 반영은 #24 범위다.
 
 ## 3. 정제 기준
 

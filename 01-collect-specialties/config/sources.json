@@ -72,6 +72,30 @@
         "status": "live_key_validated",
         "adapter": "lib/nongsaroClient.js"
       }
+    },
+    {
+      "id": "nongsaro_area_brand",
+      "name": "농촌진흥청 지역 브랜드",
+      "role": "trademark_validation_reference",
+      "catalogUrl": "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344",
+      "providerUrl": "https://www.nongsaro.go.kr/portal/ps/psn/psnj/openApiLst.ps?menuId=PS65428",
+      "formats": ["XML"],
+      "authentication": {
+        "required": true,
+        "keyEnv": "NONGSARO_LOCAL_BRAND_API_KEY",
+        "baseUrlEnv": "NONGSARO_AREA_BRAND_API_BASE_URL",
+        "defaultBaseUrl": "https://api.nongsaro.go.kr/service/areaBrand",
+        "approval": "nongsaro_member_api_application"
+      },
+      "quota": {
+        "type": "provider_policy",
+        "value": null,
+        "verification": "공식 공개 페이지에 고정 숫자 없음; 승인 계정의 마이페이지 정책을 기준으로 운영"
+      },
+      "implementation": {
+        "status": "live_contract_validated_not_joined",
+        "adapter": "03-match-trademarks/lib/areaBrandClient.js"
+      }
     }
   ]
 }
