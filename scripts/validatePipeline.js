@@ -71,6 +71,8 @@ function writeStage3Fixture(filePath) {
     results: [
       {
         status: "ok",
+        collectionStatus: "complete",
+        stopReason: "source_exhausted",
         inputIndex: 0,
         source: "지리적표시",
         query: {
@@ -148,7 +150,11 @@ function validateContracts(tempDir) {
   const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
   assert.strictEqual(plan.mode, "batch-dry-run");
   assert.strictEqual(plan.inputCount, 5);
-  assert.strictEqual(plan.plannedRequestCount, 3);
+  assert.strictEqual(plan.searchableRowCount, 3);
+  assert.strictEqual(plan.uniqueQueryCount, 3);
+  assert.strictEqual(plan.duplicateQueryRowCount, 0);
+  assert.strictEqual(plan.estimatedMinRequestCount, 3);
+  assert.strictEqual(plan.estimatedMaxRequestCount, 15);
   assert.strictEqual(plan.skippedCount, 2);
   assert.deepStrictEqual(
     plan.results.map((row) => row.status),

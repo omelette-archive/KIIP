@@ -256,13 +256,13 @@ async function run() {
     });
 
     const withoutClass = await searchOne(client, { region: "경상북도 안동시", item: "품목" }, { pageNo: 1, numOfRows: 20 });
-    assert.strictEqual(withoutClass.page.unfilteredCount, 3);
-    assert.strictEqual(withoutClass.page.filteredCount, 2, "09류 단독 상표만 제외되고 30류·09|43류(43 포함)는 남아야 함");
+    assert.strictEqual(withoutClass.pages.unfilteredCount, 3);
+    assert.strictEqual(withoutClass.pages.filteredCount, 2, "09류 단독 상표만 제외되고 30류·09|43류(43 포함)는 남아야 함");
     assert.strictEqual(withoutClass.query.classCode, null, "실제 요청 류는 여전히 null(정확한 메타데이터)");
     assert.strictEqual(withoutClass.query.classCodeFallbackApplied, true);
 
     const withClass = await searchOne(client, { region: "경상북도 안동시", item: "품목", classCode: "09" }, { pageNo: 1, numOfRows: 20 });
-    assert.strictEqual(withClass.page.filteredCount, 2, "명시적으로 09류를 요청하면 09류 상표만 남아야 함");
+    assert.strictEqual(withClass.pages.filteredCount, 2, "명시적으로 09류를 요청하면 09류 상표만 남아야 함");
     assert.strictEqual(withClass.query.classCodeFallbackApplied, false);
 
     assert.deepStrictEqual(FOOD_RELATED_CLASSES, ["29", "30", "31", "32", "33", "40", "43"]);
@@ -283,7 +283,7 @@ async function run() {
         };
       },
     };
-    const results = await runBatch(
+    const batch = await runBatch(
       [
         { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok", source: "지리적표시" },
         { rawItemName: "실패품목", status: "error" },
@@ -293,23 +293,77 @@ async function run() {
       { pageNo: 1, numOfRows: 20, concurrency: 2 }
     );
     assert.strictEqual(calls, 1);
-    assert.deepStrictEqual(results.map((row) => row.status), ["ok", "skipped", "skipped"]);
-    assert.strictEqual(results[0].page.filteredCount, 1);
-    assert.strictEqual(results[0].source, "지리적표시", "성공 행도 ②단계 원본 source가 함께 실려야 ④가 대표성 판정에 쓸 수 있음");
+    assert.deepStrictEqual(batch.results.map((row) => row.status), ["ok", "skipped", "skipped"]);
+    assert.strictEqual(batch.results[0].pages.filteredCount, 1);
+    assert.strictEqual(batch.results[0].source, "지리적표시", "성공 행도 ②단계 원본 source가 함께 실려야 ④가 대표성 판정에 쓸 수 있음");
     ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함, source도 함께 전파됨");
   }
 
   console.log("9-1) runBatch — 검색 오류 행도 source를 보존함");
   {
     const failingClient = { trademarkSearch: async () => { throw new Error("네트워크 오류"); } };
-    const results = await runBatch(
+    const failedBatch = await runBatch(
       [{ sido: "전라남도", sigungu: "보성군", rawItemName: "보성녹차", noticeName: "녹차", niceClass: "30", status: "ok", source: "농사로" }],
       failingClient,
       { pageNo: 1, numOfRows: 20, concurrency: 1 }
     );
-    assert.strictEqual(results[0].status, "error");
-    assert.strictEqual(results[0].source, "농사로");
+    assert.strictEqual(failedBatch.results[0].status, "error");
+    assert.strictEqual(failedBatch.results[0].source, "농사로");
     ok("검색 자체가 실패해도 source는 유실되지 않음");
+  }
+
+  console.log("9-2) 고유 쿼리 중복 제거·다중 페이지·체크포인트 재개");
+  {
+    const rows = [
+      { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok" },
+      { sido: "경기도", sigungu: "포천시", rawItemName: "포천사과", noticeName: "사과", niceClass: "031", status: "ok" },
+    ];
+    const checkpointQueries = {};
+    const calledPages = [];
+    const client = {
+      trademarkSearch: async ({ pageNo }) => {
+        calledPages.push(pageNo);
+        const count = pageNo < 3 ? 2 : 1;
+        return {
+          totalCount: 5,
+          hits: Array.from({ length: count }, (_, index) => ({
+            title: `사과상표-${pageNo}-${index}`,
+            applicationNumber: `${pageNo}-${index}`,
+            classificationCode: "31",
+          })),
+        };
+      },
+    };
+    const baseOptions = {
+      pageNo: 1,
+      numOfRows: 2,
+      maxPages: 3,
+      maxHitsPerQuery: 10,
+      concurrency: 2,
+      checkpointQueries,
+      saveCheckpoint: () => {},
+    };
+
+    const interrupted = await runBatch(rows, client, { ...baseOptions, maxRequests: 2 });
+    assert.deepStrictEqual(calledPages, [1, 2], "중복된 두 지역 행이 페이지를 각각 호출하면 안 됨");
+    assert.strictEqual(interrupted.uniqueQueryCount, 1);
+    assert.strictEqual(interrupted.results[0].collectionStatus, "partial");
+    assert.strictEqual(interrupted.results[0].stopReason, "request_budget");
+    assert.strictEqual(interrupted.results[0].hits.length, 4);
+    assert.strictEqual(interrupted.results[1].hits.length, 4);
+
+    calledPages.length = 0;
+    const resumed = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
+    assert.deepStrictEqual(calledPages, [3], "재개 시 다음 미완료 페이지만 호출해야 함");
+    assert.strictEqual(resumed.results[0].collectionStatus, "complete");
+    assert.strictEqual(resumed.results[0].hits.length, 5);
+
+    calledPages.length = 0;
+    const reused = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
+    assert.deepStrictEqual(calledPages, [], "완료 쿼리는 재실행 시 API를 다시 호출하면 안 됨");
+    assert.strictEqual(reused.resumedQueryCount, 1);
+    assert.ok(reused.results.every((row) => row.reusedFromCheckpoint));
+    ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
   }
 
   console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");

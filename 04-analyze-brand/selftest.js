@@ -125,6 +125,8 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   const newFormatInput = [
     {
       status: "ok",
+      collectionStatus: "partial",
+      stopReason: "max_pages",
       inputIndex: 0,
       query: { region: "전라남도 나주시", regionMatch: "unverified", item: "신선한 배", classCode: "31" },
       keywordTotalCount: 12345,
@@ -156,6 +158,7 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   const r = analyzeEntries(newFormatInput, { asOfYear: 2026 });
   assert.strictEqual(r.summary.queryCount, 3);
   assert.strictEqual(r.summary.successfulQueryCount, 1);
+  assert.strictEqual(r.summary.partialQueryCount, 1);
   assert.strictEqual(r.summary.erroredQueryCount, 1);
   assert.strictEqual(r.summary.skippedQueryCount, 1, "skipped는 성공/오류와 분리된 별도 카운트여야 함");
   assert.strictEqual(r.summary.sourceTotalCount, 12345, "keywordTotalCount를 읽어야 함(구 totalCount 아님)");
@@ -173,6 +176,10 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   assert.ok(
     r.warnings.some((w) => w.includes("검토대기·제외")),
     "skipped 건수에 대한 경고 문구가 있어야 함"
+  );
+  assert.ok(
+    r.warnings.some((w) => w.includes("부분 수집")),
+    "partial 검색이 집계에 포함됐다는 경고 문구가 있어야 함"
   );
   ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
 }
