@@ -11,6 +11,12 @@ const os = require("os");
 const path = require("path");
 const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
+const {
+  DEFAULT_BASE_URL: AREA_BRAND_BASE_URL,
+  createClient: createAreaBrandClient,
+  indexByApplicationNumber,
+  normalizeApplicationNumber,
+} = require("./lib/areaBrandClient");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const {
@@ -73,6 +79,27 @@ const SAMPLE_NOT_FOUND_XML = `<?xml version="1.0" encoding="UTF-8"?>
 const SAMPLE_ERROR_XML = `<?xml version="1.0" encoding="UTF-8"?>
 <response><header><resultCode>30</resultCode><resultMsg>SERVICE NOT REGISTERED</resultMsg></header></response>`;
 
+function areaBrandXml(items, totalCount = items.length, resultCode = "00", resultMsg = "정상 처리되었습니다.") {
+  return [
+    "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+    `<response><header><resultCode>${resultCode}</resultCode><resultMsg>${resultMsg}</resultMsg></header>`,
+    `<body><totalCount>${totalCount}</totalCount><items>`,
+    ...items.map((item) => [
+      "<item>",
+      `<aplcnoInfo>${item.applicationNumber}</aplcnoInfo>`,
+      `<brandRgsde>${item.registrationDate}</brandRgsde>`,
+      `<cntntsNo>${item.contentId}</cntntsNo>`,
+      `<cntntsSj><![CDATA[${item.brandName}]]></cntntsSj>`,
+      `<imgUrl>${item.imageUrl || ""}</imgUrl>`,
+      `<mainPrdlstNm>${item.product}</mainPrdlstNm>`,
+      `<rgnoInfo>${item.registrationNumber}</rgnoInfo>`,
+      `<signguNm>${item.region}</signguNm>`,
+      "</item>",
+    ].join("")),
+    "</items></body></response>",
+  ].join("");
+}
+
 function ok(label) {
   console.log(`  ok - ${label}`);
 }
@@ -89,6 +116,56 @@ async function run() {
     assert.strictEqual(parsed.hits[0].classificationCode, "30");
     assert.strictEqual(parsed.hits[1].agent, "특허법인 예시");
     ok("정상 응답 필드 13개 매핑 정확");
+  }
+
+  console.log("1-1) 농사로 areaBrandLst — 실제 목록 계약·페이지·출원번호 조인 키");
+  {
+    const requestedUrls = [];
+    const allItems = [
+      { applicationNumber: "4020190126184", registrationDate: "20200101", contentId: "1", brandName: "구미별미", product: "쌀", registrationNumber: "401234567", region: "구미" },
+      { applicationNumber: "40-2020-0000002", registrationDate: "20210101", contentId: "2", brandName: "경북한상", product: "사과", registrationNumber: "402345678", region: "경상북도" },
+      { applicationNumber: "4020210000003", registrationDate: "20220101", contentId: "3", brandName: "안동한상", product: "한우", registrationNumber: "403456789", region: "안동시" },
+    ];
+    const fakeFetch = async (url) => {
+      requestedUrls.push(url);
+      const parsedUrl = new URL(url);
+      const pageNo = Number(parsedUrl.searchParams.get("pageNo"));
+      const numOfRows = Number(parsedUrl.searchParams.get("numOfRows"));
+      const start = (pageNo - 1) * 2;
+      const pageItems = allItems.slice(start, start + numOfRows);
+      return { ok: true, status: 200, text: async () => areaBrandXml(pageItems, 602) };
+    };
+    const client = createAreaBrandClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const result = await client.listAreaBrands({ limit: 3, pageSize: 2 });
+    assert.strictEqual(result.totalCount, 602);
+    assert.strictEqual(result.brands.length, 3);
+    assert.strictEqual(result.brands[0].brandName, "구미별미");
+    assert.strictEqual(result.brands[1].primaryProductName, "사과");
+    assert.deepStrictEqual(
+      requestedUrls.map((url) => Number(new URL(url).searchParams.get("pageNo"))),
+      [1, 2]
+    );
+    assert.deepStrictEqual(
+      requestedUrls.map((url) => Number(new URL(url).searchParams.get("numOfRows"))),
+      [2, 2],
+      "페이지별 numOfRows가 바뀌면 offset이 겹칠 수 있음"
+    );
+    assert.ok(requestedUrls[0].startsWith(`${AREA_BRAND_BASE_URL}/areaBrandLst?`));
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("apiKey"), "test-key");
+    assert.strictEqual(normalizeApplicationNumber("40-2019-0126184"), "4020190126184");
+    const index = indexByApplicationNumber(result.brands);
+    assert.strictEqual(index.get("4020190126184")[0].regionName, "구미");
+
+    const badClient = createAreaBrandClient({
+      apiKey: "bad-key",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => areaBrandXml([], 0, "11", "인증키 오류"),
+      }),
+    });
+    await assert.rejects(() => badClient.listAreaBrands({ limit: 1 }), /\[11\] 인증키 오류/);
+    ok("areaBrandLst 602건 계약과 소량 페이지 순회, 인증 오류, 출원번호 정규화가 동작함");
   }
 
   console.log("2) filterByClassCode");

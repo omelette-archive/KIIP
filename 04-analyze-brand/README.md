@@ -71,8 +71,8 @@ node 04-analyze-brand/analyzeBrands.js \
 - `collectionStatus=partial` 검색의 저장된 hit는 집계에 포함하지만 `partialQueryCount`와 경고를
   남긴다. 따라서 상한에 걸린 결과를 완전한 모집단으로 해석하면 안 된다.
 - 현재 ③단계는 출원인 주소를 제공하지 않아 대부분 `regionMatch: unverified`다. 따라서 지금은
-  `localApplicantShare`가 `null`인 것이 정상이다. 추후 각 hit에 `applicantRegionMatch`를
-  `true`/`false` 또는 `inside`/`outside`로 넣으면 코드 변경 없이 계산된다.
+  `localApplicantShare`가 `null`인 것이 정상이다. #11 또는 #24에서 각 hit에
+  `applicantRegionMatch=true|false|inside|outside`를 넣으면 코드 변경 없이 계산된다.
 - 같은 출원번호가 여러 품목이나 지역에 걸쳐 검색되면 각 세부 집계에서는 관계별로 포함되지만,
   전체 `summary`에서는 한 번만 센다.
 - ③단계 배치 결과의 `status=skipped`(②단계에서 검토대기·제외된 행) 항목은 상표 검색 자체가

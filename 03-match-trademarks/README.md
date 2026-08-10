@@ -17,7 +17,7 @@
   `getWordSearch` 응답에는 이 필드가 없어 이번 범위에서는 못 붙였다 — 이슈 #12 참고.
 - **지역**: KIPRIS 상표 검색 응답에 출원인 주소/지역 필드가 없어서 **아직 매칭 미구현**.
   `--region` 값은 결과에 `regionMatch: "unverified"`로만 태그된다. 실제 지역 매칭 방식(별도
-  출원인 데이터셋 조인 등)이 정해지면 `matchTrademarks.js`의 TODO를 채운다.
+  출원인 주소 데이터셋 조인은 #11, 농사로 지역브랜드 subset의 출원번호 조인은 #24에서 관리한다.
 - 의존성 없는(zero-dependency) 순수 Node 스크립트. XML도 정규식 기반 경량 파서(`lib/xmlLite.js`)로
   처리한다 — 실제 응답에서 CDATA/중첩 구조가 확인되면 정식 XML 파서로 교체 필요.
 
@@ -27,6 +27,25 @@
 cp .env.example .env
 # .env 에 KIPRIS_API_KEY=발급받은키 입력 (plus.kipris.or.kr, "상표" 서비스 활용신청 필요)
 ```
+
+KIPRIS 키와 농사로 지역브랜드 키는 모두 실호출 검증됐다. 키 위치와 worktree 복사 방법은
+[`docs/api-key-management.md`](../docs/api-key-management.md)를 따른다.
+
+## 농사로 지역브랜드 검증자료
+
+농사로 `areaBrand/areaBrandLst`의 602건은 특산품 원본이 아니라 이미 출원·등록된 지역 브랜드
+검증자료다. 기존 ① 수집 결과에 섞지 않고 별도 JSON으로 소량 수집한다.
+
+```bash
+node 03-match-trademarks/fetchAreaBrands.js \
+  --limit 3 \
+  --out 03-match-trademarks/output/area-brand-sample.json
+```
+
+`lib/areaBrandClient.js`는 목록 XML 필드 8개를 구조화하고 `aplcnoInfo`를 KIPRIS
+`applicationNumber`와 비교할 수 있도록 숫자형 조인 키로 정규화한다. 아직 KIPRIS hit에 지역
+판정을 자동 부여하거나 ④ 통계에 반영하지 않는다. `signguNm`의 기초/광역/접미사 혼재를
+정규화한 뒤 연결하는 작업은 #24에서 관리한다.
 
 ## 사용법
 
@@ -101,9 +120,11 @@ KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 �
 ```
 03-match-trademarks/
 ├── matchTrademarks.js       CLI 진입점 (단건: {지역,품목} 한 쌍 / --input: ②단계 출력 배치)
+├── fetchAreaBrands.js       농사로 지역브랜드 검증자료 소량 수집 CLI (기본 3건)
 ├── selftest.js            fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
 ├── lib/
 │   ├── kiprisClient.js     trademarkSearch() — ServiceKey 쿼리 빌드, resultCode 처리
+│   ├── areaBrandClient.js  areaBrandLst XML·페이지 처리, 출원번호 조인 키 정규화
 │   ├── xmlLite.js          정규식 기반 경량 XML 파서
 │   ├── fetchWithRetry.js   타임아웃·재시도(지수 백오프)·키 마스킹
 │   ├── errors.js           KiprisApiError, resultCode 표준화
@@ -114,8 +135,8 @@ KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 �
 
 ## 테스트
 
-실제 API 키 없이 파이프라인 전체(XML 파싱 → 클라이언트 → 품목 필터 → 에러/재시도 처리)를
-검증한다:
+실제 API 키 없이 KIPRIS와 농사로 지역브랜드의 XML 파싱 → 클라이언트 → 페이지/오류 처리와
+KIPRIS 품목 필터를 검증한다:
 
 ```bash
 node 03-match-trademarks/selftest.js

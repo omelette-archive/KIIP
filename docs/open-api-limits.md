@@ -9,6 +9,7 @@
 |---|---|---|---|
 | 지리적표시 등록정보 | 무료, 농식품 포털 신청·허용 IP 등록 | 상세 페이지상 제한없음(오류코드에는 일 요청 초과 존재) | 기본 오늘 1회, 범위 복구 기본 최대 31일, 요청당 최대 1,000건 |
 | 농사로 지역특산물 | 무료, 신청 승인 후 인증키 발급(카탈로그상 개발 자동승인·운영 심의승인) | 제공기관 정책에 따라 상이(공개 숫자 없음) | 실키로 3건·2페이지·빈 결과·인증 오류 검증, 소량 실행은 `--limit` 적용 |
+| 농사로 지역브랜드 | 무료, 농사로 회원 API 신청키 | 제공기관 정책에 따라 상이(공개 숫자 없음) | `areaBrandLst` 602건 계약 확인, 전용 CLI 기본 상한 3건 |
 | KIPRISPlus 상표 API | 무료 월 1,000회, 이후 유료 | 회원 계정 기준 초당 50회. 무료 호출은 전체 상품 합산 월 1,000회이며 매월 1일 초기화 | 배치 1회 기본 상한 100건, 동시 요청 기본 2 |
 
 KIPRISPlus는 2026-03-03부터 **유료 기관 고객** 대상으로 초당 75회 시범 확대를 공지했지만,
@@ -20,6 +21,7 @@ KIPRISPlus는 2026-03-03부터 **유료 기관 고객** 대상으로 초당 75�
 - 지리적표시 등록정보: <https://www.data.go.kr/data/15080629/openapi.do>
 - 농사로 지역특산물: <https://www.data.go.kr/data/15101361/openapi.do>
 - 농사로 제공기관 API 목록: <https://www.nongsaro.go.kr/portal/ps/psn/psnj/openApiLst.ps?menuId=PS65428>
+- 농사로 지역브랜드 공개 목록: <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344>
 - KIPRISPlus FAQ(호출 제한): <https://plus.kipris.or.kr/portal/bbs/Faq_info.do?buttonIndex=&pageIndex=3>
 - KIPRISPlus 이용요금: <https://plus.kipris.or.kr/portal/use/paymentMmg.do?menuNo=200026>
 - KIPRISPlus 유료 기관 초당 제한 시범 확대 공지: <https://plus.kipris.or.kr/eng/bbs/view.do?bbsId=B0000011&nttId=1452&menuNo=300016>
@@ -40,6 +42,7 @@ KIPRISPlus는 2026-03-03부터 **유료 기관 고객** 대상으로 초당 75�
 - 존재하지 않는 검색어: 정상 응답 0건
 - 잘못된 키: 인증 오류 감지
 - 같은 3건을 SQLite에 재수집: 새 버전 0, unchanged 3으로 멱등 저장 확인
+- 지역브랜드 `areaBrandLst`: 실키로 `totalCount=602`와 목록 필드 8개 확인. 샘플 CLI 기본 상한 3건
 
 공식 농사로 안내는 OpenAPI 신청 승인 후 신청 내역에서 인증키를 확인하는 절차를 명시하지만,
 고정 일/월 호출량 숫자는 공개하지 않는다. 따라서 숫자를 추정해 코드에 넣지 않고 계정 화면과

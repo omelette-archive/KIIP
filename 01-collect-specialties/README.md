@@ -31,7 +31,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── fetchWithRetry.js    재시도/타임아웃/키마스킹 (02/03에서 포팅)
 │   ├── adminCodes.js        법정동코드 CSV 파싱 -> 시군구 레벨 마스터 목록
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
-│   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (baseUrl은 활용신청 후 확정 필요)
+│   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (공식 localSpcprd XML 계약)
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
 │   ├── collectionStore.js   SQLite 실행 이력·원문 레코드·append-only 버전 저장
 │   └── normalize.js         소스별 결과 -> 표준 출력 스키마, 지역명을 adminCodes 마스터와 대조
@@ -92,8 +92,8 @@ node 01-collect-specialties/selftest.js
 - [x] 226개(현재 269건) 기초지자체 목록(시도/시군구 코드) 기준 데이터 확보
 - [x] 각 수집 대상별 크롤러/API 연동 설계 — 지리적표시/농사로는 구현, 지자체 홈페이지/뉴스는
       범위 밖
-- [ ] 생성형 AI로 "지역 ↔ 특산품" 관계 자동 추출 — 지금은 각 API가 이미 지역+품목을 쌍으로
-      제공해서 별도 AI 추출 없이도 동작. 지자체 홈페이지/뉴스처럼 비정형 소스를 붙일 때 필요해짐
+- [ ] 비정형 소스의 "지역 ↔ 특산품" 관계 추출 — 현재 API는 이미 지역+품목을 쌍으로 제공하므로
+      AI 추출이 필요하지 않다. 지자체 홈페이지/뉴스를 실제 범위에 넣을 때 별도 이슈로 설계한다.
 - [x] 수집/정규화 데이터 계약과 DB 후보 구조 설계 — [`docs/data-pipeline-contracts.md`](../docs/data-pipeline-contracts.md)
 - [x] 원문 payload·실행 이력을 보존하는 SQLite 저장 — 동일 원본 멱등 저장·변경 버전 보존
 
