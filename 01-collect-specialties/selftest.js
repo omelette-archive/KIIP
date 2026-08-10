@@ -444,6 +444,29 @@ async function run() {
       assert.strictEqual(storedRun.request_count, 2);
       assert.strictEqual(storedRun.warning_count, 1);
       ok("같은 원본 재실행은 중복 없이 last_seen만 갱신하고, 내용 변경만 append-only 버전으로 보존");
+
+      // 회귀 테스트: 내용이 과거 버전(run1)과 정확히 같은 값으로 되돌아가면 새 버전을 또
+      // 만들지 않고 그 버전 번호를 재사용해야 한다. 이전에는 UNIQUE(raw_record_id,
+      // payload_hash) 제약을 어겨 전체 실행이 실패했다.
+      const run4 = store.startRun({ sources: ["gi"], queryScope: { dates: ["20130207"] } });
+      const reverted = store.persistRecords(
+        run4,
+        makeStoredRecords("gi", [entry], [{ ...normalized, collectedAt: "2026-08-13T00:00:00.000Z" }])
+      );
+      store.finishRun(run4, {
+        status: "success",
+        requestCount: 1,
+        succeededSourceCount: 1,
+        rowCount: 1,
+        stored: reverted,
+      });
+      assert.deepStrictEqual(reverted, { inserted: 0, updated: 1, unchanged: 0 });
+      assert.deepStrictEqual(
+        store.counts(),
+        { runs: 4, records: 1, versions: 2 },
+        "버전 수가 그대로 2여야 함 — run1과 동일한 내용이라 새 버전(3)을 만들지 않고 버전 1을 재사용"
+      );
+      ok("과거 버전과 동일한 내용으로 되돌아가도 UNIQUE 제약 위반 없이 그 버전 번호를 재사용함");
     } finally {
       store.close();
       fs.rmSync(tempDir, { recursive: true, force: true });

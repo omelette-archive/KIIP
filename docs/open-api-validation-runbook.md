@@ -211,8 +211,9 @@ node 01-collect-specialties/collectSpecialties.js `
 
 1. 농사로 공공데이터 목록에서 서비스명 `브랜드`로 검색한다.
 2. `지역 브랜드` 행의 샘플은 `areaBrand`, 공식 매뉴얼은 `areaBrand.zip`이다.
-3. `selectSclCodeLst`는 브랜드 목록이 아니라 품목 대분류 코드표이고, 실제 목록 operation은
-   `areaBrandLst`다.
+3. 샘플의 첫 operation은 `selectSclCodeLst`인데, 이건 **실제 브랜드 목록이 아니라 품목
+   대분류 코드표**다(공통·식량작물·채소류·과채류·과실류·축산물·특작류·화훼류·농산가공·기타
+   10개 코드). 실제 목록 operation은 같은 서비스의 `areaBrandLst`다.
 
 공식 자료:
 
