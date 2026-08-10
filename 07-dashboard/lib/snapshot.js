@@ -1,0 +1,461 @@
+"use strict";
+
+const crypto = require("crypto");
+const { loadAdminRegionCodes } = require("../../01-collect-specialties/lib/adminCodes");
+
+const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
+const DASHBOARD_CONTRACT_VERSION = "dashboard-data-contract-v0-draft";
+const REGION_CODE_VERSION = "molit-legal-dong-20260703";
+const SPECIALTY_ID_VERSION = "specialty-id-v1-notice-class-sha256";
+
+function clean(value) {
+  return value === undefined || value === null
+    ? ""
+    : String(value).normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+function hash(value, length = 16) {
+  return crypto.createHash("sha256").update(value, "utf8").digest("hex").slice(0, length);
+}
+
+function canonicalItem(row) {
+  const name = clean(row.noticeName) || clean(row.itemName);
+  const niceClass = clean(row.niceClass).replace(/^0+(?=\d)/, "");
+  return { name, niceClass, basis: `${name.toLowerCase()}\u001f${niceClass}` };
+}
+
+function specialtyIdentity(row) {
+  const canonical = canonicalItem(row);
+  if (!canonical.name) {
+    return { specialtyId: null, specialtyIdStatus: "unresolved", canonical };
+  }
+  return {
+    specialtyId: `sp-v1-${hash(canonical.basis)}`,
+    specialtyIdStatus: "resolved",
+    canonical,
+  };
+}
+
+function createRegionIndex(adminCodes = loadAdminRegionCodes()) {
+  const grouped = new Map();
+  for (const row of adminCodes) {
+    const key = `${clean(row.sido)}\u001f${clean(row.sigungu)}`;
+    if (!grouped.has(key)) grouped.set(key, new Map());
+    grouped.get(key).set(clean(row.code), row);
+  }
+  return grouped;
+}
+
+function resolveRegion(row, regionIndex) {
+  const regionParts = clean(row.region).split(" ").filter(Boolean);
+  const sido = clean(row.sido) || regionParts[0] || "";
+  const sigungu = clean(row.sigungu) || regionParts.slice(1).join(" ");
+  const candidates = regionIndex.get(`${sido}\u001f${sigungu}`);
+  if (!sido || !candidates || candidates.size === 0) {
+    return { regionCode: null, regionCodeStatus: "unresolved" };
+  }
+  if (candidates.size > 1) {
+    return { regionCode: null, regionCodeStatus: "ambiguous" };
+  }
+  return { regionCode: [...candidates.keys()][0], regionCodeStatus: "resolved" };
+}
+
+function rowKey(row) {
+  const canonical = canonicalItem(row);
+  const region = clean(row.region) || [clean(row.sido), clean(row.sigungu)].filter(Boolean).join(" ");
+  return `${region}\u001f${canonical.basis}`;
+}
+
+function count(row, field) {
+  const value = Number(row?.[field]);
+  return Number.isFinite(value) && value >= 0 ? value : 0;
+}
+
+function dataState(row) {
+  const queryCount = count(row, "queryCount");
+  const successful = count(row, "successfulQueryCount");
+  const partial = count(row, "partialQueryCount");
+  const errors = count(row, "erroredQueryCount");
+  const skipped = count(row, "skippedQueryCount");
+  if (queryCount === 0) return "not_collected";
+  if (errors === queryCount) return "error";
+  if (skipped === queryCount) return "skipped";
+  if (partial > 0 || errors > 0 || skipped > 0 || successful < queryCount) return "partial";
+  return count(row, "uniqueTrademarkCount") === 0 ? "complete_zero" : "complete_nonzero";
+}
+
+function metricStatus(state) {
+  if (state === "complete_zero" || state === "complete_nonzero") return "complete";
+  if (state === "error") return "error";
+  if (state === "not_collected" || state === "skipped") return "not_collected";
+  return "partial";
+}
+
+function sourceRef(provenance) {
+  const sourceId = clean(provenance?.sourceId);
+  if (sourceId) return sourceId;
+  const label = clean(provenance?.sourceLabel);
+  return label ? `label-${hash(label, 12)}` : null;
+}
+
+function rowSourceIds(row) {
+  const ids = new Set();
+  for (const provenance of Array.isArray(row?.sourceProvenance) ? row.sourceProvenance : []) {
+    const id = sourceRef(provenance);
+    if (id) ids.add(id);
+  }
+  for (const label of Array.isArray(row?.sources) ? row.sources : []) {
+    if (clean(label)) ids.add(`label-${hash(clean(label), 12)}`);
+  }
+  return [...ids].sort();
+}
+
+function makeMetric(value, row, options) {
+  const state = options.state || dataState(row);
+  return {
+    value,
+    availability: options.availability || "available",
+    status: options.status || metricStatus(state),
+    sourceIds: options.sourceIds || rowSourceIds(row),
+    calculatedAt: options.calculatedAt || null,
+    methodVersion: options.methodVersion || null,
+    rationale: options.rationale || null,
+    blockingIssue: options.blockingIssue || null,
+  };
+}
+
+function collectSources(analysis) {
+  const sources = new Map();
+  const add = (provenance) => {
+    if (!provenance || typeof provenance !== "object") return;
+    const id = sourceRef(provenance);
+    if (!id) return;
+    const existing = sources.get(id) || {};
+    sources.set(id, {
+      sourceId: id,
+      sourceLabel: clean(provenance.sourceLabel) || existing.sourceLabel || null,
+      sourceContractVersion:
+        clean(provenance.sourceContractVersion) || existing.sourceContractVersion || null,
+      sourceFetchedAt: clean(provenance.sourceFetchedAt) || existing.sourceFetchedAt || null,
+      sourceUrl: clean(provenance.sourceUrl) || existing.sourceUrl || null,
+      sourceLastVerifiedAt:
+        clean(provenance.sourceLastVerifiedAt) || existing.sourceLastVerifiedAt || null,
+      idOrigin: clean(provenance.sourceId) ? "upstream" : "derived_from_label",
+    });
+  };
+  for (const source of Array.isArray(analysis?.provenance?.sources)
+    ? analysis.provenance.sources
+    : []) add(source);
+  for (const row of Array.isArray(analysis?.regionItems) ? analysis.regionItems : []) {
+    for (const source of Array.isArray(row.sourceProvenance) ? row.sourceProvenance : []) add(source);
+    for (const label of Array.isArray(row.sources) ? row.sources : []) add({ sourceLabel: label });
+  }
+  sources.set("admin_codes", {
+    sourceId: "admin_codes",
+    sourceLabel: "국토교통부 전국 법정동 코드",
+    sourceContractVersion: REGION_CODE_VERSION,
+    sourceFetchedAt: "2026-08-06",
+    sourceUrl: "https://www.data.go.kr/data/15063424/fileData.do",
+    sourceLastVerifiedAt: "2026-08-06",
+    idOrigin: "source_registry",
+  });
+  return [...sources.values()].sort((a, b) => a.sourceId.localeCompare(b.sourceId));
+}
+
+function assertInputs(analysis, gap, strategy) {
+  if (!analysis || !Array.isArray(analysis.regionItems) || !Array.isArray(analysis.regions)) {
+    throw new Error("analysis는 ④단계 출력이어야 합니다 (regionItems/regions 배열 필요).");
+  }
+  if (!gap || !Array.isArray(gap.rows) || !Array.isArray(gap.ranking)) {
+    throw new Error("gap은 ⑤단계 출력이어야 합니다 (rows/ranking 배열 필요).");
+  }
+  if (!strategy || !Array.isArray(strategy.briefings)) {
+    throw new Error("strategy는 ⑥단계 출력이어야 합니다 (briefings 배열 필요).");
+  }
+  if (
+    strategy.sourceScoreVersion &&
+    gap.scoreVersion &&
+    strategy.sourceScoreVersion !== gap.scoreVersion
+  ) {
+    throw new Error("⑥ sourceScoreVersion과 ⑤ scoreVersion이 일치하지 않습니다.");
+  }
+  if (
+    gap.provenance?.inputAnalysisVersion &&
+    analysis.analysisVersion &&
+    gap.provenance.inputAnalysisVersion !== analysis.analysisVersion
+  ) {
+    throw new Error("⑤ inputAnalysisVersion과 ④ analysisVersion이 일치하지 않습니다.");
+  }
+}
+
+function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
+  assertInputs(analysis, gap, strategy);
+  const mode = options.mode || "sample";
+  if (!new Set(["sample", "full"]).has(mode)) {
+    throw new Error("mode는 sample 또는 full이어야 합니다.");
+  }
+  const generatedAt = options.generatedAt || new Date().toISOString();
+  const regionIndex = createRegionIndex(options.adminCodes);
+  const analysisRows = new Map(analysis.regionItems.map((row) => [rowKey(row), row]));
+  const gapRows = new Map(gap.rows.map((row) => [rowKey(row), row]));
+  const briefingRows = new Map(strategy.briefings.map((row) => [rowKey(row), row]));
+  const seenSpecialties = new Map();
+  const warnings = new Set([
+    ...(Array.isArray(analysis.warnings) ? analysis.warnings : []),
+    ...(Array.isArray(gap.warnings) ? gap.warnings : []),
+    ...(Array.isArray(strategy.warnings) ? strategy.warnings : []),
+  ]);
+  if (mode === "sample") {
+    warnings.add("샘플 실행 결과이며 전국 모집단 통계나 정책 결론으로 해석하면 안 됩니다.");
+  }
+  warnings.add("현재 행정구역 경계 GeoJSON 버전은 연결되지 않아 지도 렌더링은 차단 상태입니다.");
+  warnings.add(
+    "법정동코드 원본에 폐지·변경 이력이 섞여 있어 현재 유효한 전국 목표 지역 수는 아직 확정하지 않았습니다."
+  );
+
+  for (const row of gap.rows) {
+    if (!analysisRows.has(rowKey(row))) {
+      throw new Error(`⑤ 행을 ④ 지역×품목에 연결할 수 없습니다: ${rowKey(row)}`);
+    }
+  }
+  for (const row of strategy.briefings) {
+    if (!analysisRows.has(rowKey(row))) {
+      throw new Error(`⑥ 브리핑을 ④ 지역×품목에 연결할 수 없습니다: ${rowKey(row)}`);
+    }
+  }
+
+  const regionGroups = new Map();
+  for (const row of analysis.regionItems) {
+    const regionIdentity = resolveRegion(row, regionIndex);
+    const specialty = specialtyIdentity(row);
+    if (specialty.specialtyId) {
+      const previous = seenSpecialties.get(specialty.specialtyId);
+      if (previous && previous !== specialty.canonical.basis) {
+        throw new Error(`specialtyId 충돌: ${specialty.specialtyId}`);
+      }
+      seenSpecialties.set(specialty.specialtyId, specialty.canonical.basis);
+    }
+    const state = dataState(row);
+    const gapRow = gapRows.get(rowKey(row));
+    const briefing = briefingRows.get(rowKey(row));
+    const calculatedAt = analysis.generatedAt || generatedAt;
+    const scoreAvailability = typeof gapRow?.gapScore === "number" ? "preview" : "blocked";
+    const item = {
+      specialtyId: specialty.specialtyId,
+      specialtyIdStatus: specialty.specialtyIdStatus,
+      itemName: clean(row.itemName) || null,
+      noticeName: clean(row.noticeName) || null,
+      niceClass: clean(row.niceClass) || null,
+      dataState: state,
+      sources: rowSourceIds(row),
+      metrics: {
+        uniqueTrademarkCount: makeMetric(count(row, "uniqueTrademarkCount"), row, {
+          state,
+          calculatedAt,
+          methodVersion: analysis.analysisVersion || null,
+          rationale: "④ 저장 hit를 출원번호 우선 키로 중복 제거",
+        }),
+        registeredTrademarkCount: makeMetric(count(row.statusCounts, "registered"), row, {
+          state,
+          calculatedAt,
+          methodVersion: analysis.analysisVersion || null,
+          rationale: "④ statusCounts.registered",
+        }),
+        registrationRate: makeMetric(row.registrationRate ?? null, row, {
+          state,
+          calculatedAt,
+          methodVersion: analysis.analysisVersion || null,
+          rationale: "registered / uniqueTrademarkCount",
+        }),
+        localApplicantShare: makeMetric(
+          row.regionVerificationRate === 1 ? row.localApplicantShare ?? null : null,
+          row,
+          {
+            state,
+            availability: row.regionVerificationRate === 1 ? "available" : "blocked",
+            calculatedAt,
+            methodVersion: analysis.analysisVersion || null,
+            rationale: "출원인 주소가 검증된 hit만 사용",
+            blockingIssue: row.regionVerificationRate === 1 ? null : "#11",
+          }
+        ),
+        regionalBrandInsideShare: makeMetric(row.regionalBrandInsideShare ?? null, row, {
+          state,
+          availability:
+            count(row, "regionalBrandReferenceHitCount") > 0 ? "available" : "blocked",
+          calculatedAt,
+          methodVersion: analysis.analysisVersion || null,
+          rationale: "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
+        }),
+        gapScore: makeMetric(gapRow?.gapScore ?? null, row, {
+          state,
+          availability: scoreAvailability,
+          calculatedAt: gap.generatedAt || generatedAt,
+          methodVersion: gap.scoreVersion || null,
+          rationale: gapRow?.gapReason || "⑤ 예시 점수 기준",
+          blockingIssue: "#29",
+        }),
+      },
+      briefing: briefing
+        ? {
+            templateVersion: strategy.templateVersion || null,
+            isGapAlert: Boolean(briefing.isGapAlert),
+            sentences: Array.isArray(briefing.sentences) ? briefing.sentences : [],
+            evidence: briefing.evidence || null,
+            aiReviewApplied: false,
+          }
+        : null,
+    };
+    const groupKey = clean(row.region) || [clean(row.sido), clean(row.sigungu)].join(" ");
+    if (!regionGroups.has(groupKey)) {
+      regionGroups.set(groupKey, {
+        ...regionIdentity,
+        sido: clean(row.sido) || null,
+        sigungu: clean(row.sigungu) || null,
+        region: clean(row.region) || groupKey,
+        items: [],
+      });
+    }
+    regionGroups.get(groupKey).items.push(item);
+  }
+
+  const regionAggregates = new Map(analysis.regions.map((row) => [clean(row.region), row]));
+  const regions = [...regionGroups.values()].map((region) => {
+    const aggregate = regionAggregates.get(clean(region.region));
+    const state = aggregate ? dataState(aggregate) : "not_collected";
+    if (region.regionCodeStatus !== "resolved") {
+      warnings.add(`${region.region}의 공식 regionCode를 확정하지 못했습니다.`);
+    }
+    region.items.sort(
+      (a, b) =>
+        (b.metrics.uniqueTrademarkCount.value || 0) - (a.metrics.uniqueTrademarkCount.value || 0) ||
+        clean(a.noticeName || a.itemName).localeCompare(clean(b.noticeName || b.itemName), "ko")
+    );
+    return {
+      ...region,
+      dataState: state,
+      metrics: aggregate
+        ? {
+            uniqueTrademarkCount: makeMetric(count(aggregate, "uniqueTrademarkCount"), aggregate, {
+              state,
+              calculatedAt: analysis.generatedAt || generatedAt,
+              methodVersion: analysis.analysisVersion || null,
+            }),
+            registeredTrademarkCount: makeMetric(count(aggregate.statusCounts, "registered"), aggregate, {
+              state,
+              calculatedAt: analysis.generatedAt || generatedAt,
+              methodVersion: analysis.analysisVersion || null,
+            }),
+            registrationRate: makeMetric(aggregate.registrationRate ?? null, aggregate, {
+              state,
+              calculatedAt: analysis.generatedAt || generatedAt,
+              methodVersion: analysis.analysisVersion || null,
+            }),
+          }
+        : {},
+    };
+  });
+  regions.sort((a, b) => clean(a.region).localeCompare(clean(b.region), "ko"));
+
+  const summary = analysis.summary || {};
+  const coverage = {
+    targetRegionCount: null,
+    observedRegionCount: regions.length,
+    regionItemCount: analysis.regionItems.length,
+    completeQueryCount: Math.max(
+      0,
+      count(summary, "successfulQueryCount") - count(summary, "partialQueryCount")
+    ),
+    partialQueryCount: count(summary, "partialQueryCount"),
+    errorQueryCount: count(summary, "erroredQueryCount"),
+    skippedQueryCount: count(summary, "skippedQueryCount"),
+  };
+
+  const identityFor = (row) => {
+    const region = resolveRegion(row, regionIndex);
+    const specialty = specialtyIdentity(row);
+    return { regionCode: region.regionCode, specialtyId: specialty.specialtyId };
+  };
+  const rankings = gap.ranking.map((row, index) => {
+    const analysisRow = analysisRows.get(rowKey(row));
+    const state = dataState(analysisRow);
+    return {
+      rank: index + 1,
+      ...identityFor(row),
+      region: clean(row.region) || null,
+      itemName: clean(row.noticeName) || clean(row.itemName) || null,
+      gapScore: makeMetric(row.gapScore ?? null, row, {
+        availability: "preview",
+        status: metricStatus(state),
+        calculatedAt: gap.generatedAt || generatedAt,
+        methodVersion: gap.scoreVersion || null,
+        rationale: "⑤ 예시 점수 기준",
+        blockingIssue: "#29",
+      }),
+    };
+  });
+  const briefings = strategy.briefings.map((row) => ({
+    ...identityFor(row),
+    region: clean(row.region) || null,
+    itemName: clean(row.itemName) || null,
+    templateVersion: strategy.templateVersion || null,
+    isGapAlert: Boolean(row.isGapAlert),
+    sentences: Array.isArray(row.sentences) ? row.sentences : [],
+    evidence: row.evidence || null,
+    aiReviewApplied: false,
+  }));
+  const alerts = briefings.filter((row) => row.isGapAlert);
+  const snapshotBasis = JSON.stringify({ mode, analysis, gap, strategy });
+  const sources = collectSources(analysis);
+  const sourceFetchedAt = sources
+    .map((source) => clean(source.sourceFetchedAt))
+    .filter(Boolean)
+    .sort();
+
+  return {
+    schemaVersion: DASHBOARD_SCHEMA_VERSION,
+    snapshotId: `dashboard-${hash(snapshotBasis, 20)}`,
+    generatedAt,
+    mode,
+    asOf: {
+      sourceMinFetchedAt: sourceFetchedAt[0] || null,
+      sourceMaxFetchedAt: sourceFetchedAt[sourceFetchedAt.length - 1] || null,
+      analysisGeneratedAt: analysis.generatedAt || null,
+    },
+    versions: {
+      analysisVersion: analysis.analysisVersion || null,
+      scoreVersion: gap.scoreVersion || null,
+      templateVersion: strategy.templateVersion || null,
+      dashboardContractVersion: DASHBOARD_CONTRACT_VERSION,
+      regionCodeVersion: REGION_CODE_VERSION,
+      specialtyIdVersion: SPECIALTY_ID_VERSION,
+      geographyVersion: null,
+    },
+    coverage,
+    map: {
+      defaultMetric: "data_coverage",
+      availability: "blocked",
+      blockingReason: "현재 기준 행정구역 경계 GeoJSON 미연결",
+    },
+    sources,
+    warnings: [...warnings],
+    regions,
+    rankings,
+    briefings,
+    alerts,
+  };
+}
+
+module.exports = {
+  DASHBOARD_SCHEMA_VERSION,
+  DASHBOARD_CONTRACT_VERSION,
+  REGION_CODE_VERSION,
+  SPECIALTY_ID_VERSION,
+  buildDashboardSnapshot,
+  canonicalItem,
+  createRegionIndex,
+  dataState,
+  resolveRegion,
+  rowKey,
+  specialtyIdentity,
+};
