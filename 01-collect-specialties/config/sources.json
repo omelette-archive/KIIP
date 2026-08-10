@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastVerifiedAt": "2026-08-06",
+  "lastVerifiedAt": "2026-08-10",
   "sources": [
     {
       "id": "admin_codes",
@@ -36,15 +36,16 @@
         "required": true,
         "keyEnv": "GI_API_KEY",
         "baseUrlEnv": "GI_API_BASE_URL",
-        "approval": "provider_policy"
+        "defaultBaseUrl": "http://211.237.50.150:7080/openapi",
+        "approval": "mafra_portal_application_and_allowed_ip"
       },
       "quota": {
-        "type": "provider_policy",
-        "value": null,
-        "verification": "승인 후 제공기관 마이페이지의 계정별 트래픽 확인 필요"
+        "type": "provider_documented_unlimited",
+        "value": "unlimited",
+        "verification": "공식 상세 페이지의 신청가능 트래픽 '제한없음'; ERROR-350 일 요청 초과 코드는 방어적으로 감지"
       },
       "implementation": {
-        "status": "live_validation_required",
+        "status": "live_key_validated",
         "adapter": "lib/giClient.js"
       }
     },

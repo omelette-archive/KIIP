@@ -35,7 +35,7 @@ flowchart LR
 
 | # | 단계 | 폴더 | 상태 | 한 줄 요약 |
 |---|---|---|---|---|
-| ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | 법정동코드 검증, OpenAPI 전체 페이지 수집·실패 감지 구현, 실키 대기 |
+| ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | GI 실키·일자별 자동수집 검증, 농사로 실키 대기 |
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
 | ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | ② CSV 배치 검색·품목 매칭 동작, **지역 매칭은 TODO** |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역·품목별 집계와 시계열 분석 동작, 지역 내·외 비중은 주소 데이터 대기 |
