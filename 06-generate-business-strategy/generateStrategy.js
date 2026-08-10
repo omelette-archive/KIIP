@@ -62,6 +62,19 @@ function generateStrategies(gap) {
     generatedAt: new Date().toISOString(),
     sourceScoreVersion: gap.scoreVersion || null,
     sourceGeneratedAt: gap.generatedAt || null,
+    provenance: {
+      inputSchemaVersion: gap.schemaVersion || null,
+      inputScoreVersion: gap.scoreVersion || null,
+      upstream: gap.provenance || null,
+    },
+    methodology: {
+      generationMode: "deterministic_template",
+      factSource: "⑤ ranking의 evidence와 수치만 사용",
+      aiReviewApplied: false,
+      rationale: "생성형 AI 검토 전에도 재현 가능하고 근거를 감사할 수 있는 초안을 우선 생성",
+      criteriaIssue: "#16",
+      lastUpdatedAt: "2026-08-10",
+    },
     warnings: [
       "문장 임계값(공백 경고 기준, 지역 외 비중 경고 기준)은 예시값이다(templateVersion 참고) — " +
         "실제 기준 확정 후 06-generate-business-strategy/lib/templates.js만 교체하면 된다.",

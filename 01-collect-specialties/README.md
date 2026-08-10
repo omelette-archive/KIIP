@@ -99,5 +99,7 @@ node 01-collect-specialties/selftest.js
 
 ## 출력 (다음 단계 ②의 입력)
 
-지역별 특산품 원시 목록 — `{ sido, sigungu, rawItemName, source, collectedAt }[]`
+지역별 특산품 원시 목록 — `{ sido, sigungu, rawItemName, source, sourceId,
+sourceContractVersion, sourceUrl, sourceLastVerifiedAt, collectedAt }[]`. 원본 제공기관·계약 버전·
+공식 카탈로그·마지막 계약 확인일·실제 수집시각을 행마다 보존한다.
 상세 기준은 [`docs/data-pipeline-contracts.md`](../docs/data-pipeline-contracts.md) 참고.

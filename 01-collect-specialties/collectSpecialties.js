@@ -2,7 +2,8 @@
 "use strict";
 /**
  * 지역 특산품 원시 목록을 여러 소스에서 수집해 표준 스키마로 합친다.
- * { sido, sigungu, rawItemName, source, collectedAt }[]
+ * { sido, sigungu, rawItemName, source, sourceId, sourceContractVersion,
+ *   sourceUrl, sourceLastVerifiedAt, collectedAt }[]
  *
  * 사용법:
  *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro --out <path>
@@ -116,11 +117,24 @@ function csvEscape(value) {
 }
 
 function writeOutputCsv(outPath, rows) {
-  const fields = ["sido", "sigungu", "rawItemName", "source", "collectedAt"];
+  const fields = [
+    "sido", "sigungu", "rawItemName", "source", "sourceId", "sourceContractVersion",
+    "sourceUrl", "sourceLastVerifiedAt", "collectedAt",
+  ];
   const lines = [fields.join(",")];
   for (const row of rows) lines.push(fields.map((f) => csvEscape(row[f])).join(","));
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, "﻿" + lines.join("\n") + "\n", "utf8");
+}
+
+function addSourceMetadata(rows, definition) {
+  return rows.map((row) => ({
+    ...row,
+    sourceId: definition.id,
+    sourceContractVersion: definition.dataVersion,
+    sourceUrl: definition.catalogUrl,
+    sourceLastVerifiedAt: definition.lastVerifiedAt,
+  }));
 }
 
 async function collectGi(adminList, warnings, options = {}) {
@@ -135,7 +149,9 @@ async function collectGi(adminList, warnings, options = {}) {
       registrationDates: options.giRegistrationDates,
       limit: options.limit,
     });
-    const { rows, warnings: w } = fromGiRegistrations(registrations, adminList);
+    const normalized = fromGiRegistrations(registrations, adminList);
+    const rows = addSourceMetadata(normalized.rows, options.sourceDefinition);
+    const w = normalized.warnings;
     warnings.push(...w);
     return {
       rows,
@@ -158,7 +174,9 @@ async function collectNongsaro(adminList, warnings, options = {}) {
       onRequest: () => requestCount++,
     });
     const specialties = await client.listSpecialties({ numOfRows: 200, limit: options.limit });
-    const { rows, warnings: w } = fromNongsaro(specialties, adminList);
+    const normalized = fromNongsaro(specialties, adminList);
+    const rows = addSourceMetadata(normalized.rows, options.sourceDefinition);
+    const w = normalized.warnings;
     warnings.push(...w);
     return {
       rows,
@@ -224,7 +242,11 @@ async function main() {
         sourceResults[source] = { succeeded: false, requestCount: 0, rowCount: 0, error: message };
         continue;
       }
-      const result = await collector(adminList, warnings, { limit, giRegistrationDates });
+      const result = await collector(adminList, warnings, {
+        limit,
+        giRegistrationDates,
+        sourceDefinition: definition,
+      });
       requestCount += result.requestCount;
       if (result.succeeded) succeededSources++;
       else failedSources++;

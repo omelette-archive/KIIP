@@ -37,8 +37,8 @@ flowchart LR
 |---|---|---|---|---|
 | ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | GI·농사로 실키 검증, 일자별 수집·SQLite 멱등 누적 구현 |
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
-| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 실키 배치 검색 동작, 농사로 지역브랜드 검증자료 수집 구현, 실제 지역 조인은 #24 |
-| ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역·품목별 집계와 시계열 분석 동작, 지역 내·외 비중은 주소 데이터 대기 |
+| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 배치 검색 + 농사로 지역브랜드 출원번호 조인 3건 실검증, 출원인 주소는 #11 |
+| ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역브랜드 연관성과 출원인 주소 지표를 분리 집계, 주소 데이터는 #11 대기 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟡 진행중 | 결정론적 점수 계산 완료, **대표성·가중치 기준은 예시값**(#29) |
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |
 | ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | ⚪ 예정 | 지역별 현황 + 브랜드 공백 지도 |
@@ -66,6 +66,7 @@ node scripts/validatePipeline.js
 - [`docs/project-plan.md`](docs/project-plan.md) — 전체 기획 원문 정리 (프로젝트명·목표·7단계 상세·기대효과)
 - [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
 - [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
+- [`docs/data-source-provenance.md`](docs/data-source-provenance.md) — 원본 제공기관·공식 URL·기준 근거·버전·산출물 계보
 - [`docs/open-api-limits.md`](docs/open-api-limits.md) — 계정 승인·호출 제한과 운영 체크리스트
 - [`docs/open-api-validation-runbook.md`](docs/open-api-validation-runbook.md) — 키 위치·신청 경로·실호출 명령·결과·worktree 인수인계
 - [`docs/api-key-management.md`](docs/api-key-management.md) — 로컬 키 보관 위치와 worktree 복사 방법

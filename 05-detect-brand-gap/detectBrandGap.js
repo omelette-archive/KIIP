@@ -59,6 +59,7 @@ function detectGaps(analysis) {
       noticeName: bucket.noticeName,
       niceClass: bucket.niceClass,
       sources: bucket.sources,
+      sourceProvenance: bucket.sourceProvenance || [],
       uniqueTrademarkCount: bucket.uniqueTrademarkCount,
       registrationRate: bucket.registrationRate,
       // 참고용 메타데이터일 뿐 점수에는 안 쓴다 — 이슈 #11(출원인 주소 조인) 완료 전까지는
@@ -97,6 +98,20 @@ function detectGaps(analysis) {
     scoreVersion: GAP_SCORE_VERSION,
     generatedAt: new Date().toISOString(),
     sourceGeneratedAt: analysis.generatedAt || null,
+    provenance: {
+      inputSchemaVersion: analysis.schemaVersion || null,
+      inputAnalysisVersion: analysis.analysisVersion || null,
+      upstream: analysis.provenance || null,
+    },
+    methodology: {
+      representativeBasis: "sources에 지리적표시가 포함된 지역×품목만 대표 특산품으로 인정(예시 기준)",
+      activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준)",
+      weights: { activity: 0.7, registration: 0.3 },
+      localApplicantShareIncluded: false,
+      rationale: "출원인 주소 검증률이 낮은 값을 점수에 섞지 않아 동일 입력의 결정론성을 유지",
+      criteriaIssue: "#29",
+      lastUpdatedAt: "2026-08-10",
+    },
     warnings,
     rows,
     ranking,

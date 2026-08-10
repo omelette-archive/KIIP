@@ -12,6 +12,7 @@
 - 인증키/base URL 환경변수명과 승인 방식
 - 공개 호출 제한 또는 계정 화면에서 확인해야 한다는 상태
 - 현재 어댑터와 실키 검증 상태
+- 데이터/계약 버전과 마지막 확인일
 
 계정별 API 키와 할당량 숫자는 레지스트리에 저장하지 않는다.
 
@@ -28,6 +29,10 @@
 | `sigungu` | 법정동코드 마스터로 확인한 시군구 | 예(매칭 실패 시 원문 지역) |
 | `rawItemName` | 소스가 제공한 품목명 | 예 |
 | `source` | 사람이 읽을 수 있는 출처명 | 예 |
+| `sourceId` | 소스 레지스트리의 안정 ID | 예 |
+| `sourceContractVersion` | 수집 시점의 API/데이터 계약 버전 | 예 |
+| `sourceUrl` | 공개 공식 카탈로그 URL | 예 |
+| `sourceLastVerifiedAt` | 해당 계약을 마지막으로 확인한 날짜 | 예 |
 | `collectedAt` | UTC ISO-8601 수집 시각 | 예 |
 
 현재 CSV는 교환·스모크 포맷이고, 누적 원본은 Node 내장 SQLite로 아래 테이블에 저장한다.
@@ -69,7 +74,11 @@ URL 경로에 들어가고 JSON 본문은 `Grid_20141225000000000157_1` 객체�
 
 농사로 `areaBrand/areaBrandLst`는 특산품 수집 원본이 아니라 KIPRIS 결과의 지역·품목 검증자료다.
 따라서 ① CSV/SQLite에 섞지 않고 `03-match-trademarks/fetchAreaBrands.js`로 별도 JSON을 만든다.
-현재는 출원번호 정규화와 인덱스까지만 제공하며 KIPRIS hit·④ 통계 자동 반영은 #24 범위다.
+③의 `--area-brands` 옵션은 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`의 숫자형 키가
+완전히 같을 때만 hit에 근거를 연결한다. 지역은 법정동코드 마스터 완전일치 또는 후보가 하나인
+접미사 복원만 허용하며 모호하면 `unverified`다. ④는 이를 `regionalBrand*`로 집계하고 출원인
+주소 기반 `localApplicantShare`와 섞지 않는다. 규칙 버전과 근거는
+[`data-source-provenance.md`](data-source-provenance.md)를 따른다.
 
 ## 3. 정제 기준
 
@@ -103,6 +112,11 @@ ISO-8601 검토 시각을 보존한다. DB 도입 시 이 값은 `specialty_norm
 
 규칙이 바뀌면 자체 테스트 사례와 이 문서를 함께 갱신한다. 의미 추론이 필요한 매핑은 자동 규칙에
 추가하지 않고 검토 사례가 반복될 때만 명시적 규칙/사전으로 승격한다.
+
+② 출력 행에는 `normalizationVersion`, `dictionaryVersion`, `dictionarySourceUrl`,
+`dictionaryDownloadedAt`을 반드시 남긴다. ③ 이후 JSON은 원본 메타데이터와 규칙 버전을
+`provenance`·`methodology`·단계별 version 필드로 이어받는다. API 키나 인증 URL은 계보가 아니므로
+산출물에 저장하지 않는다.
 
 ## 4. 상표 검색 수집 완전성
 

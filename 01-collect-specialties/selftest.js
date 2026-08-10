@@ -328,7 +328,10 @@ async function run() {
     );
     try {
       assert.strictEqual(allowed.status, 0);
-      assert.match(fs.readFileSync(outPath, "utf8"), /sido,sigungu,rawItemName,source,collectedAt/);
+      assert.match(
+        fs.readFileSync(outPath, "utf8"),
+        /sido,sigungu,rawItemName,source,sourceId,sourceContractVersion,sourceUrl,sourceLastVerifiedAt,collectedAt/
+      );
       const auditStore = createCollectionStore(dbPath);
       try {
         assert.deepStrictEqual(auditStore.counts(), { runs: 2, records: 0, versions: 0 });
@@ -355,11 +358,15 @@ async function run() {
     assert.strictEqual(gi.quota.type, "provider_documented_unlimited");
     assert.ok(gi.catalogUrl.startsWith("https://www.data.go.kr/"));
     assert.strictEqual(gi.implementation.status, "live_key_validated");
+    assert.strictEqual(gi.dataVersion, "provider-live-api");
+    assert.strictEqual(gi.lastVerifiedAt, "2026-08-10");
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
     assert.strictEqual(nongsaro.implementation.status, "live_key_validated");
     assert.strictEqual(areaBrand.role, "trademark_validation_reference");
     assert.strictEqual(areaBrand.authentication.keyEnv, "NONGSARO_LOCAL_BRAND_API_KEY");
-    assert.strictEqual(areaBrand.implementation.status, "live_contract_validated_not_joined");
+    assert.strictEqual(areaBrand.dataVersion, "nongsaro-area-brand-v1");
+    assert.strictEqual(areaBrand.lastVerifiedAt, "2026-08-10");
+    assert.strictEqual(areaBrand.implementation.status, "sample_join_live_validated");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
   }
 

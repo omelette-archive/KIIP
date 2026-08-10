@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * 원시 특산품 목록(sido, sigungu, rawItemName[, source])을 받아 규칙 기반으로 먼저
+ * 원시 특산품 목록(sido, sigungu, rawItemName[, source, sourceId, ...])을 받아 규칙 기반으로 먼저
  * 정규화한다. 정확히 확정할 수 없는 행은 후보와 함께 별도 검토 CSV로 분리한다.
  *
  * 사용법:
@@ -14,6 +14,11 @@ const fs = require("fs");
 const path = require("path");
 const { loadDictionary, parseCsvLine } = require("./lib/noticeDictionary");
 const { normalizeByRules } = require("./lib/ruleNormalizer");
+
+const NORMALIZATION_VERSION = "specialty-normalization-rules-v1";
+const DICTIONARY_VERSION = "kipo-notice-goods-13-2026";
+const DICTIONARY_SOURCE_URL = "https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120";
+const DICTIONARY_DOWNLOADED_AT = "2026-08-05";
 
 function parseArgs(argv) {
   const args = { topK: 5 };
@@ -58,6 +63,11 @@ function readInputCsv(inputPath) {
     sigungu: header.indexOf("sigungu"),
     rawItemName: header.indexOf("rawItemName"),
     source: header.indexOf("source"),
+    sourceId: header.indexOf("sourceId"),
+    sourceContractVersion: header.indexOf("sourceContractVersion"),
+    sourceUrl: header.indexOf("sourceUrl"),
+    sourceLastVerifiedAt: header.indexOf("sourceLastVerifiedAt"),
+    collectedAt: header.indexOf("collectedAt"),
   };
   if (idx.sido === -1 || idx.sigungu === -1 || idx.rawItemName === -1) {
     throw new Error(`입력 CSV에 sido/sigungu/rawItemName 컬럼이 필요합니다: ${header.join(",")}`);
@@ -69,6 +79,11 @@ function readInputCsv(inputPath) {
       sigungu: fields[idx.sigungu] || "",
       rawItemName: fields[idx.rawItemName] || "",
       source: idx.source === -1 ? "" : fields[idx.source] || "",
+      sourceId: idx.sourceId === -1 ? "" : fields[idx.sourceId] || "",
+      sourceContractVersion: idx.sourceContractVersion === -1 ? "" : fields[idx.sourceContractVersion] || "",
+      sourceUrl: idx.sourceUrl === -1 ? "" : fields[idx.sourceUrl] || "",
+      sourceLastVerifiedAt: idx.sourceLastVerifiedAt === -1 ? "" : fields[idx.sourceLastVerifiedAt] || "",
+      sourceFetchedAt: idx.collectedAt === -1 ? "" : fields[idx.collectedAt] || "",
     };
   });
 }
@@ -85,6 +100,11 @@ const OUTPUT_FIELDS = [
   "sigungu",
   "rawItemName",
   "source",
+  "sourceId",
+  "sourceContractVersion",
+  "sourceUrl",
+  "sourceLastVerifiedAt",
+  "sourceFetchedAt",
   "itemName",
   "noticeName",
   "niceClass",
@@ -95,6 +115,10 @@ const OUTPUT_FIELDS = [
   "confidence",
   "reviewReason",
   "reviewCandidates",
+  "normalizationVersion",
+  "dictionaryVersion",
+  "dictionarySourceUrl",
+  "dictionaryDownloadedAt",
   "reviewDecision",
   "selectedCandidateIndex",
   "reviewNote",
@@ -164,6 +188,15 @@ async function main() {
   const results = rawRows.map((row, inputIndex) => ({
     inputIndex,
     ...normalizeRow(row, { dictionary, topK }),
+    sourceId: row.sourceId,
+    sourceContractVersion: row.sourceContractVersion,
+    sourceUrl: row.sourceUrl,
+    sourceLastVerifiedAt: row.sourceLastVerifiedAt,
+    sourceFetchedAt: row.sourceFetchedAt,
+    normalizationVersion: NORMALIZATION_VERSION,
+    dictionaryVersion: DICTIONARY_VERSION,
+    dictionarySourceUrl: DICTIONARY_SOURCE_URL,
+    dictionaryDownloadedAt: DICTIONARY_DOWNLOADED_AT,
     reviewDecision: "",
     selectedCandidateIndex: "",
     reviewNote: "",
@@ -196,4 +229,8 @@ module.exports = {
   readInputCsv,
   writeOutputCsv,
   OUTPUT_FIELDS,
+  NORMALIZATION_VERSION,
+  DICTIONARY_VERSION,
+  DICTIONARY_SOURCE_URL,
+  DICTIONARY_DOWNLOADED_AT,
 };

@@ -1,6 +1,7 @@
 .env
 node_modules/
 03-match-trademarks/output/*.json
+03-match-trademarks/output/*.csv
 04-analyze-brand/output/*.json
 05-detect-brand-gap/output/*.json
 06-generate-business-strategy/output/*.json

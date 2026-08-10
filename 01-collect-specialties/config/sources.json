@@ -6,6 +6,8 @@
       "id": "admin_codes",
       "name": "국토교통부 전국 법정동 코드",
       "role": "region_master",
+      "dataVersion": "2026-07-03",
+      "lastVerifiedAt": "2026-08-06",
       "catalogUrl": "https://www.data.go.kr/data/15063424/fileData.do",
       "providerUrl": null,
       "formats": ["CSV"],
@@ -29,6 +31,8 @@
       "id": "gi",
       "name": "국립농산물품질관리원 지리적표시 등록정보",
       "role": "collector",
+      "dataVersion": "provider-live-api",
+      "lastVerifiedAt": "2026-08-10",
       "catalogUrl": "https://www.data.go.kr/data/15080629/openapi.do",
       "providerUrl": "https://data.mafra.go.kr/opendata/data/indexOpenDataDetail.do?data_id=20141224000000000399&service_ty=O",
       "formats": ["JSON", "XML"],
@@ -53,6 +57,8 @@
       "id": "nongsaro",
       "name": "농촌진흥청 지역특산물",
       "role": "collector",
+      "dataVersion": "localSpcprd-contract-v1",
+      "lastVerifiedAt": "2026-08-10",
       "catalogUrl": "https://www.data.go.kr/data/15101361/openapi.do",
       "providerUrl": "https://www.nongsaro.go.kr/portal/ps/psn/psnj/openApiLst.ps?menuId=PS65428",
       "formats": ["XML"],
@@ -77,6 +83,8 @@
       "id": "nongsaro_area_brand",
       "name": "농촌진흥청 지역 브랜드",
       "role": "trademark_validation_reference",
+      "dataVersion": "nongsaro-area-brand-v1",
+      "lastVerifiedAt": "2026-08-10",
       "catalogUrl": "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344",
       "providerUrl": "https://www.nongsaro.go.kr/portal/ps/psn/psnj/openApiLst.ps?menuId=PS65428",
       "formats": ["XML"],
@@ -93,8 +101,8 @@
         "verification": "공식 공개 페이지에 고정 숫자 없음; 승인 계정의 마이페이지 정책을 기준으로 운영"
       },
       "implementation": {
-        "status": "live_contract_validated_not_joined",
-        "adapter": "03-match-trademarks/lib/areaBrandClient.js"
+        "status": "sample_join_live_validated",
+        "adapter": "03-match-trademarks/lib/areaBrandClient.js + lib/areaBrandEnricher.js"
       }
     }
   ]

@@ -6,6 +6,17 @@ const { extractItemBlocks, extractTag } = require("./xmlLite");
 const DEFAULT_BASE_URL = "https://api.nongsaro.go.kr/service/areaBrand";
 const DEFAULT_PAGE_SIZE = 100;
 const MAX_PAGE_SIZE = 100;
+const AREA_BRAND_CONTRACT_VERSION = "nongsaro-area-brand-v1";
+const AREA_BRAND_SOURCE_METADATA = Object.freeze({
+  sourceId: "nongsaro_area_brand",
+  provider: "농촌진흥청 농사로",
+  dataset: "지역 브랜드",
+  officialPageUrl: "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344",
+  manualUrl: "https://www.nongsaro.go.kr/portal/apiManual/areaBrand.zip",
+  apiBaseUrl: DEFAULT_BASE_URL,
+  operation: "areaBrandLst",
+  lastContractVerifiedAt: "2026-08-10",
+});
 
 function normalizeApplicationNumber(value) {
   return String(value || "").replace(/[^0-9]/g, "");
@@ -101,6 +112,8 @@ function indexByApplicationNumber(brands) {
 }
 
 module.exports = {
+  AREA_BRAND_CONTRACT_VERSION,
+  AREA_BRAND_SOURCE_METADATA,
   DEFAULT_BASE_URL,
   DEFAULT_PAGE_SIZE,
   MAX_PAGE_SIZE,

@@ -218,7 +218,9 @@ async function run() {
     try {
       fs.writeFileSync(
         inputPath,
-        "﻿sido,sigungu,rawItemName,source\n경상북도,안동시,\"안동사과, 부사\",test\n경상북도,안동시,안동하회탈,test\n",
+        "﻿sido,sigungu,rawItemName,source,sourceId,sourceContractVersion,sourceUrl,sourceLastVerifiedAt,collectedAt\n" +
+        "경상북도,안동시,\"안동사과, 부사\",test,gi,provider-live-api,https://www.data.go.kr/data/15080629/openapi.do,2026-08-10,2026-08-10T01:00:00.000Z\n" +
+        "경상북도,안동시,안동하회탈,test,gi,provider-live-api,https://www.data.go.kr/data/15080629/openapi.do,2026-08-10,2026-08-10T01:00:00.000Z\n",
         "utf8"
       );
       const result = spawnSync(
@@ -239,6 +241,12 @@ async function run() {
       assert.match(output, /review_required/);
       assert.match(output, /^﻿?inputIndex,/);
       assert.match(output, /reviewDecision,selectedCandidateIndex,reviewNote,reviewedBy,reviewedAt/);
+      assert.match(output, /specialty-normalization-rules-v1/);
+      assert.match(output, /kipo-notice-goods-13-2026/);
+      assert.match(output, /kipo\.go\.kr/);
+      assert.match(output, /sourceId,sourceContractVersion,sourceUrl,sourceLastVerifiedAt,sourceFetchedAt/);
+      assert.match(output, /provider-live-api/);
+      assert.match(output, /2026-08-10T01:00:00.000Z/);
       assert.strictEqual(review.trim().split(/\r?\n/).length, 2, "검토 CSV에는 헤더와 미확정 1행만 있어야 함");
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
