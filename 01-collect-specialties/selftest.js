@@ -327,7 +327,7 @@ async function run() {
     assert.ok(gi.catalogUrl.startsWith("https://www.data.go.kr/"));
     assert.strictEqual(gi.implementation.status, "live_key_validated");
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
-    assert.strictEqual(nongsaro.implementation.status, "xml_sample_validated_live_key_required");
+    assert.strictEqual(nongsaro.implementation.status, "live_key_validated");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
   }
 

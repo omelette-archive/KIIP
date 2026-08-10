@@ -1,4 +1,5 @@
 .env
+local-secrets/
 node_modules/
 03-match-trademarks/output/*.json
 04-analyze-brand/output/*.json

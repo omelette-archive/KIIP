@@ -66,10 +66,10 @@
       "quota": {
         "type": "provider_policy",
         "value": null,
-        "verification": "승인 후 제공기관 마이페이지의 계정별 트래픽 확인 필요"
+        "verification": "실키 발급 시 계정별 트래픽 안내 없음 — 마이페이지에서 재확인 필요"
       },
       "implementation": {
-        "status": "xml_sample_validated_live_key_required",
+        "status": "live_key_validated",
         "adapter": "lib/nongsaroClient.js"
       }
     }

@@ -1,8 +1,8 @@
 # ① 지역 특산품 데이터 자동 구축
 
 **상태**: 🟡 진행중 — 법정동코드 마스터와 소스 레지스트리/데이터 계약 구현 완료. 지리적표시는
-농식품 공공데이터포털 발급키·허용 IP로 실호출을 검증하고 실제 MAFRA 계약으로 교정했다. 농사로는 공식 매뉴얼의
-`localSpcprd/localSpcprdLst` XML 계약으로 샘플 검증을 마쳤고 실키 스모크 테스트가 필요하다.
+농식품 공공데이터포털 발급키·허용 IP로 실호출을 검증하고 실제 MAFRA 계약으로 교정했다. 농사로도
+발급키로 실호출 검증 완료 — 공식 매뉴얼의 `localSpcprd/localSpcprdLst` XML 계약 그대로 통과했다.
 지자체 홈페이지/뉴스 기사 수집은 이번 범위 밖.
 
 전국 17개 광역 및 226개 기초지자체를 대상으로 특산품 목록을 자동 수집한다.
@@ -14,7 +14,7 @@
 |---|---|---|
 | 법정동코드(시군구 마스터 목록) | 무료, 인증 불필요 — data.go.kr 파일 다운로드 | ✅ 구현+검증 완료 |
 | 지리적표시 등록정보(국립농산물품질관리원) | 농식품 공공데이터포털 신청·허용 IP 필요 | ✅ 실키·실응답 검증, 일자별 자동수집 구현 |
-| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | 🟡 공식 XML 계약 샘플 검증, 실키 검증 필요 |
+| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | ✅ 실키·실응답 검증 완료 |
 | 지자체 홈페이지 / 뉴스 기사 | 226개 사이트마다 제각각 / 별도 인프라 필요 | ⚪ 범위 밖 |
 
 GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수다. 전체 무필터 목록은 받을 수
@@ -31,7 +31,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── fetchWithRetry.js    재시도/타임아웃/키마스킹 (02/03에서 포팅)
 │   ├── adminCodes.js        법정동코드 CSV 파싱 -> 시군구 레벨 마스터 목록
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
-│   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (baseUrl은 활용신청 후 확정 필요)
+│   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (기본 baseUrl 실키로 검증 완료)
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
 │   └── normalize.js         소스별 결과 -> 표준 출력 스키마, 지역명을 adminCodes 마스터와 대조
 ├── collectSpecialties.js    CLI 진입점
@@ -48,6 +48,11 @@ cp .env.example .env
 
 node 01-collect-specialties/collectSpecialties.js --sources gi \
   --gi-date 20130207 \
+  --limit 3 \
+  --out 01-collect-specialties/output/specialties.csv
+
+# 농사로는 별도 날짜 옵션 없이 바로 최신 목록을 페이지 순회로 가져온다
+node 01-collect-specialties/collectSpecialties.js --sources nongsaro \
   --limit 3 \
   --out 01-collect-specialties/output/specialties.csv
 ```
