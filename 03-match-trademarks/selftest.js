@@ -581,10 +581,47 @@ async function run() {
     assert.strictEqual(matchedHitCount, 1);
     assert.strictEqual(joined[0].hits[0].areaBrandMatch.regionMatch, "inside");
     assert.strictEqual(joined[0].hits[0].areaBrandMatch.brandName, "일선정품");
+    assert.strictEqual(
+      joined[0].hits[0].applicantRegionMatch, true,
+      "04-analyze-brand의 regionCategory()가 바로 읽는 hit.applicantRegionMatch도 채워야 함"
+    );
     assert.strictEqual(joined[0].hits[1].areaBrandMatch, undefined, "출원번호가 안 맞으면 조인 안 됨");
+    assert.strictEqual(joined[0].hits[1].applicantRegionMatch, undefined);
     assert.strictEqual(joined[1].status, "skipped", "skipped 행은 그대로 통과");
     assert.strictEqual(entries[0].hits[0].areaBrandMatch, undefined, "원본 hit는 변경되지 않음(freeze로도 보증)");
+    assert.strictEqual(entries[0].hits[0].applicantRegionMatch, undefined, "원본 hit는 applicantRegionMatch도 안 생김");
     ok("출원번호 정규화 기준으로 조인하고, 원본은 불변으로 두고 매칭 안 된 행도 그대로 보존함");
+  }
+
+  console.log("13-1) joinAreaBrandEvidence — outside/unverified일 때 applicantRegionMatch 처리");
+  {
+    const adminList = [
+      { code: "4719000000", sido: "경상북도", sigungu: "구미시" },
+      { code: "4682000000", sido: "경상남도", sigungu: "합천군" },
+    ];
+    const entries = [
+      {
+        status: "ok",
+        query: { region: "경상북도 구미시", item: "품목" },
+        hits: [
+          { title: "합천 상표", applicationNumber: "1000000000001" }, // outside: 시군구까지 확정, 다름
+          { title: "광역만 아는 상표", applicationNumber: "1000000000002" }, // 시도만 일치, unverified
+        ],
+      },
+    ];
+    const areaBrands = [
+      { applicationNumber: "1000000000001", brandName: "합천 상표", regionName: "합천군" },
+      { applicationNumber: "1000000000002", brandName: "광역만 아는 상표", regionName: "경상북도" },
+    ];
+    const { entries: joined } = joinAreaBrandEvidence({ entries, areaBrands, adminList });
+    assert.strictEqual(joined[0].hits[0].applicantRegionMatch, false, "outside면 false로 명시");
+    assert.strictEqual(joined[0].hits[0].areaBrandMatch.regionMatch, "outside");
+    assert.strictEqual(
+      joined[0].hits[1].applicantRegionMatch, undefined,
+      "unverified(시도만 일치)면 단정하지 않고 필드 자체를 비워 04가 미검증으로 집계하게 함"
+    );
+    assert.strictEqual(joined[0].hits[1].areaBrandMatch.regionMatch, "unverified");
+    ok("outside는 applicantRegionMatch=false로 명시하고, unverified는 필드를 비워 과신하지 않음");
   }
 
   console.log("\n모든 자체 테스트 통과");

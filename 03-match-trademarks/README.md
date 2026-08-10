@@ -73,8 +73,16 @@ node 03-match-trademarks/joinAreaBrands.js \
 2026-08-10 실측: "일선정품"(경상북도 구미시) 실키 KIPRIS 검색 결과 중 지역브랜드와 출원번호가
 정확히 일치하는 1건에 `regionMatch: "inside"`가 정상 부여됨을 확인했다.
 
-아직 ④ 통계에는 반영하지 않는다(602건 전체 자동 반영 전 소규모 결과 검토 — 이슈 #24 완료
-조건). `mainPrdlstNm`은 지정상품 대조(#12)의 대체재로 쓰지 않는다.
+`inside`/`outside`로 확정된 hit에는 `applicantRegionMatch`(true/false)도 함께 채운다 —
+[`04-analyze-brand/`](../04-analyze-brand/)의 `regionCategory()`가 이미 이 필드를 읽도록
+설계돼 있어(04 README: "추후 각 hit에 applicantRegionMatch를 넣으면 코드 변경 없이
+계산된다") ④ 쪽 코드 변경 없이 조인 결과가 바로 반영된다. `unverified`는 필드를 비워
+과신하지 않는다. 위 실측 1건을 그대로 ④에 흘려보내 `regionVerificationRate: 0.5`,
+`localApplicantShare: 1`이 정확히 계산됨을 확인했다(2026-08-10).
+
+**602건 전체를 항상 자동으로 조인·반영하지는 않는다** — `fetchAreaBrands.js --limit`으로
+가져온 건수만큼만 조인 대상이 된다(이슈 #24 완료 조건: 전체 반영 전 소규모 결과 검토).
+`mainPrdlstNm`은 지정상품 대조(#12)의 대체재로 쓰지 않는다.
 
 ## 사용법
 
