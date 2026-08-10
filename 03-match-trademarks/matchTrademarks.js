@@ -4,8 +4,8 @@
  * 단일 {지역, 품목} 또는 ② 단계의 정규화 CSV를 받아 KIPRIS 상표 검색
  * (getWordSearch)을 호출하고 품목(NICE 상품류 코드)으로 결과를 필터링한다.
  *
- * 지역 매칭은 아직 구현되어 있지 않다. getWordSearch 응답에 출원인 주소/지역 필드가 없기
- * 때문에 요청 지역을 unverified 태그로만 보존한다.
+ * 출원인 주소 기반 지역 매칭은 아직 구현되어 있지 않다. 선택적으로 농사로 지역브랜드
+ * 검증자료를 출원번호로 조인하되, 이 신호는 출원인 주소와 다른 별도 필드로 보존한다.
  */
 
 const path = require("path");
@@ -15,12 +15,18 @@ const { loadEnv } = require("./lib/loadEnv");
 // kiprisClient는 모듈 로드 시 프로토콜을 결정하므로 .env를 먼저 읽어야 한다.
 loadEnv();
 
-const { createClient } = require("./lib/kiprisClient");
+const { createClient, KIPRIS_SOURCE_METADATA } = require("./lib/kiprisClient");
 const {
   filterByClassCode,
   normalizeClassCode,
   FOOD_RELATED_CLASSES,
 } = require("./lib/filters");
+const {
+  createAreaBrandContext,
+  enrichHitsWithAreaBrands,
+  loadAreaBrandDocument,
+  summarizeRegionalBrandMatches,
+} = require("./lib/areaBrandEnricher");
 
 function parseArgs(argv) {
   const args = {
@@ -62,6 +68,7 @@ function printUsageAndExit(message) {
       "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
+      "  --area-brands <path> 농사로 areaBrandLst JSON을 출원번호로 조인(선택)",
       "  --out <path>         결과를 JSON 파일로 저장",
       "  --apiKey <key>       KIPRIS_API_KEY 대신 직접 인증키 전달",
     ].join("\n")
@@ -166,13 +173,45 @@ function makeSearchKey(query) {
   return `${item}\u001f${normalizeQueryClasses(query.classCode)}`;
 }
 
+function sourceProvenance(row) {
+  return {
+    sourceLabel: row.source || null,
+    sourceId: row.sourceId || null,
+    sourceContractVersion: row.sourceContractVersion || null,
+    sourceFetchedAt: row.sourceFetchedAt || null,
+    sourceUrl: row.sourceUrl || null,
+    sourceLastVerifiedAt: row.sourceLastVerifiedAt || null,
+    sourceContentId: row.sourceContentId || null,
+    sourceApplicationNumber: row.sourceApplicationNumber || null,
+    normalizationVersion: row.normalizationVersion || null,
+    dictionaryVersion: row.dictionaryVersion || null,
+    dictionarySourceUrl: row.dictionarySourceUrl || null,
+    dictionaryDownloadedAt: row.dictionaryDownloadedAt || null,
+    matchPurpose: row.matchPurpose || null,
+  };
+}
+
 function buildBatchPlan(rows) {
   return rows.map((row, inputIndex) => {
     const query = makeBatchQuery(row);
     if (query.skipReason) {
-      return { status: "skipped", inputIndex, reason: query.skipReason, input: row };
+      return {
+        status: "skipped",
+        inputIndex,
+        reason: query.skipReason,
+        input: row,
+        source: row.source || null,
+        provenance: sourceProvenance(row),
+      };
     }
-    return { status: "planned", inputIndex, queryKey: makeSearchKey(query), query, source: row.source || null };
+    return {
+      status: "planned",
+      inputIndex,
+      queryKey: makeSearchKey(query),
+      query,
+      source: row.source || null,
+      provenance: sourceProvenance(row),
+    };
   });
 }
 
@@ -440,14 +479,21 @@ async function runBatch(rows, client, options) {
   const results = plan.map((entry) => {
     if (entry.status === "skipped") return entry;
     const group = byKey.get(entry.queryKey);
-    return {
+    const mapped = {
       inputIndex: entry.inputIndex,
       source: entry.source,
+      provenance: entry.provenance,
       queryKey: entry.queryKey,
       sharedQueryInputCount: group.inputIndexes.length,
       reusedFromCheckpoint: group.reusedFromCheckpoint,
       ...mapCollectedQuery(entry.query, group.collected),
     };
+    mapped.hits = enrichHitsWithAreaBrands(
+      mapped.hits,
+      entry.query.region,
+      options.areaBrandContext
+    );
+    return mapped;
   });
   return {
     results,
@@ -474,6 +520,24 @@ function writeJsonAtomic(filePath, output) {
   const tempPath = `${filePath}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(output, null, 2), "utf8");
   fs.renameSync(tempPath, filePath);
+}
+
+function areaBrandValidationMetadata(context, sourceFile, results) {
+  if (!context) return { enabled: false };
+  const metadata = {
+    enabled: true,
+    sourceFile,
+    referenceCount: context.brands.length,
+    sourceMetadata: context.metadata,
+    criteria: {
+      applicationJoin: "출원번호에서 숫자 외 문자를 제거한 뒤 완전일치",
+      regionNormalization: "국토교통부 법정동코드 시도·시군구명 완전일치, 고유한 시/군/구 접미사 복원",
+      ambiguousRegionPolicy: "복수 후보 또는 미매칭 지역은 추정하지 않고 unverified",
+      statisticalMeaning: "지역브랜드 연관성 검증이며 출원인 주소 근거가 아님",
+    },
+  };
+  if (results) metadata.matchCounts = summarizeRegionalBrandMatches(results);
+  return metadata;
 }
 
 function loadCheckpoint(filePath, options) {
@@ -535,6 +599,12 @@ async function main() {
 
   const numeric = validateNumericArgs(args);
   const apiKey = args.apiKey || process.env.KIPRIS_API_KEY;
+  const areaBrandsPath = args["area-brands"] ? path.resolve(args["area-brands"]) : null;
+  const areaBrandDocument = areaBrandsPath ? loadAreaBrandDocument(areaBrandsPath) : null;
+  const areaBrands = areaBrandDocument?.brands || null;
+  const areaBrandContext = areaBrandDocument
+    ? createAreaBrandContext(areaBrands, undefined, areaBrandDocument.metadata)
+    : null;
 
   if (args.input) {
     const inputPath = path.resolve(args.input);
@@ -550,6 +620,7 @@ async function main() {
     if (args["dry-run"]) {
       const output = {
         mode: "batch-dry-run",
+        trademarkSourceMetadata: KIPRIS_SOURCE_METADATA,
         inputFile: inputPath,
         inputCount: rows.length,
         searchableRowCount: searchableRows,
@@ -558,6 +629,7 @@ async function main() {
         estimatedMinRequestCount: estimatedMinRequests,
         estimatedMaxRequestCount: estimatedMaxRequests,
         maxRequestCount: numeric.maxRequests,
+        regionalBrandValidation: areaBrandValidationMetadata(areaBrandContext, areaBrandsPath),
         skippedCount: plan.filter((row) => row.status === "skipped").length,
         completedAt: new Date().toISOString(),
         results: plan,
@@ -596,11 +668,16 @@ async function main() {
       resume: Boolean(args.resume),
       checkpointQueries: checkpoint.queries || {},
       saveCheckpoint,
+      areaBrandContext,
     });
     const results = batch.results;
     const output = {
-      schemaVersion: "1.1",
+      schemaVersion: "1.2",
       mode: "batch",
+      trademarkSourceMetadata: {
+        ...KIPRIS_SOURCE_METADATA,
+        fetchedAt: new Date().toISOString(),
+      },
       inputFile: inputPath,
       inputCount: rows.length,
       searchableRowCount: searchableRows,
@@ -613,6 +690,11 @@ async function main() {
       errorCount: results.filter((row) => row.status === "error").length,
       skippedCount: results.filter((row) => row.status === "skipped").length,
       checkpointFile: checkpointPath,
+      regionalBrandValidation: areaBrandValidationMetadata(
+        areaBrandContext,
+        areaBrandsPath,
+        results
+      ),
       completedAt: new Date().toISOString(),
       results,
     };
@@ -634,6 +716,16 @@ async function main() {
   );
   const client = createClient({ apiKey });
   const output = await searchOne(client, query, numeric);
+  output.trademarkSourceMetadata = {
+    ...KIPRIS_SOURCE_METADATA,
+    fetchedAt: output.fetchedAt,
+  };
+  output.hits = enrichHitsWithAreaBrands(output.hits, query.region, areaBrandContext);
+  output.regionalBrandValidation = areaBrandValidationMetadata(
+    areaBrandContext,
+    areaBrandsPath,
+    [output]
+  );
   const outPath = writeJson(output, args.out);
   console.error(
     `[matchTrademarks] pages=${output.pages.fetchedCount}, filtered=${output.hits.length}, collection=${output.collectionStatus}, keywordTotal=${output.keywordTotalCount}${outPath ? ` -> ${outPath}` : ""}`
@@ -654,6 +746,7 @@ module.exports = {
   makeBatchQuery,
   countSearchableRows,
   makeSearchKey,
+  sourceProvenance,
   buildBatchPlan,
   groupPlannedQueries,
   buildSearchOutput,
@@ -664,4 +757,5 @@ module.exports = {
   runBatch,
   runWithConcurrency,
   loadCheckpoint,
+  areaBrandValidationMetadata,
 };

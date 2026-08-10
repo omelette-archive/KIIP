@@ -12,7 +12,10 @@ function validateRegistry(registry) {
 
   const ids = new Set();
   for (const source of registry.sources) {
-    for (const field of ["id", "name", "role", "catalogUrl", "formats", "authentication", "quota", "implementation"]) {
+    for (const field of [
+      "id", "name", "role", "dataVersion", "lastVerifiedAt", "catalogUrl", "formats",
+      "authentication", "quota", "implementation",
+    ]) {
       if (source[field] === undefined || source[field] === null || source[field] === "") {
         throw new Error(`소스 레지스트리 ${source.id || "(id 없음)"}: ${field} 필드가 필요합니다.`);
       }

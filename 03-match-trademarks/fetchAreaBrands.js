@@ -4,7 +4,11 @@
 const fs = require("fs");
 const path = require("path");
 const { loadEnv } = require("./lib/loadEnv");
-const { createClient } = require("./lib/areaBrandClient");
+const {
+  AREA_BRAND_CONTRACT_VERSION,
+  AREA_BRAND_SOURCE_METADATA,
+  createClient,
+} = require("./lib/areaBrandClient");
 
 loadEnv();
 
@@ -36,11 +40,17 @@ async function main() {
   );
   const client = createClient();
   const result = await client.listAreaBrands({ limit });
+  const fetchedAt = new Date().toISOString();
   const output = {
     schemaVersion: 1,
+    contractVersion: AREA_BRAND_CONTRACT_VERSION,
     source: "농사로 지역브랜드",
     service: "areaBrand/areaBrandLst",
-    fetchedAt: new Date().toISOString(),
+    fetchedAt,
+    sourceMetadata: {
+      ...AREA_BRAND_SOURCE_METADATA,
+      fetchedAt,
+    },
     totalCount: result.totalCount,
     returnedCount: result.brands.length,
     brands: result.brands,

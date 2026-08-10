@@ -50,7 +50,7 @@ DATA_GO_KR_API_KEY
 | `KIPRIS_API_KEY` | KIPRISPlus | `ServiceKey` 쿼리 + XML | ③에서 사용·실키 검증 완료 |
 | `GI_API_KEY` | 농식품 공공데이터포털 | URL 경로 키 + MAFRA Grid JSON | ①에서 사용·실키 검증 완료 |
 | `NONGSARO_API_KEY` | 농사로 | `apiKey` 쿼리 + XML | 지역특산물 ①에서 사용·실키 검증 완료 |
-| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 | `areaBrand` 서비스 + XML | 3건 수집 CLI 구현, KIPRIS 자동 조인 미연결(#24) |
+| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 | `areaBrand` 서비스 + XML | 3건 수집·KIPRIS 조인·④ 분석 실검증 완료 |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 | 표준 REST API용 일반 서비스키 | 현재 실행 코드에서는 미사용 |
 
 주의할 구분:
@@ -248,13 +248,39 @@ node 03-match-trademarks/fetchAreaBrands.js `
   --out 03-match-trademarks/output/area-brand-sample.json
 ```
 
-`aplcnoInfo`는 구분자를 제거하면 KIPRIS `applicationNumber`와 같은 숫자 포맷이 된다. 클라이언트는
-이 정규화와 출원번호 인덱스 함수를 제공하지만 아직 KIPRIS hit를 자동 변경하지 않는다.
-첫 지역브랜드 샘플의 브랜드명으로 KIPRIS를 1회 직접 조회한 결과, 첫 페이지 3건 중
-`applicationNumber`가 정확히 일치하는 1건을 확인해 출원번호 조인 가능성도 실데이터로 검증했다.
-`signguNm`은 `구미`처럼 접미사 없는 기초지역과 `경상북도` 같은 광역명이 섞여 있어 행정구역
-정규화가 선행돼야 한다. 이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드
-검증자료이므로 ① 특산물 목록에 섞지 않는다. 실제 조인·④ 통계 반영은 #24에서 진행한다.
+별도 검증자료를 ③ 입력으로 바꾸고 KIPRIS 조인과 ④ 분석까지 실행한다.
+
+```powershell
+node 03-match-trademarks/buildAreaBrandValidationInput.js `
+  --input 03-match-trademarks/output/area-brand-sample.json `
+  --limit 3 `
+  --out 03-match-trademarks/output/area-brand-validation-input.csv
+
+node 03-match-trademarks/matchTrademarks.js `
+  --input 03-match-trademarks/output/area-brand-validation-input.csv `
+  --area-brands 03-match-trademarks/output/area-brand-sample.json `
+  --numOfRows 100 --max-pages 1 --max-hits-per-query 100 --max-requests 3 `
+  --out 03-match-trademarks/output/area-brand-validation-result.json
+
+node 04-analyze-brand/analyzeBrands.js `
+  --input 03-match-trademarks/output/area-brand-validation-result.json `
+  --out 04-analyze-brand/output/area-brand-validation-analysis.json `
+  --asOfYear 2026
+```
+
+2026-08-10 측정값은 입력 3건, KIPRIS 성공 3건, 오류 0건, 출원번호 완전일치 조인 3건,
+지역브랜드 inside 3건이다. 총 고유 KIPRIS hit는 21건이었다. 한 쿼리는 `--max-pages=1` 상한으로
+`partial`이며 오류가 아니다. 출원인 주소가 없으므로 `localApplicantShare`는 세 행 모두
+`null`이고, 농사로 근거는 별도 `regionalBrand*` 지표로만 반영됐다.
+
+`signguNm`은 법정동코드 완전일치와 고유 접미사 복원만 허용한다. `구미`는 `구미시`로 복원할 수
+있지만 `고성`처럼 여러 시도에 후보가 있으면 `unverified`로 남긴다. 조인 규칙은
+`area-brand-application-region-join-v1`, 분석 규칙은
+`brand-analysis-v2-regional-brand-separated`다. 공식 출처와 전체 기준은
+[`data-source-provenance.md`](data-source-provenance.md)에 기록한다.
+
+이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 검증자료이므로 ① 특산물
+목록에 섞지 않는다. 위 3건은 연결 계약 검증용이며 전체 602건을 대표하지 않는다.
 
 ## 7. 생성된 로컬 검증 산출물
 
@@ -271,7 +297,11 @@ node 03-match-trademarks/fetchAreaBrands.js `
 03-match-trademarks/output/nongsaro-key-smoke-result.json
 03-match-trademarks/output/nongsaro-key-smoke-result.json.checkpoint.json
 03-match-trademarks/output/area-brand-sample.json
+03-match-trademarks/output/area-brand-validation-input.csv
+03-match-trademarks/output/area-brand-validation-result.json
+03-match-trademarks/output/area-brand-validation-result.json.checkpoint.json
 04-analyze-brand/output/nongsaro-key-smoke-analysis.json
+04-analyze-brand/output/area-brand-validation-analysis.json
 ```
 
 SQLite의 `-wal`, `-shm` 보조 파일도 Git에 올리지 않는다.
@@ -284,11 +314,11 @@ SQLite의 `-wal`, `-shm` 보조 파일도 Git에 올리지 않는다.
 - PR #25: 루트 진행표 갱신
 - 이슈 #2: KIPRIS·GI·농사로 인증/실호출 검증 완료 후 종료
 - 이슈 #3: GI·농사로 원문 누적과 멱등 재실행 완료 후 종료
+- #24: 농사로 지역브랜드 3건 출원번호 조인·별도 ④ 지표·모호 지역 보수 처리 구현
 
 후속:
 
 - #22: GI 과거 전체 초기 적재 데이터 확보
-- #24: 농사로 지역 브랜드 API를 ③·④ 검증 소스로 연결
 - #11: 출원인 주소 기반 지역 상표 매칭
 - #12: NICE류 후보를 지정상품 상세 대조로 보강
 - #29: ⑤ 대표 특산품·브랜드 공백 점수 업무 기준 확정
