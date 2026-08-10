@@ -33,4 +33,4 @@ function filterByClassCode(hits, classCode) {
 // 이 목록 밖인 사례 확인됨)에는 안 맞는다 — 데이터가 쌓이면 언제든 바뀔 수 있는 값이다.
 const FOOD_RELATED_CLASSES = ["29", "30", "31", "32", "33", "40", "43"];
 
-module.exports = { filterByClassCode, FOOD_RELATED_CLASSES };
+module.exports = { filterByClassCode, normalizeClassCode, FOOD_RELATED_CLASSES };
