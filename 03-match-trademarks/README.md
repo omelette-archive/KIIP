@@ -15,9 +15,10 @@
   (`query.classCode` 자체는 요청 시점에 실제로 알던 류만 남겨 메타데이터 정확성을 유지).
   더 정확한 필터는 **지정상품**(류보다 세분화된 상표 등록 상품 목록) 기준 대조인데,
   `getWordSearch` 응답에는 이 필드가 없어 이번 범위에서는 못 붙였다 — 이슈 #12 참고.
-- **지역**: KIPRIS 상표 검색 응답에 출원인 주소/지역 필드가 없어서 **아직 매칭 미구현**.
-  `--region` 값은 결과에 `regionMatch: "unverified"`로만 태그된다. 실제 지역 매칭 방식(별도
-  출원인 주소 데이터셋 조인은 #11, 농사로 지역브랜드 subset의 출원번호 조인은 #24에서 관리한다.
+- **지역**: KIPRIS 상표 검색 응답 자체에는 출원인 주소/지역 필드가 없어서 `--region` 값은
+  여전히 `regionMatch: "unverified"`로만 태그된다(전면 해결은 #11). 다만 농사로 지역 브랜드
+  602건 서브셋에 한해서는 출원번호 조인으로 지역 근거를 붙일 수 있다 — 아래 "농사로 지역브랜드
+  검증자료" 절, 이슈 #24 참고.
 - 의존성 없는(zero-dependency) 순수 Node 스크립트. XML도 정규식 기반 경량 파서(`lib/xmlLite.js`)로
   처리한다 — 실제 응답에서 CDATA/중첩 구조가 확인되면 정식 XML 파서로 교체 필요.
 
@@ -43,9 +44,37 @@ node 03-match-trademarks/fetchAreaBrands.js \
 ```
 
 `lib/areaBrandClient.js`는 목록 XML 필드 8개를 구조화하고 `aplcnoInfo`를 KIPRIS
-`applicationNumber`와 비교할 수 있도록 숫자형 조인 키로 정규화한다. 아직 KIPRIS hit에 지역
-판정을 자동 부여하거나 ④ 통계에 반영하지 않는다. `signguNm`의 기초/광역/접미사 혼재를
-정규화한 뒤 연결하는 작업은 #24에서 관리한다.
+`applicationNumber`와 비교할 수 있도록 숫자형 조인 키로 정규화한다.
+
+### 지역 조인 (`lib/areaBrandRegion.js`, `joinAreaBrands.js`)
+
+`signguNm`은 "구미"(접미사 없는 기초지역)·"경상북도"(광역명만) 형태가 섞여 나온다(실측:
+2026-08-10, `areaBrandLst` 실키 샘플 — 근거는 이슈 #24 코멘트와
+[`docs/open-api-validation-runbook.md`](../docs/open-api-validation-runbook.md) §6).
+`normalizeAreaBrandRegion()`이 `01-collect-specialties/data/법정동코드_전국_20260703.csv`
+(국토교통부, data.go.kr, 2026-07-03판) 마스터와 대조해 시군구까지 확정되면 `matchLevel:
+"sigungu"`, 광역명만 확인되면 `"sido"`, 그래도 모호하면 추정하지 않고 `"unverified"`로 남긴다
+— "모호하면 unverified 유지"는 이슈 #11과 동일한 프로젝트 공통 원칙이다.
+
+```bash
+node 03-match-trademarks/joinAreaBrands.js \
+  --input 03-match-trademarks/output/result.json \
+  --area-brands 03-match-trademarks/output/area-brand-sample.json \
+  --out 03-match-trademarks/output/result-with-area-brand.json
+```
+
+출원번호(`aplcnoInfo` ↔ `applicationNumber`)가 일치하는 hit에만 `areaBrandMatch`
+(`applicationNumber`, `brandName`, `region`, `regionMatch`)를 추가한 **새 파일**을 만든다 —
+원본 ③ 결과 파일과 입력 지역브랜드 파일은 바꾸지 않으며, 어떤 산출물로 조인했는지(`areaBrandFile`,
+`areaBrandFetchedAt`, `adminCodesFile`, `joinedAt`)를 `areaBrandJoin` 메타데이터에 남긴다.
+`regionMatch`는 시군구까지 확정된 경우만 `inside`/`outside`로 판정하고, 시도만 같고 시군구를
+모르면 `unverified`로 남긴다(과신 방지).
+
+2026-08-10 실측: "일선정품"(경상북도 구미시) 실키 KIPRIS 검색 결과 중 지역브랜드와 출원번호가
+정확히 일치하는 1건에 `regionMatch: "inside"`가 정상 부여됨을 확인했다.
+
+아직 ④ 통계에는 반영하지 않는다(602건 전체 자동 반영 전 소규모 결과 검토 — 이슈 #24 완료
+조건). `mainPrdlstNm`은 지정상품 대조(#12)의 대체재로 쓰지 않는다.
 
 ## 사용법
 
@@ -121,10 +150,13 @@ KIPRISPlus 무료 호출은 전체 상품 합산 월 1,000회이므로 배치 �
 03-match-trademarks/
 ├── matchTrademarks.js       CLI 진입점 (단건: {지역,품목} 한 쌍 / --input: ②단계 출력 배치)
 ├── fetchAreaBrands.js       농사로 지역브랜드 검증자료 소량 수집 CLI (기본 3건)
+├── joinAreaBrands.js        ③ 결과 × 지역브랜드를 출원번호로 조인 (원본과 분리된 새 파일)
 ├── selftest.js            fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
 ├── lib/
 │   ├── kiprisClient.js     trademarkSearch() — ServiceKey 쿼리 빌드, resultCode 처리
 │   ├── areaBrandClient.js  areaBrandLst XML·페이지 처리, 출원번호 조인 키 정규화
+│   ├── areaBrandRegion.js  signguNm 정규화(법정동코드 대조) + 출원번호 조인 + inside/outside 판정
+│   ├── adminCodes.js       법정동코드 CSV 로더 (01-collect-specialties/lib/adminCodes.js 포팅)
 │   ├── xmlLite.js          정규식 기반 경량 XML 파서
 │   ├── fetchWithRetry.js   타임아웃·재시도(지수 백오프)·키 마스킹
 │   ├── errors.js           KiprisApiError, resultCode 표준화

@@ -20,6 +20,12 @@ const {
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const {
+  normalizeAreaBrandRegion,
+  parseQueryRegion,
+  computeRegionMatch,
+  joinAreaBrandEvidence,
+} = require("./lib/areaBrandRegion");
+const {
   parseCsvLine,
   readNormalizedCsv,
   makeBatchQuery,
@@ -474,6 +480,111 @@ async function run() {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
+  }
+
+  console.log("11) normalizeAreaBrandRegion — signguNm 표기 혼재 정규화 (이슈 #24 실측)");
+  {
+    const adminList = [
+      { code: "4719000000", sido: "경상북도", sigungu: "구미시" },
+      { code: "4721000000", sido: "경상북도", sigungu: "안동시" },
+      { code: "4682000000", sido: "경상남도", sigungu: "합천군" },
+      { code: "4280000000", sido: "강원특별자치도", sigungu: "고성군" },
+      { code: "4872000000", sido: "경상남도", sigungu: "고성군" },
+    ];
+    assert.deepStrictEqual(normalizeAreaBrandRegion("구미시", adminList), {
+      sido: "경상북도", sigungu: "구미시", matchLevel: "sigungu",
+    });
+    assert.deepStrictEqual(
+      normalizeAreaBrandRegion("구미", adminList),
+      { sido: "경상북도", sigungu: "구미시", matchLevel: "sigungu" },
+      "areaBrandLst 실측(2026-08-10)에서 확인된 접미사 없는 표기('구미')도 매칭돼야 함"
+    );
+    assert.deepStrictEqual(
+      normalizeAreaBrandRegion("경상북도", adminList),
+      { sido: "경상북도", sigungu: "", matchLevel: "sido" },
+      "광역명만 있으면 시도까지만 확정하고 시군구는 모른다고 표시"
+    );
+    const ambiguous = normalizeAreaBrandRegion("고성", adminList);
+    assert.strictEqual(ambiguous.matchLevel, "unverified");
+    assert.strictEqual(ambiguous.ambiguous, true);
+    assert.deepStrictEqual(ambiguous.candidateSidos.sort(), ["강원특별자치도", "경상남도"]);
+    assert.deepStrictEqual(normalizeAreaBrandRegion("존재하지않는지역", adminList), {
+      sido: "", sigungu: "존재하지않는지역", matchLevel: "unverified",
+    });
+    assert.deepStrictEqual(normalizeAreaBrandRegion("", adminList), {
+      sido: "", sigungu: "", matchLevel: "unverified",
+    });
+    ok("접미사 없는 표기·광역명 단독·동명 시군구 모두 추정 없이 정확한 신뢰도로 구분됨");
+  }
+
+  console.log("12) parseQueryRegion / computeRegionMatch — inside/outside/unverified 판정 근거");
+  {
+    assert.deepStrictEqual(parseQueryRegion("경상북도 구미시"), { sido: "경상북도", sigungu: "구미시" });
+    assert.deepStrictEqual(parseQueryRegion("경상북도"), { sido: "경상북도", sigungu: "" });
+    assert.deepStrictEqual(parseQueryRegion(""), { sido: "", sigungu: "" });
+
+    const query = { sido: "경상북도", sigungu: "구미시" };
+    assert.strictEqual(
+      computeRegionMatch({ sido: "경상북도", sigungu: "구미시", matchLevel: "sigungu" }, query),
+      "inside"
+    );
+    assert.strictEqual(
+      computeRegionMatch({ sido: "경상남도", sigungu: "합천군", matchLevel: "sigungu" }, query),
+      "outside",
+      "시군구까지 확정됐는데 다르면 outside로 확신"
+    );
+    assert.strictEqual(
+      computeRegionMatch({ sido: "경상북도", sigungu: "", matchLevel: "sido" }, query),
+      "unverified",
+      "시도는 같지만 시군구를 모르면 inside로 단정하지 않음(이슈 #24 원칙)"
+    );
+    assert.strictEqual(
+      computeRegionMatch({ sido: "전라남도", sigungu: "", matchLevel: "sido" }, query),
+      "outside",
+      "시도 자체가 다르면 시군구를 몰라도 outside로 확신 가능"
+    );
+    assert.strictEqual(
+      computeRegionMatch({ sido: "", sigungu: "", matchLevel: "unverified" }, query),
+      "unverified"
+    );
+    ok("시군구 확정 여부에 따라 inside/outside/unverified를 과신 없이 구분함");
+  }
+
+  console.log("13) joinAreaBrandEvidence — 출원번호 조인, 원본 hit 불변, 매칭 없는 행 보존");
+  {
+    const entries = [
+      {
+        status: "ok",
+        query: { region: "경상북도 구미시", item: "일선정품" },
+        hits: [
+          { title: "일선정품", applicant: "홍길동", applicationNumber: "4020190126184" },
+          { title: "관련없는상표", applicant: "김철수", applicationNumber: "4099999999999" },
+        ],
+      },
+      { status: "skipped", reason: "테스트" },
+    ];
+    Object.freeze(entries[0].hits[0]);
+    Object.freeze(entries[0].hits);
+    Object.freeze(entries);
+
+    const areaBrands = [
+      {
+        applicationNumber: "40-2019-0126184",
+        brandName: "일선정품",
+        regionName: "구미",
+        registrationNumber: "401640456",
+      },
+    ];
+    const adminList = [{ code: "4719000000", sido: "경상북도", sigungu: "구미시" }];
+
+    const { entries: joined, matchedHitCount } = joinAreaBrandEvidence({ entries, areaBrands, adminList });
+    assert.strictEqual(matchedHitCount, 1);
+    assert.strictEqual(joined[0].hits[0].areaBrandMatch.regionMatch, "inside");
+    assert.strictEqual(joined[0].hits[0].areaBrandMatch.brandName, "일선정품");
+    assert.strictEqual(joined[0].hits[1].areaBrandMatch, undefined, "출원번호가 안 맞으면 조인 안 됨");
+    assert.strictEqual(joined[1].status, "skipped", "skipped 행은 그대로 통과");
+    assert.strictEqual(entries[0].hits[0].areaBrandMatch, undefined, "원본 hit는 변경되지 않음(freeze로도 보증)");
+    ok("출원번호 정규화 기준으로 조인하고, 원본은 불변으로 두고 매칭 안 된 행도 그대로 보존함");
   }
 
   console.log("\n모든 자체 테스트 통과");
