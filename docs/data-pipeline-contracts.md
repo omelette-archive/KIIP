@@ -30,15 +30,20 @@
 | `source` | 사람이 읽을 수 있는 출처명 | 예 |
 | `collectedAt` | UTC ISO-8601 수집 시각 | 예 |
 
-현재 CSV는 교환 포맷이다. 실제 DB를 도입할 때는 아래 테이블로 분리한다.
+현재 CSV는 교환·스모크 포맷이고, 누적 원본은 Node 내장 SQLite로 아래 테이블에 저장한다.
 
-- `data_sources`: 소스 레지스트리 스냅샷
-- `collection_runs`: 실행 시각, 성공/실패, 경고, 요청 수
-- `specialty_raw_records`: 원문 payload, 소스 레코드 ID, 수집 실행 ID
+- `collection_runs`: 실행 시각, 조회 범위, 소스별 성공/실패, 경고, 논리 요청 수, 저장 건수
+- `specialty_raw_records`: 소스 레코드 안정 키, 현재 payload hash와 버전, 최초/최근 실행 ID
+- `specialty_raw_versions`: 원문 payload, 정규화 payload, hash, append-only 버전과 수집 실행 ID
 - `specialty_normalizations`: 규칙 버전, 확정 값, 검토 상태와 결정 이력
 
-원문 payload와 소스 레코드 ID를 보존하는 DB 저장은 아직 구현하지 않는다. API 실키와 실제 응답
-필드가 확정된 뒤 추가한다.
+GI 키는 `등록신청 공고번호+등록일`, 농사로 키는 `지역코드+링크 URL`(링크가 없으면 제목)을
+사용한다. 식별 필드가 없으면 canonical raw payload의 SHA-256을 fallback으로 사용한다. 동일 키와
+동일 내용은 `last_seen`만 갱신하고, 내용이 달라졌을 때만 `specialty_raw_versions`에 새 버전을
+추가한다. 실행마다 바뀌는 `collectedAt`은 변경 hash에서 제외한다.
+
+`data_sources`와 `specialty_normalizations`의 DB 저장은 아직 구현하지 않았다. 전자는 현재
+`config/sources.json`이 기준이고, 후자는 ②단계 수동 검토 이력 저장소를 정할 때 추가한다.
 
 ### GI 실제 응답 계약(2026-08-10 실키 검증)
 

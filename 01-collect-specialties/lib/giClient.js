@@ -88,7 +88,13 @@ function mapRegistration(row) {
   };
 }
 
-function createClient({ apiKey, baseUrl = DEFAULT_BASE_URL, dataset = DEFAULT_DATASET, fetchImpl } = {}) {
+function createClient({
+  apiKey,
+  baseUrl = DEFAULT_BASE_URL,
+  dataset = DEFAULT_DATASET,
+  fetchImpl,
+  onRequest,
+} = {}) {
   if (!apiKey) throw new Error("농식품 공공데이터포털 API 인증키(GI_API_KEY)가 필요합니다.");
 
   async function fetchPage({ registrationDate, startIndex, endIndex, registeredName }) {
@@ -101,6 +107,7 @@ function createClient({ apiKey, baseUrl = DEFAULT_BASE_URL, dataset = DEFAULT_DA
       registrationDate,
       registeredName,
     });
+    if (onRequest) onRequest({ source: "gi", registrationDate, startIndex, endIndex });
     const response = await fetchWithRetry(url, {}, fetchImpl);
     if (!response.ok) throw new Error(`MAFRA GI API HTTP 오류 (${response.status})`);
     let json;

@@ -14,6 +14,7 @@ function createClient({
   baseUrl,
   operation = "localSpcprdLst",
   fetchImpl,
+  onRequest,
 } = {}) {
   if (!apiKey) {
     throw new Error("농사로 Open API 인증키(apiKey)가 필요합니다.");
@@ -47,6 +48,7 @@ function createClient({
         if (p[key]) query.set(key, String(p[key]));
       }
       const url = `${String(serviceBaseUrl).replace(/\/$/, "")}/${operation}?${query}`;
+      if (onRequest) onRequest({ source: "nongsaro", operation, pageNo, numOfRows: remaining });
       const response = await fetchWithRetry(url, {}, fetchImpl);
       if (!response.ok) throw new Error(`nongsaro(${operation}): API 오류 (${response.status})`);
       const parsed = parseNongsaroResponse(await response.text());

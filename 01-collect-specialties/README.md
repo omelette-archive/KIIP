@@ -1,8 +1,8 @@
 # ① 지역 특산품 데이터 자동 구축
 
 **상태**: 🟡 진행중 — 법정동코드 마스터와 소스 레지스트리/데이터 계약 구현 완료. 지리적표시는
-농식품 공공데이터포털 발급키·허용 IP로 실호출을 검증하고 실제 MAFRA 계약으로 교정했다. 농사로는 공식 매뉴얼의
-`localSpcprd/localSpcprdLst` XML 계약으로 샘플 검증을 마쳤고 실키 스모크 테스트가 필요하다.
+농식품 공공데이터포털 발급키·허용 IP로 실호출을 검증하고 실제 MAFRA 계약으로 교정했다. 농사로도 공식 매뉴얼의
+`localSpcprd/localSpcprdLst` XML 계약과 발급키로 2페이지·빈 결과·인증 오류 실호출을 검증했다.
 지자체 홈페이지/뉴스 기사 수집은 이번 범위 밖.
 
 전국 17개 광역 및 226개 기초지자체를 대상으로 특산품 목록을 자동 수집한다.
@@ -14,7 +14,7 @@
 |---|---|---|
 | 법정동코드(시군구 마스터 목록) | 무료, 인증 불필요 — data.go.kr 파일 다운로드 | ✅ 구현+검증 완료 |
 | 지리적표시 등록정보(국립농산물품질관리원) | 농식품 공공데이터포털 신청·허용 IP 필요 | ✅ 실키·실응답 검증, 일자별 자동수집 구현 |
-| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | 🟡 공식 XML 계약 샘플 검증, 실키 검증 필요 |
+| 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | ✅ 실키·2페이지·빈 결과·인증 오류 검증 |
 | 지자체 홈페이지 / 뉴스 기사 | 226개 사이트마다 제각각 / 별도 인프라 필요 | ⚪ 범위 밖 |
 
 GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수다. 전체 무필터 목록은 받을 수
@@ -33,6 +33,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
 │   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (baseUrl은 활용신청 후 확정 필요)
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
+│   ├── collectionStore.js   SQLite 실행 이력·원문 레코드·append-only 버전 저장
 │   └── normalize.js         소스별 결과 -> 표준 출력 스키마, 지역명을 adminCodes 마스터와 대조
 ├── collectSpecialties.js    CLI 진입점
 ├── selftest.js              fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)
@@ -49,7 +50,8 @@ cp .env.example .env
 node 01-collect-specialties/collectSpecialties.js --sources gi \
   --gi-date 20130207 \
   --limit 3 \
-  --out 01-collect-specialties/output/specialties.csv
+  --out 01-collect-specialties/output/specialties.csv \
+  --db 01-collect-specialties/output/specialties.sqlite
 ```
 
 `--limit`은 소스별 최대 건수를 제한한다. 샘플 검증에서는 반드시 작은 값으로 지정한다.
@@ -64,6 +66,17 @@ GI 날짜 옵션:
 각 조회 결과는 `totalCnt`까지 자동으로 페이지를 순회한다. 키가 없는 소스는 경고를 남기고
 건너뛰되, 선택한 소스가 모두 실패하면 빈 수집 결과를 성공으로 오인하지 않도록 종료 코드 1로
 끝난다. 빈 CSV가 의도된 경우에만 `--allow-empty`를 명시한다.
+
+`--db`를 생략하면 CSV와 같은 폴더·이름의 `.sqlite`가 생성된다. SQLite에는 다음을 누적한다.
+
+- `collection_runs`: 조회 범위, 소스별 성공/실패, 논리 API 요청 수, 경고, 저장 건수
+- `specialty_raw_records`: 소스 원본의 안정 키, 최초/최근 확인 실행, 현재 버전
+- `specialty_raw_versions`: 원문 payload와 정규화 결과의 append-only 버전
+
+같은 source record key와 같은 내용으로 재실행하면 버전을 추가하지 않고 최근 확인 시각만
+갱신한다. 원문 또는 정규화 내용이 달라졌을 때만 새 버전을 추가한다. `collectedAt`만 달라진 것은
+내용 변경으로 보지 않는다. CSV는 ②단계 전달·스모크 확인용이고 SQLite가 누적 원본의 기준이다.
+요청 수는 재시도를 포함한 물리 HTTP 횟수가 아니라 페이지 단위 논리 API 요청 수다.
 
 공식 URL과 접근 조건은 [`config/sources.json`](config/sources.json), 계정·호출 제한은
 [`docs/open-api-limits.md`](../docs/open-api-limits.md)를 기준으로 관리한다.
@@ -82,7 +95,7 @@ node 01-collect-specialties/selftest.js
 - [ ] 생성형 AI로 "지역 ↔ 특산품" 관계 자동 추출 — 지금은 각 API가 이미 지역+품목을 쌍으로
       제공해서 별도 AI 추출 없이도 동작. 지자체 홈페이지/뉴스처럼 비정형 소스를 붙일 때 필요해짐
 - [x] 수집/정규화 데이터 계약과 DB 후보 구조 설계 — [`docs/data-pipeline-contracts.md`](../docs/data-pipeline-contracts.md)
-- [ ] 원문 payload·실행 이력을 보존하는 실제 DB 저장 — GI 실응답 필드는 확정, 저장소 선택 후 진행
+- [x] 원문 payload·실행 이력을 보존하는 SQLite 저장 — 동일 원본 멱등 저장·변경 버전 보존
 
 ## 출력 (다음 단계 ②의 입력)
 

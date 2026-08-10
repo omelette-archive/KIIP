@@ -66,10 +66,10 @@
       "quota": {
         "type": "provider_policy",
         "value": null,
-        "verification": "승인 후 제공기관 마이페이지의 계정별 트래픽 확인 필요"
+        "verification": "공식 공개 페이지에 고정 숫자 없음; 승인 계정의 마이페이지 정책을 기준으로 운영"
       },
       "implementation": {
-        "status": "xml_sample_validated_live_key_required",
+        "status": "live_key_validated",
         "adapter": "lib/nongsaroClient.js"
       }
     }
