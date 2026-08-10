@@ -38,9 +38,9 @@ function parseCsvLine(line) {
 
 /**
  * @param {string} [csvPath]
- * @returns {{code:string, sido:string, sigungu:string}[]}
+ * @returns {{code:string, sido:string, sigungu:string, level:"sido"|"sigungu"}[]}
  */
-function loadAdminCodes(csvPath = DEFAULT_CSV_PATH) {
+function loadAdminRegionCodes(csvPath = DEFAULT_CSV_PATH) {
   const raw = fs.readFileSync(csvPath, "utf8");
   const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
   const lines = text.split(/\r\n|\n/).filter((line) => line.length > 0);
@@ -65,12 +65,24 @@ function loadAdminCodes(csvPath = DEFAULT_CSV_PATH) {
     const sigungu = (fields[idx.sigungu] || "").trim();
     const eupmyeondong = (fields[idx.eupmyeondong] || "").trim();
     const ri = (fields[idx.ri] || "").trim();
-    // 시군구명은 있고 읍면동/리는 비어있는 행 = 시군구 레벨.
-    if (sido && sigungu && !eupmyeondong && !ri) {
-      result.push({ code: (fields[idx.code] || "").trim(), sido, sigungu });
+    // 읍면동/리가 비어 있으면 시도 또는 시군구 레벨이다. 대시보드 집계는 두 레벨을 모두
+    // 쓰지만 기존 수집 정규화는 아래 loadAdminCodes()에서 시군구만 계속 사용한다.
+    if (sido && !eupmyeondong && !ri) {
+      result.push({
+        code: (fields[idx.code] || "").trim(),
+        sido,
+        sigungu,
+        level: sigungu ? "sigungu" : "sido",
+      });
     }
   }
   return result;
 }
 
-module.exports = { loadAdminCodes, parseCsvLine, DEFAULT_CSV_PATH };
+function loadAdminCodes(csvPath = DEFAULT_CSV_PATH) {
+  return loadAdminRegionCodes(csvPath)
+    .filter((row) => row.level === "sigungu")
+    .map(({ code, sido, sigungu }) => ({ code, sido, sigungu }));
+}
+
+module.exports = { loadAdminCodes, loadAdminRegionCodes, parseCsvLine, DEFAULT_CSV_PATH };
