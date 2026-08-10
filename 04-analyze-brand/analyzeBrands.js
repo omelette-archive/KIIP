@@ -55,6 +55,7 @@ function main() {
     recentYears: args.recentYears,
     maxRecentBrands: args.maxRecentBrands,
   });
+  analysis.provenance.inputFile = inputPath;
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(analysis, null, 2), "utf8");
   console.error(

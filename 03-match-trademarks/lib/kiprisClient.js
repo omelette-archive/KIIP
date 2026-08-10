@@ -13,6 +13,17 @@ const { KiprisApiError } = require("./errors");
 
 const PROTO = process.env.KIPRIS_API_PROTOCOL === "http" ? "http" : "https";
 const TRADEMARK_BASE = `${PROTO}://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService`;
+const KIPRIS_CONTRACT_VERSION = "kipris-trademark-word-search-v1";
+const KIPRIS_SOURCE_METADATA = Object.freeze({
+  sourceId: "kipris_trademark",
+  provider: "지식재산처 KIPRISPlus",
+  dataset: "상표 단어검색",
+  portalUrl: "https://plus.kipris.or.kr",
+  endpoint: `${TRADEMARK_BASE}/getWordSearch`,
+  operation: "trademarkInfoSearchService/getWordSearch",
+  contractVersion: KIPRIS_CONTRACT_VERSION,
+  lastContractVerifiedAt: "2026-08-10",
+});
 
 function buildQuery(params) {
   const sp = new URLSearchParams();
@@ -71,4 +82,9 @@ function createClient({ apiKey, fetchImpl } = {}) {
   return { trademarkSearch };
 }
 
-module.exports = { createClient, TRADEMARK_BASE };
+module.exports = {
+  createClient,
+  KIPRIS_CONTRACT_VERSION,
+  KIPRIS_SOURCE_METADATA,
+  TRADEMARK_BASE,
+};

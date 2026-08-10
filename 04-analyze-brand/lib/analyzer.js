@@ -2,6 +2,7 @@
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
+const ANALYSIS_VERSION = "brand-analysis-v2-regional-brand-separated";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -36,6 +37,21 @@ function regionCategory(hit) {
   return "unverified";
 }
 
+function regionalBrandCategory(hit, bucket) {
+  if (!bucket.sido || !hit.regionalBrandMatchSource) return null;
+  const evidence = Array.isArray(hit.regionalBrandEvidence) ? hit.regionalBrandEvidence : [];
+  if (evidence.length === 0) return "unverified";
+  const values = evidence.map((row) => {
+    if (clean(row.regionStatus) !== "matched" || !clean(row.sido)) return "unverified";
+    if (clean(row.sido) !== clean(bucket.sido)) return "outside";
+    if (clean(row.regionLevel) === "sigungu" && clean(bucket.sigungu)) {
+      return clean(row.sigungu) === clean(bucket.sigungu) ? "inside" : "outside";
+    }
+    return "inside";
+  });
+  return new Set(values).size === 1 ? values[0] : "unverified";
+}
+
 function trademarkKey(hit) {
   const applicationNumber = clean(hit.applicationNumber);
   if (applicationNumber) return `app:${applicationNumber.replace(/\s/g, "")}`;
@@ -62,10 +78,12 @@ function normalizeInput(parsed) {
 function entryDimensions(entry) {
   const query = entry.query || {};
   const input = entry.input || {};
-  const sido = clean(entry.sido) || clean(input.sido);
-  const sigungu = clean(entry.sigungu) || clean(input.sigungu);
+  const queryRegion = clean(query.region);
+  const regionParts = queryRegion.split(/\s+/).filter(Boolean);
+  const sido = clean(entry.sido) || clean(input.sido) || regionParts[0] || "";
+  const sigungu = clean(entry.sigungu) || clean(input.sigungu) || regionParts.slice(1).join(" ");
   const region =
-    clean(query.region) || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
+    queryRegion || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
   const itemName =
     clean(entry.itemName) ||
     clean(query.item) ||
@@ -100,6 +118,13 @@ function entrySource(entry) {
   return clean(entry.source) || clean(input.source);
 }
 
+function entryProvenance(entry) {
+  if (entry.provenance && typeof entry.provenance === "object") return entry.provenance;
+  const input = entry.input || {};
+  const sourceLabel = entrySource(entry);
+  return sourceLabel ? { sourceLabel, sourceId: input.sourceId || null } : null;
+}
+
 function createBucket(dimensions) {
   return {
     ...dimensions,
@@ -112,6 +137,7 @@ function createBucket(dimensions) {
     returnedHitCount: 0,
     hits: new Map(),
     sources: new Set(),
+    sourceProvenance: new Map(),
   };
 }
 
@@ -124,6 +150,17 @@ function addEntry(bucket, entry) {
   bucket.queryCount++;
   const source = entrySource(entry);
   if (source) bucket.sources.add(source);
+  const provenance = entryProvenance(entry);
+  if (provenance) {
+    const provenanceKey = JSON.stringify([
+      provenance.sourceId || null,
+      provenance.sourceLabel || null,
+      provenance.sourceContractVersion || null,
+      provenance.sourceFetchedAt || null,
+      provenance.sourceContentId || null,
+    ]);
+    bucket.sourceProvenance.set(provenanceKey, provenance);
+  }
   const status = entryStatus(entry);
   // ②단계에서 검토대기·제외로 걸러진 행(status=skipped, dry-run의 planned)은 상표 검색
   // 자체가 안 일어난 것이라, 성공/오류 어느 쪽에도 넣지 않고 별도로만 센다.
@@ -158,6 +195,9 @@ function mergeBucket(target, source) {
     if (!target.hits.has(key)) target.hits.set(key, hit);
   }
   for (const s of source.sources) target.sources.add(s);
+  for (const [key, provenance] of source.sourceProvenance) {
+    if (!target.sourceProvenance.has(key)) target.sourceProvenance.set(key, provenance);
+  }
 }
 
 function trendOf(recent, previous) {
@@ -171,6 +211,9 @@ function trendOf(recent, previous) {
 function finalizeBucket(bucket, options) {
   const statusCounts = { registered: 0, pending: 0, inactive: 0, unknown: 0 };
   const regionCounts = { inside: 0, outside: 0, unverified: 0 };
+  const regionalBrandCounts = bucket.sido
+    ? { inside: 0, outside: 0, unverified: 0, notReferenced: 0 }
+    : null;
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
   const recentBrands = [];
@@ -183,6 +226,11 @@ function finalizeBucket(bucket, options) {
   for (const hit of bucket.hits.values()) {
     statusCounts[statusCategory(hit.applicationStatus)]++;
     regionCounts[regionCategory(hit)]++;
+    if (regionalBrandCounts) {
+      const category = regionalBrandCategory(hit, bucket);
+      if (category === null) regionalBrandCounts.notReferenced++;
+      else regionalBrandCounts[category]++;
+    }
     const year = applicationYear(hit.applicationDate);
     if (year === null) {
       invalidApplicationDateCount++;
@@ -208,6 +256,12 @@ function finalizeBucket(bucket, options) {
   const recentApplicationCount = countRange(recentStart, recentEnd);
   const previousApplicationCount = countRange(previousStart, previousEnd);
   const regionVerifiedHitCount = regionCounts.inside + regionCounts.outside;
+  const regionalBrandReferenceHitCount = regionalBrandCounts
+    ? regionalBrandCounts.inside + regionalBrandCounts.outside + regionalBrandCounts.unverified
+    : 0;
+  const regionalBrandVerifiedHitCount = regionalBrandCounts
+    ? regionalBrandCounts.inside + regionalBrandCounts.outside
+    : 0;
   const uniqueTrademarkCount = bucket.hits.size;
   const applicationYearCounts = {};
   for (const year of [...yearCounts.keys()].sort((a, b) => a - b)) {
@@ -217,11 +271,12 @@ function finalizeBucket(bucket, options) {
 
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
-    if (key !== "hits" && key !== "sources") result[key] = value;
+    if (key !== "hits" && key !== "sources" && key !== "sourceProvenance") result[key] = value;
   }
   return {
     ...result,
     sources: [...bucket.sources].sort(),
+    sourceProvenance: [...bucket.sourceProvenance.values()],
     uniqueTrademarkCount,
     duplicateHitCount: Math.max(0, bucket.returnedHitCount - uniqueTrademarkCount),
     statusCounts,
@@ -240,6 +295,15 @@ function finalizeBucket(bucket, options) {
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
     localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
+    regionalBrandCounts,
+    regionalBrandReferenceHitCount: regionalBrandCounts ? regionalBrandReferenceHitCount : null,
+    regionalBrandVerifiedHitCount: regionalBrandCounts ? regionalBrandVerifiedHitCount : null,
+    regionalBrandReferenceRate: regionalBrandCounts
+      ? safeRate(regionalBrandReferenceHitCount, uniqueTrademarkCount)
+      : null,
+    regionalBrandInsideShare: regionalBrandCounts
+      ? safeRate(regionalBrandCounts.inside, regionalBrandVerifiedHitCount)
+      : null,
     invalidApplicationDateCount,
   };
 }
@@ -267,6 +331,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
     throw new Error("maxRecentBrands는 1~100 범위의 정수여야 합니다.");
   }
   const options = { asOfYear, recentYears, maxRecentBrands };
+  const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
 
@@ -299,6 +364,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
 
   const finalizeAll = (buckets) => sortAggregates([...buckets.values()].map((b) => finalizeBucket(b, options)));
   const summary = finalizeBucket(summaryBucket, options);
+  const regionItems = finalizeAll(regionItemBuckets);
+  const regions = finalizeAll(regionBuckets);
+  const items = finalizeAll(itemBuckets);
   const warnings = [];
   if (summary.erroredQueryCount > 0) {
     warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
@@ -316,11 +384,35 @@ function analyzeEntries(parsed, providedOptions = {}) {
   if (summary.regionVerificationRate !== 1 && summary.uniqueTrademarkCount > 0) {
     warnings.push("출원인 주소 기반 지역 매칭이 끝나지 않은 상표가 있어 지역 내·외 비중은 검증된 건만 기준으로 계산했습니다.");
   }
+  if (regionItems.some((row) => row.regionalBrandReferenceHitCount > 0)) {
+    warnings.push(
+      "농사로 지역브랜드 출원번호 조인은 등록된 지역브랜드 연관성 검증 신호이며 출원인 주소 근거가 아닙니다. localApplicantShare에는 포함하지 않았습니다."
+    );
+  }
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
 
   return {
-    schemaVersion: "1.1",
+    schemaVersion: "1.2",
+    analysisVersion: ANALYSIS_VERSION,
     generatedAt: new Date().toISOString(),
+    provenance: {
+      inputSchemaVersion: inputDocument?.schemaVersion || null,
+      inputCompletedAt: inputDocument?.completedAt || null,
+      sources: [
+        inputDocument?.trademarkSourceMetadata,
+        inputDocument?.regionalBrandValidation?.enabled
+          ? inputDocument.regionalBrandValidation.sourceMetadata
+          : null,
+      ].filter(Boolean),
+    },
+    methodology: {
+      trademarkCountBasis: "03단계가 저장한 hit를 출원번호 우선 키로 중복 제거",
+      partialCollectionPolicy: "partial hit도 포함하되 경고와 partialQueryCount를 함께 제공",
+      applicantRegionMetric: "출원인 주소 근거만 localApplicantShare에 사용",
+      regionalBrandMetric: "농사로 지역브랜드 출원번호 연관성은 별도 regionalBrand* 지표로 집계",
+      currentYearPolicy: "진행 중인 현재 연도는 최근/직전 기간 비교에서 제외",
+      lastUpdatedAt: "2026-08-10",
+    },
     parameters: {
       asOfYear,
       recentYears,
@@ -329,16 +421,18 @@ function analyzeEntries(parsed, providedOptions = {}) {
     },
     warnings,
     summary,
-    regionItems: finalizeAll(regionItemBuckets),
-    regions: finalizeAll(regionBuckets),
-    items: finalizeAll(itemBuckets),
+    regionItems,
+    regions,
+    items,
   };
 }
 
 module.exports = {
+  ANALYSIS_VERSION,
   analyzeEntries,
   applicationYear,
   normalizeInput,
+  regionalBrandCategory,
   regionCategory,
   statusCategory,
   trademarkKey,

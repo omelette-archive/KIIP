@@ -191,6 +191,12 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
       status: "ok",
       inputIndex: 0,
       source: "지리적표시",
+      provenance: {
+        sourceLabel: "지리적표시",
+        sourceId: "gi",
+        sourceContractVersion: "provider-live-api",
+        sourceFetchedAt: "2026-08-10T01:00:00Z",
+      },
       query: { region: "경기도 안성시", item: "안성배" },
       keywordTotalCount: 2,
       hits: [hit("40-2025-9", "안성햇배", "20250501", "등록", "unverified")],
@@ -220,12 +226,55 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
   const r = analyzeEntries(withSource, { asOfYear: 2026 });
   const anseongPear = r.regionItems.find((row) => row.region === "경기도 안성시");
   assert.deepStrictEqual(anseongPear.sources, ["지리적표시"], "같은 지역×품목에 중복 등장해도 출처는 한 번만 담김");
+  assert.strictEqual(anseongPear.sourceProvenance[0].sourceId, "gi");
+  assert.strictEqual(anseongPear.sourceProvenance[0].sourceContractVersion, "provider-live-api");
   const boseongTea = r.regionItems.find((row) => row.region === "전라남도 보성군");
   assert.deepStrictEqual(boseongTea.sources, ["농사로"], "검색 자체가 오류난 행도 출처는 유실되지 않음");
   const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
   assert.deepStrictEqual(andongTree.sources, ["샘플"], "skipped 행은 input.source에서 읽어야 함");
-  assert.strictEqual(r.schemaVersion, "1.1");
+  assert.strictEqual(r.schemaVersion, "1.2");
   ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
+}
+
+console.log("6) 농사로 지역브랜드 조인 신호 — 출원인 주소 지표와 분리");
+{
+  const referenced = (number, regionStatus, level, sido, sigungu) => ({
+    ...hit(number, `상표-${number}`, "20250101", "등록", "unverified"),
+    regionalBrandMatchSource: "nongsaro_area_brand_application_number",
+    regionalBrandMatchVersion: "area-brand-application-region-join-v1",
+    regionalBrandEvidence: [{
+      contentId: number,
+      regionStatus,
+      regionLevel: level,
+      sido,
+      sigungu,
+      normalizedRegion: [sido, sigungu].filter(Boolean).join(" ") || null,
+    }],
+  });
+  const r = analyzeEntries([{
+    status: "ok",
+    query: { region: "경상북도 구미시", item: "쌀", classCode: "30" },
+    hits: [
+      referenced("40-1", "matched", "sigungu", "경상북도", "구미시"),
+      referenced("40-2", "matched", "sigungu", "경상북도", "안동시"),
+      referenced("40-3", "ambiguous", null, null, null),
+      hit("40-4", "미참조상표", "20250101", "등록", "unverified"),
+    ],
+  }], { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.deepStrictEqual(row.regionalBrandCounts, {
+    inside: 1,
+    outside: 1,
+    unverified: 1,
+    notReferenced: 1,
+  });
+  assert.strictEqual(row.regionalBrandReferenceHitCount, 3);
+  assert.strictEqual(row.regionalBrandVerifiedHitCount, 2);
+  assert.strictEqual(row.regionalBrandReferenceRate, 0.75);
+  assert.strictEqual(row.regionalBrandInsideShare, 0.5);
+  assert.strictEqual(row.localApplicantShare, null, "지역브랜드 연관성을 출원인 주소로 간주하면 안 됨");
+  assert.ok(r.warnings.some((warning) => warning.includes("출원인 주소 근거가 아닙니다")));
+  ok("출원번호 지역브랜드 연관성은 별도 지표로 집계되고 localApplicantShare를 오염시키지 않음");
 }
 
 console.log("\n모든 자체 테스트 통과");

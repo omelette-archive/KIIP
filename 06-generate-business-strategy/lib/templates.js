@@ -86,6 +86,7 @@ function buildBriefing(row) {
       localApplicantShare: row.regionMatchVerified ? row.localApplicantShare : null,
       regionMatchVerified: row.regionMatchVerified,
       scoreInputs: row.scoreInputs || null,
+      sourceProvenance: row.sourceProvenance || [],
     },
   };
 }

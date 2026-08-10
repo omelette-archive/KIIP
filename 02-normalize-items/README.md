@@ -60,13 +60,25 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
   --review-out 02-normalize-items/output/review-required.csv
 ```
 
-입력 CSV 컬럼: `sido, sigungu, rawItemName[, source]` — 01단계 출력을 그대로 넣을 수 있다.
+입력 CSV 필수 컬럼은 `sido, sigungu, rawItemName`이다. ① 출력의 `source`, `sourceId`,
+`sourceContractVersion`, `sourceUrl`, `sourceLastVerifiedAt`, `collectedAt`도 읽어 다음 단계까지
+그대로 전달한다.
 
 `status=ok`는 규칙으로 확정된 행, `status=review_required`는 사람이 개별 검토해야 하는
 행이다. 검토 파일에는 `reviewReason`과 `reviewCandidates`가 함께 기록되어, 검토자가
 사전 후보를 다시 찾을 필요 없이 바로 판단할 수 있다. 처리 오류는 `status=error`로
 보존하며 하나라도 있으면 부분 결과를 쓴 뒤 종료 코드 2를 반환한다. ① 단계의 `source`도
 출력까지 유지한다.
+
+모든 출력 행에는 재현을 위한 다음 메타데이터를 함께 기록한다.
+
+- `normalizationVersion`: 현재 규칙 `specialty-normalization-rules-v1`
+- `dictionaryVersion`: 현재 사전 `kipo-notice-goods-13-2026`
+- `dictionarySourceUrl`: 지식재산처 고시상품명칭 공식 페이지
+- `dictionaryDownloadedAt`: 현재 원본 다운로드일 `2026-08-05`
+
+공식 출처와 규칙의 채택 근거는
+[`docs/data-source-provenance.md`](../docs/data-source-provenance.md)에 중앙 관리한다.
 
 ### 중간산출물 수동 검토
 
@@ -101,7 +113,9 @@ node 02-normalize-items/selftest.js
 ## 입력 → 출력
 
 `01-collect-specialties/`의 원시 목록 → `{ inputIndex, sido, sigungu, rawItemName, source,
+sourceId, sourceContractVersion, sourceUrl, sourceLastVerifiedAt, sourceFetchedAt,
 itemName, noticeName, niceClass, similarGroupCode, excluded, status, matchMethod,
 confidence, reviewReason, reviewCandidates, reviewDecision, selectedCandidateIndex,
-reviewNote, reviewedBy, reviewedAt, error }[]`
+reviewNote, reviewedBy, reviewedAt, normalizationVersion, dictionaryVersion,
+dictionarySourceUrl, dictionaryDownloadedAt, error }[]`
 (다음 단계 ③의 입력)
