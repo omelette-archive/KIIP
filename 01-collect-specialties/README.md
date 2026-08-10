@@ -30,7 +30,6 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── loadEnv.js           .env 로더 (02/03에서 포팅)
 │   ├── fetchWithRetry.js    재시도/타임아웃/키마스킹 (02/03에서 포팅)
 │   ├── adminCodes.js        법정동코드 CSV 파싱 -> 시군구 레벨 마스터 목록
-│   ├── dataGoKrClient.js    data.go.kr OpenAPI 공통 클라이언트 (표준 응답 포맷 파싱)
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
 │   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (baseUrl은 활용신청 후 확정 필요)
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
