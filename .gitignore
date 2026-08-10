@@ -5,6 +5,9 @@ node_modules/
 02-normalize-items/output/*.csv
 02-normalize-items/output/*.json
 01-collect-specialties/output/*.csv
+01-collect-specialties/output/*.sqlite
+01-collect-specialties/output/*.sqlite-shm
+01-collect-specialties/output/*.sqlite-wal
 
 # buildmap.js/buildmuni.js가 07-dashboard/prototypes/data/skorea_*.json에서 재생성하는
 # 중간 산출물 — vendored 원본만 커밋하고 빌드 결과물은 커밋하지 않는다.

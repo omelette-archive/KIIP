@@ -26,6 +26,11 @@ const {
   DEFAULT_BASE_URL: NONGSARO_BASE_URL,
 } = require("./lib/nongsaroClient");
 const { parseNongsaroResponse } = require("./lib/xmlLite");
+const {
+  createCollectionStore,
+  makeStoredRecords,
+  sourceRecordKey,
+} = require("./lib/collectionStore");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -167,6 +172,7 @@ async function run() {
   console.log("6) giClient — MAFRA URL 경로·Grid 응답 매핑");
   {
     const requestedUrls = [];
+    let logicalRequests = 0;
     const fakeFetch = async (url) => {
       requestedUrls.push(url);
       const date = new URL(url).searchParams.get("REGIST_NO_REGIST_DE");
@@ -196,7 +202,11 @@ async function run() {
         }),
       };
     };
-    const gi = createGiClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const gi = createGiClient({
+      apiKey: "test-key",
+      fetchImpl: fakeFetch,
+      onRequest: () => logicalRequests++,
+    });
     const rows = await gi.listRegistrations({ registrationDates: ["20130207", "20260810"] });
     assert.strictEqual(rows.length, 1);
     assert.strictEqual(rows[0].registrationNumber, "2012-40");
@@ -205,6 +215,7 @@ async function run() {
     assert.strictEqual(rows[0].organizationName, "생산자연합회");
     assert.ok(rows[0].raw.GGRPH_INDICT_SFE);
     assert.strictEqual(requestedUrls.length, 2);
+    assert.strictEqual(logicalRequests, 2);
     assert.ok(requestedUrls[0].startsWith(`${GI_BASE_URL}/test-key/json/${GI_DATASET}/1/1000?`));
     assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("REGIST_NO_REGIST_DE"), "20130207");
     assert.ok(maskSensitiveUrl(requestedUrls[0]).includes("/openapi/***/json/"));
@@ -232,6 +243,7 @@ async function run() {
   console.log("7) nongsaroClient — 공식 XML 계약 파싱 + 샘플 제한");
   {
     const requestedUrls = [];
+    let logicalRequests = 0;
     const fakeFetch = async (url) => {
       requestedUrls.push(url);
       const pageNo = Number(new URL(url).searchParams.get("pageNo"));
@@ -259,12 +271,18 @@ async function run() {
         ].join(""),
       };
     };
-    const client = createNongsaroClient({ apiKey: "test-key", baseUrl: "", fetchImpl: fakeFetch });
+    const client = createNongsaroClient({
+      apiKey: "test-key",
+      baseUrl: "",
+      fetchImpl: fakeFetch,
+      onRequest: () => logicalRequests++,
+    });
     const rows = await client.listSpecialties({ numOfRows: 2, limit: 3 });
     assert.strictEqual(rows.length, 3);
     assert.strictEqual(rows[0].title, "안동사과");
     assert.strictEqual(rows[2].region, "경상남도 합천군");
     assert.deepStrictEqual(requestedUrls.map((url) => Number(new URL(url).searchParams.get("pageNo"))), [1, 2]);
+    assert.strictEqual(logicalRequests, 2);
     assert.ok(requestedUrls[0].startsWith(`${NONGSARO_BASE_URL}/localSpcprdLst?`));
     assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("apiKey"), "test-key");
     assert.strictEqual(new URL(requestedUrls[0]).searchParams.has("serviceKey"), false);
@@ -292,6 +310,7 @@ async function run() {
   console.log("8) collectSpecialties CLI — 모든 소스 실패 시 non-zero 종료");
   {
     const outPath = path.join(os.tmpdir(), `specialties_empty_${Date.now()}.csv`);
+    const dbPath = outPath.replace(/\.csv$/, ".sqlite");
     const scriptPath = path.join(__dirname, "collectSpecialties.js");
     const result = spawnSync(
       process.execPath,
@@ -310,8 +329,17 @@ async function run() {
     try {
       assert.strictEqual(allowed.status, 0);
       assert.match(fs.readFileSync(outPath, "utf8"), /sido,sigungu,rawItemName,source,collectedAt/);
+      const auditStore = createCollectionStore(dbPath);
+      try {
+        assert.deepStrictEqual(auditStore.counts(), { runs: 2, records: 0, versions: 0 });
+        assert.strictEqual(auditStore.getRun(1).status, "failed");
+        assert.strictEqual(auditStore.getRun(2).status, "empty_allowed");
+      } finally {
+        auditStore.close();
+      }
     } finally {
       if (fs.existsSync(outPath)) fs.unlinkSync(outPath);
+      if (fs.existsSync(dbPath)) fs.unlinkSync(dbPath);
     }
     ok("기본은 종료 코드 1, --allow-empty를 명시한 경우에만 빈 CSV를 허용함");
   }
@@ -329,6 +357,93 @@ async function run() {
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
     assert.strictEqual(nongsaro.implementation.status, "xml_sample_validated_live_key_required");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");
+  }
+
+  console.log("10) collectionStore — 실행 이력·원문 멱등 저장·변경 버전");
+  {
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-collection-store-"));
+    const dbPath = path.join(tempDir, "specialties.sqlite");
+    const store = createCollectionStore(dbPath);
+    try {
+      const entry = {
+        registrationNumber: "2012-40",
+        registrationDate: "20130207",
+        registeredName: "안성배",
+        raw: { REGIST_REQST_PBLANC_NO: "2012-40", GGRPH_INDICT_KOREAN_NM: "안성배" },
+      };
+      const normalized = {
+        sido: "경기도",
+        sigungu: "안성시",
+        rawItemName: "안성배",
+        source: "지리적표시",
+        collectedAt: "2026-08-10T00:00:00.000Z",
+      };
+      assert.strictEqual(sourceRecordKey("gi", entry), "gi:2012-40|20130207");
+      assert.strictEqual(
+        sourceRecordKey("nongsaro", {
+          title: "안동사과",
+          raw: { areaCode: "4717000000", linkUrl: "https://example.test/1" },
+        }),
+        "nongsaro:4717000000|https://example.test/1"
+      );
+
+      const records = makeStoredRecords("gi", [entry], [normalized]);
+      const run1 = store.startRun({ sources: ["gi"], queryScope: { dates: ["20130207"] } });
+      const inserted = store.persistRecords(run1, records);
+      store.finishRun(run1, {
+        status: "success",
+        requestCount: 1,
+        succeededSourceCount: 1,
+        rowCount: 1,
+        stored: inserted,
+      });
+      assert.deepStrictEqual(inserted, { inserted: 1, updated: 0, unchanged: 0 });
+
+      const run2 = store.startRun({ sources: ["gi"], queryScope: { dates: ["20130207"] } });
+      const sameRecordNewTime = makeStoredRecords(
+        "gi",
+        [entry],
+        [{ ...normalized, collectedAt: "2026-08-11T00:00:00.000Z" }]
+      );
+      const unchanged = store.persistRecords(run2, sameRecordNewTime);
+      store.finishRun(run2, {
+        status: "success",
+        requestCount: 1,
+        succeededSourceCount: 1,
+        rowCount: 1,
+        stored: unchanged,
+      });
+      assert.deepStrictEqual(unchanged, { inserted: 0, updated: 0, unchanged: 1 });
+
+      const changedEntry = {
+        ...entry,
+        raw: { ...entry.raw, GGRPH_INDICT_SFE: "당도가 높음" },
+      };
+      const run3 = store.startRun({ sources: ["gi"], queryScope: { dates: ["20130207"] } });
+      const updated = store.persistRecords(
+        run3,
+        makeStoredRecords("gi", [changedEntry], [{ ...normalized, collectedAt: "2026-08-12T00:00:00.000Z" }])
+      );
+      store.finishRun(run3, {
+        status: "partial",
+        requestCount: 2,
+        succeededSourceCount: 1,
+        failedSourceCount: 1,
+        rowCount: 1,
+        stored: updated,
+        warnings: ["테스트 경고"],
+      });
+      assert.deepStrictEqual(updated, { inserted: 0, updated: 1, unchanged: 0 });
+      assert.deepStrictEqual(store.counts(), { runs: 3, records: 1, versions: 2 });
+      const storedRun = store.getRun(run3);
+      assert.strictEqual(storedRun.status, "partial");
+      assert.strictEqual(storedRun.request_count, 2);
+      assert.strictEqual(storedRun.warning_count, 1);
+      ok("같은 원본 재실행은 중복 없이 last_seen만 갱신하고, 내용 변경만 append-only 버전으로 보존");
+    } finally {
+      store.close();
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
   }
 
   console.log("\n모든 자체 테스트 통과");

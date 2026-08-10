@@ -22,6 +22,7 @@ const { createClient: createGiClient, normalizeDate: normalizeGiDate } = require
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
+const { createCollectionStore, makeStoredRecords } = require("./lib/collectionStore");
 
 loadEnv();
 
@@ -49,6 +50,7 @@ function printUsageAndExit(message) {
       "옵션:",
       "  --sources <목록>   콤마로 구분된 소스 목록 (기본 gi,nongsaro)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
+      "  --db <path>        누적 SQLite 경로 (기본: CSV와 같은 이름의 .sqlite)",
       "  --limit <n>        소스별 최대 수집 건수 (샘플 검증용)",
       "  --gi-date <목록>    GI 등록일 YYYYMMDD 목록 (콤마 구분, 기본: 한국시간 오늘)",
       "  --gi-from <날짜>    GI 누락 복구 시작일 YYYYMMDD (--gi-to와 함께 사용)",
@@ -122,10 +124,12 @@ function writeOutputCsv(outPath, rows) {
 }
 
 async function collectGi(adminList, warnings, options = {}) {
+  let requestCount = 0;
   try {
     const client = createGiClient({
       apiKey: process.env.GI_API_KEY,
       baseUrl: process.env.GI_API_BASE_URL,
+      onRequest: () => requestCount++,
     });
     const registrations = await client.listRegistrations({
       registrationDates: options.giRegistrationDates,
@@ -133,26 +137,38 @@ async function collectGi(adminList, warnings, options = {}) {
     });
     const { rows, warnings: w } = fromGiRegistrations(registrations, adminList);
     warnings.push(...w);
-    return { rows, succeeded: true };
+    return {
+      rows,
+      rawRecords: makeStoredRecords("gi", registrations, rows),
+      succeeded: true,
+      requestCount,
+    };
   } catch (err) {
     warnings.push(`gi 소스 건너뜀: ${err.message}`);
-    return { rows: [], succeeded: false };
+    return { rows: [], rawRecords: [], succeeded: false, requestCount, error: err.message };
   }
 }
 
 async function collectNongsaro(adminList, warnings, options = {}) {
+  let requestCount = 0;
   try {
     const client = createNongsaroClient({
       apiKey: process.env.NONGSARO_API_KEY,
       baseUrl: process.env.NONGSARO_API_BASE_URL,
+      onRequest: () => requestCount++,
     });
     const specialties = await client.listSpecialties({ numOfRows: 200, limit: options.limit });
     const { rows, warnings: w } = fromNongsaro(specialties, adminList);
     warnings.push(...w);
-    return { rows, succeeded: true };
+    return {
+      rows,
+      rawRecords: makeStoredRecords("nongsaro", specialties, rows),
+      succeeded: true,
+      requestCount,
+    };
   } catch (err) {
     warnings.push(`nongsaro 소스 건너뜀: ${err.message}`);
-    return { rows: [], succeeded: false };
+    return { rows: [], rawRecords: [], succeeded: false, requestCount, error: err.message };
   }
 }
 
@@ -163,7 +179,9 @@ async function main() {
   if (args.help || args.h) printUsageAndExit();
 
   const outPath = path.resolve(args.out || path.join(__dirname, "output", "specialties.csv"));
-  const sources = String(args.sources).split(",").map((s) => s.trim()).filter(Boolean);
+  const parsedOut = path.parse(outPath);
+  const dbPath = path.resolve(args.db || path.join(parsedOut.dir, `${parsedOut.name}.sqlite`));
+  const sources = [...new Set(String(args.sources).split(",").map((s) => s.trim()).filter(Boolean))];
   const sourceRegistry = loadSourceRegistry();
   const limit = args.limit === undefined ? undefined : Number(args.limit);
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
@@ -177,41 +195,103 @@ async function main() {
     );
   }
 
-  const adminList = loadAdminCodes();
-  console.error(`[collectSpecialties] 법정동코드 마스터 ${adminList.length.toLocaleString()}건 로드`);
-
   const warnings = [];
   let rows = [];
+  let rawRecords = [];
   let succeededSources = 0;
-  for (const source of sources) {
-    const definition = getSourceDefinition(source, sourceRegistry);
-    const collector = COLLECTORS[source];
-    if (!definition || definition.role !== "collector" || !collector) {
-      warnings.push(`알 수 없는 소스: ${source}`);
-      continue;
+  let failedSources = 0;
+  let requestCount = 0;
+  let stored = { inserted: 0, updated: 0, unchanged: 0 };
+  const sourceResults = {};
+  const store = createCollectionStore(dbPath);
+  const runId = store.startRun({
+    sources,
+    queryScope: { limit: limit ?? null, giRegistrationDates },
+  });
+  let runFinished = false;
+
+  try {
+    const adminList = loadAdminCodes();
+    console.error(`[collectSpecialties] 법정동코드 마스터 ${adminList.length.toLocaleString()}건 로드`);
+
+    for (const source of sources) {
+      const definition = getSourceDefinition(source, sourceRegistry);
+      const collector = COLLECTORS[source];
+      if (!definition || definition.role !== "collector" || !collector) {
+        const message = `알 수 없는 소스: ${source}`;
+        warnings.push(message);
+        failedSources++;
+        sourceResults[source] = { succeeded: false, requestCount: 0, rowCount: 0, error: message };
+        continue;
+      }
+      const result = await collector(adminList, warnings, { limit, giRegistrationDates });
+      requestCount += result.requestCount;
+      if (result.succeeded) succeededSources++;
+      else failedSources++;
+      sourceResults[source] = {
+        succeeded: result.succeeded,
+        requestCount: result.requestCount,
+        rowCount: result.rows.length,
+        error: result.error || null,
+      };
+      console.error(`[collectSpecialties] ${source} (${definition.name}) -> ${result.rows.length}행`);
+      rows = rows.concat(result.rows);
+      rawRecords = rawRecords.concat(result.rawRecords);
     }
-    const { rows: sourceRows, succeeded } = await collector(adminList, warnings, {
-      limit,
-      giRegistrationDates,
+
+    if (succeededSources === 0 && !args["allow-empty"]) {
+      const details = warnings.length ? ` 원인: ${warnings.slice(0, 5).join("; ")}` : "";
+      throw new Error(
+        `선택한 수집 소스가 모두 실패했습니다. 빈 결과를 의도했다면 --allow-empty를 사용하세요.${details}`
+      );
+    }
+
+    stored = store.persistRecords(runId, rawRecords);
+    writeOutputCsv(outPath, rows);
+    const status = succeededSources === 0 ? "empty_allowed" : failedSources > 0 ? "partial" : "success";
+    store.finishRun(runId, {
+      status,
+      sourceResults,
+      requestCount,
+      succeededSourceCount: succeededSources,
+      failedSourceCount: failedSources,
+      rowCount: rows.length,
+      stored,
+      warnings,
     });
-    if (succeeded) succeededSources++;
-    console.error(`[collectSpecialties] ${source} (${definition.name}) -> ${sourceRows.length}행`);
-    rows = rows.concat(sourceRows);
-  }
+    runFinished = true;
 
-  if (succeededSources === 0 && !args["allow-empty"]) {
-    const details = warnings.length ? ` 원인: ${warnings.slice(0, 5).join("; ")}` : "";
-    throw new Error(
-      `선택한 수집 소스가 모두 실패했습니다. 빈 결과를 의도했다면 --allow-empty를 사용하세요.${details}`
+    console.error(
+      `[collectSpecialties] done. total=${rows.length}, requests=${requestCount}, ` +
+      `db(inserted=${stored.inserted}, updated=${stored.updated}, unchanged=${stored.unchanged}) -> ${outPath}`
     );
-  }
-
-  writeOutputCsv(outPath, rows);
-  console.error(`[collectSpecialties] done. total=${rows.length} -> ${outPath}`);
-  if (warnings.length) {
-    console.error(`[collectSpecialties] 경고 ${warnings.length}건:`);
-    for (const w of warnings.slice(0, 20)) console.error(`  - ${w}`);
-    if (warnings.length > 20) console.error(`  ... 외 ${warnings.length - 20}건`);
+    console.error(`[collectSpecialties] run=${runId} -> ${dbPath}`);
+    if (warnings.length) {
+      console.error(`[collectSpecialties] 경고 ${warnings.length}건:`);
+      for (const w of warnings.slice(0, 20)) console.error(`  - ${w}`);
+      if (warnings.length > 20) console.error(`  ... 외 ${warnings.length - 20}건`);
+    }
+  } catch (error) {
+    if (!runFinished) {
+      try {
+        store.finishRun(runId, {
+          status: "failed",
+          sourceResults,
+          requestCount,
+          succeededSourceCount: succeededSources,
+          failedSourceCount: Math.max(failedSources, sources.length - succeededSources),
+          rowCount: rows.length,
+          stored,
+          warnings,
+          errorMessage: error.message,
+        });
+      } catch (finishError) {
+        error.message += `; 실행 이력 저장 실패: ${finishError.message}`;
+      }
+    }
+    throw error;
+  } finally {
+    store.close();
   }
 }
 
