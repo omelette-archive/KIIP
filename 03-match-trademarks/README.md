@@ -55,7 +55,8 @@ node 03-match-trademarks/matchTrademarks.js \
 ① 원시 CSV가 정규화를 건너뛰고 호출량을 쓰지 않도록 ② 출력 필드를 필수로 검증한다.
 ② 단계의 `status=review_required|error` 또는 `excluded=true` 행은 `skipped`로 보존하며, 검색 오류도 행별
 `status=error`로 남긴다. 검색 오류가 하나라도 있으면 결과 JSON을 저장한 뒤 종료 코드 2를
-반환한다.
+반환한다. `ok`/`error` 행에도 ②의 `source`(지리적표시/농사로/샘플 등 수집 출처)를 그대로
+실어보낸다 — ④단계가 "대표 특산품" 판정에 쓴다.
 
 ## 건수 필드의 의미
 

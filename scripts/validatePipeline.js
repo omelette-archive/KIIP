@@ -72,6 +72,7 @@ function writeStage3Fixture(filePath) {
       {
         status: "ok",
         inputIndex: 0,
+        source: "지리적표시",
         query: {
           region: "경상북도 안동시",
           regionMatch: "unverified",
@@ -123,6 +124,8 @@ function validateContracts(tempDir) {
   const planPath = path.join(tempDir, "batch-plan.json");
   const stage3Path = path.join(tempDir, "stage3-result.json");
   const analysisPath = path.join(tempDir, "analysis.json");
+  const gapPath = path.join(tempDir, "gap.json");
+  const strategyPath = path.join(tempDir, "strategy.json");
 
   runNode("② 샘플 정규화", [
     "02-normalize-items/normalizeItems.js",
@@ -170,12 +173,41 @@ function validateContracts(tempDir) {
   assert.strictEqual(analysis.summary.sourceTotalCount, 7);
   assert.strictEqual(analysis.summary.uniqueTrademarkCount, 1);
   assert.ok(!analysis.regionItems.some((row) => row.region === "미지정 지역"));
-  console.log("[validatePipeline] ③→④ 계약 통과 (성공/건너뜀/전체건수 보존)");
+  const andongApple = analysis.regionItems.find((row) => row.itemName === "신선한 사과");
+  assert.deepStrictEqual(andongApple.sources, ["지리적표시"], "③의 source가 ④ 버킷까지 전파돼야 함");
+  console.log("[validatePipeline] ③→④ 계약 통과 (성공/건너뜀/전체건수 보존, source 전파)");
+
+  runNode("⑤ 브랜드 공백 점수 계산", [
+    "05-detect-brand-gap/detectBrandGap.js",
+    "--input",
+    analysisPath,
+    "--out",
+    gapPath,
+  ]);
+  const gap = JSON.parse(fs.readFileSync(gapPath, "utf8"));
+  assert.strictEqual(gap.rows.length, analysis.regionItems.length);
+  assert.strictEqual(gap.ranking.length, 1, "지리적표시 출처 1건만 대표 특산품으로 랭킹에 남아야 함");
+  assert.strictEqual(gap.ranking[0].itemName, "신선한 사과");
+  assert.ok(typeof gap.ranking[0].gapScore === "number");
+  console.log("[validatePipeline] ④→⑤ 계약 통과 (대표 특산품만 랭킹, 점수 산출)");
+
+  runNode("⑥ 고정 템플릿 전략 초안", [
+    "06-generate-business-strategy/generateStrategy.js",
+    "--input",
+    gapPath,
+    "--out",
+    strategyPath,
+  ]);
+  const strategy = JSON.parse(fs.readFileSync(strategyPath, "utf8"));
+  assert.strictEqual(strategy.summary.briefingCount, gap.ranking.length);
+  assert.ok(strategy.briefings[0].sentences.length > 0);
+  assert.ok(!strategy.briefings[0].sentences[0].includes("은(는)"), "조사가 은/는 중 하나로 확정돼야 함");
+  console.log("[validatePipeline] ⑤→⑥ 계약 통과 (고정 템플릿 문장 생성, AI 미사용)");
 }
 
 function main() {
   validateSyntax();
-  for (const phase of ["01", "02", "03", "04"]) {
+  for (const phase of ["01", "02", "03", "04", "05", "06"]) {
     const directory = fs
       .readdirSync(ROOT)
       .find((name) => name.startsWith(`${phase}-`));
