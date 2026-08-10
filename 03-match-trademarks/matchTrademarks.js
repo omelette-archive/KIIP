@@ -172,7 +172,7 @@ function buildBatchPlan(rows) {
     if (query.skipReason) {
       return { status: "skipped", inputIndex, reason: query.skipReason, input: row };
     }
-    return { status: "planned", inputIndex, queryKey: makeSearchKey(query), query };
+    return { status: "planned", inputIndex, queryKey: makeSearchKey(query), query, source: row.source || null };
   });
 }
 
@@ -396,6 +396,10 @@ async function runWithConcurrency(items, concurrency, worker) {
   return results;
 }
 
+// ⑤단계가 "대표 특산품"을 판정하려면 어느 수집 출처(지리적표시/농사로 등)에서 온
+// 행인지가 필요하다. skipped 행은 이미 input 전체를 보존해 source가 딸려오지만,
+// 검색이 실제로 일어난 ok/error 행은 query/hits만 담아 source가 빠져 있었다 — 여기서
+// 함께 실어보내 ④가 지역×품목 버킷에 집계할 수 있게 한다.
 async function runBatch(rows, client, options) {
   options = {
     numOfRows: 20,
@@ -438,6 +442,7 @@ async function runBatch(rows, client, options) {
     const group = byKey.get(entry.queryKey);
     return {
       inputIndex: entry.inputIndex,
+      source: entry.source,
       queryKey: entry.queryKey,
       sharedQueryInputCount: group.inputIndexes.length,
       reusedFromCheckpoint: group.reusedFromCheckpoint,

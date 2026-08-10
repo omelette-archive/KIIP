@@ -24,8 +24,8 @@ flowchart LR
     class P2 partial
     class P3 partial
     class P4 partial
-    class P5 todo
-    class P6 todo
+    class P5 partial
+    class P6 partial
     class P7 todo
 ```
 
@@ -39,8 +39,8 @@ flowchart LR
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
 | ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | ② CSV 배치 검색·품목 매칭 동작, **지역 매칭은 TODO** |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 지역·품목별 집계와 시계열 분석 동작, 지역 내·외 비중은 주소 데이터 대기 |
-| ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | ⚪ 예정 | 상표 활용도 낮은 지역/품목 탐지 |
-| ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | ⚪ 예정 | 분석 결과 → 비즈니스 확장 전략 브리핑 자동 생성 |
+| ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟡 진행중 | 결정론적 점수 계산 배선 완료, **대표성·가중치 기준은 예시값** |
+| ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |
 | ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | ⚪ 예정 | 지역별 현황 + 브랜드 공백 지도 |
 
 각 폴더의 `README.md`에 해당 단계의 목표·할 일·입출력 스키마가 정리되어 있다.
@@ -51,7 +51,7 @@ Open API 계정/호출 제한은 [`docs/open-api-limits.md`](docs/open-api-limit
 
 ## 지속 검증
 
-외부 API 키 없이 JavaScript 구문, ①~④ 자체 테스트, ②→③ 샘플 dry-run, ③→④ 분석 계약을
+외부 API 키 없이 JavaScript 구문, ①~⑥ 자체 테스트, ②→③ 샘플 dry-run, ③→④→⑤→⑥ 계약을
 한 번에 검증한다.
 
 ```bash

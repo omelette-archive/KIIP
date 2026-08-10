@@ -285,7 +285,7 @@ async function run() {
     };
     const batch = await runBatch(
       [
-        { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok" },
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok", source: "지리적표시" },
         { rawItemName: "실패품목", status: "error" },
         { sido: "경상북도", sigungu: "안동시", rawItemName: "사과나무", excluded: "true", status: "ok" },
       ],
@@ -295,10 +295,24 @@ async function run() {
     assert.strictEqual(calls, 1);
     assert.deepStrictEqual(batch.results.map((row) => row.status), ["ok", "skipped", "skipped"]);
     assert.strictEqual(batch.results[0].pages.filteredCount, 1);
-    ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함");
+    assert.strictEqual(batch.results[0].source, "지리적표시", "성공 행도 ②단계 원본 source가 함께 실려야 ④가 대표성 판정에 쓸 수 있음");
+    ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함, source도 함께 전파됨");
   }
 
-  console.log("9-1) 고유 쿼리 중복 제거·다중 페이지·체크포인트 재개");
+  console.log("9-1) runBatch — 검색 오류 행도 source를 보존함");
+  {
+    const failingClient = { trademarkSearch: async () => { throw new Error("네트워크 오류"); } };
+    const failedBatch = await runBatch(
+      [{ sido: "전라남도", sigungu: "보성군", rawItemName: "보성녹차", noticeName: "녹차", niceClass: "30", status: "ok", source: "농사로" }],
+      failingClient,
+      { pageNo: 1, numOfRows: 20, concurrency: 1 }
+    );
+    assert.strictEqual(failedBatch.results[0].status, "error");
+    assert.strictEqual(failedBatch.results[0].source, "농사로");
+    ok("검색 자체가 실패해도 source는 유실되지 않음");
+  }
+
+  console.log("9-2) 고유 쿼리 중복 제거·다중 페이지·체크포인트 재개");
   {
     const rows = [
       { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과", noticeName: "사과", niceClass: "31", status: "ok" },

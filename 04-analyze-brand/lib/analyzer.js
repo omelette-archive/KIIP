@@ -92,6 +92,14 @@ function entryTotalCount(entry) {
   return Number.isFinite(n) ? n : 0;
 }
 
+// ①단계 수집 출처(지리적표시/농사로/샘플 등). ok/error 행은 entry.source, skipped 행은
+// entry.input.source에 들어있다 — ⑤단계가 "대표 특산품"(예: 지리적표시 등록 여부) 신호로
+// 쓴다.
+function entrySource(entry) {
+  const input = entry.input || {};
+  return clean(entry.source) || clean(input.source);
+}
+
 function createBucket(dimensions) {
   return {
     ...dimensions,
@@ -103,6 +111,7 @@ function createBucket(dimensions) {
     sourceTotalCount: 0,
     returnedHitCount: 0,
     hits: new Map(),
+    sources: new Set(),
   };
 }
 
@@ -113,6 +122,8 @@ function entryStatus(entry) {
 
 function addEntry(bucket, entry) {
   bucket.queryCount++;
+  const source = entrySource(entry);
+  if (source) bucket.sources.add(source);
   const status = entryStatus(entry);
   // ②단계에서 검토대기·제외로 걸러진 행(status=skipped, dry-run의 planned)은 상표 검색
   // 자체가 안 일어난 것이라, 성공/오류 어느 쪽에도 넣지 않고 별도로만 센다.
@@ -146,6 +157,7 @@ function mergeBucket(target, source) {
   for (const [key, hit] of source.hits) {
     if (!target.hits.has(key)) target.hits.set(key, hit);
   }
+  for (const s of source.sources) target.sources.add(s);
 }
 
 function trendOf(recent, previous) {
@@ -205,10 +217,11 @@ function finalizeBucket(bucket, options) {
 
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
-    if (key !== "hits") result[key] = value;
+    if (key !== "hits" && key !== "sources") result[key] = value;
   }
   return {
     ...result,
+    sources: [...bucket.sources].sort(),
     uniqueTrademarkCount,
     duplicateHitCount: Math.max(0, bucket.returnedHitCount - uniqueTrademarkCount),
     statusCounts,
@@ -306,7 +319,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
 
   return {
-    schemaVersion: "1.0",
+    schemaVersion: "1.1",
     generatedAt: new Date().toISOString(),
     parameters: {
       asOfYear,

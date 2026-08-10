@@ -57,6 +57,9 @@ node 04-analyze-brand/analyzeBrands.js \
 - `recentBrands`
 - `regionCounts`, `regionVerificationRate`, `localApplicantShare`
 - `queryCount`, `successfulQueryCount`, `partialQueryCount`, `erroredQueryCount`, `skippedQueryCount`, `sourceTotalCount`, `returnedHitCount`
+- `sources`: 이 버킷에 기여한 ①단계 수집 출처의 중복 없는 목록(예: `["지리적표시"]`). ok/error/
+  skipped 행 모두에서 읽으므로 검색이 실패해도 유실되지 않는다. ⑤단계가 "대표 특산품"(지리적
+  표시 등록 여부 등) 판정 신호로 쓴다 (`schemaVersion: "1.1"`에서 추가).
 
 `recentTrend`는 `new`, `increase`, `flat`, `decrease`, `no_activity` 중 하나다.
 `localApplicantShare`는 `inside / (inside + outside)`로 계산하며, 지역 검증 건이 없으면 `null`이다.

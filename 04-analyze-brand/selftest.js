@@ -184,4 +184,48 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
 }
 
+console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파 — ⑤단계 대표성 판정용");
+{
+  const withSource = [
+    {
+      status: "ok",
+      inputIndex: 0,
+      source: "지리적표시",
+      query: { region: "경기도 안성시", item: "안성배" },
+      keywordTotalCount: 2,
+      hits: [hit("40-2025-9", "안성햇배", "20250501", "등록", "unverified")],
+    },
+    {
+      status: "ok",
+      inputIndex: 1,
+      source: "지리적표시",
+      query: { region: "경기도 안성시", item: "안성배" },
+      keywordTotalCount: 2,
+      hits: [hit("40-2025-9", "안성햇배", "20250501", "등록", "unverified")],
+    },
+    {
+      status: "error",
+      inputIndex: 2,
+      source: "농사로",
+      query: { region: "전라남도 보성군", item: "보성녹차" },
+      error: "테스트 오류",
+    },
+    {
+      status: "skipped",
+      inputIndex: 3,
+      reason: "② 단계에서 분석 제외된 품목",
+      input: { sido: "경상북도", sigungu: "안동시", rawItemName: "안동사과나무", itemName: "사과나무", source: "샘플" },
+    },
+  ];
+  const r = analyzeEntries(withSource, { asOfYear: 2026 });
+  const anseongPear = r.regionItems.find((row) => row.region === "경기도 안성시");
+  assert.deepStrictEqual(anseongPear.sources, ["지리적표시"], "같은 지역×품목에 중복 등장해도 출처는 한 번만 담김");
+  const boseongTea = r.regionItems.find((row) => row.region === "전라남도 보성군");
+  assert.deepStrictEqual(boseongTea.sources, ["농사로"], "검색 자체가 오류난 행도 출처는 유실되지 않음");
+  const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
+  assert.deepStrictEqual(andongTree.sources, ["샘플"], "skipped 행은 input.source에서 읽어야 함");
+  assert.strictEqual(r.schemaVersion, "1.1");
+  ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
+}
+
 console.log("\n모든 자체 테스트 통과");
