@@ -5,16 +5,31 @@
 실제 인증키는 저장소 루트의 `.env` 한 곳에만 저장한다. `.env`는 `.gitignore` 대상이며,
 이슈·PR·커밋·일반 문서에는 키 값을 기록하지 않는다.
 
+현재 개발 PC에서는 다음 두 파일을 같은 내용으로 유지한다.
+
+- 기준 복사본: `C:\Users\이준형\orca\KIIP\.env`
+- 현재 worktree: `C:\Users\이준형\orca\workspaces\KIIP\main\.env`
+
+Orca worktree끼리는 ignored 파일인 `.env`를 자동 공유하지 않는다. 새 worktree에서 API 작업을
+시작할 때는 저장소 루트에서 다음 명령을 먼저 실행한다.
+
+```powershell
+Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
+```
+
+다른 PC에서는 위 절대경로를 사용하지 말고 그 PC의 안전한 기준 위치에서 `.env`를 준비한다.
+
 | 환경변수 | 용도 | 현재 코드 사용 |
 |---|---|---|
 | `KIPRIS_API_KEY` | KIPRISPlus 상표 검색 | 사용 |
 | `GI_API_KEY` | 농식품 공공데이터포털 지리적표시 API | 사용 |
 | `NONGSARO_API_KEY` | 농사로 지역특산물 API | 사용 |
-| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 미사용·보관만 |
+| `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 실호출 검증 완료·파이프라인 미연결 |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 일반 서비스키 | 현재 미사용·보관만 |
 
 농사로의 지역특산물과 지역 브랜드에 동일한 회원 API 키가 발급돼도 용도를 잊지 않도록 두
-환경변수명을 유지한다. 현재 실행 코드는 `NONGSARO_API_KEY`만 읽는다.
+환경변수명을 유지한다. 현재 파이프라인 코드는 `NONGSARO_API_KEY`만 읽고, 지역 브랜드 키는
+공식 `areaBrand/selectSclCodeLst` 실호출까지만 검증했다.
 
 ## 취급 규칙
 
@@ -39,3 +54,6 @@ Get-Content .env |
 ```powershell
 git check-ignore -v .env
 ```
+
+전체 신청 경로·실호출 명령·검증 결과는
+[`open-api-validation-runbook.md`](open-api-validation-runbook.md)를 따른다.
