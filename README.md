@@ -67,6 +67,7 @@ node scripts/validatePipeline.js
 - [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
 - [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
 - [`docs/data-source-provenance.md`](docs/data-source-provenance.md) — 원본 제공기관·공식 URL·기준 근거·버전·산출물 계보
+- [`docs/dashboard-data-contract.md`](docs/dashboard-data-contract.md) — ⑦ 지표 정의·준비도·통합 스냅샷·지도/출처 계약
 - [`docs/open-api-limits.md`](docs/open-api-limits.md) — 계정 승인·호출 제한과 운영 체크리스트
 - [`docs/open-api-validation-runbook.md`](docs/open-api-validation-runbook.md) — 키 위치·신청 경로·실호출 명령·결과·worktree 인수인계
 - [`docs/api-key-management.md`](docs/api-key-management.md) — 로컬 키 보관 위치와 worktree 복사 방법
