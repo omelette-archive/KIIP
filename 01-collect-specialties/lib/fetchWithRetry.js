@@ -3,10 +3,12 @@
 
 function maskSensitiveUrl(url) {
   if (!url) return url;
-  return url.replace(
-    /([?&](?:accessKey|ServiceKey|serviceKey|apikey|apiKey|api_key|key)=)[^&]+/g,
-    "$1***"
-  );
+  return url
+    .replace(
+      /([?&](?:accessKey|ServiceKey|serviceKey|apikey|apiKey|api_key|key)=)[^&]+/g,
+      "$1***"
+    )
+    .replace(/(\/openapi\/)[^/]+(\/(?:json|xml|xls)\/)/gi, "$1***$2");
 }
 
 function sleep(ms) {

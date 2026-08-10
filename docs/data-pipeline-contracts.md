@@ -40,6 +40,27 @@
 원문 payload와 소스 레코드 ID를 보존하는 DB 저장은 아직 구현하지 않는다. API 실키와 실제 응답
 필드가 확정된 뒤 추가한다.
 
+### GI 실제 응답 계약(2026-08-10 실키 검증)
+
+GI는 data.go.kr 공통 `serviceKey` 계약이 아니라 농식품 공공데이터포털 LINK API다. 인증키는
+URL 경로에 들어가고 JSON 본문은 `Grid_20141225000000000157_1` 객체를 루트로 사용한다.
+`REGIST_NO_REGIST_DE` 완전일치 값이 필수이며 연/월만 넣으면 해당 완전일치 값이 없어 0건이다.
+
+| 원본 필드 | 의미 | 현재 사용 |
+|---|---|---|
+| `REGIST_REQST_PBLANC_NO` | 등록신청 공고번호 | 클라이언트 표준 모델의 `registrationNumber` |
+| `GGRPH_INDICT_KOREAN_NM` | 지리적표시 한글명칭 | ① `rawItemName` |
+| `GGRPH_INDICT_ENG_NM` | 영문명칭 | raw 보존 후보 |
+| `REGIST_NO_REGIST_DE` | 등록일자 | 증분 조회 기준·raw 보존 후보 |
+| `GRP_NM` | 등록 단체명 | raw 보존 후보 |
+| `TRGET_AREA` | 대상지역 자유문 | 법정동코드 대조 후 ① `sido`/`sigungu` |
+| `PRDCTN_PLAN_QY` | 생산계획량 자유문 | raw 보존 후보 |
+| `GGRPH_INDICT_SFE` | 특징 설명 | raw 보존 후보 |
+| `HMPG_IMAGE_FILE_NO` | 이미지 파일번호 | raw 보존 후보 |
+
+현재 CSV에는 다음 단계가 사용하는 5개 공통 필드만 기록한다. 위 부가 필드와 원문은 향후
+`specialty_raw_records`에 저장하고, 키 값은 어떤 산출물에도 저장하지 않는다.
+
 ## 3. 정제 기준
 
 ②단계는 외부 AI 없이 다음 순서로 처리한다.

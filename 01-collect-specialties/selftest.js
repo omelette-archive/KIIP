@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 "use strict";
 /**
- * 실제 API 키 없이 파이프라인(법정동코드 파싱 -> 지역 매칭 -> data.go.kr 클라이언트
+ * 실제 API 키 없이 파이프라인(법정동코드 파싱 -> 지역 매칭 -> 제공기관 클라이언트
  * 요청/응답 처리)을 검증하는 자체 테스트. fetch를 모킹해서 네트워크 없이 돌린다.
  * 실행: node 01-collect-specialties/selftest.js
  */
@@ -15,7 +15,13 @@ const { parseCsvLine, loadAdminCodes } = require("./lib/adminCodes");
 const { splitRegion, fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { createClient: createDataGoKrClient } = require("./lib/dataGoKrClient");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
-const { createClient: createGiClient } = require("./lib/giClient");
+const {
+  DEFAULT_BASE_URL: GI_BASE_URL,
+  DEFAULT_DATASET: GI_DATASET,
+  createClient: createGiClient,
+  normalizeDate: normalizeGiDate,
+} = require("./lib/giClient");
+const { maskSensitiveUrl } = require("./lib/fetchWithRetry");
 const {
   createClient: createNongsaroClient,
   DEFAULT_BASE_URL: NONGSARO_BASE_URL,
@@ -246,10 +252,13 @@ async function run() {
 
   console.log("9) 소스별 필수 설정 검증");
   {
+    assert.throws(() => createGiClient({}), /GI_API_KEY/);
     const gi = createGiClient({ apiKey: "test-key" });
-    await assert.rejects(() => gi.listRegistrations(), /baseUrl/);
+    await assert.rejects(() => gi.listRegistrations(), /registrationDates/);
     assert.throws(() => createNongsaroClient({}), /인증키/);
-    ok("지리적표시는 baseUrl, 농사로는 apiKey 누락 시 명확한 에러로 실패함");
+    assert.strictEqual(normalizeGiDate("2013-02-07"), "20130207");
+    assert.throws(() => normalizeGiDate("20130230"), /유효하지/);
+    ok("지리적표시는 키·등록일, 농사로는 키 누락 시 명확한 에러로 실패함");
   }
 
   console.log("9-1) dataGoKrClient.callAllPages — totalCount까지 페이지 순회");
@@ -281,23 +290,69 @@ async function run() {
     ok("한 페이지를 초과하는 목록도 totalCount까지 모두 수집됨");
   }
 
-  console.log("10) giClient — baseUrl 지정 시 정상 매핑");
+  console.log("10) giClient — MAFRA URL 경로·Grid 응답 매핑");
   {
-    const fakeFetch = async () => ({
-      ok: true,
-      status: 200,
-      json: async () => ({
-        response: {
-          header: { resultCode: "00", resultMsg: "OK" },
-          body: { totalCount: 1, items: { item: { registNo: "1", registName: "보성녹차", registArea: "전라남도 보성군" } } },
-        },
+    const requestedUrls = [];
+    const fakeFetch = async (url) => {
+      requestedUrls.push(url);
+      const date = new URL(url).searchParams.get("REGIST_NO_REGIST_DE");
+      const rows = date === "20130207"
+        ? [{
+            ROW_NUM: 1,
+            REGIST_REQST_PBLANC_NO: "2012-40",
+            GGRPH_INDICT_KOREAN_NM: "안성배",
+            GGRPH_INDICT_ENG_NM: "Anseong Bae(Pear)",
+            REGIST_NO_REGIST_DE: "20130207",
+            GRP_NM: "생산자연합회",
+            TRGET_AREA: "행정구역상 경기도 안성시 일원",
+            PRDCTN_PLAN_QY: "2,400톤",
+            GGRPH_INDICT_SFE: "특징",
+            HMPG_IMAGE_FILE_NO: "266",
+          }]
+        : [];
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          [GI_DATASET]: {
+            totalCnt: rows.length,
+            result: { code: "INFO-000", message: "정상 처리되었습니다." },
+            row: rows,
+          },
+        }),
+      };
+    };
+    const gi = createGiClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const rows = await gi.listRegistrations({ registrationDates: ["20130207", "20260810"] });
+    assert.strictEqual(rows.length, 1);
+    assert.strictEqual(rows[0].registrationNumber, "2012-40");
+    assert.strictEqual(rows[0].registeredName, "안성배");
+    assert.strictEqual(rows[0].region, "행정구역상 경기도 안성시 일원");
+    assert.strictEqual(rows[0].organizationName, "생산자연합회");
+    assert.ok(rows[0].raw.GGRPH_INDICT_SFE);
+    assert.strictEqual(requestedUrls.length, 2);
+    assert.ok(requestedUrls[0].startsWith(`${GI_BASE_URL}/test-key/json/${GI_DATASET}/1/1000?`));
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("REGIST_NO_REGIST_DE"), "20130207");
+    assert.ok(maskSensitiveUrl(requestedUrls[0]).includes("/openapi/***/json/"));
+    assert.strictEqual(maskSensitiveUrl(requestedUrls[0]).includes("test-key"), false);
+    ok("발급키 URL 경로와 필수 등록일을 구성하고 Grid 필드를 표준 모델로 매핑함");
+  }
+
+  console.log("10-0) giClient — HTTP 200 내부 API 오류 감지");
+  {
+    const gi = createGiClient({
+      apiKey: "bad-key",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ result: { code: "INFO-100", message: "인증키가 유효하지 않습니다." } }),
       }),
     });
-    const gi = createGiClient({ apiKey: "test-key", baseUrl: "http://apis.data.go.kr/x/GeoIndi", fetchImpl: fakeFetch });
-    const rows = await gi.listRegistrations();
-    assert.strictEqual(rows[0].registeredName, "보성녹차");
-    assert.strictEqual(rows[0].region, "전라남도 보성군");
-    ok("응답 필드를 registeredName/region 등으로 정상 매핑, raw 원본도 보존");
+    await assert.rejects(
+      () => gi.listRegistrations({ registrationDates: ["20130207"] }),
+      /\[INFO-100\] 인증키가 유효하지 않습니다/
+    );
+    ok("HTTP 200이어도 MAFRA result.code가 INFO-000이 아니면 실패 처리됨");
   }
 
   console.log("10-1) nongsaroClient — 공식 XML 계약 파싱 + 샘플 제한");
@@ -393,8 +448,10 @@ async function run() {
     const gi = getSourceDefinition("gi", registry);
     const nongsaro = getSourceDefinition("nongsaro", registry);
     assert.strictEqual(gi.authentication.keyEnv, "GI_API_KEY");
-    assert.strictEqual(gi.quota.type, "provider_policy");
+    assert.strictEqual(gi.authentication.defaultBaseUrl, GI_BASE_URL);
+    assert.strictEqual(gi.quota.type, "provider_documented_unlimited");
     assert.ok(gi.catalogUrl.startsWith("https://www.data.go.kr/"));
+    assert.strictEqual(gi.implementation.status, "live_key_validated");
     assert.deepStrictEqual(nongsaro.formats, ["XML"]);
     assert.strictEqual(nongsaro.implementation.status, "xml_sample_validated_live_key_required");
     ok("소스별 공식 URL·환경변수·포맷·할당량 확인 상태를 레지스트리에서 조회 가능");

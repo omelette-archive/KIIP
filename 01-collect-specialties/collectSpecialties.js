@@ -8,9 +8,9 @@
  *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro --out <path>
  *
  * 소스:
- *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY, GI_API_BASE_URL 필요)
+ *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY 필요)
  *   nongsaro  농촌진흥청 지역특산물 (NONGSARO_API_KEY, NONGSARO_API_BASE_URL 필요)
- * 두 소스 모두 data.go.kr 활용신청 승인이 필요 — 키/baseUrl이 없으면 해당 소스만 건너뛰고
+ * 두 소스 모두 제공기관 활용신청 승인이 필요 — 키가 없으면 해당 소스만 건너뛰고
  * 경고를 남긴다(전체 실패시키지 않음).
  */
 
@@ -18,7 +18,7 @@ const fs = require("fs");
 const path = require("path");
 const { loadEnv } = require("./lib/loadEnv");
 const { loadAdminCodes } = require("./lib/adminCodes");
-const { createClient: createGiClient } = require("./lib/giClient");
+const { createClient: createGiClient, normalizeDate: normalizeGiDate } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
@@ -50,10 +50,61 @@ function printUsageAndExit(message) {
       "  --sources <목록>   콤마로 구분된 소스 목록 (기본 gi,nongsaro)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
       "  --limit <n>        소스별 최대 수집 건수 (샘플 검증용)",
+      "  --gi-date <목록>    GI 등록일 YYYYMMDD 목록 (콤마 구분, 기본: 한국시간 오늘)",
+      "  --gi-from <날짜>    GI 누락 복구 시작일 YYYYMMDD (--gi-to와 함께 사용)",
+      "  --gi-to <날짜>      GI 누락 복구 종료일 YYYYMMDD (양끝 포함)",
+      "  --gi-max-days <n>   GI 범위 조회 보호 상한 (기본 31, 최대 366)",
       "  --allow-empty      모든 소스가 실패해도 빈 CSV를 쓰고 성공 처리",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
+}
+
+function currentKstDate() {
+  return new Date(Date.now() + 9 * 60 * 60 * 1000).toISOString().slice(0, 10).replace(/-/g, "");
+}
+
+function giDateToUtc(date) {
+  const normalized = normalizeGiDate(date);
+  return new Date(Date.UTC(
+    Number(normalized.slice(0, 4)),
+    Number(normalized.slice(4, 6)) - 1,
+    Number(normalized.slice(6, 8))
+  ));
+}
+
+function resolveGiRegistrationDates(args) {
+  const explicit = args["gi-date"];
+  const from = args["gi-from"];
+  const to = args["gi-to"];
+  if (explicit && (from || to)) {
+    throw new Error("--gi-date와 --gi-from/--gi-to는 동시에 사용할 수 없습니다.");
+  }
+  if ((from && !to) || (!from && to)) {
+    throw new Error("--gi-from과 --gi-to는 함께 지정해야 합니다.");
+  }
+  if (explicit) {
+    const dates = String(explicit).split(",").map((date) => normalizeGiDate(date.trim()));
+    return [...new Set(dates)];
+  }
+  if (!from && !to) return [currentKstDate()];
+
+  const maxDays = args["gi-max-days"] === undefined ? 31 : Number(args["gi-max-days"]);
+  if (!Number.isInteger(maxDays) || maxDays < 1 || maxDays > 366) {
+    throw new Error("--gi-max-days는 1~366 정수여야 합니다.");
+  }
+  const start = giDateToUtc(from);
+  const end = giDateToUtc(to);
+  if (start > end) throw new Error("--gi-from은 --gi-to보다 늦을 수 없습니다.");
+  const dayCount = Math.floor((end - start) / 86400000) + 1;
+  if (dayCount > maxDays) {
+    throw new Error(`GI 범위 조회는 ${maxDays}일을 초과할 수 없습니다. 범위를 나눠 실행하세요.`);
+  }
+  const dates = [];
+  for (let cursor = start; cursor <= end; cursor = new Date(cursor.getTime() + 86400000)) {
+    dates.push(cursor.toISOString().slice(0, 10).replace(/-/g, ""));
+  }
+  return dates;
 }
 
 function csvEscape(value) {
@@ -76,7 +127,10 @@ async function collectGi(adminList, warnings, options = {}) {
       apiKey: process.env.GI_API_KEY,
       baseUrl: process.env.GI_API_BASE_URL,
     });
-    const registrations = await client.listRegistrations({ numOfRows: 200, limit: options.limit });
+    const registrations = await client.listRegistrations({
+      registrationDates: options.giRegistrationDates,
+      limit: options.limit,
+    });
     const { rows, warnings: w } = fromGiRegistrations(registrations, adminList);
     warnings.push(...w);
     return { rows, succeeded: true };
@@ -115,6 +169,13 @@ async function main() {
   if (limit !== undefined && (!Number.isInteger(limit) || limit < 1)) {
     printUsageAndExit("--limit 는 1 이상의 정수여야 합니다.");
   }
+  const giRegistrationDates = sources.includes("gi") ? resolveGiRegistrationDates(args) : [];
+  if (giRegistrationDates.length) {
+    console.error(
+      `[collectSpecialties] GI 등록일 조회 ${giRegistrationDates.length}일 ` +
+      `(${giRegistrationDates[0]}~${giRegistrationDates[giRegistrationDates.length - 1]})`
+    );
+  }
 
   const adminList = loadAdminCodes();
   console.error(`[collectSpecialties] 법정동코드 마스터 ${adminList.length.toLocaleString()}건 로드`);
@@ -129,7 +190,10 @@ async function main() {
       warnings.push(`알 수 없는 소스: ${source}`);
       continue;
     }
-    const { rows: sourceRows, succeeded } = await collector(adminList, warnings, { limit });
+    const { rows: sourceRows, succeeded } = await collector(adminList, warnings, {
+      limit,
+      giRegistrationDates,
+    });
     if (succeeded) succeededSources++;
     console.error(`[collectSpecialties] ${source} (${definition.name}) -> ${sourceRows.length}행`);
     rows = rows.concat(sourceRows);

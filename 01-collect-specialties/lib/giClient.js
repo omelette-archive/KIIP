@@ -1,57 +1,167 @@
 "use strict";
+
 /**
- * 국립농산물품질관리원 지리적표시 등록정보 OpenAPI(data.go.kr) 클라이언트.
- * 참고: https://www.data.go.kr/data/15080629/openapi.do ("등록번호, 등록명칭, 등록일자,
- * 대상지역" 등 관리 — 지역+특산품이 이미 1:1로 짝지어진 공식 데이터, 현재 193건 등록).
+ * 농림축산식품 공공데이터포털의 국립농산물품질관리원 지리적표시 등록정보 클라이언트.
  *
- * ⚠️ 같은 데이터의 CSV 직접 다운로드(data.mafra.go.kr)는 실제로 시도해봤으나 다운로드
- * 엔드포인트가 "서비스 장애"를 반환해 막혀있었다 — 그래서 OpenAPI 경로로 전환.
- *
- * ⚠️ 활용신청 승인 전까지는 정확한 baseUrl/오퍼레이션명/응답 필드명을 확인할 방법이 없다.
- * 아래 값은 확정된 게 아니라 승인 후 마이페이지에서 반드시 재확인해야 한다 — 임의로
- * 지어낸 기관코드를 넣지 않고, 호출 시점에 baseUrl을 넘기지 않으면 바로 에러가 나도록
- * 만들어뒀다.
+ * 실제 계약은 data.go.kr 공통 serviceKey 형식이 아니라 다음 MAFRA LINK API 형식이다.
+ *   /openapi/{API_KEY}/{TYPE}/{API_URL}/{START_INDEX}/{END_INDEX}
+ * 응답 본문은 Grid_20141225000000000157_1.row 배열이며 REGIST_NO_REGIST_DE가 필수다.
  */
 
-const { createClient: createDataGoKrClient } = require("./dataGoKrClient");
+const { fetchWithRetry } = require("./fetchWithRetry");
 
-function createClient({ apiKey, baseUrl, operation = "getGeoIndiCertInfoList", fetchImpl } = {}) {
-  const client = createDataGoKrClient({ apiKey, fetchImpl });
+const DEFAULT_BASE_URL = "http://211.237.50.150:7080/openapi";
+const DEFAULT_DATASET = "Grid_20141225000000000157_1";
+const MAX_PAGE_SIZE = 1000;
 
-  /**
-   * 기본적으로 totalCount까지 모든 페이지를 순회해서 전체 목록을 가져온다
-   * (193건 정도라 한 번에 다 받아도 부담 없음). maxItems를 두고 싶으면 limit을,
-   * 한 페이지만 보고 싶으면 { allPages:false, pageNo, numOfRows }를 넘긴다.
-   * @param {{pageNo?:number, numOfRows?:number, limit?:number, baseUrl?:string, allPages?:boolean}} [p]
-   * @returns {Promise<{registrationNumber:string, registeredName:string, region:string, registrationDate:string, raw:object}[]>}
-   */
-  async function listRegistrations(p = {}) {
-    const effectiveBaseUrl = p.baseUrl || baseUrl;
-    const result =
-      p.allPages === false
-        ? await client.callOperation({
-            baseUrl: effectiveBaseUrl,
-            operation,
-            params: { pageNo: p.pageNo || 1, numOfRows: p.numOfRows || 100 },
-          })
-        : await client.callAllPages({
-            baseUrl: effectiveBaseUrl,
-            operation,
-            pageNo: p.pageNo || 1,
-            numOfRows: p.numOfRows || 100,
-            maxItems: p.limit,
-          });
-    // 필드명은 활용가이드 확인 전까지 추정치라 여러 후보를 시도하고, raw로 원본도 함께 남긴다.
-    return result.items.map((item) => ({
-      registrationNumber: item.registNo || item.regNo || item.registrationNumber || "",
-      registeredName: item.registName || item.prdlstNm || item.registeredName || "",
-      region: item.registArea || item.area || item.region || "",
-      registrationDate: item.registDate || item.regDate || item.registrationDate || "",
-      raw: item,
-    }));
+function normalizeDate(value) {
+  const date = String(value || "").replace(/-/g, "");
+  if (!/^\d{8}$/.test(date)) {
+    throw new Error(`GI 등록일은 YYYYMMDD 형식이어야 합니다: ${value || "(빈 값)"}`);
   }
-
-  return { listRegistrations };
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(4, 6));
+  const day = Number(date.slice(6, 8));
+  const parsed = new Date(Date.UTC(year, month - 1, day));
+  if (
+    parsed.getUTCFullYear() !== year ||
+    parsed.getUTCMonth() !== month - 1 ||
+    parsed.getUTCDate() !== day
+  ) {
+    throw new Error(`GI 등록일이 유효하지 않습니다: ${value}`);
+  }
+  return date;
 }
 
-module.exports = { createClient };
+function buildRequestUrl({
+  apiKey,
+  baseUrl = DEFAULT_BASE_URL,
+  dataset = DEFAULT_DATASET,
+  startIndex = 1,
+  endIndex = 1000,
+  registrationDate,
+  registeredName,
+}) {
+  if (!apiKey) throw new Error("농식품 공공데이터포털 API 인증키(GI_API_KEY)가 필요합니다.");
+  const date = normalizeDate(registrationDate);
+  if (!Number.isInteger(startIndex) || startIndex < 1) {
+    throw new Error("GI START_INDEX는 1 이상의 정수여야 합니다.");
+  }
+  if (!Number.isInteger(endIndex) || endIndex < startIndex || endIndex - startIndex + 1 > MAX_PAGE_SIZE) {
+    throw new Error(`GI END_INDEX는 START_INDEX 이상이고 한 번에 ${MAX_PAGE_SIZE}건 이하여야 합니다.`);
+  }
+
+  const root = String(baseUrl || DEFAULT_BASE_URL).replace(/\/+$/, "");
+  const url = new URL(
+    `${root}/${encodeURIComponent(apiKey)}/json/${encodeURIComponent(dataset)}/${startIndex}/${endIndex}`
+  );
+  url.searchParams.set("REGIST_NO_REGIST_DE", date);
+  if (registeredName) url.searchParams.set("GGRPH_INDICT_KOREAN_NM", String(registeredName));
+  return url.toString();
+}
+
+function parseResponse(json, dataset = DEFAULT_DATASET) {
+  const payload = json && (json[dataset] || json);
+  const result = (payload && payload.result) || {};
+  const code = result.code || "";
+  const message = result.message || "응답 메시지 없음";
+  if (code !== "INFO-000") {
+    throw new Error(`MAFRA GI API 오류 [${code || "UNKNOWN"}] ${message}`);
+  }
+  const rawRows = payload && payload.row;
+  const rows = Array.isArray(rawRows) ? rawRows : rawRows ? [rawRows] : [];
+  return { totalCount: Number(payload.totalCnt) || 0, rows };
+}
+
+function mapRegistration(row) {
+  return {
+    registrationNumber: row.REGIST_REQST_PBLANC_NO || "",
+    registeredName: row.GGRPH_INDICT_KOREAN_NM || "",
+    registeredNameEnglish: row.GGRPH_INDICT_ENG_NM || "",
+    registrationDate: row.REGIST_NO_REGIST_DE || "",
+    organizationName: row.GRP_NM || "",
+    region: row.TRGET_AREA || "",
+    plannedQuantity: row.PRDCTN_PLAN_QY || "",
+    description: row.GGRPH_INDICT_SFE || "",
+    imageFileNumber: row.HMPG_IMAGE_FILE_NO || "",
+    raw: row,
+  };
+}
+
+function createClient({ apiKey, baseUrl = DEFAULT_BASE_URL, dataset = DEFAULT_DATASET, fetchImpl } = {}) {
+  if (!apiKey) throw new Error("농식품 공공데이터포털 API 인증키(GI_API_KEY)가 필요합니다.");
+
+  async function fetchPage({ registrationDate, startIndex, endIndex, registeredName }) {
+    const url = buildRequestUrl({
+      apiKey,
+      baseUrl,
+      dataset,
+      startIndex,
+      endIndex,
+      registrationDate,
+      registeredName,
+    });
+    const response = await fetchWithRetry(url, {}, fetchImpl);
+    if (!response.ok) throw new Error(`MAFRA GI API HTTP 오류 (${response.status})`);
+    let json;
+    try {
+      json = await response.json();
+    } catch {
+      throw new Error("MAFRA GI API 응답이 JSON 형식이 아닙니다.");
+    }
+    return parseResponse(json, dataset);
+  }
+
+  /**
+   * 지정한 등록일 목록을 순서대로 조회한다. API가 REGIST_NO_REGIST_DE 완전일치를 필수로
+   * 요구하므로 전체 목록 무필터 호출은 지원하지 않는다.
+   * @param {{registrationDates:string[], limit?:number, pageSize?:number, registeredName?:string}} options
+   */
+  async function listRegistrations({ registrationDates, limit, pageSize = MAX_PAGE_SIZE, registeredName } = {}) {
+    const dates = [...new Set((registrationDates || []).map(normalizeDate))];
+    if (dates.length === 0) throw new Error("GI 조회 등록일(registrationDates)이 최소 1개 필요합니다.");
+    if (!Number.isInteger(pageSize) || pageSize < 1 || pageSize > MAX_PAGE_SIZE) {
+      throw new Error(`GI pageSize는 1~${MAX_PAGE_SIZE} 정수여야 합니다.`);
+    }
+    const itemLimit = limit === undefined ? null : Number(limit);
+    if (itemLimit !== null && (!Number.isInteger(itemLimit) || itemLimit < 1)) {
+      throw new Error("GI limit은 1 이상의 정수여야 합니다.");
+    }
+
+    const registrations = [];
+    for (const registrationDate of dates) {
+      let startIndex = 1;
+      while (true) {
+        const remaining = itemLimit === null ? pageSize : Math.min(pageSize, itemLimit - registrations.length);
+        if (remaining <= 0) return registrations;
+        const endIndex = startIndex + remaining - 1;
+        const page = await fetchPage({ registrationDate, startIndex, endIndex, registeredName });
+        registrations.push(...page.rows.map(mapRegistration));
+        if (
+          page.rows.length === 0 ||
+          startIndex + page.rows.length - 1 >= page.totalCount ||
+          page.rows.length < remaining ||
+          (itemLimit !== null && registrations.length >= itemLimit)
+        ) {
+          break;
+        }
+        startIndex = endIndex + 1;
+      }
+      if (itemLimit !== null && registrations.length >= itemLimit) break;
+    }
+    return itemLimit === null ? registrations : registrations.slice(0, itemLimit);
+  }
+
+  return { fetchPage, listRegistrations };
+}
+
+module.exports = {
+  DEFAULT_BASE_URL,
+  DEFAULT_DATASET,
+  MAX_PAGE_SIZE,
+  buildRequestUrl,
+  createClient,
+  mapRegistration,
+  normalizeDate,
+  parseResponse,
+};
