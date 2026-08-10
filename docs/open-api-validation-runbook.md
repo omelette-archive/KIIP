@@ -211,7 +211,10 @@ node 01-collect-specialties/collectSpecialties.js `
 
 1. 농사로 공공데이터 목록에서 서비스명 `브랜드`로 검색한다.
 2. `지역 브랜드` 행의 샘플은 `areaBrand`, 공식 매뉴얼은 `areaBrand.zip`이다.
-3. 샘플의 첫 operation은 `selectSclCodeLst`다.
+3. 샘플의 첫 operation은 `selectSclCodeLst`인데, 이건 **실제 브랜드 목록이 아니라 품목
+   대분류 코드표**다(공통·식량작물·채소류·과채류·과실류·축산물·특작류·화훼류·농산가공·기타
+   10개 코드). 진짜 602건 목록을 주는 operation은 같은 서비스의 `areaBrandLst`다
+   (2026-08-10 교차검증, 이슈 #24 코멘트).
 
 공식 자료:
 
@@ -219,24 +222,31 @@ node 01-collect-specialties/collectSpecialties.js `
   <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344>
 - 공식 매뉴얼 ZIP: <https://www.nongsaro.go.kr/portal/apiManual/areaBrand.zip>
 - service base: `https://api.nongsaro.go.kr/service/areaBrand`
-- 검증 operation: `selectSclCodeLst`
+- 코드표 operation: `selectSclCodeLst` (품목 대분류 코드, 참고용)
+- **목록 operation: `areaBrandLst`** (실제 602건 데이터)
 
 ### 실키 결과
 
-`NONGSARO_LOCAL_BRAND_API_KEY`로 다음 요청 계약을 확인했다.
+`NONGSARO_LOCAL_BRAND_API_KEY`로 두 operation 모두 다음 요청 계약을 확인했다.
 
 ```text
 HTTP status       200
 resultCode        00
 resultMsg         정상적으로 처리되었습니다.
 응답              XML
-확인 필드         code, codeNm
 ```
 
-공개 화면에는 지역, 브랜드명, 등록번호, 출원번호, 등록일, 주요품목이 표시된다. 이 데이터는
-특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 데이터이므로 ① 특산물 목록에 바로 섞지
-않는다. 등록/출원번호로 KIPRIS 결과를 조인하고 #11 지역 검증·#12 품목 대조를 보강하는 설계는
-#24에서 진행한다.
+`selectSclCodeLst` 확인 필드: `code`, `codeNm`(품목 대분류 코드/명).
+
+`areaBrandLst` 확인 필드: `aplcnoInfo`(출원번호 — **KIPRIS `applicationNumber`와 동일 포맷**,
+예: `4020190126184`), `rgnoInfo`(등록번호), `brandRgsde`(브랜드 등록일), `cntntsSj`(브랜드명),
+`mainPrdlstNm`(주요 품목명), `signguNm`(지역명 — 응답 안에서 시군구/광역 표기가 섞여 나와 정규화
+필요), `totalCount`(602, 공개 화면 수치와 일치).
+
+이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 데이터이므로 ① 특산물 목록에
+바로 섞지 않는다. `aplcnoInfo`가 KIPRIS 출원번호와 같은 포맷이라, 이 602건에 한해 ③ 결과와
+출원번호로 직접 조인해 #11(지역 매칭)의 그라운드 트루스로 쓸 수 있어 보인다. 조인·품목 대조
+설계는 #24에서 진행한다.
 
 ## 7. 생성된 로컬 검증 산출물
 

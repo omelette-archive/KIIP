@@ -133,6 +133,9 @@ function createCollectionStore(dbPath) {
     SELECT id, current_payload_hash, current_version
     FROM specialty_raw_records WHERE source_id = ? AND source_record_key = ?
   `);
+  const findVersionByHash = db.prepare(`
+    SELECT version FROM specialty_raw_versions WHERE raw_record_id = ? AND payload_hash = ?
+  `);
   const insertRecord = db.prepare(`
     INSERT INTO specialty_raw_records (
       source_id, source_record_key, current_payload_hash, current_version,
@@ -196,17 +199,26 @@ function createCollectionStore(dbPath) {
           touchRecord.run(seenAt, runId, existing.id);
           counts.unchanged++;
         } else {
-          const nextVersion = Number(existing.current_version) + 1;
-          insertVersion.run(
-            existing.id,
-            nextVersion,
-            payloadHash,
-            rawJson,
-            normalizedJson,
-            seenAt,
-            runId
-          );
-          updateRecord.run(payloadHash, nextVersion, seenAt, runId, existing.id);
+          // 내용이 과거 어느 버전과 정확히 같은 값으로 되돌아간 경우, 그 버전 번호를 그대로
+          // 재사용한다 — payload_hash는 raw_record_id 안에서 유일해야 하므로(중복 내용을 두 번
+          // 남기지 않음) 새 버전을 또 만들면 UNIQUE(raw_record_id, payload_hash) 제약을 어겨
+          // 전체 실행이 실패한다. current_version이 예전 번호로 "되돌아갈" 수 있다.
+          const reused = findVersionByHash.get(existing.id, payloadHash);
+          if (reused) {
+            updateRecord.run(payloadHash, reused.version, seenAt, runId, existing.id);
+          } else {
+            const nextVersion = Number(existing.current_version) + 1;
+            insertVersion.run(
+              existing.id,
+              nextVersion,
+              payloadHash,
+              rawJson,
+              normalizedJson,
+              seenAt,
+              runId
+            );
+            updateRecord.run(payloadHash, nextVersion, seenAt, runId, existing.id);
+          }
           counts.updated++;
         }
       }
