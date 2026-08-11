@@ -34,8 +34,9 @@ Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
 읽는다. 저장한 목록은 ③의 `--area-brands` 옵션으로 KIPRIS 결과에 완전일치 조인할 수 있으며,
 ④에서는 출원인 주소와 분리된 `regionalBrand*` 지표로 반영한다.
 
-등록원부 키는 `03-match-trademarks/enrichIpRegistry.js`만 사용한다. 공공데이터포털에서 받은
-키라도 기존 `DATA_GO_KR_API_KEY`와 용도를 섞지 않고 별도 변수명으로 보존한다.
+등록원부 키는 `03-match-trademarks/matchTrademarks.js --enrich-registry` 또는 별도
+`enrichIpRegistry.js`에서만 사용한다. 공공데이터포털에서 받은 키라도 기존
+`DATA_GO_KR_API_KEY`와 용도를 섞지 않고 별도 변수명으로 보존한다.
 
 ## 취급 규칙
 

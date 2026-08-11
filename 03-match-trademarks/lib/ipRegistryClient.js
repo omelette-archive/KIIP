@@ -28,6 +28,23 @@ function normalizeRegistrationNumber(value) {
   return clean(value).replace(/\D/g, "");
 }
 
+function withCompatibilityFields(record, item = {}) {
+  const firstApplicant = record.applicants?.[0] || {};
+  const firstOwner = asArray(item.owner)[0] || {};
+  return {
+    ...record,
+    title: clean(item.title) || null,
+    applicantAddr: firstApplicant.address || null,
+    applicantName: clean(asArray(item.applicant)[0]?.applicantName) || null,
+    ownerAddr: clean(firstOwner.ownerAddr) || null,
+    ownerName: clean(firstOwner.ownerName) || null,
+    productList: (record.products || []).map((row) => ({
+      productClsCd: row.classCode,
+      desProduct: row.designatedProductName,
+    })),
+  };
+}
+
 function parseMarkHistoryResponse(parsed) {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("등록원부 응답이 JSON 객체가 아닙니다.");
@@ -56,7 +73,7 @@ function parseMarkHistoryResponse(parsed) {
       designatedProductName: clean(row?.desProduct) || null,
     }))
     .filter((row) => row.classCode || row.designatedProductName);
-  return {
+  return withCompatibilityFields({
     found: true,
     resultCode,
     resultMsg,
@@ -66,38 +83,57 @@ function parseMarkHistoryResponse(parsed) {
     registrationDate: clean(item.rgstDate) || null,
     applicants,
     products,
-  };
+  }, item);
+}
+
+function summarizeMarkHistory(items) {
+  return parseMarkHistoryResponse({
+    resultCode: "000",
+    resultMsg: "REQUEST_SUCCESS",
+    totalCount: items ? 1 : 0,
+    items,
+  });
 }
 
 function createClient({
   apiKey = process.env.IP_REGISTRY_API_KEY,
   baseUrl = process.env.IP_REGISTRY_API_BASE_URL || DEFAULT_BASE_URL,
   fetchImpl,
+  onRequest,
 } = {}) {
   if (!apiKey) {
     throw new Error("등록원부 API 인증키가 필요합니다. .env 의 IP_REGISTRY_API_KEY를 설정하세요.");
   }
 
-  async function getMarkHistory({ registrationNumber }) {
+  async function getMarkHistory(input) {
+    const registrationNumber =
+      input && typeof input === "object" ? input.registrationNumber : input;
     const normalized = normalizeRegistrationNumber(registrationNumber);
     if (!normalized) throw new Error("getMarkHistory에는 registrationNumber가 필요합니다.");
     const url = new URL(`${baseUrl.replace(/\/$/, "")}/getMarkHistory`);
     url.searchParams.set("serviceKey", apiKey);
     url.searchParams.set("type", "json");
     url.searchParams.set("rgstNo", normalized);
+    if (onRequest) onRequest({ source: "ip_registry", registrationNumber: normalized });
     const response = await fetchWithRetry(
       url.toString(),
       { headers: { Accept: "application/json" } },
       fetchImpl
     );
     if (!response.ok) throw new Error(`getMarkHistory: API 오류 (${response.status})`);
-    const text = await response.text();
-    if (!text.trim()) throw new Error("getMarkHistory: 빈 응답");
     let parsed;
-    try {
-      parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
-    } catch {
-      throw new Error("getMarkHistory: JSON이 아닌 응답");
+    if (typeof response.text === "function") {
+      const text = await response.text();
+      if (!text.trim()) throw new Error("getMarkHistory: 빈 응답");
+      try {
+        parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
+      } catch {
+        throw new Error("getMarkHistory: JSON이 아닌 응답");
+      }
+    } else if (typeof response.json === "function") {
+      parsed = await response.json();
+    } else {
+      throw new Error("getMarkHistory: JSON 응답을 읽을 수 없습니다.");
     }
     return parseMarkHistoryResponse(parsed);
   }
@@ -113,4 +149,5 @@ module.exports = {
   createClient,
   normalizeRegistrationNumber,
   parseMarkHistoryResponse,
+  summarizeMarkHistory,
 };

@@ -90,7 +90,8 @@ node 03-match-trademarks/enrichIpRegistry.js \
   --out 03-match-trademarks/output/area-brand-ip-registry-sample.json
 ```
 
-기본 호출 상한은 등록번호 3개다. 2026-08-11 실키 결과는 등록번호 고유 13개 중 3개 요청,
+별도 보강 CLI의 기본 호출 상한은 등록번호 3개다. 2026-08-11 실키 결과는 등록번호 고유
+13개 중 3개 요청,
 성공 3·오류 0·미수집 10이었다. 출원인 주소 판정은 inside 2·outside 0·unverified 1,
 지정상품은 세 건 모두 `class_only` 후보였다. 이는 샘플 기술 검증이며 전체 분포가 아니다.
 
@@ -98,7 +99,7 @@ node 03-match-trademarks/enrichIpRegistry.js \
 
 - 수집 JSON: `contractVersion`, `sourceMetadata`, `fetchedAt`
 - ③ JSON: `trademarkSourceMetadata`, 입력별 `provenance`, `regionalBrandValidation`,
-  `ipRegistryValidation`
+  `ipRegistryEnrichment`
 - 조인된 hit: `regionalBrandMatchVersion`, `regionalBrandMatchSource`,
   `regionalBrandEvidence`
 - 등록원부 보강 hit: `applicantRegionMatch*`, `applicantRegionEvidence`, `goodsMatch*`,
@@ -107,8 +108,8 @@ node 03-match-trademarks/enrichIpRegistry.js \
   `nongsaro-area-brand-v1`, 등록원부 `ip-registry-mark-history-v1`
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
-출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을
-보존한다. 키 값과 인증 URL은 저장하지 않는다.
+출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을 보존한다.
+출원인 전체 주소·키 값·인증 URL은 저장하지 않는다.
 
 ## 구조와 테스트
 
