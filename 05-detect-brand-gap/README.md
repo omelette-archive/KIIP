@@ -63,7 +63,7 @@ node 05-detect-brand-gap/detectBrandGap.js \
   generatedAt,
   sourceGeneratedAt,  // 입력으로 쓴 ④ 산출물의 generatedAt
   warnings,
-  rows,               // ④의 모든 지역×품목 행 + representative/gapScore/gapReason/regionMatchVerified
+  rows,               // ④의 모든 지역×품목 행 + representative/gapScore/gapReason/regionMatchVerified/partialQueryCount
   ranking             // rows 중 representative=true만 gapScore 내림차순
 }
 ```

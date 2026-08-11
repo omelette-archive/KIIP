@@ -85,6 +85,8 @@ function buildBriefing(row) {
       registrationRate: row.registrationRate,
       localApplicantShare: row.regionMatchVerified ? row.localApplicantShare : null,
       regionMatchVerified: row.regionMatchVerified,
+      // ⑥-2(#16) 후보 선정 조건: ③단계 상한에 걸려 부분 수집된 행인지 여부.
+      collectionPartial: (row.partialQueryCount || 0) > 0,
       scoreInputs: row.scoreInputs || null,
       sourceProvenance: row.sourceProvenance || [],
     },
