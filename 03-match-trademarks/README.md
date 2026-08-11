@@ -87,6 +87,7 @@ node 03-match-trademarks/matchTrademarks.js \
 node 03-match-trademarks/enrichIpRegistry.js \
   --input 03-match-trademarks/output/area-brand-validation-result.json \
   --limit 3 --concurrency 1 \
+  --cache 03-match-trademarks/output/ip-registry-cache.json \
   --out 03-match-trademarks/output/area-brand-ip-registry-sample.json
 ```
 
@@ -94,6 +95,13 @@ node 03-match-trademarks/enrichIpRegistry.js \
 13개 중 3개 요청,
 성공 3·오류 0·미수집 10이었다. 출원인 주소 판정은 inside 2·outside 0·unverified 1,
 지정상품은 세 건 모두 `class_only` 후보였다. 이는 샘플 기술 검증이며 전체 분포가 아니다.
+
+기본 영속 캐시는 `output/ip-registry-cache.json`이다. 성공한 등록번호의 응답은 다음 실행에서
+API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 `--limit`만큼 추가 조회한다. 캐시에는
+키·출원인 이름·전체 상세주소를 저장하지 않고 주소에서 정규화한 시도·시군구와 지정상품만
+보존한다. 등록번호가 아직 없는 출원·심사 중 상표는 이 등록원부 API의 조회 대상이 아니므로
+출원번호 기반 공식 주소 소스가 확보되기 전까지 `not_applicable`로 남는다. 캐시를 사용하지 않을
+때만 `--no-cache`를 명시한다.
 
 ## 출처와 버전 필드
 

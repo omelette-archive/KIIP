@@ -33,6 +33,7 @@ const {
   enrichHitsWithIpRegistry,
   ipRegistryValidationMetadata,
 } = require("./lib/ipRegistryEnricher");
+const { loadCache: loadIpRegistryCache, saveCache: saveIpRegistryCache } = require("./lib/ipRegistryCache");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
@@ -757,6 +758,62 @@ async function run() {
       "complete", "error", "not_collected", "not_collected",
     ]);
     ok("선택 상한과 실제 요청 수를 구분하고 회로 차단된 건을 미수집으로 기록");
+  }
+
+  console.log("12-1e) 등록원부 영속 캐시 — 성공 응답 누적·상세주소 비저장");
+  {
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let calls = 0;
+    const fakeClient = {
+      getMarkHistory: async ({ registrationNumber }) => {
+        calls++;
+        return summarizeMarkHistory({
+          rgstNo: registrationNumber,
+          applNo: `A${registrationNumber}`,
+          applicant: [{ applicantAddr: "강원특별자치도 양양군 상세주소 123" }],
+          productList: [{ productClsCd: "31", desProduct: "신선한사과" }],
+        });
+      },
+    };
+    const document = {
+      results: [{
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+        hits: ["1", "2"].map((registrationNumber) => ({ registrationNumber })),
+      }],
+    };
+    const entries = new Map();
+    const first = await enrichDocument(document, fakeClient, {
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: entries,
+      adminList,
+    });
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(first.ipRegistryEnrichment.completeRegistrationCount, 1);
+    assert.strictEqual(entries.get("1").record.applicants[0].address, "강원특별자치도 양양군");
+    assert.ok(!JSON.stringify(entries.get("1")).includes("상세주소"));
+
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-registry-cache-"));
+    const cachePath = path.join(cacheDir, "cache.json");
+    saveIpRegistryCache(cachePath, entries, "2026-08-11T00:00:00.000Z");
+    const reloaded = loadIpRegistryCache(cachePath);
+    const second = await enrichDocument(document, fakeClient, {
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: reloaded,
+      adminList,
+    });
+    assert.strictEqual(calls, 2, "등록번호 1은 캐시 재사용, 미수집 등록번호 2만 추가 호출");
+    assert.strictEqual(second.ipRegistryEnrichment.cachedRegistrationCount, 1);
+    assert.strictEqual(second.ipRegistryEnrichment.newlyCompleteRegistrationCount, 1);
+    assert.strictEqual(second.ipRegistryEnrichment.completeRegistrationCount, 2);
+    assert.strictEqual(second.ipRegistryEnrichment.notCollectedRegistrationCount, 0);
+    assert.deepStrictEqual(
+      second.results[0].hits.map((hit) => hit.applicantRegionMatch),
+      ["inside", "inside"]
+    );
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    ok("성공 주소를 시도·시군구로만 영속 저장하고 다음 실행은 미수집 등록번호부터 조회함");
   }
 
   console.log("12-2) ipRegistryValidationMetadata — 요약 통계·기준 문서화");
