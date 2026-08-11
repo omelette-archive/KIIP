@@ -37,6 +37,7 @@
 | 기준 버전 | 기준 | 근거와 보수적 처리 |
 |---|---|---|
 | `specialty-normalization-rules-v1` | 정제명→`신선한`→`미가공` 순서의 고시명칭 정확 일치만 자동 확정 | 의미 추정에 의한 오분류를 막기 위해 부분·복수 일치는 사람 검토로 분리. 사전은 `kipo-notice-goods-13-2026` |
+| `specialty-normalization-rules-v2-approved-aliases` | v1 규칙 + `approved-aliases.json`의 사용자 승인 표현만 자동 확정 | 승인 2026-08-11, #51. 대상 고시명칭·NICE류·유사군코드가 `kipo-notice-goods-13-2026`과 일치하지 않으면 차단 |
 | `area-brand-region-normalization-v1` | 법정동코드의 시도·시군구 완전일치, 고유한 경우에만 시/군/구 접미사 복원 | `구미`→`구미시`처럼 후보가 하나일 때만 복원. `고성`처럼 복수 시도 후보면 `unverified` |
 | `area-brand-application-region-join-v1` | 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`에서 숫자 외 문자를 제거한 뒤 완전일치 | 하이픈 표시 차이만 제거하며 이름·유사 문자열 조인은 하지 않음 |
 | `ip-registry-applicant-region-v1` | 등록원부 `applicantAddr`에 포함된 시도·시군구를 법정동코드로 완전 대조 | 복수·미매칭 주소는 추정하지 않고 `unverified`; 등록번호 없는 hit는 `not_applicable` |

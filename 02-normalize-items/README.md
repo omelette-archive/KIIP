@@ -72,7 +72,8 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
 
 모든 출력 행에는 재현을 위한 다음 메타데이터를 함께 기록한다.
 
-- `normalizationVersion`: 현재 규칙 `specialty-normalization-rules-v1`
+- `normalizationVersion`: 현재 규칙 `specialty-normalization-rules-v2-approved-aliases`
+- 사용자 승인 별칭: `data/approved-aliases.json`에 버전·승인일·이슈·고시명칭·NICE류·유사군코드를 기록합니다. 실행 시 고시 사전 계약이 일치하지 않으면 자동 확정하지 않고 검토대기로 되돌립니다.
 - `dictionaryVersion`: 현재 사전 `kipo-notice-goods-13-2026`
 - `dictionarySourceUrl`: 지식재산처 고시상품명칭 공식 페이지
 - `dictionaryDownloadedAt`: 현재 원본 다운로드일 `2026-08-05`

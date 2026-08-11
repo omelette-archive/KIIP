@@ -15,7 +15,7 @@ const path = require("path");
 const { loadDictionary, parseCsvLine } = require("./lib/noticeDictionary");
 const { normalizeByRules } = require("./lib/ruleNormalizer");
 
-const NORMALIZATION_VERSION = "specialty-normalization-rules-v1";
+const NORMALIZATION_VERSION = "specialty-normalization-rules-v2-approved-aliases";
 const DICTIONARY_VERSION = "kipo-notice-goods-13-2026";
 const DICTIONARY_SOURCE_URL = "https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120";
 const DICTIONARY_DOWNLOADED_AT = "2026-08-05";
