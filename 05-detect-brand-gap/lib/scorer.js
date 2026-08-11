@@ -3,15 +3,16 @@
  * ④의 지역×품목 집계만 입력으로 받는 결정론적 브랜드 공백 점수 계산. 생성형 AI를 쓰지
  * 않으며(이슈 #16), 동일 입력에는 항상 동일 점수를 낸다.
  *
- * "대표 특산품" 판정과 가중치는 사용자가 확정한 실제 기준이 아니라 파이프라인 배선을
- * 먼저 완성하기 위한 예시값이다 — 아래 상수에 명시적으로 모아두고 GAP_SCORE_VERSION으로
- * 버전을 남긴다. 실제 기준이 정해지면 이 파일만 바꾸면 되고, 산출물의 scoreVersion을 보면
- * 어떤 기준으로 나온 점수인지 항상 구분할 수 있다.
+ * "대표 특산품" 판정 기준은 2026-08-11 #29에서 확정됐다: GI 출처 등록 또는 상표 출원
+ * 3건 이상(OR) — GI 미등록이어도 출원 활동이 활발한 품목을 놓치지 않기 위함이다. 활용도
+ * 포화 건수·가중치는 아직 업무 확정 전 예시값이며, 실제 기준이 정해지면 이 파일만 바꾸면
+ * 된다. 산출물의 scoreVersion을 보면 어떤 기준으로 나온 점수인지 항상 구분할 수 있다.
  */
 
-// 예시 기준 — 실제 업무 기준이 확정될 때 이 상수와 scoreVersion을 함께 교체한다.
-// 지금은 ①단계에서 지리적표시(GI) 등록으로 수집된 품목만 대표성이 있다고 본다.
+// 2026-08-11 #29에서 확정: ①단계 수집 출처가 지리적표시(GI) 등록이거나(OR),
+// REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD 이상의 상표 출원이 있으면 대표 특산품으로 본다.
 const REPRESENTATIVE_SOURCES = ["지리적표시"];
+const REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD = 3;
 
 // 예시 기준 — 상표 5건(고유 출원 기준) 이상이면 "활용도 충분"으로 간주해 activityScore가
 // 1(포화)에 도달하게 하는 임의 상한. 실측 근거 없는 잠정값이다.
@@ -22,7 +23,7 @@ const ACTIVITY_SATURATION_COUNT = 5;
 const ACTIVITY_WEIGHT = 0.7;
 const REGISTRATION_WEIGHT = 0.3;
 
-const GAP_SCORE_VERSION = "gap-score-v0-example";
+const GAP_SCORE_VERSION = "gap-score-v1-representative-gi-or-count3";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -30,7 +31,10 @@ function clean(value) {
 
 function isRepresentative(bucket) {
   const sources = Array.isArray(bucket.sources) ? bucket.sources : [];
-  return sources.some((s) => REPRESENTATIVE_SOURCES.includes(s));
+  const hasRepresentativeSource = sources.some((s) => REPRESENTATIVE_SOURCES.includes(s));
+  const hasEnoughTrademarks =
+    (Number(bucket.uniqueTrademarkCount) || 0) >= REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
+  return hasRepresentativeSource || hasEnoughTrademarks;
 }
 
 function activityScore(bucket) {
@@ -56,7 +60,7 @@ function scoreBucket(bucket) {
     return {
       representative: false,
       gapScore: null,
-      gapReason: "대표 특산품 판정 기준(예시: 지리적표시 등록)을 충족하지 않음",
+      gapReason: `대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 ${REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD}건 이상)을 충족하지 않음`,
     };
   }
   const activity = activityScore(bucket);
@@ -79,6 +83,7 @@ function scoreBucket(bucket) {
 module.exports = {
   GAP_SCORE_VERSION,
   REPRESENTATIVE_SOURCES,
+  REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD,
   ACTIVITY_SATURATION_COUNT,
   ACTIVITY_WEIGHT,
   REGISTRATION_WEIGHT,

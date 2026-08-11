@@ -1,7 +1,9 @@
 # ⑤ 브랜드 공백(Brand Gap) 자동 발굴
 
-**상태**: 🟡 진행중 — 결정론적 점수 계산 파이프라인 배선 완료. **판정 기준·가중치는 예시값**이며
-실제 기준 확정 후 교체 예정(이슈 #29). 생성형 AI와 고정 계산의 분리는 이슈 #16을 따른다.
+**상태**: 🟡 진행중 — 결정론적 점수 계산 파이프라인 배선 완료. **"대표 특산품" 판정 기준은
+2026-08-11 #29에서 확정**(GI 출처 또는 상표 출원 3건 이상, OR). **활용도 포화 건수·가중치는
+아직 예시값**이며 실제 기준 확정 후 교체 예정(이슈 #29 잔여 범위). 생성형 AI와 고정 계산의
+분리는 이슈 #16을 따른다.
 
 지역 대표 특산품인데도 상표 활용이 저조한 곳을 찾아낸다.
 전체 기획은 [`docs/project-plan.md`](../docs/project-plan.md)의 ⑤ 참고.
@@ -12,24 +14,32 @@
 - 품목별 상표 활용도가 낮은 지역 자동 식별
 - 지역 브랜드 육성 우선순위 후보 도출 (생성형 AI는 이 단계에서 쓰지 않는다 — ⑥으로 분리)
 
-## ⚠️ 지금 기준은 예시값이다
+## 판정 기준과 확정 상태
 
-`lib/scorer.js` 상단에 다음 상수로 모아뒀다. 실제 업무 기준이 정해지면 이 파일만 바꾸면 되고,
-산출물의 `scoreVersion`으로 어떤 기준으로 나온 점수인지 항상 구분할 수 있다.
+`lib/scorer.js` 상단에 다음 상수로 모아뒀다. 산출물의 `scoreVersion`으로 어떤 기준으로 나온
+점수인지 항상 구분할 수 있다.
 
-| 상수 | 지금 값(예시) | 의미 |
-|---|---|---|
-| `REPRESENTATIVE_SOURCES` | `["지리적표시"]` | "대표 특산품" 판정 — ①단계 수집 출처가 지리적표시(GI) 등록인 것만 인정 |
-| `ACTIVITY_SATURATION_COUNT` | `5` | 고유 상표 건수가 이 값 이상이면 "활용도 충분(1.0)"으로 간주 |
-| `ACTIVITY_WEIGHT` / `REGISTRATION_WEIGHT` | `0.7` / `0.3` | 최종 점수에서 출원 활동량 대 등록 성사율의 비중 |
+| 상수 | 값 | 의미 | 확정 상태 |
+|---|---|---|---|
+| `REPRESENTATIVE_SOURCES` | `["지리적표시"]` | "대표 특산품" 판정 조건 1 — ①단계 수집 출처가 지리적표시(GI) 등록 | ✅ 확정(#29, 2026-08-11) |
+| `REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD` | `3` | "대표 특산품" 판정 조건 2 — 고유 상표 출원 3건 이상(조건 1과 OR) | ✅ 확정(#29, 2026-08-11) |
+| `ACTIVITY_SATURATION_COUNT` | `5` | 고유 상표 건수가 이 값 이상이면 "활용도 충분(1.0)"으로 간주 | 🟡 예시값, 미확정 |
+| `ACTIVITY_WEIGHT` / `REGISTRATION_WEIGHT` | `0.7` / `0.3` | 최종 점수에서 출원 활동량 대 등록 성사율의 비중 | 🟡 예시값, 미확정 |
 
-**지역 내·외 출원 비중(`localApplicantShare`)은 점수에 쓰지 않는다.** ③단계 출원인 주소
-매칭이 아직 없어(이슈 #11) 대부분 검증되지 않은 값이라, 점수에 섞으면 ③의 진행 상황에 따라
-같은 입력의 점수가 달라져 결정론성이 깨진다. `regionMatchVerified`로 참고만 할 수 있게 남긴다.
+GI 미등록이어도 상표 출원 활동이 활발한 품목을 놓치지 않기 위해 조건 1·2는 OR로 결합한다
+(둘 중 하나만 충족해도 대표). `gapReason`과 `methodology.representativeBasis`에 판정 근거를
+그대로 남긴다.
+
+**지역 내·외 출원 비중(`localApplicantShare`)은 아직 점수에 쓰지 않는다.** ③단계
+`--enrich-registry`(이슈 #11, 2026-08-11 연결)로 검증된 값만 신뢰할 수 있고, 미실행 입력은
+여전히 대부분 `unverified`다. 파이프라인 전체에 `--enrich-registry`가 기본 적용되기 전까지는
+점수에 섞으면 실행 시점에 따라 같은 입력의 점수가 달라져 결정론성이 깨진다.
+`regionMatchVerified`로 참고만 할 수 있게 남긴다.
 
 ## 계산 방식
 
-1. ④의 `regionItems` 각 버킷에 대해 `sources`에 `지리적표시`가 있으면 "대표 특산품"으로 판정
+1. ④의 `regionItems` 각 버킷에 대해 `sources`에 `지리적표시`가 있거나(OR) 고유 상표 출원이
+   `REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD`(3건) 이상이면 "대표 특산품"으로 판정
 2. 대표 특산품이 아니면 `gapScore: null` + 사유만 남기고 랭킹에서 제외
 3. 대표 특산품이면 `activityScore`(고유 상표 건수 기준)와 `registrationScore`(등록률, 결측은
    0) 를 0~1로 정규화해 가중합하고, `gapScore = 1 - 가중합`으로 계산 — 상표가 적을수록 1에
@@ -49,7 +59,7 @@ node 05-detect-brand-gap/detectBrandGap.js \
 ```text
 {
   schemaVersion,
-  scoreVersion,       // "gap-score-v0-example" — 기준 변경 시 문자열도 함께 바뀜
+  scoreVersion,       // "gap-score-v1-representative-gi-or-count3" — 기준 변경 시 문자열도 함께 바뀜
   generatedAt,
   sourceGeneratedAt,  // 입력으로 쓴 ④ 산출물의 generatedAt
   warnings,
@@ -70,10 +80,11 @@ node 05-detect-brand-gap/selftest.js
 ## 할 일
 
 - [x] 파이프라인 배선(④ 출력 → 결정론적 점수 → 랭킹) — 판정 기준은 예시값으로 우선 완주
-- [ ] "대표 특산품"의 실제 판정 기준 확정(#29, 예: 지리적표시 등록 여부, 언급 빈도 등) — 확정 후
-      `lib/scorer.js`의 `REPRESENTATIVE_SOURCES`만 교체
-- [ ] "상표 활용도" 지표·가중치 실제 기준 확정(#29)
-- [ ] 지역 내·외 비중을 점수에 포함할지는 이슈 #11(출원인 주소 조인) 완료 후 재검토
+- [x] "대표 특산품"의 실제 판정 기준 확정(#29, 2026-08-11) — GI 출처 또는 상표 출원 3건 이상(OR)
+- [ ] "상표 활용도" 지표(포화 건수)·가중치 실제 기준 확정(#29 잔여 범위)
+- [ ] `collectionStatus=partial` 데이터를 점수에 포함할지 결정(#29 잔여 범위)
+- [ ] 지역 내·외 비중(`localApplicantShare`)을 점수에 포함할지 — #11은 연결됐지만
+      `--enrich-registry`가 파이프라인 기본 실행에 포함되기 전까지는 대부분 unverified라 보류
 
 ## 입력 → 출력
 
