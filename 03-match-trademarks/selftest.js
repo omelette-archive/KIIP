@@ -22,6 +22,16 @@ const {
   enrichHitsWithAreaBrands,
   normalizeAreaBrandRegion,
 } = require("./lib/areaBrandEnricher");
+const {
+  createClient: createIpRegistryClient,
+  normalizeRegistrationNumber,
+  summarizeMarkHistory,
+} = require("./lib/ipRegistryClient");
+const {
+  createIpRegistryContext,
+  enrichHitsWithIpRegistry,
+  ipRegistryValidationMetadata,
+} = require("./lib/ipRegistryEnricher");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
@@ -534,6 +544,194 @@ async function run() {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
+  }
+
+  console.log("11) ipRegistryClient.getMarkHistory — 요청 구성·응답 요약·오류 코드(000이 성공)");
+  {
+    let requestedUrl;
+    const fakeFetch = async (url) => {
+      requestedUrl = url;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          resultCode: "000",
+          resultMsg: "REQUEST_SUCCESS",
+          items: {
+            title: "양양 해풍 사과",
+            rgstNo: "4025303310000",
+            applNo: "4020240190374",
+            applicant: [{ applicantName: "김흥수", applicantAddr: "강원특별자치도 양양군 ..." }],
+            owner: [{ ownerName: "김흥수", ownerAddr: "강원특별자치도 양양군 ..." }],
+            productList: [
+              { productClsCd: "31", desProduct: "미가공사과(강원도양양군에서생산된해풍사과에한함)" },
+              { productClsCd: null, desProduct: null },
+            ],
+          },
+        }),
+      };
+    };
+    const client = createIpRegistryClient({ apiKey: "test-key", fetchImpl: fakeFetch });
+    const result = await client.getMarkHistory("4025-3033-0000");
+    const parsedUrl = new URL(requestedUrl);
+    assert.ok(requestedUrl.startsWith(`https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getMarkHistory?`));
+    assert.strictEqual(parsedUrl.searchParams.get("serviceKey"), "test-key");
+    assert.strictEqual(parsedUrl.searchParams.get("type"), "json");
+    assert.strictEqual(parsedUrl.searchParams.get("rgstNo"), "402530330000", "하이픈 등 숫자 아닌 문자는 제거해서 조회");
+    assert.strictEqual(normalizeRegistrationNumber("4025-3033-0000"), "402530330000");
+    assert.strictEqual(result.applicantAddr, "강원특별자치도 양양군 ...");
+    assert.strictEqual(result.ownerAddr, "강원특별자치도 양양군 ...");
+    assert.deepStrictEqual(result.productList, [
+      { productClsCd: "31", desProduct: "미가공사과(강원도양양군에서생산된해풍사과에한함)" },
+    ], "productClsCd/desProduct가 둘 다 없는 빈 행은 제거함");
+    ok("serviceKey/type=json/rgstNo(숫자만) 쿼리 구성과 출원인 주소·지정상품 요약이 정확함");
+  }
+
+  console.log("11-1) ipRegistryClient.getMarkHistory — resultCode가 000이 아니면 오류");
+  {
+    const client = createIpRegistryClient({
+      apiKey: "test-key",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        json: async () => ({ resultCode: "010", resultMsg: "잘못된 요청 파라미터입니다." }),
+      }),
+    });
+    await assert.rejects(() => client.getMarkHistory("4025303310000"), /\[010\] 잘못된 요청 파라미터/);
+    ok("다른 KIPRIS/MAFRA 서비스와 규약이 달라 000 이외는 성공이 아니라 오류로 처리됨");
+  }
+
+  console.log("12) enrichHitsWithIpRegistry — 출원인 주소를 applicantRegionMatch 본류에 직접 반영");
+  {
+    const adminList = [
+      { code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" },
+      { code: "4682000000", sido: "경상남도", sigungu: "합천군" },
+    ];
+    let calls = 0;
+    const fakeClient = {
+      getMarkHistory: async (rgstNo) => {
+        calls++;
+        if (rgstNo === "1") {
+          return summarizeMarkHistory({
+            rgstNo: "1",
+            applicant: [{ applicantAddr: "강원특별자치도 양양군 ..." }],
+            productList: [{ productClsCd: "31", desProduct: "신선한사과" }],
+          });
+        }
+        if (rgstNo === "2") {
+          return summarizeMarkHistory({
+            rgstNo: "2",
+            applicant: [{ applicantAddr: "경상남도 합천군 ..." }],
+            productList: [],
+          });
+        }
+        throw new Error("등록번호 미등록");
+      },
+    };
+    const context = createIpRegistryContext({ client: fakeClient, adminList, maxRequests: 10 });
+    const hits = [
+      { applicationNumber: "A1", registrationNumber: "1" }, // inside(양양군 쿼리와 일치)
+      { applicationNumber: "A2", registrationNumber: "2" }, // outside(합천군, 양양군 쿼리와 불일치)
+      { applicationNumber: "A3", registrationNumber: "1" }, // 캐시 재사용 확인용 중복
+      { applicationNumber: "A4" }, // 등록번호 없음
+      { applicationNumber: "A5", registrationNumber: "999" }, // 조회 실패
+    ];
+    const enriched = await enrichHitsWithIpRegistry(hits, "강원특별자치도 양양군", context);
+
+    assert.strictEqual(enriched[0].applicantRegionMatch, true);
+    assert.strictEqual(enriched[0].applicantRegion.sigungu, "양양군");
+    assert.strictEqual(enriched[0].designatedGoodsEvidence.productList[0].desProduct, "신선한사과");
+
+    assert.strictEqual(enriched[1].applicantRegionMatch, false);
+    assert.strictEqual(enriched[1].designatedGoodsEvidence, undefined, "지정상품이 없으면 필드 자체를 안 만듦");
+
+    assert.strictEqual(calls, 3, "등록번호 1·2·999 각 1회, 중복된 등록번호(1)는 캐시로 재사용해 추가 호출 없음");
+    assert.strictEqual(enriched[2].applicantRegionMatch, true, "캐시로 얻은 결과도 동일하게 반영됨");
+
+    assert.deepStrictEqual(enriched[3].ipRegistryLookup, { status: "no_registration_number" });
+    assert.strictEqual(enriched[3].applicantRegionMatch, undefined);
+
+    assert.strictEqual(enriched[4].ipRegistryLookup.status, "error");
+    assert.match(enriched[4].ipRegistryLookup.error, /등록번호 미등록/);
+    assert.strictEqual(enriched[4].applicantRegionMatch, undefined, "조회 실패 hit는 배치 전체를 죽이지 않고 값만 비움");
+
+    ok("등록번호 기준으로 캐시·조회실패·무등록번호를 구분하고, 진짜 출원인 주소는 applicantRegionMatch에 직접 반영됨");
+  }
+
+  console.log("12-1) enrichHitsWithIpRegistry — 호출 예산 소진 시 배치를 죽이지 않고 건너뜀");
+  {
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    const fakeClient = {
+      getMarkHistory: async (rgstNo) =>
+        summarizeMarkHistory({ rgstNo, applicant: [{ applicantAddr: "강원특별자치도 양양군 ..." }], productList: [] }),
+    };
+    const context = createIpRegistryContext({ client: fakeClient, adminList, maxRequests: 1 });
+    const hits = [
+      { registrationNumber: "1" },
+      { registrationNumber: "2" },
+    ];
+    const enriched = await enrichHitsWithIpRegistry(hits, "강원특별자치도 양양군", context);
+    assert.strictEqual(enriched[0].applicantRegionMatch, true);
+    assert.strictEqual(enriched[1].ipRegistryLookup.status, "skipped_budget");
+    assert.strictEqual(context.stats.skippedBudget, 1);
+    ok("--max-registry-requests 상한에 도달하면 초과 hit는 skipped_budget으로 남기고 예외를 던지지 않음");
+  }
+
+  console.log("12-1b) enrichHitsWithIpRegistry — concurrency로 동시 호출 수를 제한(429 방지)");
+  {
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let inFlight = 0;
+    let maxInFlight = 0;
+    const fakeClient = {
+      getMarkHistory: async (rgstNo) => {
+        inFlight++;
+        maxInFlight = Math.max(maxInFlight, inFlight);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        inFlight--;
+        return summarizeMarkHistory({ rgstNo, applicant: [{ applicantAddr: "강원특별자치도 양양군 ..." }], productList: [] });
+      },
+    };
+    const context = createIpRegistryContext({ client: fakeClient, adminList, maxRequests: 10, concurrency: 2 });
+    const hits = Array.from({ length: 6 }, (_, i) => ({ registrationNumber: String(i + 1) }));
+    const enriched = await enrichHitsWithIpRegistry(hits, "강원특별자치도 양양군", context);
+    assert.strictEqual(enriched.length, 6);
+    assert.ok(maxInFlight <= 2, `동시 호출은 concurrency(2)를 넘지 않아야 함 (실제 최대: ${maxInFlight})`);
+    ok("실키 검증(2026-08-11)에서 무제한 동시 호출이 등록원부 API 429를 유발한 문제를 concurrency 상한으로 방지함");
+  }
+
+  console.log("12-2) ipRegistryValidationMetadata — 요약 통계·기준 문서화");
+  {
+    const adminList = [
+      { code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" },
+      { code: "4682000000", sido: "경상남도", sigungu: "합천군" },
+    ];
+    const fakeClient = {
+      getMarkHistory: async (rgstNo) =>
+        summarizeMarkHistory({
+          rgstNo,
+          applicant: [{ applicantAddr: rgstNo === "1" ? "강원특별자치도 양양군 ..." : "경상남도 합천군 ..." }],
+          productList: [{ productClsCd: "31", desProduct: "신선한사과" }],
+        }),
+    };
+    const context = createIpRegistryContext({ client: fakeClient, adminList, maxRequests: 10 });
+    const results = [
+      {
+        status: "ok",
+        query: { region: "강원특별자치도 양양군" },
+        hits: await enrichHitsWithIpRegistry(
+          [{ registrationNumber: "1" }, { registrationNumber: "2" }],
+          "강원특별자치도 양양군",
+          context
+        ),
+      },
+    ];
+    const metadata = ipRegistryValidationMetadata(context, results);
+    assert.strictEqual(metadata.enabled, true);
+    assert.deepStrictEqual(metadata.matchCounts, {
+      inside: 1, outside: 1, unverified: 0, referenced: 2, goodsReferenced: 2,
+    });
+    assert.strictEqual(ipRegistryValidationMetadata(null).enabled, false);
+    ok("활성화 여부·기준·요약 통계를 함께 보존해 감사 가능함");
   }
 
   console.log("\n모든 자체 테스트 통과");

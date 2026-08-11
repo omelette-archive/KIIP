@@ -55,7 +55,8 @@ node 03-match-trademarks/matchTrademarks.js \
 완전 모집단으로 해석하면 안 된다.
 
 주요 옵션은 `--numOfRows`, `--concurrency`, `--max-requests`, `--max-pages`,
-`--max-hits-per-query`, `--checkpoint`, `--resume`, `--dry-run`, `--area-brands`다.
+`--max-hits-per-query`, `--checkpoint`, `--resume`, `--dry-run`, `--area-brands`,
+`--enrich-registry`, `--max-registry-requests`, `--registry-concurrency`다.
 
 ## 농사로 지역브랜드 3건 E2E
 
@@ -96,7 +97,8 @@ node 03-match-trademarks/enrichIpRegistry.js \
 ## 출처와 버전 필드
 
 - 수집 JSON: `contractVersion`, `sourceMetadata`, `fetchedAt`
-- ③ JSON: `trademarkSourceMetadata`, 입력별 `provenance`, `regionalBrandValidation`
+- ③ JSON: `trademarkSourceMetadata`, 입력별 `provenance`, `regionalBrandValidation`,
+  `ipRegistryValidation`
 - 조인된 hit: `regionalBrandMatchVersion`, `regionalBrandMatchSource`,
   `regionalBrandEvidence`
 - 등록원부 보강 hit: `applicantRegionMatch*`, `applicantRegionEvidence`, `goodsMatch*`,
@@ -105,7 +107,8 @@ node 03-match-trademarks/enrichIpRegistry.js \
   `nongsaro-area-brand-v1`, 등록원부 `ip-registry-mark-history-v1`
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
-출원번호를 보존한다. 키 값과 인증 URL은 저장하지 않는다.
+출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을
+보존한다. 키 값과 인증 URL은 저장하지 않는다.
 
 ## 구조와 테스트
 
