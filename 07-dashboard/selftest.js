@@ -35,6 +35,16 @@ function bucket(overrides = {}) {
     localApplicantShare: null,
     regionalBrandReferenceHitCount: 0,
     regionalBrandInsideShare: null,
+    goodsConfirmedHitCount: 1,
+    goodsReviewRequiredHitCount: 0,
+    ipRegistryStatusCounts: {
+      complete: 1,
+      not_applicable: 0,
+      not_collected: 0,
+      not_found: 0,
+      error: 0,
+      unknown: 0,
+    },
     sources: ["지리적표시"],
     sourceProvenance: [
       {
@@ -69,7 +79,19 @@ function fixture() {
     analysisVersion: "brand-analysis-v2-regional-brand-separated",
     generatedAt: "2026-08-10T01:00:00Z",
     parameters: { asOfYear: 2026 },
-    provenance: { sources: [] },
+    provenance: {
+      sources: [
+        { sourceId: "kipris_trademark" },
+        {
+          sourceId: "ip_registry",
+          dataset: "등록원부 실시간 정보 조회 서비스",
+          catalogUrl: "https://www.data.go.kr/data/15124946/openapi.do",
+          contractVersion: "ip-registry-mark-history-v1",
+          fetchedAt: "2026-08-11T00:00:00Z",
+          lastContractVerifiedAt: "2026-08-11",
+        },
+      ],
+    },
     warnings: [],
     summary: {
       queryCount: 2,
@@ -189,6 +211,10 @@ assert.strictEqual(snapshot.briefings.length, 1);
 assert.strictEqual(snapshot.alerts.length, 1);
 assert.ok(snapshot.sources.some((source) => source.sourceId === "admin_codes"));
 assert.ok(snapshot.sources.some((source) => source.sourceId === "gi"));
+const registrySource = snapshot.sources.find((source) => source.sourceId === "ip_registry");
+assert.strictEqual(registrySource.sourceContractVersion, "ip-registry-mark-history-v1");
+assert.strictEqual(registrySource.sourceLastVerifiedAt, "2026-08-11");
+assert.strictEqual(registrySource.sourceUrl, "https://www.data.go.kr/data/15124946/openapi.do");
 assert.ok(snapshot.warnings.some((warning) => warning.includes("전국 모집단")));
 const andong = snapshot.regions.find((row) => row.region === "경상북도 안동시");
 const boseong = snapshot.regions.find((row) => row.region === "전라남도 보성군");
@@ -199,6 +225,10 @@ assert.strictEqual(andong.items[0].metrics.localApplicantShare.availability, "bl
 assert.strictEqual(andong.items[0].metrics.localApplicantShare.blockingIssue, "#11");
 assert.strictEqual(andong.items[0].metrics.gapScore.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.gapScore.blockingIssue, "#29");
+assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability, "preview");
+assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.blockingIssue, "#12");
+assert.ok(andong.items[0].metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
+assert.ok(andong.items[0].metrics.uniqueTrademarkCount.sourceIds.includes("kipris_trademark"));
 assert.strictEqual(boseong.dataState, "complete_zero");
 assert.strictEqual(snapshot.map.availability, "blocked");
 assert.strictEqual(snapshot.coverage.targetRegionCount, null);

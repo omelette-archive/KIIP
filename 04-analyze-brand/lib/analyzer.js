@@ -2,7 +2,7 @@
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
-const ANALYSIS_VERSION = "brand-analysis-v2-regional-brand-separated";
+const ANALYSIS_VERSION = "brand-analysis-v3-ip-registry-evidence";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -50,6 +50,20 @@ function regionalBrandCategory(hit, bucket) {
     return "inside";
   });
   return new Set(values).size === 1 ? values[0] : "unverified";
+}
+
+function goodsMatchCategory(hit) {
+  const value = clean(hit.goodsMatchMethod).toLowerCase();
+  return ["normalized_exact", "normalized_contains", "class_only", "mismatch", "unverified"].includes(value)
+    ? value
+    : "unverified";
+}
+
+function ipRegistryStatusCategory(hit) {
+  const value = clean(hit.ipRegistryStatus).toLowerCase();
+  return ["complete", "not_applicable", "not_collected", "not_found", "error"].includes(value)
+    ? value
+    : "unknown";
 }
 
 function trademarkKey(hit) {
@@ -214,6 +228,21 @@ function finalizeBucket(bucket, options) {
   const regionalBrandCounts = bucket.sido
     ? { inside: 0, outside: 0, unverified: 0, notReferenced: 0 }
     : null;
+  const goodsMatchCounts = {
+    normalized_exact: 0,
+    normalized_contains: 0,
+    class_only: 0,
+    mismatch: 0,
+    unverified: 0,
+  };
+  const ipRegistryStatusCounts = {
+    complete: 0,
+    not_applicable: 0,
+    not_collected: 0,
+    not_found: 0,
+    error: 0,
+    unknown: 0,
+  };
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
   const recentBrands = [];
@@ -231,6 +260,8 @@ function finalizeBucket(bucket, options) {
       if (category === null) regionalBrandCounts.notReferenced++;
       else regionalBrandCounts[category]++;
     }
+    goodsMatchCounts[goodsMatchCategory(hit)]++;
+    ipRegistryStatusCounts[ipRegistryStatusCategory(hit)]++;
     const year = applicationYear(hit.applicationDate);
     if (year === null) {
       invalidApplicationDateCount++;
@@ -263,6 +294,11 @@ function finalizeBucket(bucket, options) {
     ? regionalBrandCounts.inside + regionalBrandCounts.outside
     : 0;
   const uniqueTrademarkCount = bucket.hits.size;
+  const goodsConfirmedHitCount = goodsMatchCounts.normalized_exact;
+  const goodsReviewRequiredHitCount =
+    goodsMatchCounts.normalized_contains + goodsMatchCounts.class_only;
+  const goodsEvaluatedHitCount =
+    goodsConfirmedHitCount + goodsReviewRequiredHitCount + goodsMatchCounts.mismatch;
   const applicationYearCounts = {};
   for (const year of [...yearCounts.keys()].sort((a, b) => a - b)) {
     applicationYearCounts[String(year)] = yearCounts.get(year);
@@ -304,6 +340,12 @@ function finalizeBucket(bucket, options) {
     regionalBrandInsideShare: regionalBrandCounts
       ? safeRate(regionalBrandCounts.inside, regionalBrandVerifiedHitCount)
       : null,
+    goodsMatchCounts,
+    goodsConfirmedHitCount,
+    goodsReviewRequiredHitCount,
+    goodsMismatchHitCount: goodsMatchCounts.mismatch,
+    goodsVerificationRate: safeRate(goodsEvaluatedHitCount, uniqueTrademarkCount),
+    ipRegistryStatusCounts,
     invalidApplicationDateCount,
   };
 }
@@ -389,10 +431,24 @@ function analyzeEntries(parsed, providedOptions = {}) {
       "농사로 지역브랜드 출원번호 조인은 등록된 지역브랜드 연관성 검증 신호이며 출원인 주소 근거가 아닙니다. localApplicantShare에는 포함하지 않았습니다."
     );
   }
+  if (inputDocument?.ipRegistryEnrichment?.enabled) {
+    const registry = inputDocument.ipRegistryEnrichment;
+    if (registry.status !== "complete") {
+      warnings.push(
+        `등록원부 보강이 ${registry.status} 상태입니다(완료 ${registry.completeRegistrationCount || 0}, ` +
+          `오류 ${registry.errorRegistrationCount || 0}, 미수집 ${registry.notCollectedRegistrationCount || 0}).`
+      );
+    }
+    if (summary.goodsReviewRequiredHitCount > 0) {
+      warnings.push(
+        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품 normalized_contains/class_only 검토 후보이며 #12 기준 확정 전 확정 매칭으로 해석하면 안 됩니다.`
+      );
+    }
+  }
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
 
   return {
-    schemaVersion: "1.2",
+    schemaVersion: "1.3",
     analysisVersion: ANALYSIS_VERSION,
     generatedAt: new Date().toISOString(),
     provenance: {
@@ -403,6 +459,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
         inputDocument?.regionalBrandValidation?.enabled
           ? inputDocument.regionalBrandValidation.sourceMetadata
           : null,
+        inputDocument?.ipRegistryEnrichment?.enabled
+          ? inputDocument.ipRegistryEnrichment.sourceMetadata
+          : null,
       ].filter(Boolean),
     },
     methodology: {
@@ -410,8 +469,14 @@ function analyzeEntries(parsed, providedOptions = {}) {
       partialCollectionPolicy: "partial hit도 포함하되 경고와 partialQueryCount를 함께 제공",
       applicantRegionMetric: "출원인 주소 근거만 localApplicantShare에 사용",
       regionalBrandMetric: "농사로 지역브랜드 출원번호 연관성은 별도 regionalBrand* 지표로 집계",
+      applicantRegionMetricVersion:
+        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion || null,
+      designatedGoodsPolicy:
+        "normalized_exact만 확정 근거, normalized_contains/class_only는 검토 후보; #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않음",
+      designatedGoodsMatchVersion:
+        inputDocument?.ipRegistryEnrichment?.policy?.goodsMatchVersion || null,
       currentYearPolicy: "진행 중인 현재 연도는 최근/직전 기간 비교에서 제외",
-      lastUpdatedAt: "2026-08-10",
+      lastUpdatedAt: "2026-08-11",
     },
     parameters: {
       asOfYear,
@@ -431,6 +496,8 @@ module.exports = {
   ANALYSIS_VERSION,
   analyzeEntries,
   applicationYear,
+  goodsMatchCategory,
+  ipRegistryStatusCategory,
   normalizeInput,
   regionalBrandCategory,
   regionCategory,

@@ -1,6 +1,6 @@
 # Open API 키·실호출 검증 인수인계
 
-최종 검증일: 2026-08-10  
+최종 검증일: 2026-08-11
 검증 환경: Windows PowerShell, Node.js 24(로컬), Node.js 22(GitHub Actions)
 
 이 문서는 다른 작업자가 API 신청처·키 위치·실행 명령·검증 완료 범위를 다시 조사하지 않고
@@ -41,6 +41,7 @@ GI_API_KEY
 NONGSARO_API_KEY
 NONGSARO_LOCAL_BRAND_API_KEY
 DATA_GO_KR_API_KEY
+IP_REGISTRY_API_KEY
 ```
 
 ## 2. 키별 구분 — 서로 바꿔 쓰지 않는다
@@ -52,6 +53,7 @@ DATA_GO_KR_API_KEY
 | `NONGSARO_API_KEY` | 농사로 | `apiKey` 쿼리 + XML | 지역특산물 ①에서 사용·실키 검증 완료 |
 | `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 | `areaBrand` 서비스 + XML | 3건 수집·KIPRIS 조인·④ 분석 실검증 완료 |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 | 표준 REST API용 일반 서비스키 | 현재 실행 코드에서는 미사용 |
+| `IP_REGISTRY_API_KEY` | 공공데이터포털·지식재산처 등록원부 | `serviceKey` + JSON | 등록번호 3건 주소·지정상품 보강 실검증 |
 
 주의할 구분:
 
@@ -282,6 +284,27 @@ node 04-analyze-brand/analyzeBrands.js `
 이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 검증자료이므로 ① 특산물
 목록에 섞지 않는다. 위 3건은 연결 계약 검증용이며 전체 602건을 대표하지 않는다.
 
+## 6-1. 지식재산처 등록원부 주소·지정상품 보강
+
+- 카탈로그: <https://www.data.go.kr/data/15124946/openapi.do>
+- 엔드포인트: `https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getMarkHistory`
+- 인증: `IP_REGISTRY_API_KEY`를 `serviceKey`로 전달
+- 요청: `type=json`, `rgstNo=<등록번호>`
+- 실제 성공 코드: `000 / REQUEST_SUCCESS`
+- 실제 응답: 최상위 `items.applicant[]`, `items.productList[]`
+
+```powershell
+node 03-match-trademarks/enrichIpRegistry.js `
+  --input 03-match-trademarks/output/area-brand-validation-result.json `
+  --limit 3 --concurrency 1 `
+  --out 03-match-trademarks/output/area-brand-ip-registry-sample.json
+```
+
+2026-08-11 소량 결과는 고유 등록번호 13개 중 요청 3·성공 3·오류 0·미수집 10이다. 주소는
+inside 2·outside 0·unverified 1, 지정상품은 `class_only` 후보 3건이었다. 등록번호가 없는 hit는
+호출하지 않고 `not_applicable`, 상한 밖 등록번호는 `not_collected`로 보존한다. 전체 주소는
+산출물에 복사하지 않고 법정동코드로 확인한 시도·시군구만 evidence에 남긴다.
+
 ## 7. 생성된 로컬 검증 산출물
 
 다음 파일은 현재 worktree에 있고 모두 `.gitignore` 대상이다.
@@ -300,8 +323,13 @@ node 04-analyze-brand/analyzeBrands.js `
 03-match-trademarks/output/area-brand-validation-input.csv
 03-match-trademarks/output/area-brand-validation-result.json
 03-match-trademarks/output/area-brand-validation-result.json.checkpoint.json
+03-match-trademarks/output/area-brand-ip-registry-sample.json
 04-analyze-brand/output/nongsaro-key-smoke-analysis.json
 04-analyze-brand/output/area-brand-validation-analysis.json
+04-analyze-brand/output/area-brand-ip-registry-analysis.json
+05-detect-brand-gap/output/area-brand-ip-registry-gap.json
+06-generate-business-strategy/output/area-brand-ip-registry-strategy.json
+07-dashboard/output/area-brand-ip-registry-dashboard.json
 ```
 
 SQLite의 `-wal`, `-shm` 보조 파일도 Git에 올리지 않는다.
@@ -315,12 +343,14 @@ SQLite의 `-wal`, `-shm` 보조 파일도 Git에 올리지 않는다.
 - 이슈 #2: KIPRIS·GI·농사로 인증/실호출 검증 완료 후 종료
 - 이슈 #3: GI·농사로 원문 누적과 멱등 재실행 완료 후 종료
 - #24: 농사로 지역브랜드 3건 출원번호 조인·별도 ④ 지표·모호 지역 보수 처리 구현
+- PR #39: 등록원부 주소·지정상품 실응답 계약 확인
+- 등록원부 등록번호 3건 보강과 ③→⑦ 샘플 E2E 구현
 
 후속:
 
 - #22: GI 과거 전체 초기 적재 데이터 확보
-- #11: 출원인 주소 기반 지역 상표 매칭
-- #12: NICE류 후보를 지정상품 상세 대조로 보강
+- #11: 등록번호 없는 출원 건의 주소 소스·전체 보강 범위
+- #12: normalized_contains/class_only 후보의 최종 포함·제외 기준 확정
 - #29: ⑤ 대표 특산품·브랜드 공백 점수 업무 기준 확정
 
 ## 9. 새 작업자 체크리스트

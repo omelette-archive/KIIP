@@ -64,6 +64,23 @@ function validateSyntax() {
 function writeStage3Fixture(filePath) {
   const fixture = {
     mode: "batch",
+    schemaVersion: "1.1",
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "complete",
+      completeRegistrationCount: 1,
+      errorRegistrationCount: 0,
+      notCollectedRegistrationCount: 0,
+      sourceMetadata: {
+        sourceId: "ip_registry",
+        contractVersion: "ip-registry-mark-history-v1",
+        fetchedAt: "2026-08-11T00:00:00Z",
+      },
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+    },
     inputCount: 2,
     successCount: 1,
     errorCount: 0,
@@ -94,9 +111,14 @@ function writeStage3Fixture(filePath) {
             title: "안동사과",
             applicant: "예시 영농조합",
             applicationNumber: "40-2025-0000001",
+            registrationNumber: "40-1234567-0000",
             applicationDate: "20250102",
             applicationStatus: "등록",
             classificationCode: "31",
+            ipRegistryStatus: "complete",
+            applicantRegionMatch: "inside",
+            applicantRegionMatchSource: "ip_registry_applicant_address",
+            goodsMatchMethod: "normalized_exact",
           },
         ],
       },
@@ -182,6 +204,9 @@ function validateContracts(tempDir) {
   assert.ok(!analysis.regionItems.some((row) => row.region === "미지정 지역"));
   const andongApple = analysis.regionItems.find((row) => row.itemName === "신선한 사과");
   assert.deepStrictEqual(andongApple.sources, ["지리적표시"], "③의 source가 ④ 버킷까지 전파돼야 함");
+  assert.strictEqual(andongApple.localApplicantShare, 1);
+  assert.strictEqual(andongApple.goodsConfirmedHitCount, 1);
+  assert.ok(analysis.provenance.sources.some((source) => source.sourceId === "ip_registry"));
   console.log("[validatePipeline] ③→④ 계약 통과 (성공/건너뜀/전체건수 보존, source 전파)");
 
   runNode("⑤ 브랜드 공백 점수 계산", [
@@ -231,6 +256,12 @@ function validateContracts(tempDir) {
   assert.strictEqual(dashboard.rankings.length, gap.ranking.length);
   assert.strictEqual(dashboard.briefings.length, strategy.briefings.length);
   assert.ok(dashboard.regions.every((region) => region.regionCode));
+  const dashboardItem = dashboard.regions[0].items.find(
+    (item) => item.noticeName === "신선한 사과" || item.itemName === "신선한 사과"
+  );
+  assert.strictEqual(dashboardItem.metrics.localApplicantShare.availability, "available");
+  assert.strictEqual(dashboardItem.metrics.confirmedGoodsMatchCount.value, 1);
+  assert.ok(dashboardItem.metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
   assert.ok(dashboard.warnings.some((warning) => warning.includes("전국 모집단")));
   console.log("[validatePipeline] ④·⑤·⑥→⑦ 계약 통과 (샘플·상태·출처·버전 보존)");
 }
