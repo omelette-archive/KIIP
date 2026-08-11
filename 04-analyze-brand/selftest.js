@@ -328,4 +328,46 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
+console.log("8) 지역브랜드 조인 검증용 브랜드명 자료(고시명칭 미정제)가 섞이면 경고");
+{
+  const brandOnlyEntry = {
+    status: "ok",
+    query: { region: "경상북도", item: "데일리", classCode: null },
+    itemName: "데일리",
+    noticeName: null,
+    provenance: { matchPurpose: "regional_brand_application_join_validation" },
+    hits: [hit("50-1", "데일리", "20250101", "등록", "inside")],
+  };
+  const normalEntry = {
+    status: "ok",
+    query: { region: "경상북도 영양군", item: "신선한 사과", classCode: "31" },
+    noticeName: "신선한 사과",
+    provenance: { matchPurpose: null },
+    hits: [hit("50-2", "영양사과", "20250101", "등록", "inside")],
+  };
+
+  const withBrandOnly = analyzeEntries([brandOnlyEntry], { asOfYear: 2026 });
+  assert.ok(
+    withBrandOnly.warnings.some((warning) => warning.includes("브랜드명 기반") && warning.includes("고시명칭")),
+    "noticeName 없이 join-validation 자료만 있으면 경고가 있어야 함"
+  );
+
+  const withNormalOnly = analyzeEntries([normalEntry], { asOfYear: 2026 });
+  assert.ok(
+    !withNormalOnly.warnings.some((warning) => warning.includes("브랜드명 기반")),
+    "고시명칭이 있는 정상 자료만 있으면 이 경고가 없어야 함"
+  );
+
+  const brandOnlyWithNotice = {
+    ...brandOnlyEntry,
+    noticeName: "신선한 사과",
+  };
+  const withNoticeFilled = analyzeEntries([brandOnlyWithNotice], { asOfYear: 2026 });
+  assert.ok(
+    !withNoticeFilled.warnings.some((warning) => warning.includes("브랜드명 기반")),
+    "matchPurpose가 join-validation이어도 noticeName이 채워져 있으면 경고하지 않음(고시명칭 정제까지 마친 자료로 간주)"
+  );
+  ok("buildAreaBrandValidationInput.js류 브랜드명 자료가 고시명칭 정제 없이 섞이면 감지해 경고함");
+}
+
 console.log("\n모든 자체 테스트 통과");

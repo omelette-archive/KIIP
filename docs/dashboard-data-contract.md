@@ -148,6 +148,24 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 `molit-legal-dong-20260703`, `specialty-id-v1-notice-class-sha256`으로 남긴다. 상위 단계에서
 안정 ID를 직접 제공하게 되면 조용히 교체하지 않고 ID 버전을 올리고 이전 ID 매핑을 보존한다.
 
+**"품목"은 반드시 고시명칭(②의 `noticeName`) 기준이어야 하며, 상표명·브랜드명이 대신
+들어가면 안 된다.** 지역의 대표 특산품(예: "사과")을 보여줘야 할 자리에 특정 상표/브랜드
+이름(예: "데일리")이 나오면 안 된다는 뜻이다 — 사용자가 보고 싶은 것은 "이 지역의 사과가
+얼마나 출원됐는가"이지 "이 지역의 특정 상표 하나"가 아니다.
+
+- 2026-08-11 실사례: `03-match-trademarks/buildAreaBrandValidationInput.js`는 지역브랜드
+  출원번호 조인 기능 자체를 검증하려고 고시명칭 정제 없이 브랜드명(`brand.brandName`)을
+  `itemName`으로 직접 써서 KIPRIS를 검색한다(`matchPurpose:
+  "regional_brand_application_join_validation"`). 이 CSV를 대시보드 샘플 생성에 그대로
+  재사용해서 "경상북도"의 대표 품목이 "데일리"(브랜드명)로 표시되는 문제가 있었다.
+- 대시보드용 샘플·운영 데이터는 반드시 ①(실제 특산물 수집) → ②(`normalizeItems.js`로
+  고시명칭 정제) → ③ → ④ → ⑤ → ⑥ → ⑦ 정식 경로로 생성해야 한다.
+  `buildAreaBrandValidationInput.js`의 출력은 지역브랜드 조인 기능 자체를 검증하는 용도로만
+  쓰고, 대시보드에 반영해선 안 된다.
+- `04-analyze-brand/lib/analyzer.js`가 `matchPurpose === "regional_brand_application_join_validation"`
+  이면서 `noticeName`이 없는 행을 감지하면 경고를 남긴다(고시명칭 정제 없이 섞였다는 뜻).
+  이 경고가 뜨면 입력을 다시 만들어야 한다.
+
 ### 3.2 각 지표 공통 메타데이터
 
 중요 지표는 값만 저장하지 않고 다음 정보를 함께 제공한다.

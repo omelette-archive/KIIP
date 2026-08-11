@@ -32,12 +32,15 @@ test("renders tab navigation and a data-connected ranking table (레퍼런스 �
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /class="ranking-table"/, "레퍼런스의 등록상표 랭킹 TOP 10/50에 대응하는 테이블");
-  // 안성 배 계열이 아니라 실제 샘플(경상북도 데일리, 등록 8건)이 1위로 정렬돼야 함 —
-  // registeredTrademarkCount 내림차순 정렬이 실제로 동작하는지 값으로 확인한다.
+  // 품목명은 고시명칭 정제를 거친 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
+  // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
+  // 조인 검증용일 뿐 대표 특산품이 아니다. registeredTrademarkCount 내림차순 정렬이 실제로
+  // 동작하는지도 값으로 확인한다(신선한 포도 14건이 1위).
   const tbodyIndex = html.indexOf("<tbody>");
   const firstRow = html.slice(tbodyIndex, html.indexOf("</tr>", tbodyIndex));
   assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
-  assert.match(firstRow, /데일리/, "등록상표 건수가 가장 많은 행이 1위여야 함(경상북도 데일리, 8건)");
+  assert.match(firstRow, /신선한 포도/, "등록상표 건수가 가장 많은 행이 1위여야 함(경상북도 영양군 신선한 포도, 14건)");
+  assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
 test("ships a valid dashboard snapshot", async () => {

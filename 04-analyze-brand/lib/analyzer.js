@@ -376,10 +376,19 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
+  // buildAreaBrandValidationInput.js는 지역브랜드 출원번호 조인을 검증하려고 고시명칭 정제
+  // 없이 브랜드명을 itemName으로 직접 써서 KIPRIS를 검색한다(matchPurpose로 표시).
+  // 대표 특산품 판정·대시보드 "품목" 표시는 반드시 고시명칭(noticeName) 기준이어야 하는데,
+  // 이 자료를 실수로 그대로 흘려보내면 "사과" 대신 "데일리" 같은 브랜드명이 품목으로
+  // 노출된다(2026-08-11 실사례). noticeName이 없는 이 출처 행이 섞였는지 감지해 경고한다.
+  let brandNameOnlyRowCount = 0;
 
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
     const dimensions = entryDimensions(entry);
+    if (entry.provenance?.matchPurpose === "regional_brand_application_join_validation" && !dimensions.noticeName) {
+      brandNameOnlyRowCount++;
+    }
     const key = [dimensions.region, dimensions.itemName, dimensions.niceClass || ""].join("\u001f");
     if (!regionItemBuckets.has(key)) regionItemBuckets.set(key, createBucket(dimensions));
     addEntry(regionItemBuckets.get(key), entry);
@@ -410,6 +419,13 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
   const warnings = [];
+  if (brandNameOnlyRowCount > 0) {
+    warnings.push(
+      `${brandNameOnlyRowCount}개 지역×품목 행은 지역브랜드 출원번호 조인 검증용 자료(고시명칭 정제 전 ` +
+        "브랜드명 기반)입니다. 대표 특산품 판정·대시보드 품목 표시에는 쓰면 안 됩니다 — " +
+        "②단계 고시명칭 정제를 거친 자료로 다시 생성하세요."
+    );
+  }
   if (summary.erroredQueryCount > 0) {
     warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
   }
