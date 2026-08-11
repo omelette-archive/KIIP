@@ -3,6 +3,10 @@
 `dashboard-snapshot-v1`을 직접 읽는 ⑦단계 웹 대시보드다. 현재 배포 데이터는 소규모 E2E
 샘플이며 화면에서도 `샘플 데이터`로 표시한다.
 
+레퍼런스의 `요약 / 지자체별 조회 / 품목별 조회 / 특화작목 비교` 구조를 반영한다. 요약 지도는
+시도→시군구 드릴다운을 제공하며, 참고용 2013 KOSTAT 경계와 현재 데이터 상태를 구분해 표시한다.
+샘플이 없는 회색 지역은 상표 0건이 아니라 `데이터 없음`이다.
+
 ## 로컬 실행
 
 ```powershell
@@ -16,6 +20,7 @@ npm run dev
 
 ```powershell
 npm run sync:snapshot -- ../output/dashboard-snapshot.json
+npm run sync:map
 ```
 
 입력은 `dashboard-snapshot-v1`이고 `mode=sample|full`이어야 한다. 전국 수집이 완료되기 전에는

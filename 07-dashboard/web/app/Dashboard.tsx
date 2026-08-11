@@ -2,370 +2,100 @@
 
 import { useMemo, useState } from "react";
 
-type Metric = {
-  value: number | null;
-  availability: "available" | "preview" | "blocked";
-  status: string;
-  rationale?: string | null;
-  blockingIssue?: string | null;
-};
+type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; dataState: string; metrics: { uniqueTrademarkCount: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
+type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
+type Snapshot = { schemaVersion: string; snapshotId: string; mode: "sample" | "full"; generatedAt: string; versions?: Record<string, string | null>; map?: { availability: string; blockingReason?: string | null }; coverage: { targetRegionCount: number | null; observedRegionCount: number; regionItemCount: number; completeQueryCount: number; partialQueryCount: number; errorQueryCount: number }; regions: Region[]; sources: Source[]; warnings: string[] };
+type ProvinceShape = { name: string; d: string; labelX: number; labelY: number };
+type MunicipalityShape = { name: string; d: string; labelX: number; labelY: number };
+type MapGeometry = { schemaVersion: string; viewBox: string; boundaryReference: { sourceName: string; sourceUrl: string; sourceBasis: string; status: string; warning: string }; provinces: ProvinceShape[]; municipalities: Record<string, { viewBox: string; items: MunicipalityShape[] }> };
+type Tab = "summary" | "regions" | "items" | "compare";
+type MapMetric = "trademarks" | "registration" | "coverage" | "gap";
 
-type Item = {
-  specialtyId: string | null;
-  itemName: string | null;
-  noticeName: string | null;
-  niceClass: string | null;
-  dataState: string;
-  metrics: {
-    uniqueTrademarkCount: Metric;
-    registeredTrademarkCount: Metric;
-    registrationRate: Metric;
-    localApplicantShare: Metric;
-    confirmedGoodsMatchCount: Metric;
-    goodsReviewCandidateCount: Metric;
-    gapScore: Metric;
-  };
-};
+const STATE_LABELS: Record<string, string> = { complete_nonzero: "수집 완료", complete_zero: "결과 0건", partial: "부분 수집", error: "오류", skipped: "건너뜀", not_collected: "미수집", complete: "완료" };
+const TAB_LABELS: Record<Tab, string> = { summary: "요약", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교" };
+const MAP_LABELS: Record<MapMetric, string> = { trademarks: "상표 건수", registration: "등록률", coverage: "수집 범위", gap: "브랜드 공백" };
 
-type Region = {
-  regionCode: string | null;
-  regionCodeStatus: string;
-  region: string;
-  sido: string | null;
-  sigungu: string | null;
-  dataState: string;
-  items: Item[];
-};
+function number(value: number | null | undefined) { return typeof value === "number" ? value.toLocaleString("ko-KR") : "—"; }
+function percent(value: number | null | undefined) { return typeof value === "number" ? `${Math.round(value * 100)}%` : "—"; }
+function date(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록"; }
+function itemName(item: Item) { return item.noticeName || item.itemName || "미지정 품목"; }
+function regionKey(region: Region) { return region.regionCode || region.region; }
+function issueUrl(issue: string | null | undefined) { const match = issue?.match(/^#(\d+)$/); return match ? `https://github.com/omelette-archive/KIIP/issues/${match[1]}` : null; }
+function fill(value: number | null, max: number) { if (value === null) return "#e5e1d7"; const ratio = Math.max(0.12, Math.min(1, max ? value / max : 0)); return `color-mix(in srgb, #1f6d56 ${Math.round(24 + ratio * 68)}%, #e7eee9)`; }
 
-type Source = {
-  sourceId: string;
-  sourceLabel: string | null;
-  sourceContractVersion: string | null;
-  sourceFetchedAt: string | null;
-  sourceUrl: string | null;
-  sourceLastVerifiedAt: string | null;
-};
-
-type Snapshot = {
-  schemaVersion: string;
-  snapshotId: string;
-  mode: "sample" | "full";
-  generatedAt: string;
-  coverage: {
-    targetRegionCount: number | null;
-    observedRegionCount: number;
-    regionItemCount: number;
-    completeQueryCount: number;
-    partialQueryCount: number;
-    errorQueryCount: number;
-  };
-  regions: Region[];
-  sources: Source[];
-  warnings: string[];
-};
-
-const STATE_LABELS: Record<string, string> = {
-  complete_nonzero: "수집 완료",
-  complete_zero: "결과 0건",
-  partial: "부분 수집",
-  error: "오류",
-  skipped: "건너뜀",
-  not_collected: "미수집",
-};
-
-function number(value: number | null | undefined) {
-  return typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
-}
-
-function percent(value: number | null | undefined) {
-  return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
-}
-
-function date(value: string | null | undefined) {
-  if (!value) return "미기록";
-  return new Intl.DateTimeFormat("ko-KR", {
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    timeZone: "Asia/Seoul",
-  }).format(new Date(value));
-}
-
-function issueUrl(issue: string | null | undefined) {
-  const match = issue?.match(/^#(\d+)$/);
-  return match ? `https://github.com/omelette-archive/KIIP/issues/${match[1]}` : null;
-}
-
-export default function Dashboard({ snapshot }: { snapshot: Snapshot }) {
+export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; geometry: MapGeometry }) {
+  const [tab, setTab] = useState<Tab>("summary");
   const [query, setQuery] = useState("");
-  const [selectedRegionCode, setSelectedRegionCode] = useState(
-    snapshot.regions.find((region) => region.regionCode)?.regionCode || "",
-  );
+  const [itemQuery, setItemQuery] = useState("");
+  const [selectedRegionCode, setSelectedRegionCode] = useState(regionKey(snapshot.regions[0]));
   const [selectedItemId, setSelectedItemId] = useState("");
+  const [mapMetric, setMapMetric] = useState<MapMetric>("trademarks");
+  const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
+  const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
 
-  const filteredRegions = useMemo(() => {
-    const keyword = query.trim().toLocaleLowerCase("ko-KR");
-    if (!keyword) return snapshot.regions;
-    return snapshot.regions.filter(
-      (region) =>
-        region.region.toLocaleLowerCase("ko-KR").includes(keyword) ||
-        region.items.some((item) =>
-          (item.noticeName || item.itemName || "").toLocaleLowerCase("ko-KR").includes(keyword),
-        ),
-    );
-  }, [query, snapshot.regions]);
+  const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0 }), [snapshot.regions]);
+  const provinceStats = useMemo(() => {
+    const stats = new Map<string, { trademarks: number; registered: number; items: number; complete: number; total: number; gaps: number[] }>();
+    snapshot.regions.forEach((region) => {
+      const name = region.sido || region.region;
+      const current = stats.get(name) || { trademarks: 0, registered: 0, items: 0, complete: 0, total: 0, gaps: [] };
+      region.items.forEach((item) => { current.trademarks += item.metrics.uniqueTrademarkCount.value || 0; current.registered += item.metrics.registeredTrademarkCount.value || 0; current.items += 1; current.total += 1; if (item.dataState === "complete_nonzero" || item.dataState === "complete_zero") current.complete += 1; if (typeof item.metrics.gapScore.value === "number") current.gaps.push(item.metrics.gapScore.value); });
+      stats.set(name, current);
+    });
+    return stats;
+  }, [snapshot.regions]);
+  const hasGap = [...provinceStats.values()].some((stat) => stat.gaps.length > 0);
+  const mapMax = Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : mapMetric === "registration" ? (stat.trademarks ? stat.registered / stat.trademarks : 0) : mapMetric === "coverage" ? stat.items : stat.gaps.length ? stat.gaps.reduce((a, b) => a + b, 0) / stat.gaps.length : 0));
+  const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => itemName(item).toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
+  const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode) || filteredRegions[0] || snapshot.regions[0];
+  const selectedItem = selectedRegion?.items.find((item) => item.specialtyId === selectedItemId) || selectedRegion?.items[0];
+  const itemRows = useMemo(() => {
+    const rows = new Map<string, { name: string; trademarks: number; registered: number; regions: string[]; states: string[] }>();
+    snapshot.regions.forEach((region) => region.items.forEach((item) => { const name = itemName(item); const row = rows.get(name) || { name, trademarks: 0, registered: 0, regions: [], states: [] }; row.trademarks += item.metrics.uniqueTrademarkCount.value || 0; row.registered += item.metrics.registeredTrademarkCount.value || 0; if (!row.regions.includes(region.region)) row.regions.push(region.region); row.states.push(item.dataState); rows.set(name, row); }));
+    const keyword = itemQuery.trim().toLocaleLowerCase("ko-KR");
+    return [...rows.values()].filter((row) => !keyword || row.name.toLocaleLowerCase("ko-KR").includes(keyword) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(keyword))).sort((a, b) => b.trademarks - a.trademarks);
+  }, [itemQuery, snapshot.regions]);
 
-  const selectedRegion =
-    snapshot.regions.find((region) => region.regionCode === selectedRegionCode) ||
-    filteredRegions[0] ||
-    snapshot.regions[0];
-  const selectedItem =
-    selectedRegion?.items.find((item) => item.specialtyId === selectedItemId) ||
-    selectedRegion?.items[0];
+  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(region.items[0]?.specialtyId || ""); }
+  function mapValue(name: string) { const stat = provinceStats.get(name); if (!stat) return null; if (mapMetric === "trademarks") return stat.trademarks; if (mapMetric === "registration") return stat.trademarks ? stat.registered / stat.trademarks : 0; if (mapMetric === "coverage") return stat.items; return stat.gaps.length ? stat.gaps.reduce((a, b) => a + b, 0) / stat.gaps.length : null; }
+  function mapValueLabel(name: string) { const value = mapValue(name); if (value === null) return "데이터 없음"; if (mapMetric === "registration") return percent(value); if (mapMetric === "gap") return `${Math.round(value)}점`; return `${number(value)}${mapMetric === "trademarks" ? "건" : "개 품목"}`; }
+  function openProvince(name: string) { setSelectedProvince(name); setSelectedMunicipality(null); }
+  function openMunicipality(name: string) { setSelectedMunicipality(name); const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === name); if (match) chooseRegion(match); }
 
-  const totals = useMemo(
-    () =>
-      snapshot.regions.reduce(
-        (acc, region) => {
-          for (const item of region.items) {
-            acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0;
-            acc.registered += item.metrics.registeredTrademarkCount.value || 0;
-            acc.review += item.metrics.goodsReviewCandidateCount.value || 0;
-          }
-          return acc;
-        },
-        { trademarks: 0, registered: 0, review: 0 },
-      ),
-    [snapshot.regions],
-  );
+  const visibleRegions = selectedProvince ? snapshot.regions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality)) : snapshot.regions;
+  const visibleItems = visibleRegions.flatMap((region) => region.items.map((item) => ({ region, item }))).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
+  const municipalityGeometry = selectedProvince ? geometry.municipalities[selectedProvince] : null;
 
-  function chooseRegion(region: Region) {
-    setSelectedRegionCode(region.regionCode || region.region);
-    setSelectedItemId(region.items[0]?.specialtyId || "");
-  }
+  return <main className="shell">
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><span className="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>특산품 × 상표 근거 대시보드</small></span></button><div className="snapshot-meta"><span className="sample-badge">{snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터"}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
+    <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
-  return (
-    <main className="shell">
-      <header className="topbar">
-        <a className="brand" href="#top" aria-label="지역 브랜드 인사이트 홈">
-          <span className="brand-mark">K</span>
-          <span>
-            <strong>지역 브랜드 인사이트</strong>
-            <small>특산품 × 상표 근거 대시보드</small>
-          </span>
-        </a>
-        <div className="snapshot-meta">
-          <span className="sample-badge">{snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터"}</span>
-          <span>마지막 생성 {date(snapshot.generatedAt)}</span>
+    {tab === "summary" && <>
+      <section className="hero"><div><p className="eyebrow">LOCAL BRAND OBSERVATORY</p><h1>지역 특산품의 상표 공백을<br />지도와 근거로 살펴봅니다.</h1><p className="hero-copy">레퍼런스의 지도·지자체·품목·특화작목 구조를 따르되, 수집된 값과 미수집 상태를 섞지 않습니다. 현재는 소규모 E2E 검증 범위입니다.</p></div><div className="hero-note"><span>현재 검증 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}개 품목</strong><p>전국 지도 틀은 표시하지만 색상 값은 샘플이 존재하는 지역에만 적용합니다.</p></div></section>
+      <section className="metrics" aria-label="핵심 지표"><article><span>고유 상표</span><strong>{number(totals.trademarks)}</strong><small>출원번호 우선 중복 제거</small></article><article><span>등록 상표</span><strong>{number(totals.registered)}</strong><small>등록 상태 확인 표본</small></article><article><span>지정상품 검토 후보</span><strong>{number(totals.review)}</strong><small>확실한 항목만 자동 확정</small></article><article><span>수집 상태</span><strong>{snapshot.coverage.partialQueryCount > 0 ? "부분" : "완료"}</strong><small>완료 {snapshot.coverage.completeQueryCount} · 부분 {snapshot.coverage.partialQueryCount}</small></article></section>
+      <section className="map-workspace">
+        <div className="map-card"><div className="map-heading"><div><p className="eyebrow">BRAND GAP MAP</p><h2>{selectedProvince ? `${selectedProvince} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip">참고 경계 · 2013 KOSTAT</span></div>
+          <div className="map-toolbar"><div className="map-metrics">{(Object.keys(MAP_LABELS) as MapMetric[]).map((key) => <button type="button" key={key} disabled={key === "gap" && !hasGap} className={mapMetric === key ? "active" : ""} onClick={() => setMapMetric(key)} title={key === "gap" && !hasGap ? "현재 샘플의 공백 점수가 차단 상태입니다." : undefined}>{MAP_LABELS[key]}</button>)}</div>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div>
+          <div className="map-stage"><svg className="korea-map" viewBox={municipalityGeometry?.viewBox || geometry.viewBox} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? municipalityGeometry.items.map((shape) => { const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === shape.name); const statValue = match ? match.items.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; const active = selectedMunicipality === shape.name; return <g key={shape.name}><path d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(statValue, Math.max(1, ...municipalityGeometry.items.map((item) => { const row = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === item.name); return row ? row.items.reduce((sum, entry) => sum + (entry.metrics.uniqueTrademarkCount.value || 0), 0) : 0; }))) }} tabIndex={0} role="button" aria-label={`${shape.name} ${statValue === null ? "데이터 없음" : `상표 ${statValue}건`}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{shape.name} · {statValue === null ? "데이터 없음" : `상표 ${statValue}건`}</title></path><text x={shape.labelX} y={shape.labelY} className="map-label">{shape.name.replace(/(특별자치시|특별자치도|특별시|광역시|시|군|구)$/u, "")}</text></g>; }) : geometry.provinces.map((shape) => <g key={shape.name}><path d={shape.d} className={selectedProvince === shape.name ? "map-shape selected" : "map-shape"} style={{ fill: fill(mapValue(shape.name), mapMax) }} tabIndex={0} role="button" aria-label={`${shape.name} ${mapValueLabel(shape.name)}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{shape.name} · {mapValueLabel(shape.name)}</title></path><text x={shape.labelX} y={shape.labelY} className="map-label">{shape.name.replace(/(특별자치도|특별자치시|통합특별시|특별시|광역시|도)$/u, "")}</text></g>)}</svg></div>
+          <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div><p className="map-warning">{geometry.boundaryReference.warning} 공백 점수는 #29 기준과 값이 준비될 때만 활성화됩니다.</p>
         </div>
-      </header>
-
-      <section className="hero" id="top">
-        <div>
-          <p className="eyebrow">LOCAL BRAND OBSERVATORY</p>
-          <h1>지역의 특산품과 상표 활용 현황을<br />근거부터 살펴봅니다.</h1>
-          <p className="hero-copy">
-            수집된 숫자만 보여주지 않습니다. 완료·부분·미검증 상태와 공식 출처를 함께 제공해
-            지금 판단 가능한 범위를 분명하게 구분합니다.
-          </p>
-        </div>
-        <div className="hero-note">
-          <span>현재 범위</span>
-          <strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}개 품목</strong>
-          <p>소규모 E2E 검증 자료입니다. 전국 통계로 해석하지 않습니다.</p>
-        </div>
+        <aside className="map-insight"><p className="eyebrow">SELECTED AREA</p><h2>{selectedMunicipality || selectedProvince || "전국 샘플"}</h2><p className="insight-summary">{selectedProvince ? `${visibleRegions.length}개 수집 지역, ${visibleItems.length}개 품목` : `${snapshot.coverage.observedRegionCount}개 수집 지역만 색상에 반영`}</p><div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{itemName(item)}</strong><small>{region.region}</small></span><b>{number(item.metrics.uniqueTrademarkCount.value)}건</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역의 샘플 데이터가 없습니다.</p>}</div><div className="insight-note"><strong>표시 원칙</strong><p>샘플이 없는 지역은 0건이 아니라 ‘데이터 없음’입니다. 회색 영역을 상표 공백으로 해석하지 않습니다.</p></div></aside>
       </section>
+    </>}
 
-      <section className="metrics" aria-label="핵심 지표">
-        <article>
-          <span>고유 상표</span>
-          <strong>{number(totals.trademarks)}</strong>
-          <small>저장 hit, 출원번호 우선 중복 제거</small>
-        </article>
-        <article>
-          <span>등록 상표</span>
-          <strong>{number(totals.registered)}</strong>
-          <small>등록 상태로 확인된 표본</small>
-        </article>
-        <article>
-          <span>지정상품 검토 후보</span>
-          <strong>{number(totals.review)}</strong>
-          <small>#12 확정 전 자동 제외하지 않음</small>
-        </article>
-        <article>
-          <span>수집 상태</span>
-          <strong>{snapshot.coverage.partialQueryCount > 0 ? "부분" : "완료"}</strong>
-          <small>완료 {snapshot.coverage.completeQueryCount} · 부분 {snapshot.coverage.partialQueryCount}</small>
-        </article>
-      </section>
+    {tab === "regions" && <section className="screen-section"><div className="screen-heading"><div><p className="eyebrow">LOCAL GOVERNMENT</p><h1>지자체별 조회</h1></div><p>지역 → 품목 → 근거 지표 순으로 확인합니다.</p></div><section className="workspace" aria-label="지역별 상세 조회"><aside className="region-panel"><div className="panel-heading"><div><p className="eyebrow">REGION INDEX</p><h2>수집 지역</h2></div><span>{filteredRegions.length}건</span></div><label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label><div className="region-list">{filteredRegions.map((region) => { const count = region.items.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); return <button type="button" key={regionKey(region)} className={regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.region}</strong><small>{region.items.length}개 품목 · 상표 {number(count)}건</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}{filteredRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div></aside><RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} /></section></section>}
 
-      <section className="workspace" aria-label="지역별 상세 조회">
-        <aside className="region-panel">
-          <div className="panel-heading">
-            <div>
-              <p className="eyebrow">REGION INDEX</p>
-              <h2>지역별 조회</h2>
-            </div>
-            <span>{filteredRegions.length}건</span>
-          </div>
-          <label className="search-field">
-            <span className="sr-only">지역 또는 품목 검색</span>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="지역 또는 품목 검색"
-            />
-          </label>
-          <div className="region-list">
-            {filteredRegions.map((region) => {
-              const active = selectedRegion?.regionCode === region.regionCode;
-              const count = region.items.reduce(
-                (sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0),
-                0,
-              );
-              return (
-                <button
-                  type="button"
-                  key={region.regionCode || region.region}
-                  className={active ? "region-button active" : "region-button"}
-                  onClick={() => chooseRegion(region)}
-                >
-                  <span>
-                    <strong>{region.region}</strong>
-                    <small>{region.items.length}개 품목 · 상표 {number(count)}건</small>
-                  </span>
-                  <span className={`state state-${region.dataState}`}>
-                    {STATE_LABELS[region.dataState] || region.dataState}
-                  </span>
-                </button>
-              );
-            })}
-            {filteredRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}
-          </div>
-        </aside>
+    {tab === "items" && <section className="screen-section"><div className="screen-heading"><div><p className="eyebrow">ITEM EXPLORER</p><h1>품목별 조회</h1></div><p>품목을 기준으로 지역과 상표 활동을 다시 묶었습니다.</p></div><div className="item-screen"><div className="item-screen-toolbar"><label><span className="sr-only">품목 검색</span><input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목 또는 지역 검색" /></label><span>{itemRows.length}개 품목</span></div><div className="item-table" role="table"><div className="item-table-head" role="row"><span>품목</span><span>수집 지역</span><span>고유 상표</span><span>등록 상표</span><span>등록률</span></div>{itemRows.map((row, index) => <div className="item-table-row" role="row" key={row.name}><span><b>{String(index + 1).padStart(2, "0")}</b><strong>{row.name}</strong></span><span>{row.regions.join(", ")}</span><span>{number(row.trademarks)}건</span><span>{number(row.registered)}건</span><span>{percent(row.trademarks ? row.registered / row.trademarks : null)}</span></div>)}</div><div className="method-note"><strong>집계 기준</strong><p>현재 스냅샷의 정규화된 품목명을 기준으로 지역별 결과를 재그룹했습니다. 같은 품목명이 다른 지역에 존재하면 한 행으로 합치며, 샘플 밖 지역은 포함하지 않습니다.</p></div></div></section>}
 
-        <div className="detail-panel">
-          {selectedRegion && selectedItem ? (
-            <>
-              <div className="detail-heading">
-                <div>
-                  <p className="eyebrow">REGION DETAIL</p>
-                  <h2>{selectedRegion.region}</h2>
-                  <p>법정동코드 {selectedRegion.regionCode || "미확정"}</p>
-                </div>
-                <span className={`state state-${selectedRegion.dataState}`}>
-                  {STATE_LABELS[selectedRegion.dataState] || selectedRegion.dataState}
-                </span>
-              </div>
+    {tab === "compare" && <section className="screen-section"><div className="screen-heading"><div><p className="eyebrow">SPECIALIZED CROP MATCH</p><h1>특화작목 비교</h1></div><p>정책 지정 작목과 실제 상표 활동의 일치 여부를 비교하는 화면입니다.</p></div><div className="compare-banner"><span>현재 상태</span><strong>정책 지정 특화작목 원본 미수집 · 비교 대기</strong><p>농사로 지역특산물과 정책 지정 특화작목은 같은 데이터가 아니므로 임의로 대체하지 않습니다.</p></div><div className="compare-grid">{[...provinceStats.entries()].map(([province, stat]) => { const names = snapshot.regions.filter((region) => (region.sido || region.region) === province).flatMap((region) => region.items.map(itemName)); return <article key={province}><div className="compare-head"><h2>{province}</h2><span>비교 대기</span></div><dl><dt>현재 공식 특산품 후보</dt><dd>{names.join(", ") || "없음"}</dd><dt>정책 지정 특화작목</dt><dd className="missing">미수집</dd><dt>상표 활동 표본</dt><dd>{number(stat.trademarks)}건</dd><dt>일치 여부</dt><dd className="missing">판정 불가</dd></dl></article>; })}</div><div className="compare-sources"><article><span>추가 수집 1</span><strong>농촌진흥청 지역특화작목 지정 목록</strong><p>계획 기간·지역·작목·고시 또는 보고서 버전을 구조화해야 합니다.</p></article><article><span>추가 수집 2</span><strong>한국지식재산연구원 로컬브랜드 근거</strong><p>레퍼런스가 인용한 2024년 보고서의 지역·품목 대응표와 페이지 근거가 필요합니다.</p></article><article><span>자동화 원칙</span><strong>정책 목록 확보 후 결정론적 비교</strong><p>명칭 정규화 후보만 사람 검토하고 나머지 집계·일치 판정은 자동화합니다.</p></article></div></section>}
 
-              <div className="item-tabs" role="tablist" aria-label={`${selectedRegion.region} 품목`}>
-                {selectedRegion.items.map((item) => (
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={selectedItem.specialtyId === item.specialtyId}
-                    key={item.specialtyId || item.itemName}
-                    onClick={() => setSelectedItemId(item.specialtyId || "")}
-                  >
-                    {item.noticeName || item.itemName || "미지정 품목"}
-                  </button>
-                ))}
-              </div>
+    <section className="provenance"><div className="section-heading"><div><p className="eyebrow">TRACEABLE BY DESIGN</p><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-grid">{snapshot.sources.filter((source) => source.sourceUrl).map((source) => <a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer" key={source.sourceId}><span>{source.sourceLabel || source.sourceId}</span><strong>{source.sourceContractVersion || "버전 미기록"}</strong><small>검증 {source.sourceLastVerifiedAt || date(source.sourceFetchedAt)}</small></a>)}<a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer"><span>지도 경계</span><strong>{geometry.boundaryReference.sourceName}</strong><small>{geometry.boundaryReference.sourceBasis} · 참고용</small></a></div><details><summary>현재 해석 주의사항 {snapshot.warnings.length}건 보기</summary><ul>{snapshot.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul></details></section>
+    <footer><span>Snapshot {snapshot.snapshotId}</span><span>수치·판정·지도 경계는 출처와 버전을 함께 표시합니다.</span></footer>
+  </main>;
+}
 
-              <div className="item-title">
-                <div>
-                  <span>선택 품목</span>
-                  <h3>{selectedItem.noticeName || selectedItem.itemName || "미지정 품목"}</h3>
-                </div>
-                <span className="class-chip">NICE {selectedItem.niceClass || "미확정"}</span>
-              </div>
-
-              <div className="detail-grid">
-                <article>
-                  <span>고유 상표</span>
-                  <strong>{number(selectedItem.metrics.uniqueTrademarkCount.value)}건</strong>
-                  <small>{selectedItem.metrics.uniqueTrademarkCount.rationale}</small>
-                </article>
-                <article>
-                  <span>등록 상표</span>
-                  <strong>{number(selectedItem.metrics.registeredTrademarkCount.value)}건</strong>
-                  <small>등록률 {percent(selectedItem.metrics.registrationRate.value)}</small>
-                </article>
-                <article>
-                  <span>지역 출원인 비중</span>
-                  <strong>{percent(selectedItem.metrics.localApplicantShare.value)}</strong>
-                  <small>{selectedItem.metrics.localApplicantShare.availability === "blocked" ? "주소 검증률 부족" : "등록원부 주소 근거"}</small>
-                </article>
-                <article>
-                  <span>브랜드 공백 점수</span>
-                  <strong>{selectedItem.metrics.gapScore.value ?? "검토 중"}</strong>
-                  <small>#29 건수 기준 반영 전 preview</small>
-                </article>
-              </div>
-
-              <div className="review-strip">
-                <div>
-                  <span>자동 확정</span>
-                  <strong>{number(selectedItem.metrics.confirmedGoodsMatchCount.value)}건</strong>
-                </div>
-                <div>
-                  <span>사람 검토 필요</span>
-                  <strong>{number(selectedItem.metrics.goodsReviewCandidateCount.value)}건</strong>
-                </div>
-                <p>확실한 항목은 자동 처리하고, 지정상품 후보처럼 눈으로 볼 항목만 검토 큐에 남깁니다.</p>
-              </div>
-
-              <div className="blocking-list">
-                {[selectedItem.metrics.localApplicantShare, selectedItem.metrics.gapScore]
-                  .filter((metric) => metric.availability === "blocked" && metric.blockingIssue)
-                  .map((metric) => {
-                    const href = issueUrl(metric.blockingIssue);
-                    return href ? (
-                      <a href={href} target="_blank" rel="noreferrer" key={metric.blockingIssue}>
-                        {metric.blockingIssue} 기준 확인 →
-                      </a>
-                    ) : null;
-                  })}
-              </div>
-            </>
-          ) : (
-            <p className="empty">표시할 지역 데이터가 없습니다.</p>
-          )}
-        </div>
-      </section>
-
-      <section className="provenance">
-        <div className="section-heading">
-          <div>
-            <p className="eyebrow">TRACEABLE BY DESIGN</p>
-            <h2>출처와 데이터 상태</h2>
-          </div>
-          <span>{snapshot.schemaVersion}</span>
-        </div>
-        <div className="source-grid">
-          {snapshot.sources
-            .filter((source) => source.sourceUrl)
-            .map((source) => (
-              <a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer" key={source.sourceId}>
-                <span>{source.sourceLabel || source.sourceId}</span>
-                <strong>{source.sourceContractVersion || "버전 미기록"}</strong>
-                <small>검증 {source.sourceLastVerifiedAt || date(source.sourceFetchedAt)}</small>
-              </a>
-            ))}
-        </div>
-        <details>
-          <summary>현재 해석 주의사항 {snapshot.warnings.length}건 보기</summary>
-          <ul>{snapshot.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>
-        </details>
-      </section>
-
-      <footer>
-        <span>Snapshot {snapshot.snapshotId}</span>
-        <span>수치·판정 기준은 버전과 함께 갱신됩니다.</span>
-      </footer>
-    </main>
-  );
+function RegionDetail({ region, item, onItem }: { region: Region; item: Item; onItem: (id: string) => void }) {
+  return <div className="detail-panel"><div className="detail-heading"><div><p className="eyebrow">REGION DETAIL</p><h2>{region.region}</h2><p>법정동코드 {region.regionCode || "미확정"}</p></div><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></div><div className="item-tabs" role="tablist" aria-label={`${region.region} 품목`}>{region.items.map((row) => <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")}>{itemName(row)}</button>)}</div><div className="item-title"><div><span>선택 품목</span><h3>{itemName(item)}</h3></div><span className="class-chip">NICE {item.niceClass || "미확정"}</span></div><div className="detail-grid"><article><span>고유 상표</span><strong>{number(item.metrics.uniqueTrademarkCount.value)}건</strong><small>{item.metrics.uniqueTrademarkCount.rationale}</small></article><article><span>등록 상표</span><strong>{number(item.metrics.registeredTrademarkCount.value)}건</strong><small>등록률 {percent(item.metrics.registrationRate.value)}</small></article><article><span>지역 출원인 비중</span><strong>{percent(item.metrics.localApplicantShare.value)}</strong><small>{item.metrics.localApplicantShare.availability === "blocked" ? "주소 검증률 부족" : "등록원부 주소 근거"}</small></article><article><span>브랜드 공백 점수</span><strong>{item.metrics.gapScore.value ?? "검토 중"}</strong><small>{item.metrics.gapScore.availability === "blocked" ? "#29 기준 또는 대표성 근거 확인" : "낮은 상표 활용도 기준"}</small></article></div><div className="review-strip"><div><span>자동 확정</span><strong>{number(item.metrics.confirmedGoodsMatchCount.value)}건</strong></div><div><span>사람 검토 필요</span><strong>{number(item.metrics.goodsReviewCandidateCount.value)}건</strong></div><p>확실한 항목은 자동 처리하고, 지정상품 후보처럼 눈으로 볼 항목만 검토 큐에 남깁니다.</p></div><div className="blocking-list">{[item.metrics.localApplicantShare, item.metrics.gapScore].filter((metric) => metric.availability === "blocked" && metric.blockingIssue).map((metric) => { const href = issueUrl(metric.blockingIssue); return href ? <a href={href} target="_blank" rel="noreferrer" key={metric.blockingIssue}>{metric.blockingIssue} 기준 확인 →</a> : null; })}</div></div>;
 }

@@ -87,12 +87,13 @@ UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며,
 - [x] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-business-strategy/` 출력을 합치는
       `dashboard-snapshot-v1` 샘플 어댑터 구현 — [`buildDashboardSnapshot.js`](buildDashboardSnapshot.js)
 - [x] 법정동코드 정확 매칭 `regionCode`와 고시명칭·NICE류 기반 `specialtyId` 추가
-- [ ] 현재 기준 지도 경계 GeoJSON 확보(현재 스냅샷의 지도 상태는 `blocked`)
+- [ ] 현재 기준 지도 경계 GeoJSON 확보(공백 점수용 운영 경계는 계속 `blocked`)
 - [x] 브랜드 공백 지도 시각화 방식 검토 — [`prototypes/brand-map.html`](prototypes/brand-map.html)에서
-      지도 기반(시도→시군구 드릴다운) 방향으로 목업 완료. 실제 구현 프레임워크(Streamlit 등)로
-      이 인터랙션을 어떻게 옮길지는 아직 미정
+      검토한 시도→시군구 드릴다운을 React 웹과 단일 HTML에 구현. 2013 KOSTAT 참고 경계는
+      상표 건수·등록률·수집 범위 표시에만 사용하고, 현재 경계·점수 미확정 상태를 화면에 명시
 - [ ] 실시간 신규 출원 모니터링 갱신 주기/알림 방식 결정
-- [x] 샘플 스냅샷을 읽는 웹 UI, 지역·품목 검색/선택, 근거·부분수집·차단 상태 표시
+- [x] 샘플 스냅샷을 읽는 웹 UI, 전국 지도, 지역·품목 조회, 특화작목 비교 준비 화면,
+      근거·부분수집·차단 상태 표시
 - [ ] 실키 수집 스케줄과 사이트 무인 재배포 연결(#42)
 - [ ] 통합 스냅샷과 후속 데이터 갭 구현 — [#37](https://github.com/omelette-archive/KIIP/issues/37)
 
@@ -114,5 +115,7 @@ node 07-dashboard/buildDashboardSnapshot.js `
   --out 07-dashboard/output/dashboard-snapshot.json
 ```
 
-`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 지도 경계
-데이터가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지된다.
+`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 기준 지도
+경계가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지한다. 다만 UI는 출처와
+연도를 표시한 참고 경계 위에 상표 건수·등록률·수집 범위를 그리며, 데이터 없는 지역은 0건이 아닌
+`데이터 없음`으로 표시한다. 브랜드 공백 색상은 점수와 운영 경계가 준비될 때까지 비활성화한다.
