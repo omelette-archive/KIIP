@@ -28,7 +28,7 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /특화작목 비교/);
   assert.match(html, /2013 KOSTAT/);
   assert.match(visibleTextHtml, /영양군 \/ (사과|배|포도)/, "지도 옆 표기는 '지역 / 특산품' 형식이어야 함");
-  assert.match(html, /매칭·집계 기준/);
+  assert.match(html, /판정 기준과 매칭 방법/, "매칭 기준은 하단 note가 아니라 상시 노출 섹션에 있어야 함");
   assert.match(html, /고시명칭 \+ NICE류/);
   assert.match(html, /출처와 데이터 상태/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
@@ -51,6 +51,19 @@ test("renders tab navigation and a data-connected ranking table", async () => {
   assert.match(firstRow, />(사과|배|포도|토마토)</, "주 라벨은 브랜드명·고시명칭이 아니라 대표 특산품명이어야 함");
   assert.match(firstRow, /신선한 (사과|배|포도|토마토)/, "고시명칭은 집계 근거로 병기해야 함");
   assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
+});
+
+test("renders matching criteria prominently, on every tab, not just as bottom-of-page small print", async () => {
+  const response = await render();
+  const html = await response.text();
+  // 판정 기준은 하단 <details>가 아니라 항상 보이는 섹션이어야 한다(2026-08-11 피드백:
+  // "작은글씨는 아니면 위에 잘 넣을수있으면 넣고"). tab 조건문 밖에 있어야 모든 탭에서 보인다.
+  assert.match(html, /class="criteria"/);
+  assert.match(html, /판정 기준과 매칭 방법/);
+  assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
+  assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
+  assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
+  assert.match(html, /등록원부 실시간 조회/, "출원인 지역 매칭 기준이 명시돼야 함");
 });
 
 test("ships a valid dashboard snapshot", async () => {
@@ -89,8 +102,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /특화작목 비교/);
   assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);
-  // 단일 HTML은 클라이언트가 지도·탭·랭킹을 같은 데이터로 렌더링한다.
+  // 단일 HTML은 클라이언트가 지도·탭·랭킹·판정 기준을 같은 데이터로 렌더링한다.
   assert.match(html, /primary-tabs/);
   assert.match(html, /ranking-table/);
+  assert.match(html, /class="criteria"/, "판정 기준 섹션이 단독 HTML에도 동일하게 있어야 함");
   assert.match(html, /dashboardClient\(/);
 });

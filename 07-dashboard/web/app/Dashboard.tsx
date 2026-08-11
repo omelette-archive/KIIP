@@ -80,10 +80,24 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><span className="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>특산품 × 상표 근거 대시보드</small></span></button><div className="snapshot-meta"><span className="sample-badge">{snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터"}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
+    <section className="criteria" aria-label="판정 기준과 매칭 방법">
+      <div className="section-heading">
+        <div><p className="eyebrow">HOW THIS IS BUILT</p><h2>판정 기준과 매칭 방법</h2></div>
+        <span>현재 출처 {sourceLine}</span>
+      </div>
+      <div className="criteria-grid">
+        <article><span>대표 특산품 판정</span><strong>GI 출처 또는 상표 출원 3건 이상</strong><small>#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)</small></article>
+        <article><span>품목 매칭</span><strong>고시상품명칭 정확 일치</strong><small>지식재산처 고시상품명칭 13판(2026) 기준. 부분·복수 일치는 추정하지 않고 사람 검토로 분리</small></article>
+        <article><span>지역 매칭</span><strong>법정동코드 완전일치</strong><small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small></article>
+        <article><span>상표 검색</span><strong>KIPRIS 단어검색(고시명칭 기준)</strong><small>검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음</small></article>
+        <article><span>고유 상표 / 등록 상표</span><strong>출원번호 중복 제거 / 상태=등록만</strong><small>③단계가 저장한 hit 기준. KIPRIS 전체 검색 건수(totalCount)와 다를 수 있음</small></article>
+        <article><span>출원인 지역 매칭</span><strong>등록원부 실시간 조회(등록번호 기준)</strong><small>등록 완료된 상표만 대상. 주소가 검증된 표본만 지역 내·외 비중 계산에 사용</small></article>
+      </div>
+    </section>
+
     {tab === "summary" && <>
       <section className="hero"><div><p className="eyebrow">LOCAL BRAND OBSERVATORY</p><h1>지역 특산품의 상표 공백을<br />지도와 근거로 살펴봅니다.</h1><p className="hero-copy">레퍼런스의 지도·지자체·품목·특화작목 구조를 따르되, 수집된 값과 미수집 상태를 섞지 않습니다. 현재는 소규모 E2E 검증 범위입니다.</p></div><div className="hero-note"><span>현재 검증 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}개 품목</strong><p>전국 지도 틀은 표시하지만 색상 값은 샘플이 존재하는 지역에만 적용합니다.</p></div></section>
       <section className="metrics" aria-label="핵심 지표"><article><span>고유 상표</span><strong>{number(totals.trademarks)}</strong><small>출원번호 우선 중복 제거</small></article><article><span>등록 상표</span><strong>{number(totals.registered)}</strong><small>등록 상태 확인 표본</small></article><article><span>지정상품 검토 후보</span><strong>{number(totals.review)}</strong><small>확실한 항목만 자동 확정</small></article><article><span>수집 상태</span><strong>{snapshot.coverage.partialQueryCount > 0 ? "부분" : "완료"}</strong><small>완료 {snapshot.coverage.completeQueryCount} · 부분 {snapshot.coverage.partialQueryCount}</small></article></section>
-      <div className="method-note matching-rule"><strong>매칭·집계 기준</strong><p>화면명은 지역의 대표 특산품(예: 사과), 검색·집계 키는 특허청 고시명칭 + NICE류(예: 신선한 사과 · 31류)입니다. 상표명은 개별 사례로만 보존합니다.</p><p><b>현재 출처</b> {sourceLine}</p></div>
       <section className="map-workspace">
         <div className="map-card"><div className="map-heading"><div><p className="eyebrow">BRAND GAP MAP</p><h2>{selectedProvince ? `${selectedProvince} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip">참고 경계 · 2013 KOSTAT</span></div>
           <div className="map-toolbar"><div className="map-metrics">{(Object.keys(MAP_LABELS) as MapMetric[]).map((key) => <button type="button" key={key} disabled={key === "gap" && !hasGap} className={mapMetric === key ? "active" : ""} onClick={() => setMapMetric(key)} title={key === "gap" && !hasGap ? "현재 샘플의 공백 점수가 차단 상태입니다." : undefined}>{MAP_LABELS[key]}</button>)}</div>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div>
