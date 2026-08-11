@@ -127,3 +127,49 @@ node 07-dashboard/buildDashboardSnapshot.js `
 
 `sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 지도 경계
 데이터가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지된다.
+
+### ⚠️ 샘플은 반드시 ①→⑦ 정식 경로로 만든다 — "품목"은 고시명칭 기준이어야 함
+
+`analysis.json`(④)의 입력을 만들 때 `01-collect-specialties`(실제 특산물 수집) →
+`02-normalize-items/normalizeItems.js`(고시명칭 정제) → `03-match-trademarks`를 거쳐야
+한다. `03-match-trademarks/buildAreaBrandValidationInput.js`(지역브랜드 출원번호 조인
+*기능 자체*를 검증하는 별도 도구)의 출력을 대시보드 샘플에 재사용하면 안 된다 — 그 CSV는
+`noticeName`을 비워두고 브랜드명을 `itemName`으로 직접 쓰기 때문에, 지역의 대표
+특산품(예: "사과") 대신 특정 상표/브랜드명(예: "데일리")이 "품목"으로 노출된다
+(2026-08-11 실사례 — `docs/dashboard-data-contract.md` §3.1, `docs/data-source-provenance.md`
+§1 참고). `04-analyze-brand/lib/analyzer.js`가 이 오용을 감지하면 `warnings`에 경고를
+남기니, 경고가 보이면 입력을 다시 만든다.
+
+실제로 검증된 재현 절차(2026-08-11, 경상북도 영양군·충청남도 천안시 5개 품목):
+
+```powershell
+node 01-collect-specialties/collectSpecialties.js --sources nongsaro --limit 40 `
+  --out 01-collect-specialties/output/specialties-sample.csv
+
+node 02-normalize-items/normalizeItems.js --input 01-collect-specialties/output/specialties-sample.csv `
+  --out 02-normalize-items/output/normalized-sample.csv
+
+node 03-match-trademarks/matchTrademarks.js --input 02-normalize-items/output/normalized-sample.csv `
+  --numOfRows 30 --max-pages 2 --max-hits-per-query 30 --max-requests 10 `
+  --enrich-registry --max-registry-requests 15 --registry-concurrency 3 `
+  --out 03-match-trademarks/output/stage3-sample.json
+
+node 04-analyze-brand/analyzeBrands.js --input 03-match-trademarks/output/stage3-sample.json `
+  --out 04-analyze-brand/output/analysis.json --asOfYear 2026
+node 05-detect-brand-gap/detectBrandGap.js --input 04-analyze-brand/output/analysis.json `
+  --out 05-detect-brand-gap/output/gap.json
+node 06-generate-business-strategy/generateStrategy.js --input 05-detect-brand-gap/output/gap.json `
+  --out 06-generate-business-strategy/output/strategy.json
+node 07-dashboard/buildDashboardSnapshot.js --analysis 04-analyze-brand/output/analysis.json `
+  --gap 05-detect-brand-gap/output/gap.json --strategy 06-generate-business-strategy/output/strategy.json `
+  --mode sample --out 07-dashboard/output/dashboard-snapshot.json
+
+cd 07-dashboard/web
+npm run sync:snapshot -- ../output/dashboard-snapshot.json
+npm run build:html
+```
+
+이 절차로 만든 현재 샘플은 "신선한 사과"·"신선한 배"·"신선한 포도"(경상북도 영양군),
+"신선한 토마토"(충청남도 천안시)를 실제 고시명칭 기준 품목으로 보여준다. "오미자"(천안시)는
+②단계에서 고시명칭 정확 일치가 없어 검토대기로 남았고, ③단계에서 검색 자체를 건너뛴
+사례로 그대로 유지했다 — 대표 특산품이라고 추정해서 채우지 않는다.
