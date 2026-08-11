@@ -59,19 +59,26 @@ test("renders tab navigation and a data-connected ranking table", async () => {
   // 품목명은 정규화된 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
   // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
   // 조인 검증용일 뿐 대표 특산품이 아니다. registeredTrademarkCount 내림차순 정렬이 실제로
-  // 동작하는지도 현재 스냅샷의 1위 값으로 확인한다.
+  // 동작하는지도 확인한다. 단, 지역 귀속이 막힌 스냅샷이면 전국 검색 후보로 억지 순위를
+  // 만들지 않고 빈 랭킹을 유지해야 한다(#50).
   const tbodyIndex = html.indexOf("<tbody>");
   const firstRow = html.slice(tbodyIndex, html.indexOf("</tr>", tbodyIndex)).replace(/<!--.*?-->/gs, "");
   const firstRanking = snapshot.regions
     .flatMap((region) => region.items.map((item) => ({ region, item })))
+    .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
     .sort(
       (a, b) =>
         (b.item.metrics.registeredTrademarkCount.value || 0) -
         (a.item.metrics.registeredTrademarkCount.value || 0)
     )[0];
-  assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
-  assert.match(firstRow, new RegExp(`>${escapeRegExp(firstRanking.item.itemName)}<`), "주 라벨은 현재 데이터의 대표 특산품명이어야 함");
-  assert.match(firstRow, new RegExp(escapeRegExp(firstRanking.item.noticeName)), "고시명칭은 집계 근거로 병기해야 함");
+  if (firstRanking) {
+    assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
+    assert.match(firstRow, new RegExp(`>${escapeRegExp(firstRanking.item.itemName)}<`), "주 라벨은 현재 데이터의 대표 특산품명이어야 함");
+    assert.match(firstRow, new RegExp(escapeRegExp(firstRanking.item.noticeName)), "고시명칭은 집계 근거로 병기해야 함");
+  } else {
+    assert.doesNotMatch(firstRow, />1<\/td>/, "지역 귀속 미검증 전국 후보로 순위를 만들면 안 됨");
+    assert.match(html, /검증 중/, "차단된 지역 지표는 0건이 아니라 검증 중으로 표시해야 함");
+  }
   assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
@@ -85,7 +92,7 @@ test("renders matching criteria prominently, on every tab, not just as bottom-of
   assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
   assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
   assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
-  assert.match(html, /등록원부 실시간 조회/, "출원인 지역 매칭 기준이 명시돼야 함");
+  assert.match(html, /전체 주소 귀속 완료 전 지표 차단/, "출원인 지역 매칭 차단 기준이 명시돼야 함");
 });
 
 test("ships a valid dashboard snapshot", async () => {
@@ -100,6 +107,18 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.every((item) => item.matchingBasis === "notice_name_and_nice_class"));
   assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
+  assert.ok(
+    items.every((item) => item.metrics.uniqueTrademarkCount.availability === "blocked"),
+    "현재 부분 보강 샘플의 지역 건수는 모두 차단돼야 함"
+  );
+  assert.ok(
+    items.every((item) => item.metrics.uniqueTrademarkCount.value === null),
+    "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨"
+  );
+  assert.ok(
+    items.every((item) => Number.isFinite(item.metrics.nationwideSearchTrademarkCount.value)),
+    "전국 검색 후보 건수는 별도 참고 지표로 보존해야 함"
+  );
   const confirmedItems = items.filter((item) => Number(item.metrics.confirmedGoodsMatchCount.value) > 0);
   if (confirmedItems.length > 0) {
     assert.ok(

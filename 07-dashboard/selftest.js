@@ -29,10 +29,16 @@ function bucket(overrides = {}) {
     skippedQueryCount: 0,
     sourceTotalCount: 1,
     uniqueTrademarkCount: 1,
+    nationwideSearchTrademarkCount: 1,
+    regionalUniqueTrademarkCount: 1,
     statusCounts: { registered: 1, pending: 0, inactive: 0, unknown: 0 },
+    regionalStatusCounts: { registered: 1, pending: 0, inactive: 0, unknown: 0 },
     registrationRate: 1,
-    regionVerificationRate: 0,
-    localApplicantShare: null,
+    regionalRegistrationRate: 1,
+    regionalMetricAvailability: "available",
+    regionalMetricBlockingReasons: [],
+    regionVerificationRate: 1,
+    localApplicantShare: 1,
     regionalBrandReferenceHitCount: 0,
     regionalBrandInsideShare: null,
     goodsConfirmedHitCount: 1,
@@ -80,6 +86,12 @@ function fixture() {
     uniqueTrademarkCount: 0,
     statusCounts: { registered: 0, pending: 0, inactive: 0, unknown: 0 },
     registrationRate: null,
+    regionalUniqueTrademarkCount: 0,
+    regionalStatusCounts: { registered: 0, pending: 0, inactive: 0, unknown: 0 },
+    regionalRegistrationRate: null,
+    regionalMetricAvailability: "blocked",
+    regionalMetricBlockingReasons: ["applicant_address_unverified"],
+    regionVerificationRate: 0,
     sources: ["농사로"],
     sourceProvenance: [{ sourceId: "nongsaro", sourceLabel: "농사로" }],
   });
@@ -230,8 +242,10 @@ const boseong = snapshot.regions.find((row) => row.region === "전라남도 보�
 assert.match(andong.regionCode, /^\d+$/);
 assert.strictEqual(andong.regionCodeStatus, "resolved");
 assert.strictEqual(snapshot.briefings[0].regionCode, andong.regionCode);
-assert.strictEqual(andong.items[0].metrics.localApplicantShare.availability, "blocked");
-assert.strictEqual(andong.items[0].metrics.localApplicantShare.blockingIssue, "#11");
+assert.strictEqual(andong.items[0].metrics.uniqueTrademarkCount.value, 1);
+assert.strictEqual(andong.items[0].metrics.uniqueTrademarkCount.availability, "available");
+assert.strictEqual(andong.items[0].metrics.nationwideSearchTrademarkCount.value, 1);
+assert.strictEqual(andong.items[0].metrics.localApplicantShare.availability, "available");
 assert.strictEqual(andong.items[0].metrics.gapScore.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.gapScore.blockingIssue, "#29");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability, "preview");
@@ -244,6 +258,9 @@ assert.strictEqual(
 assert.ok(andong.items[0].metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
 assert.ok(andong.items[0].metrics.uniqueTrademarkCount.sourceIds.includes("kipris_trademark"));
 assert.strictEqual(boseong.dataState, "complete_zero");
+assert.strictEqual(boseong.items[0].metrics.uniqueTrademarkCount.value, null);
+assert.strictEqual(boseong.items[0].metrics.uniqueTrademarkCount.availability, "blocked");
+assert.strictEqual(boseong.items[0].metrics.uniqueTrademarkCount.blockingIssue, "#50");
 assert.strictEqual(snapshot.map.availability, "blocked");
 assert.strictEqual(snapshot.coverage.targetRegionCount, null);
 ok("안정 ID·상태·지표 메타데이터·출처·랭킹·브리핑을 한 JSON으로 결합");

@@ -1,8 +1,13 @@
 import { readFile, writeFile } from "node:fs/promises";
-import { fileURLToPath } from "node:url";
+import path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
-const inputUrl = new URL("../public/data/dashboard-snapshot.json", import.meta.url);
-const outputUrl = new URL("../../dashboard.html", import.meta.url);
+const inputUrl = process.argv[2]
+  ? pathToFileURL(path.resolve(process.argv[2]))
+  : new URL("../public/data/dashboard-snapshot.json", import.meta.url);
+const outputUrl = process.argv[3]
+  ? pathToFileURL(path.resolve(process.argv[3]))
+  : new URL("../../dashboard.html", import.meta.url);
 const [snapshotText, geometryText, cssText, client] = await Promise.all([
   readFile(inputUrl, "utf8"),
   readFile(new URL("../public/data/map-geometry.json", import.meta.url), "utf8"),

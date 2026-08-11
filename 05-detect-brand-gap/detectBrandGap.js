@@ -14,6 +14,9 @@ const path = require("path");
 const {
   GAP_SCORE_VERSION,
   REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD,
+  regionalMetricAvailable,
+  regionalTrademarkCount,
+  regionalRegistrationRate,
   scoreBucket,
 } = require("./lib/scorer");
 
@@ -64,14 +67,18 @@ function detectGaps(analysis) {
       niceClass: bucket.niceClass,
       sources: bucket.sources,
       sourceProvenance: bucket.sourceProvenance || [],
-      uniqueTrademarkCount: bucket.uniqueTrademarkCount,
-      registrationRate: bucket.registrationRate,
+      uniqueTrademarkCount: regionalMetricAvailable(bucket) ? regionalTrademarkCount(bucket) : null,
+      registrationRate: regionalMetricAvailable(bucket) ? regionalRegistrationRate(bucket) : null,
+      nationwideSearchTrademarkCount:
+        bucket.nationwideSearchTrademarkCount ?? bucket.uniqueTrademarkCount ?? 0,
+      regionalUniqueTrademarkCount: bucket.regionalUniqueTrademarkCount ?? null,
+      regionalMetricAvailability:
+        bucket.regionalMetricAvailability || (regionalMetricAvailable(bucket) ? "available" : "blocked"),
+      regionalMetricBlockingReasons: bucket.regionalMetricBlockingReasons || [],
       // ③단계 페이지·hit·요청 상한에 걸려 부분 수집된 검색 수 — ⑥-2가 "사람이 봐야 할" 후보를
       // 고를 때 근거가 불완전한 행을 가려내는 데 쓴다(이슈 #16).
       partialQueryCount: bucket.partialQueryCount || 0,
-      // 참고용 메타데이터일 뿐 점수에는 안 쓴다 — 이슈 #11(출원인 주소 조인) 완료 전까지는
-      // 대부분 false/null이다. ⑥단계가 문장 생성 시 검증 여부에 따라 문장을 넣거나 뺀다.
-      regionMatchVerified: bucket.regionVerificationRate === 1,
+      regionMatchVerified: regionalMetricAvailable(bucket),
       localApplicantShare: bucket.localApplicantShare,
       goodsMatchCounts: bucket.goodsMatchCounts || null,
       goodsConfirmedHitCount: bucket.goodsConfirmedHitCount || 0,
@@ -96,12 +103,17 @@ function detectGaps(analysis) {
     "대표 특산품 판정 기준(GI 출처 또는 상표 출원 3건 이상)은 #29에서 확정됐지만, 활용도 " +
       "포화 건수·가중치는 아직 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 " +
       "05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
-    "지역 내·외 출원 비중(localApplicantShare)은 ③단계 --enrich-registry로 검증된 값만 " +
-      "신뢰할 수 있다 — 미실행 입력은 대부분 unverified다. regionMatchVerified는 참고용 " +
-      "메타데이터일 뿐 점수에는 아직 쓰지 않는다.",
+    "지역 상표 건수·등록률·공백 점수는 ③단계 --enrich-registry 주소 귀속과 검색 수집이 모두 " +
+      "완료된 행만 계산한다. 미검증 전국 검색 hit는 nationwideSearchTrademarkCount 참고값으로만 보존한다.",
     "지정상품 normalized_contains/class_only 후보는 #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않는다.",
   ];
-  const nonRepresentativeCount = rows.filter((row) => !row.representative).length;
+  const blockedCount = rows.filter((row) => row.scoreAvailability === "blocked").length;
+  if (blockedCount > 0) {
+    warnings.push(
+      `${blockedCount}개 지역×품목은 지역 귀속 또는 검색 수집이 불완전해 공백 점수를 차단했습니다(#50).`
+    );
+  }
+  const nonRepresentativeCount = rows.filter((row) => row.representative === false).length;
   if (nonRepresentativeCount > 0) {
     warnings.push(
       `${nonRepresentativeCount}개 지역×품목은 대표 특산품 판정 기준을 충족하지 않아 순위에서 제외됨.`
@@ -125,11 +137,13 @@ function detectGaps(analysis) {
       activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준, 미확정)",
       weights: { activity: 0.7, registration: 0.3 },
       weightsConfirmed: false,
+      regionalCountBasis: "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 사용",
+      regionalMetricGate: "검색 수집과 모든 저장 hit의 주소 귀속이 완료된 행만 점수 계산(#50)",
       localApplicantShareIncluded: false,
       designatedGoodsPolicy:
         "normalized_exact만 확정 근거; 후보·불일치는 메타데이터로 보존하고 점수 입력은 기존 합계 유지",
       designatedGoodsCriteriaIssue: "#12",
-      rationale: "출원인 주소 검증률이 낮은 값을 점수에 섞지 않아 동일 입력의 결정론성을 유지",
+      rationale: "전국 검색 결과를 지역 활동량으로 오인하지 않도록 미검증 행의 점수를 차단",
       criteriaIssue: "#29",
       lastUpdatedAt: "2026-08-11",
     },

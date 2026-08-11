@@ -105,6 +105,15 @@ assert.strictEqual(andongApple.duplicateHitCount, 1);
 assert.strictEqual(andongApple.statusCounts.registered, 1);
 assert.strictEqual(andongApple.statusCounts.pending, 1);
 assert.strictEqual(andongApple.statusCounts.inactive, 1);
+assert.strictEqual(andongApple.nationwideSearchTrademarkCount, 4);
+assert.strictEqual(andongApple.regionalUniqueTrademarkCount, 1);
+assert.strictEqual(andongApple.regionalStatusCounts.registered, 1);
+assert.strictEqual(andongApple.regionalRegistrationRate, 1);
+assert.strictEqual(andongApple.regionalMetricAvailability, "blocked");
+assert.deepStrictEqual(andongApple.regionalMetricBlockingReasons, [
+  "collection_incomplete",
+  "applicant_address_unverified",
+]);
 assert.strictEqual(andongApple.invalidApplicationDateCount, 1);
 ok("오류·0건 포함, 출원번호 중복 제거, 상태별 집계");
 
@@ -234,7 +243,7 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
   const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
   assert.strictEqual(andongTree, undefined, "분석 제외 품목을 집계 차원에 만들면 안 됨");
   assert.ok(r.summary.skippedQueryCount > 0, "제외 행은 운영 요약에는 남아야 함");
-  assert.strictEqual(r.schemaVersion, "1.3");
+  assert.strictEqual(r.schemaVersion, "1.4");
   ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
 }
 
@@ -392,6 +401,26 @@ console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무�
   assert.strictEqual(withNoticeFilled.regionItems.length, 0);
   assert.strictEqual(withNoticeFilled.exclusions.validationOnlyExcludedCount, 1);
   ok("validation_only 자료는 출원번호 evidence에만 쓰고 특산품 통계를 오염시키지 않음");
+}
+
+console.log("5-1) 지역 상표 지표는 완전 수집·주소 귀속 완료 시에만 공개");
+{
+  const r = analyzeEntries([{
+    status: "ok",
+    collectionStatus: "complete",
+    query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
+    hits: [
+      hit("R-1", "안동사과", "20250101", "등록", "inside"),
+      hit("R-2", "서울사과", "20250102", "등록", "outside"),
+    ],
+  }], { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.strictEqual(row.nationwideSearchTrademarkCount, 2);
+  assert.strictEqual(row.regionalUniqueTrademarkCount, 1);
+  assert.strictEqual(row.regionalMetricAvailability, "available");
+  assert.deepStrictEqual(row.regionalMetricBlockingReasons, []);
+  assert.strictEqual(row.regionalRegistrationRate, 1);
+  ok("전국 검색 후보 2건과 지역 inside 확정 1건을 분리하고 완전 검증 여부를 명시");
 }
 
 console.log("0) 상표 사례는 최신순을 유지하면서 지정상품 근거를 보존");
