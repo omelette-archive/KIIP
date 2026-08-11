@@ -18,6 +18,7 @@ const html = `<!doctype html>
 <meta name="description" content="지역 특산품과 상표 근거를 함께 확인하는 KIIP 샘플 대시보드"><title>지역 브랜드 인사이트</title><style>${css}</style></head>
 <body><main class="shell"><header><div class="brand"><span class="mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>특산품 × 상표 근거 대시보드</small></span></div><div class="meta"><span class="badge">샘플 데이터</span><span id="generated"></span></div></header>
 <section class="hero"><div><p class="eyebrow">LOCAL BRAND OBSERVATORY</p><h1>지역의 특산품과 상표 활용 현황을 근거부터 살펴봅니다</h1><p>수집 상태와 공식 출처를 함께 표시해 지금 판단 가능한 범위를 분명히 구분합니다.</p></div><aside class="note"><span>현재 검증 범위</span><strong id="coverage"></strong><p>소규모 E2E 샘플이며 전국 통계로 해석하면 안 됩니다.</p></aside></section>
+<section class="criteria" aria-label="판정 기준과 매칭 방법"><div class="section-heading"><div><p class="eyebrow">HOW THIS IS BUILT</p><h2>판정 기준과 매칭 방법</h2></div></div><div class="criteria-grid" id="criteria"></div></section>
 <div class="tab-nav" id="tabs" role="tablist" aria-label="대시보드 보기 전환"></div>
 <section class="metrics" id="totals"></section><section class="ranking" id="ranking"></section>
 <section class="workspace" id="region-view"><aside class="panel"><div class="panel-head"><p class="eyebrow">REGION INDEX</p><h2>지역별 조회</h2><input id="search" class="search" type="search" placeholder="지역 또는 품목 검색" aria-label="지역 또는 품목 검색"></div><div id="regions" class="region-list"></div></aside><section class="panel content" id="detail"></section></section>

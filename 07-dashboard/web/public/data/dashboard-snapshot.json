@@ -1,12 +1,12 @@
 {
   "schemaVersion": "dashboard-snapshot-v1",
-  "snapshotId": "dashboard-252f563339e37ed500d0",
-  "generatedAt": "2026-08-11T02:05:41.700Z",
+  "snapshotId": "dashboard-a30cf9f7ac05f4570872",
+  "generatedAt": "2026-08-11T02:27:15.600Z",
   "mode": "sample",
   "asOf": {
     "sourceMinFetchedAt": "2026-08-06",
     "sourceMaxFetchedAt": "2026-08-11T02:01:05.333Z",
-    "analysisGeneratedAt": "2026-08-11T02:05:41.333Z"
+    "analysisGeneratedAt": "2026-08-11T02:27:15.283Z"
   },
   "versions": {
     "analysisVersion": "brand-analysis-v3-ip-registry-evidence",
@@ -124,7 +124,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
@@ -138,7 +138,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
@@ -152,7 +152,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -166,7 +166,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
@@ -180,7 +180,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
@@ -194,7 +194,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
@@ -208,7 +208,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -221,12 +221,50 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.450Z",
+              "calculatedAt": "2026-08-11T02:27:15.382Z",
               "methodVersion": "gap-score-v1-representative-gi-or-count3",
               "rationale": "⑤ 예시 점수 기준",
               "blockingIssue": "#29"
             }
           },
+          "recentTrademarks": [
+            {
+              "title": "배산골송고",
+              "applicationNumber": "4020250189769",
+              "applicationDate": "20251014",
+              "applicant": "보배 농업회사법인 주식회사",
+              "applicationStatus": "출원",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "배하츠",
+              "applicationNumber": "4020240171436",
+              "applicationDate": "20240913",
+              "applicant": "김은희",
+              "applicationStatus": "포기",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "천년이음나주배",
+              "applicationNumber": "4020240032705",
+              "applicationDate": "20240221",
+              "applicant": "나주시농업협동조합공동사업법인|나주시",
+              "applicationStatus": "거절",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "통천포 배",
+              "applicationNumber": "4020240018636",
+              "applicationDate": "20240129",
+              "applicant": "박종협",
+              "applicationStatus": "거절",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            }
+          ],
           "briefing": {
             "templateVersion": "strategy-template-v0-example",
             "isGapAlert": false,
@@ -288,7 +326,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
@@ -302,7 +340,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
@@ -316,7 +354,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -331,7 +369,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
@@ -345,7 +383,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
@@ -360,7 +398,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
@@ -375,7 +413,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -388,12 +426,63 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.450Z",
+              "calculatedAt": "2026-08-11T02:27:15.382Z",
               "methodVersion": "gap-score-v1-representative-gi-or-count3",
               "rationale": "⑤ 예시 점수 기준",
               "blockingIssue": "#29"
             }
           },
+          "recentTrademarks": [
+            {
+              "title": "청정자연 돌밭에서 자란 왕머들 사과 명품",
+              "applicationNumber": "4020250244537",
+              "applicationDate": "20251230",
+              "applicant": "신재명",
+              "applicationStatus": "출원",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "산 산속의 사과",
+              "applicationNumber": "4020250217641",
+              "applicationDate": "20251121",
+              "applicant": "이광호",
+              "applicationStatus": "출원",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "무당벌레 사과",
+              "applicationNumber": "4020250200836",
+              "applicationDate": "20251030",
+              "applicant": "정동인",
+              "applicationStatus": "출원",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "구름위에서 자란 사과",
+              "applicationNumber": "4020250184483",
+              "applicationDate": "20251001",
+              "applicant": "김명동",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_exact",
+              "designatedGoods": [
+                "신선한사과"
+              ]
+            },
+            {
+              "title": "서리맞은 사과 STOLEN APPLE",
+              "applicationNumber": "4020250174268",
+              "applicationDate": "20250917",
+              "applicant": "김명동",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_exact",
+              "designatedGoods": [
+                "신선한사과"
+              ]
+            }
+          ],
           "briefing": {
             "templateVersion": "strategy-template-v0-example",
             "isGapAlert": false,
@@ -455,7 +544,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
@@ -469,7 +558,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
@@ -483,7 +572,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -497,7 +586,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
@@ -511,7 +600,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
@@ -525,7 +614,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
@@ -539,7 +628,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -552,12 +641,23 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.450Z",
+              "calculatedAt": "2026-08-11T02:27:15.382Z",
               "methodVersion": "gap-score-v1-representative-gi-or-count3",
               "rationale": "⑤ 예시 점수 기준",
               "blockingIssue": "#29"
             }
           },
+          "recentTrademarks": [
+            {
+              "title": "옥 옥산 포도 옥산",
+              "applicationNumber": "4020250146983",
+              "applicationDate": "20250811",
+              "applicant": "허태호",
+              "applicationStatus": "출원",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            }
+          ],
           "briefing": {
             "templateVersion": "strategy-template-v0-example",
             "isGapAlert": false,
@@ -609,7 +709,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -622,7 +722,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -635,7 +735,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -670,7 +770,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
@@ -684,7 +784,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
@@ -698,7 +798,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -712,7 +812,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
@@ -726,7 +826,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
@@ -740,7 +840,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
@@ -754,7 +854,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -767,12 +867,59 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.450Z",
+              "calculatedAt": "2026-08-11T02:27:15.382Z",
               "methodVersion": "gap-score-v1-representative-gi-or-count3",
               "rationale": "⑤ 예시 점수 기준",
               "blockingIssue": "#29"
             }
           },
+          "recentTrademarks": [
+            {
+              "title": "따마토 따자마자 보내는 토마토 TAMATO",
+              "applicationNumber": "4020240163382",
+              "applicationDate": "20240902",
+              "applicant": "주식회사 농업회사법인 따옴농장",
+              "applicationStatus": "공고",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "토마토 집 TOMATO HOUSE",
+              "applicationNumber": "4020240096237",
+              "applicationDate": "20240528",
+              "applicant": "신진희",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "똑똑한 토마토",
+              "applicationNumber": "4020230129841",
+              "applicationDate": "20230720",
+              "applicant": "(주)마이크로자임|김재일",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "스테비아 토마토 스방토",
+              "applicationNumber": "4020230096514",
+              "applicationDate": "20230601",
+              "applicant": "농업회사법인 주식회사 더케이팜",
+              "applicationStatus": "거절",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            },
+            {
+              "title": "스테비아 토마토 단방울",
+              "applicationNumber": "4020230096525",
+              "applicationDate": "20230601",
+              "applicant": "농업회사법인 주식회사 더케이팜",
+              "applicationStatus": "거절",
+              "goodsMatchMethod": null,
+              "designatedGoods": null
+            }
+          ],
           "briefing": {
             "templateVersion": "strategy-template-v0-example",
             "isGapAlert": false,
@@ -834,7 +981,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
@@ -848,7 +995,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
@@ -862,7 +1009,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -876,7 +1023,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
@@ -890,7 +1037,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
@@ -904,7 +1051,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
@@ -918,7 +1065,7 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.333Z",
+              "calculatedAt": "2026-08-11T02:27:15.283Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -931,12 +1078,13 @@
                 "label-ee12f051eaf0",
                 "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T02:05:41.450Z",
+              "calculatedAt": "2026-08-11T02:27:15.382Z",
               "methodVersion": "gap-score-v1-representative-gi-or-count3",
               "rationale": "대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 3건 이상)을 충족하지 않음",
               "blockingIssue": "#29"
             }
           },
+          "recentTrademarks": [],
           "briefing": null
         }
       ],
@@ -950,7 +1098,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -963,7 +1111,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -976,7 +1124,7 @@
             "label-ee12f051eaf0",
             "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T02:05:41.333Z",
+          "calculatedAt": "2026-08-11T02:27:15.283Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -999,7 +1147,7 @@
           "label-ee12f051eaf0",
           "nongsaro"
         ],
-        "calculatedAt": "2026-08-11T02:05:41.450Z",
+        "calculatedAt": "2026-08-11T02:27:15.382Z",
         "methodVersion": "gap-score-v1-representative-gi-or-count3",
         "rationale": "⑤ 예시 점수 기준",
         "blockingIssue": "#29"
@@ -1019,7 +1167,7 @@
           "label-ee12f051eaf0",
           "nongsaro"
         ],
-        "calculatedAt": "2026-08-11T02:05:41.450Z",
+        "calculatedAt": "2026-08-11T02:27:15.382Z",
         "methodVersion": "gap-score-v1-representative-gi-or-count3",
         "rationale": "⑤ 예시 점수 기준",
         "blockingIssue": "#29"
@@ -1039,7 +1187,7 @@
           "label-ee12f051eaf0",
           "nongsaro"
         ],
-        "calculatedAt": "2026-08-11T02:05:41.450Z",
+        "calculatedAt": "2026-08-11T02:27:15.382Z",
         "methodVersion": "gap-score-v1-representative-gi-or-count3",
         "rationale": "⑤ 예시 점수 기준",
         "blockingIssue": "#29"
@@ -1059,7 +1207,7 @@
           "label-ee12f051eaf0",
           "nongsaro"
         ],
-        "calculatedAt": "2026-08-11T02:05:41.450Z",
+        "calculatedAt": "2026-08-11T02:27:15.382Z",
         "methodVersion": "gap-score-v1-representative-gi-or-count3",
         "rationale": "⑤ 예시 점수 기준",
         "blockingIssue": "#29"

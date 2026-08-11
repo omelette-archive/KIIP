@@ -59,7 +59,19 @@ function bucket(overrides = {}) {
 }
 
 function fixture() {
-  const andong = bucket();
+  const andong = bucket({
+    recentBrands: [
+      {
+        title: "안동사과애",
+        applicationNumber: "4020250000001",
+        applicationDate: "20250601",
+        applicant: "안동사과영농조합",
+        applicationStatus: "등록",
+        goodsMatchMethod: "normalized_exact",
+        designatedGoods: ["신선한사과", "미가공사과"],
+      },
+    ],
+  });
   const boseong = bucket({
     sido: "전라남도",
     sigungu: "보성군",
@@ -229,6 +241,10 @@ assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.blockingIssue, "#12");
 assert.ok(andong.items[0].metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
 assert.ok(andong.items[0].metrics.uniqueTrademarkCount.sourceIds.includes("kipris_trademark"));
+assert.strictEqual(andong.items[0].recentTrademarks.length, 1, "품목(고시명칭)은 그룹핑 기준일 뿐, 실제 출원 상표명도 근거로 남아야 함");
+assert.strictEqual(andong.items[0].recentTrademarks[0].title, "안동사과애");
+assert.deepStrictEqual(andong.items[0].recentTrademarks[0].designatedGoods, ["신선한사과", "미가공사과"]);
+assert.deepStrictEqual(boseong.items[0].recentTrademarks, [], "recentBrands가 없는 행은 빈 배열(추정하지 않음)");
 assert.strictEqual(boseong.dataState, "complete_zero");
 assert.strictEqual(snapshot.map.availability, "blocked");
 assert.strictEqual(snapshot.coverage.targetRegionCount, null);

@@ -370,4 +370,33 @@ console.log("8) 지역브랜드 조인 검증용 브랜드명 자료(고시명�
   ok("buildAreaBrandValidationInput.js류 브랜드명 자료가 고시명칭 정제 없이 섞이면 감지해 경고함");
 }
 
+console.log("9) recentBrands — 품목(고시명칭)은 그룹핑 기준일 뿐, 실제 출원 상표명·지정상품도 근거로 보존");
+{
+  const goodsHit = (number, title, designatedGoods) => ({
+    ...hit(number, title, "20250101", "등록", "inside"),
+    goodsMatchMethod: "normalized_exact",
+    goodsEvidence: designatedGoods.map((name) => ({ classCode: "31", designatedProductName: name })),
+  });
+  const r = analyzeEntries({
+    results: [{
+      status: "ok",
+      query: { region: "경상북도 영양군", item: "신선한 사과", classCode: "31" },
+      hits: [
+        goodsHit("60-1", "사과애", ["신선한사과", "미가공사과", "신선한과실"]),
+        { ...hit("60-2", "무명 사과", "20250101", "등록", "inside") }, // 지정상품 근거 없는 일반 hit
+      ],
+    }],
+  }, { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.strictEqual(row.itemName, "신선한 사과", "품목 그룹핑 키 자체는 여전히 고시명칭(정규화된 품목)이어야 함");
+  assert.strictEqual(row.recentBrands.length, 2);
+  const branded = row.recentBrands.find((b) => b.title === "사과애");
+  assert.ok(branded, "실제 출원 상표명(예: 사과애)이 recentBrands에 그대로 보존돼야 함");
+  assert.strictEqual(branded.goodsMatchMethod, "normalized_exact");
+  assert.deepStrictEqual(branded.designatedGoods, ["신선한사과", "미가공사과", "신선한과실"]);
+  const unbranded = row.recentBrands.find((b) => b.title === "무명 사과");
+  assert.strictEqual(unbranded.designatedGoods, null, "지정상품 근거가 없으면 null(추정하지 않음)");
+  ok("품목은 고시명칭 기준으로 묶이지만, 실제 상표명과 지정상품은 recentBrands에 근거로 보존됨");
+}
+
 console.log("\n모든 자체 테스트 통과");

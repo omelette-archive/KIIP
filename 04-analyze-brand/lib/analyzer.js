@@ -274,6 +274,14 @@ function finalizeBucket(bucket, options) {
           applicationDate: clean(hit.applicationDate) || null,
           applicant: clean(hit.applicant) || null,
           applicationStatus: clean(hit.applicationStatus) || null,
+          // 대표 특산품(고시명칭)은 "품목" 그룹핑 기준일 뿐, 실제로 어떤 상표명이 출원됐고
+          // 등록원부 지정상품이 무엇인지도 대시보드에서 확인할 수 있어야 한다 — 품목 하나를
+          // 완전히 대체하지 않고 근거로 함께 보여주기 위한 필드.
+          goodsMatchMethod: clean(hit.goodsMatchMethod) || null,
+          designatedGoods:
+            Array.isArray(hit.goodsEvidence) && hit.goodsEvidence.length > 0
+              ? hit.goodsEvidence.map((g) => clean(g.designatedProductName)).filter(Boolean).slice(0, 3)
+              : null,
         });
       }
     }
