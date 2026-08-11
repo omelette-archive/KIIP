@@ -4,8 +4,8 @@
  * 단일 {지역, 품목} 또는 ② 단계의 정규화 CSV를 받아 KIPRIS 상표 검색
  * (getWordSearch)을 호출하고 품목(NICE 상품류 코드)으로 결과를 필터링한다.
  *
- * 출원인 주소 기반 지역 매칭은 아직 구현되어 있지 않다. 선택적으로 농사로 지역브랜드
- * 검증자료를 출원번호로 조인하되, 이 신호는 출원인 주소와 다른 별도 필드로 보존한다.
+ * 농사로 지역브랜드 검증자료는 출원번호로, 등록원부 주소·지정상품은 등록번호로 선택 보강한다.
+ * 두 지역 근거는 서로 다른 필드와 규칙 버전으로 보존한다.
  */
 
 const path = require("path");
@@ -42,7 +42,7 @@ function parseArgs(argv) {
     "max-requests": 100,
     "max-pages": 5,
     "max-hits-per-query": 100,
-    "max-registry-requests": 50,
+    "max-registry-requests": 3,
     "registry-concurrency": 3,
   };
   for (let i = 0; i < argv.length; i++) {
@@ -78,7 +78,7 @@ function printUsageAndExit(message) {
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --area-brands <path> 농사로 areaBrandLst JSON을 출원번호로 조인(선택)",
       "  --enrich-registry    등록번호가 있는 hit를 등록원부 API로 보강(출원인 주소·지정상품, 선택)",
-      "  --max-registry-requests <n> 등록원부 API 호출 상한 (기본 50)",
+      "  --max-registry-requests <n> 등록원부 API 호출 상한 (기본 3, 최대 100)",
       "  --registry-concurrency <n> 등록원부 API 동시 호출 수 (기본 3, 429 방지)",
       "  --registryApiKey <key> IP_REGISTRY_API_KEY 대신 직접 인증키 전달",
       "  --out <path>         결과를 JSON 파일로 저장",
@@ -594,12 +594,12 @@ function validateNumericArgs(args) {
     printUsageAndExit("--max-hits-per-query 는 1 이상의 정수여야 합니다.");
   }
   const maxRegistryRequests = Number(args["max-registry-requests"]);
-  if (!Number.isInteger(maxRegistryRequests) || maxRegistryRequests < 1) {
-    printUsageAndExit("--max-registry-requests 는 1 이상의 정수여야 합니다.");
+  if (!Number.isInteger(maxRegistryRequests) || maxRegistryRequests < 1 || maxRegistryRequests > 100) {
+    printUsageAndExit("--max-registry-requests 는 1~100 정수여야 합니다.");
   }
   const registryConcurrency = Number(args["registry-concurrency"]);
-  if (!Number.isInteger(registryConcurrency) || registryConcurrency < 1) {
-    printUsageAndExit("--registry-concurrency 는 1 이상의 정수여야 합니다.");
+  if (!Number.isInteger(registryConcurrency) || registryConcurrency < 1 || registryConcurrency > 5) {
+    printUsageAndExit("--registry-concurrency 는 1~5 정수여야 합니다.");
   }
   return {
     numOfRows,
@@ -711,7 +711,7 @@ async function main() {
     if (ipRegistryContext) {
       for (const entry of results) {
         if (entry.status === "ok" && Array.isArray(entry.hits)) {
-          entry.hits = await enrichHitsWithIpRegistry(entry.hits, entry.query.region, ipRegistryContext);
+          entry.hits = await enrichHitsWithIpRegistry(entry.hits, entry.query, ipRegistryContext);
         }
       }
     }
@@ -739,7 +739,7 @@ async function main() {
         areaBrandsPath,
         results
       ),
-      ipRegistryValidation: ipRegistryValidationMetadata(ipRegistryContext, results),
+      ipRegistryEnrichment: ipRegistryValidationMetadata(ipRegistryContext, results),
       completedAt: new Date().toISOString(),
       results,
     };
@@ -757,7 +757,7 @@ async function main() {
     classCode: args.classCode || null,
   };
   console.error(
-    `[matchTrademarks] item="${query.item}" region="${query.region}" (지역은 아직 미검증 태그만 부여)`
+    `[matchTrademarks] item="${query.item}" region="${query.region}" (등록원부 보강은 --enrich-registry 선택)`
   );
   const client = createClient({ apiKey });
   const output = await searchOne(client, query, numeric);
@@ -772,9 +772,9 @@ async function main() {
     [output]
   );
   if (ipRegistryContext) {
-    output.hits = await enrichHitsWithIpRegistry(output.hits, query.region, ipRegistryContext);
+    output.hits = await enrichHitsWithIpRegistry(output.hits, query, ipRegistryContext);
   }
-  output.ipRegistryValidation = ipRegistryValidationMetadata(ipRegistryContext, [output]);
+  output.ipRegistryEnrichment = ipRegistryValidationMetadata(ipRegistryContext, [output]);
   const outPath = writeJson(output, args.out);
   console.error(
     `[matchTrademarks] pages=${output.pages.fetchedCount}, filtered=${output.hits.length}, collection=${output.collectionStatus}, keywordTotal=${output.keywordTotalCount}${outPath ? ` -> ${outPath}` : ""}`

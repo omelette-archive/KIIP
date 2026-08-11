@@ -1,15 +1,4 @@
 "use strict";
-/**
- * 지식재산처 등록원부 실시간 정보 조회 서비스(`getMarkHistory`) 클라이언트. 등록번호
- * 기준으로 출원인 주소(#11)와 지정상품(#12)을 함께 제공한다 — 실키 검증 2026-08-11.
- *
- * 출처: https://www.data.go.kr/data/15124946/openapi.do
- * 엔드포인트: https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getMarkHistory
- *
- * ⚠️ 이 서비스의 resultCode 규약은 KIPRIS(00)나 MAFRA(INFO-000)와 다르다 — 성공은 "000"이다.
- * 조회 키는 applicationNumber(출원번호)가 아니라 registrationNumber(등록번호)다. 등록이
- * 완료되지 않은 상표(출원중/거절/포기 등)는 등록번호 자체가 없어 이 API로 보강할 수 없다.
- */
 
 const { fetchWithRetry } = require("./fetchWithRetry");
 
@@ -17,84 +6,136 @@ const DEFAULT_BASE_URL = "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc";
 const IP_REGISTRY_CONTRACT_VERSION = "ip-registry-mark-history-v1";
 const IP_REGISTRY_SOURCE_METADATA = Object.freeze({
   sourceId: "ip_registry",
-  provider: "지식재산처(특허로)",
+  provider: "지식재산처",
   dataset: "등록원부 실시간 정보 조회 서비스",
-  officialPageUrl: "https://www.data.go.kr/data/15124946/openapi.do",
-  apiBaseUrl: DEFAULT_BASE_URL,
-  operation: "getMarkHistory",
+  catalogUrl: "https://www.data.go.kr/data/15124946/openapi.do",
+  endpoint: `${DEFAULT_BASE_URL}/getMarkHistory`,
+  operation: "PttRgstRtInfoInqSvc/getMarkHistory",
+  contractVersion: IP_REGISTRY_CONTRACT_VERSION,
   lastContractVerifiedAt: "2026-08-11",
 });
-const SUCCESS_RESULT_CODE = "000";
 
-function normalizeRegistrationNumber(value) {
-  return String(value || "").replace(/[^0-9]/g, "");
+function clean(value) {
+  return value === undefined || value === null ? "" : String(value).trim();
 }
 
 function asArray(value) {
   if (Array.isArray(value)) return value;
-  if (value === null || value === undefined) return [];
-  return [value];
+  return value === undefined || value === null ? [] : [value];
 }
 
-/**
- * 서버 응답을 그대로 두지 않고, 파이프라인이 실제로 쓰는 형태로만 축약한다. 원문은
- * `raw`에 보존해 나중에 다른 필드가 필요해져도 재조회 없이 쓸 수 있게 한다.
- */
-function summarizeMarkHistory(items) {
-  const applicants = asArray(items?.applicant);
-  const owners = asArray(items?.owner);
-  const productList = asArray(items?.productList)
-    .filter((row) => row && (row.desProduct || row.productClsCd))
-    .map((row) => ({
-      productClsCd: row.productClsCd || null,
-      desProduct: row.desProduct || null,
-    }));
+function normalizeRegistrationNumber(value) {
+  return clean(value).replace(/\D/g, "");
+}
+
+function withCompatibilityFields(record, item = {}) {
+  const firstApplicant = record.applicants?.[0] || {};
+  const firstOwner = asArray(item.owner)[0] || {};
   return {
-    title: items?.title || null,
-    registrationNumber: items?.rgstNo || null,
-    registrationDate: items?.rgstDate || null,
-    applicationNumber: items?.applNo || null,
-    applicantAddr: applicants[0]?.applicantAddr || null,
-    applicantName: applicants[0]?.applicantName || null,
-    ownerAddr: owners[0]?.ownerAddr || null,
-    ownerName: owners[0]?.ownerName || null,
-    productList,
-    raw: items || null,
+    ...record,
+    title: clean(item.title) || null,
+    applicantAddr: firstApplicant.address || null,
+    applicantName: clean(asArray(item.applicant)[0]?.applicantName) || null,
+    ownerAddr: clean(firstOwner.ownerAddr) || null,
+    ownerName: clean(firstOwner.ownerName) || null,
+    productList: (record.products || []).map((row) => ({
+      productClsCd: row.classCode,
+      desProduct: row.designatedProductName,
+    })),
   };
+}
+
+function parseMarkHistoryResponse(parsed) {
+  if (!parsed || typeof parsed !== "object") {
+    throw new Error("등록원부 응답이 JSON 객체가 아닙니다.");
+  }
+  const resultCode = clean(parsed.resultCode);
+  const resultMsg = clean(parsed.resultMsg);
+  if (!new Set(["0", "00", "000"]).has(resultCode)) {
+    const error = new Error(`등록원부 API 오류 [${resultCode || "UNKNOWN"}] ${resultMsg || "메시지 없음"}`);
+    error.resultCode = resultCode || null;
+    throw error;
+  }
+  const item = parsed.items && typeof parsed.items === "object" ? parsed.items : null;
+  if (!item || Number(parsed.totalCount) === 0) {
+    return { found: false, resultCode, resultMsg, totalCount: Number(parsed.totalCount) || 0 };
+  }
+  const applicants = asArray(item.applicant)
+    .map((row) => ({
+      address: clean(row?.applicantAddr) || null,
+      nationality: clean(row?.applicantNatl) || null,
+      representative: clean(row?.rpstrYn) || null,
+    }))
+    .filter((row) => row.address || row.nationality);
+  const products = asArray(item.productList)
+    .map((row) => ({
+      classCode: clean(row?.productClsCd) || null,
+      designatedProductName: clean(row?.desProduct) || null,
+    }))
+    .filter((row) => row.classCode || row.designatedProductName);
+  return withCompatibilityFields({
+    found: true,
+    resultCode,
+    resultMsg,
+    totalCount: Number(parsed.totalCount) || 1,
+    applicationNumber: clean(item.applNo) || null,
+    registrationNumber: clean(item.rgstNo) || null,
+    registrationDate: clean(item.rgstDate) || null,
+    applicants,
+    products,
+  }, item);
+}
+
+function summarizeMarkHistory(items) {
+  return parseMarkHistoryResponse({
+    resultCode: "000",
+    resultMsg: "REQUEST_SUCCESS",
+    totalCount: items ? 1 : 0,
+    items,
+  });
 }
 
 function createClient({
   apiKey = process.env.IP_REGISTRY_API_KEY,
   baseUrl = process.env.IP_REGISTRY_API_BASE_URL || DEFAULT_BASE_URL,
-  fetchImpl = fetch,
+  fetchImpl,
   onRequest,
 } = {}) {
   if (!apiKey) {
-    throw new Error("등록원부 조회 API 인증키(IP_REGISTRY_API_KEY)가 필요합니다.");
+    throw new Error("등록원부 API 인증키가 필요합니다. .env 의 IP_REGISTRY_API_KEY를 설정하세요.");
   }
 
-  /**
-   * @param {string} registrationNumber 등록번호(하이픈 등은 자동으로 제거됨)
-   */
-  async function getMarkHistory(registrationNumber) {
-    const rgstNo = normalizeRegistrationNumber(registrationNumber);
-    if (!rgstNo) throw new Error("getMarkHistory: registrationNumber가 필요합니다.");
-
-    const url = new URL(`${String(baseUrl).replace(/\/$/, "")}/getMarkHistory`);
+  async function getMarkHistory(input) {
+    const registrationNumber =
+      input && typeof input === "object" ? input.registrationNumber : input;
+    const normalized = normalizeRegistrationNumber(registrationNumber);
+    if (!normalized) throw new Error("getMarkHistory에는 registrationNumber가 필요합니다.");
+    const url = new URL(`${baseUrl.replace(/\/$/, "")}/getMarkHistory`);
     url.searchParams.set("serviceKey", apiKey);
     url.searchParams.set("type", "json");
-    url.searchParams.set("rgstNo", rgstNo);
-    if (onRequest) onRequest({ source: "ip_registry", registrationNumber: rgstNo });
-
-    const response = await fetchWithRetry(url.toString(), {}, fetchImpl);
-    if (!response.ok) throw new Error(`getMarkHistory: HTTP 오류 (${response.status})`);
-    const json = await response.json();
-    if (json.resultCode !== SUCCESS_RESULT_CODE) {
-      throw new Error(
-        `getMarkHistory: [${json.resultCode || "unknown"}] ${json.resultMsg || "알 수 없는 오류"}`
-      );
+    url.searchParams.set("rgstNo", normalized);
+    if (onRequest) onRequest({ source: "ip_registry", registrationNumber: normalized });
+    const response = await fetchWithRetry(
+      url.toString(),
+      { headers: { Accept: "application/json" } },
+      fetchImpl
+    );
+    if (!response.ok) throw new Error(`getMarkHistory: API 오류 (${response.status})`);
+    let parsed;
+    if (typeof response.text === "function") {
+      const text = await response.text();
+      if (!text.trim()) throw new Error("getMarkHistory: 빈 응답");
+      try {
+        parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
+      } catch {
+        throw new Error("getMarkHistory: JSON이 아닌 응답");
+      }
+    } else if (typeof response.json === "function") {
+      parsed = await response.json();
+    } else {
+      throw new Error("getMarkHistory: JSON 응답을 읽을 수 없습니다.");
     }
-    return summarizeMarkHistory(json.items);
+    return parseMarkHistoryResponse(parsed);
   }
 
   return { getMarkHistory };
@@ -104,8 +145,9 @@ module.exports = {
   DEFAULT_BASE_URL,
   IP_REGISTRY_CONTRACT_VERSION,
   IP_REGISTRY_SOURCE_METADATA,
-  SUCCESS_RESULT_CODE,
+  asArray,
   createClient,
   normalizeRegistrationNumber,
+  parseMarkHistoryResponse,
   summarizeMarkHistory,
 };

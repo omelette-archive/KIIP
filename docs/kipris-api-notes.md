@@ -10,8 +10,8 @@ KIPRIS Plus 오픈API를 MCP 도구로 감싼 서버. 상표 파이프라인을 
 **진행 상황**: `03-match-trademarks/matchTrademarks.js`에서 실키 검색·NICE류 필터·페이지 상한·
 체크포인트 재개가 동작한다. 농사로 `areaBrandLst` 검증자료도 별도 수집할 수 있다. 농사로
 지역브랜드 subset의 출원번호 완전일치 조인과 별도 지역 연관성 지표는 2026-08-10 샘플 3건으로
-검증했다. 출원인 주소(#11)·지정상품(#12) 모두 등록원부 API(`getMarkHistory`)로 실키 확보
-완료(2026-08-11) — 파이프라인 연결은 아직 미착수.
+검증했다. 출원인 주소(#11)·지정상품(#12)은 등록원부 API(`getMarkHistory`)로 실키를 확보했고,
+등록번호 3개를 보강하는 결정론적 샘플 파이프라인까지 연결했다(2026-08-11).
 
 ## 인증
 
@@ -80,10 +80,10 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 - 특허 쪽에는 서지상세(`getBibliographyDetailInfoSearch`)가 있지만 상표용 서지상세는 레퍼런스
   리포에 구현되어 있지 않음 — 다만 위 등록원부 API가 사실상 이 역할을 대신한다.
 
-→ 후속 작업: `getMarkHistory` 응답의 `applicantAddr`를 법정동코드 마스터와 대조해
-`applicantRegionMatch`로 정규화하는 파이프라인 연결(#11). 이건 **진짜 출원인 주소**이므로
-농사로 지역브랜드의 `regionalBrand*`(브랜드 연관 지역, #24)와 달리 `applicantRegionMatch`
-본류에 직접 반영해도 개념적으로 맞다.
+→ 구현: `enrichIpRegistry.js`가 등록번호가 있는 hit만 제한 수만큼 조회하고 `applicantAddr`를
+법정동코드 마스터와 대조해 `applicantRegionMatch`로 정규화한다. 이건 **진짜 출원인 주소**이므로
+농사로 지역브랜드의 `regionalBrand*`와 달리 `localApplicantShare` 본류에 반영한다. 등록번호가
+없는 hit와 호출 상한 밖 hit는 각각 `not_applicable`, `not_collected`로 남긴다.
 
 ## 품목(품목/상품류) 매칭
 
@@ -99,6 +99,10 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
   이력` API(`15059142`)는 아직 실엔드포인트 미확인 상태로 후보에 남겨두되, 등록원부 API로
   이미 지정상품 실데이터를 확보했으므로 우선순위는 낮췄다. 상세는 이슈 #12 코멘트
   (2026-08-11) 참고.
+
+`ip-registry-designated-goods-v0-review`는 공백·특수문자를 제거한 뒤 `normalized_exact`,
+`normalized_contains`, `class_only`, `mismatch`, `unverified`를 분리한다. exact만 확정 근거이며
+나머지 포함·류 후보를 통계에서 제외할지는 #12 기준 확정 후 결정한다.
 
 ## resultCode
 

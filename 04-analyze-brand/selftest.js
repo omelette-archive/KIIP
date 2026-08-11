@@ -232,7 +232,7 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
   assert.deepStrictEqual(boseongTea.sources, ["농사로"], "검색 자체가 오류난 행도 출처는 유실되지 않음");
   const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
   assert.deepStrictEqual(andongTree.sources, ["샘플"], "skipped 행은 input.source에서 읽어야 함");
-  assert.strictEqual(r.schemaVersion, "1.2");
+  assert.strictEqual(r.schemaVersion, "1.3");
   ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
 }
 
@@ -275,6 +275,57 @@ console.log("6) 농사로 지역브랜드 조인 신호 — 출원인 주소 지
   assert.strictEqual(row.localApplicantShare, null, "지역브랜드 연관성을 출원인 주소로 간주하면 안 됨");
   assert.ok(r.warnings.some((warning) => warning.includes("출원인 주소 근거가 아닙니다")));
   ok("출원번호 지역브랜드 연관성은 별도 지표로 집계되고 localApplicantShare를 오염시키지 않음");
+}
+
+console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
+{
+  const enrichedHit = (number, applicantRegionMatch, goodsMatchMethod) => ({
+    ...hit(number, `등록원부-${number}`, "20250101", "등록", "unverified"),
+    ipRegistryStatus: "complete",
+    applicantRegionMatch,
+    applicantRegionMatchSource: "ip_registry_applicant_address",
+    goodsMatchMethod,
+  });
+  const r = analyzeEntries({
+    schemaVersion: "1.1",
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeRegistrationCount: 2,
+      errorRegistrationCount: 0,
+      notCollectedRegistrationCount: 1,
+      sourceMetadata: { sourceId: "ip_registry", contractVersion: "ip-registry-mark-history-v1" },
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+    },
+    results: [{
+      status: "ok",
+      query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
+      hits: [
+        enrichedHit("40-1", "inside", "normalized_exact"),
+        enrichedHit("40-2", "outside", "class_only"),
+        { ...hit("40-3", "미수집", "20250101", "등록", "unverified"), ipRegistryStatus: "not_collected" },
+      ],
+    }],
+  }, { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.deepStrictEqual(row.regionCounts, { inside: 1, outside: 1, unverified: 1 });
+  assert.strictEqual(row.localApplicantShare, 0.5);
+  assert.strictEqual(row.regionVerificationRate, 0.6667);
+  assert.strictEqual(row.goodsMatchCounts.normalized_exact, 1);
+  assert.strictEqual(row.goodsMatchCounts.class_only, 1);
+  assert.strictEqual(row.goodsMatchCounts.unverified, 1);
+  assert.strictEqual(row.goodsConfirmedHitCount, 1);
+  assert.strictEqual(row.goodsReviewRequiredHitCount, 1);
+  assert.strictEqual(row.goodsVerificationRate, 0.6667);
+  assert.strictEqual(row.ipRegistryStatusCounts.complete, 2);
+  assert.strictEqual(row.ipRegistryStatusCounts.not_collected, 1);
+  assert.ok(r.provenance.sources.some((source) => source.sourceId === "ip_registry"));
+  assert.ok(r.warnings.some((warning) => warning.includes("등록원부 보강이 partial")));
+  assert.ok(r.warnings.some((warning) => warning.includes("#12")));
+  ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
 console.log("\n모든 자체 테스트 통과");

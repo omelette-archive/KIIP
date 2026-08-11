@@ -34,6 +34,7 @@ const {
 } = require("./lib/ipRegistryEnricher");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
+const { runIpRegistryTests } = require("./ipRegistrySelftest");
 const {
   parseCsvLine,
   readNormalizedCsv,
@@ -120,6 +121,8 @@ function ok(label) {
 }
 
 async function run() {
+  await runIpRegistryTests();
+
   console.log("1) xmlLite.parseTrademarkResponse");
   {
     const parsed = parseTrademarkResponse(SAMPLE_OK_XML);
@@ -635,15 +638,16 @@ async function run() {
     ];
     const enriched = await enrichHitsWithIpRegistry(hits, "강원특별자치도 양양군", context);
 
-    assert.strictEqual(enriched[0].applicantRegionMatch, true);
+    assert.strictEqual(enriched[0].applicantRegionMatch, "inside");
     assert.strictEqual(enriched[0].applicantRegion.sigungu, "양양군");
+    assert.strictEqual(enriched[0].applicantRegion.raw, undefined, "전체 주소는 산출물에 복사하지 않음");
     assert.strictEqual(enriched[0].designatedGoodsEvidence.productList[0].desProduct, "신선한사과");
 
-    assert.strictEqual(enriched[1].applicantRegionMatch, false);
+    assert.strictEqual(enriched[1].applicantRegionMatch, "outside");
     assert.strictEqual(enriched[1].designatedGoodsEvidence, undefined, "지정상품이 없으면 필드 자체를 안 만듦");
 
     assert.strictEqual(calls, 3, "등록번호 1·2·999 각 1회, 중복된 등록번호(1)는 캐시로 재사용해 추가 호출 없음");
-    assert.strictEqual(enriched[2].applicantRegionMatch, true, "캐시로 얻은 결과도 동일하게 반영됨");
+    assert.strictEqual(enriched[2].applicantRegionMatch, "inside", "캐시로 얻은 결과도 동일하게 반영됨");
 
     assert.deepStrictEqual(enriched[3].ipRegistryLookup, { status: "no_registration_number" });
     assert.strictEqual(enriched[3].applicantRegionMatch, undefined);
@@ -668,7 +672,7 @@ async function run() {
       { registrationNumber: "2" },
     ];
     const enriched = await enrichHitsWithIpRegistry(hits, "강원특별자치도 양양군", context);
-    assert.strictEqual(enriched[0].applicantRegionMatch, true);
+    assert.strictEqual(enriched[0].applicantRegionMatch, "inside");
     assert.strictEqual(enriched[1].ipRegistryLookup.status, "skipped_budget");
     assert.strictEqual(context.stats.skippedBudget, 1);
     ok("--max-registry-requests 상한에 도달하면 초과 hit는 skipped_budget으로 남기고 예외를 던지지 않음");

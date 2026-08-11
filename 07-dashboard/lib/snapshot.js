@@ -133,13 +133,33 @@ function collectSources(analysis) {
     const existing = sources.get(id) || {};
     sources.set(id, {
       sourceId: id,
-      sourceLabel: clean(provenance.sourceLabel) || existing.sourceLabel || null,
+      sourceLabel:
+        clean(provenance.sourceLabel) ||
+        clean(provenance.dataset) ||
+        clean(provenance.provider) ||
+        existing.sourceLabel ||
+        null,
       sourceContractVersion:
-        clean(provenance.sourceContractVersion) || existing.sourceContractVersion || null,
-      sourceFetchedAt: clean(provenance.sourceFetchedAt) || existing.sourceFetchedAt || null,
-      sourceUrl: clean(provenance.sourceUrl) || existing.sourceUrl || null,
+        clean(provenance.sourceContractVersion) ||
+        clean(provenance.contractVersion) ||
+        existing.sourceContractVersion ||
+        null,
+      sourceFetchedAt:
+        clean(provenance.sourceFetchedAt) ||
+        clean(provenance.fetchedAt) ||
+        existing.sourceFetchedAt ||
+        null,
+      sourceUrl:
+        clean(provenance.sourceUrl) ||
+        clean(provenance.catalogUrl) ||
+        clean(provenance.endpoint) ||
+        existing.sourceUrl ||
+        null,
       sourceLastVerifiedAt:
-        clean(provenance.sourceLastVerifiedAt) || existing.sourceLastVerifiedAt || null,
+        clean(provenance.sourceLastVerifiedAt) ||
+        clean(provenance.lastContractVerifiedAt) ||
+        existing.sourceLastVerifiedAt ||
+        null,
       idOrigin: clean(provenance.sourceId) ? "upstream" : "derived_from_label",
     });
   };
@@ -196,6 +216,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
   }
   const generatedAt = options.generatedAt || new Date().toISOString();
   const regionIndex = createRegionIndex(options.adminCodes);
+  const analysisSourceIds = (Array.isArray(analysis?.provenance?.sources)
+    ? analysis.provenance.sources
+    : [])
+    .map(sourceRef)
+    .filter((sourceId) => sourceId && sourceId !== "ip_registry");
   const analysisRows = new Map(analysis.regionItems.map((row) => [rowKey(row), row]));
   const gapRows = new Map(gap.rows.map((row) => [rowKey(row), row]));
   const briefingRows = new Map(strategy.briefings.map((row) => [rowKey(row), row]));
@@ -236,6 +261,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       seenSpecialties.set(specialty.specialtyId, specialty.canonical.basis);
     }
     const state = dataState(row);
+    const baseMetricSourceIds = [
+      ...new Set([...rowSourceIds(row), ...analysisSourceIds]),
+    ].sort();
+    const registryMetricSourceIds =
+      count(row.ipRegistryStatusCounts, "complete") > 0
+        ? [...new Set([...baseMetricSourceIds, "ip_registry"])].sort()
+        : baseMetricSourceIds;
     const gapRow = gapRows.get(rowKey(row));
     const briefing = briefingRows.get(rowKey(row));
     const calculatedAt = analysis.generatedAt || generatedAt;
@@ -251,18 +283,21 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       metrics: {
         uniqueTrademarkCount: makeMetric(count(row, "uniqueTrademarkCount"), row, {
           state,
+          sourceIds: baseMetricSourceIds,
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
           rationale: "④ 저장 hit를 출원번호 우선 키로 중복 제거",
         }),
         registeredTrademarkCount: makeMetric(count(row.statusCounts, "registered"), row, {
           state,
+          sourceIds: baseMetricSourceIds,
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
           rationale: "④ statusCounts.registered",
         }),
         registrationRate: makeMetric(row.registrationRate ?? null, row, {
           state,
+          sourceIds: baseMetricSourceIds,
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
           rationale: "registered / uniqueTrademarkCount",
@@ -272,6 +307,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           row,
           {
             state,
+            sourceIds: registryMetricSourceIds,
             availability: row.regionVerificationRate === 1 ? "available" : "blocked",
             calculatedAt,
             methodVersion: analysis.analysisVersion || null,
@@ -281,11 +317,32 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         ),
         regionalBrandInsideShare: makeMetric(row.regionalBrandInsideShare ?? null, row, {
           state,
+          sourceIds: baseMetricSourceIds,
           availability:
             count(row, "regionalBrandReferenceHitCount") > 0 ? "available" : "blocked",
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
           rationale: "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
+        }),
+        confirmedGoodsMatchCount: makeMetric(row.goodsConfirmedHitCount ?? 0, row, {
+          state,
+          sourceIds: registryMetricSourceIds,
+          availability:
+            count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
+          calculatedAt,
+          methodVersion: "ip-registry-designated-goods-v0-review",
+          rationale: "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
+          blockingIssue: "#12",
+        }),
+        goodsReviewCandidateCount: makeMetric(row.goodsReviewRequiredHitCount ?? 0, row, {
+          state,
+          sourceIds: registryMetricSourceIds,
+          availability:
+            count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
+          calculatedAt,
+          methodVersion: "ip-registry-designated-goods-v0-review",
+          rationale: "normalized_contains 또는 class_only 후보",
+          blockingIssue: "#12",
         }),
         gapScore: makeMetric(gapRow?.gapScore ?? null, row, {
           state,

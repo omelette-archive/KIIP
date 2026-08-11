@@ -1,32 +1,221 @@
 "use strict";
-/**
- * ③ 배치 결과의 hit 중 registrationNumber가 있는 것만 골라 등록원부 API(getMarkHistory)로
- * 보강한다 — 출원인 주소(#11)와 지정상품(#12)을 함께 얻는다.
- *
- * 농사로 지역브랜드(areaBrandEnricher.js)와의 차이: 그쪽은 사전에 받아둔 정적 파일을
- * 출원번호로 조인하는 동기 처리지만, 여기는 등록번호 단위로 실시간 API를 호출하는 비동기
- * 처리다. 그래서 호출 예산(budget)과 동시성 제어가 필요하고, 실패한 개별 조회가 배치 전체를
- * 죽이지 않도록 개별 hit 단위로 에러를 흡수한다.
- *
- * 지역 판정 로직은 areaBrandEnricher.js의 normalizeAreaBrandRegion/classifyRegionalBrandMatch를
- * 그대로 재사용한다(지역 텍스트 정규화 규칙은 출처와 무관하게 동일해야 함). 다만 여기서 얻는
- * 주소는 지역브랜드처럼 "브랜드 연관 지역"이 아니라 진짜 출원인 주소이므로, 결과를
- * regionalBrand*가 아니라 04-analyze-brand가 이미 읽는 applicantRegionMatch 본류에 직접
- * 반영한다(docs/data-source-provenance.md 참고).
- */
 
 const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes");
+const { splitRegion } = require("../../01-collect-specialties/lib/normalize");
+const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
+const { normalizeClassCode } = require("./filters");
 const {
-  classifyRegionalBrandMatch,
-  normalizeAreaBrandRegion,
-} = require("./areaBrandEnricher");
-const {
-  IP_REGISTRY_CONTRACT_VERSION,
   IP_REGISTRY_SOURCE_METADATA,
   normalizeRegistrationNumber,
 } = require("./ipRegistryClient");
 
 const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v1";
+const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v0-review";
+
+function clean(value) {
+  return value === undefined || value === null
+    ? ""
+    : String(value).normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+function normalizeGoodsText(value) {
+  return clean(value).toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
+}
+
+function normalizeApplicantAddress(address, adminList = loadAdminCodes()) {
+  const raw = clean(address);
+  if (!raw) return { status: "unmatched", level: null, reason: "empty_address" };
+  const split = splitRegion(raw, adminList);
+  if (!split.matched) {
+    return {
+      status: split.ambiguous ? "ambiguous" : "unmatched",
+      level: null,
+      reason: split.ambiguous ? "ambiguous_sigungu" : "address_not_in_admin_master",
+      candidateSidos: split.candidateSidos || [],
+    };
+  }
+  return {
+    status: "matched",
+    level: "sigungu",
+    sido: split.sido,
+    sigungu: split.sigungu,
+    normalizedRegion: `${split.sido} ${split.sigungu}`,
+    method: "admin_sigungu_in_masked_address",
+  };
+}
+
+function classifyApplicantRegionMatch(queryRegion, applicantRegion) {
+  if (queryRegion.status !== "matched" || applicantRegion.status !== "matched") {
+    return { match: "unverified", confidence: "unverified_registry_address" };
+  }
+  if (queryRegion.sido !== applicantRegion.sido) {
+    return { match: "outside", confidence: "exact_registry_address_sido" };
+  }
+  if (queryRegion.level === "sigungu" && applicantRegion.level === "sigungu") {
+    return {
+      match: queryRegion.sigungu === applicantRegion.sigungu ? "inside" : "outside",
+      confidence: "exact_registry_address_sigungu",
+    };
+  }
+  return { match: "inside", confidence: "exact_registry_address_sido" };
+}
+
+function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes()) {
+  const queryRegion = normalizeAreaBrandRegion(queryRegionText, adminList);
+  const evidence = (applicants || []).map((applicant) => {
+    const region = normalizeApplicantAddress(applicant.address, adminList);
+    const result = classifyApplicantRegionMatch(queryRegion, region);
+    return {
+      normalizedRegion: region.normalizedRegion || null,
+      regionStatus: region.status,
+      regionLevel: region.level,
+      sido: region.sido || null,
+      sigungu: region.sigungu || null,
+      nationality: applicant.nationality || null,
+      representative: applicant.representative || null,
+      match: result.match,
+      confidence: result.confidence,
+    };
+  });
+  if (evidence.length === 0) {
+    return { match: "unverified", confidence: "no_applicant_address", evidence: [] };
+  }
+  const matches = [...new Set(evidence.map((row) => row.match))];
+  const confidences = [...new Set(evidence.map((row) => row.confidence))];
+  if (matches.length !== 1 || confidences.length !== 1) {
+    return {
+      match: "unverified",
+      confidence: "multiple_conflicting_applicant_addresses",
+      evidence,
+    };
+  }
+  return { match: matches[0], confidence: confidences[0], evidence };
+}
+
+function queryClassCodes(value) {
+  return new Set(
+    clean(value)
+      .split(/[|,;\s]+/)
+      .filter(Boolean)
+      .map(normalizeClassCode)
+  );
+}
+
+function evaluateGoods(query, products) {
+  const target = normalizeGoodsText(query?.item);
+  const wantedClasses = queryClassCodes(query?.classCode);
+  const normalizedProducts = (products || []).map((product) => ({
+    classCode: product.classCode ? normalizeClassCode(product.classCode) : null,
+    designatedProductName: clean(product.designatedProductName) || null,
+    normalizedName: normalizeGoodsText(product.designatedProductName),
+  }));
+  const classMatched = normalizedProducts.filter(
+    (product) => wantedClasses.size === 0 || (product.classCode && wantedClasses.has(product.classCode))
+  );
+  const exact = target
+    ? classMatched.filter((product) => product.normalizedName === target)
+    : [];
+  const contains = target
+    ? classMatched.filter(
+        (product) =>
+          product.normalizedName &&
+          product.normalizedName !== target &&
+          (product.normalizedName.includes(target) || target.includes(product.normalizedName))
+      )
+    : [];
+  let method = "unverified";
+  let confidence = "unverified";
+  let reviewRequired = true;
+  if (exact.length > 0) {
+    method = "normalized_exact";
+    confidence = "high";
+    reviewRequired = false;
+  } else if (contains.length > 0) {
+    method = "normalized_contains";
+    confidence = "review_required";
+  } else if (classMatched.length > 0) {
+    method = "class_only";
+    confidence = "candidate_only";
+  } else if (normalizedProducts.length > 0) {
+    method = "mismatch";
+    confidence = "high";
+  }
+  return {
+    method,
+    confidence,
+    reviewRequired,
+    targetNormalized: target || null,
+    productCount: normalizedProducts.length,
+    classMatchedProductCount: classMatched.length,
+    evidence: [...exact, ...contains]
+      .filter(
+        (row, index, all) =>
+          all.findIndex(
+            (candidate) =>
+              candidate.classCode === row.classCode &&
+              candidate.designatedProductName === row.designatedProductName
+          ) === index
+      )
+      .slice(0, 50)
+      .map(({ classCode, designatedProductName }) => ({ classCode, designatedProductName })),
+  };
+}
+
+function enrichHit(hit, query, record, fetchedAt) {
+  const applicant = evaluateApplicantRegions(query?.region, record.applicants);
+  const goods = evaluateGoods(query, record.products);
+  return {
+    ...hit,
+    ipRegistryStatus: "complete",
+    ipRegistrySource: IP_REGISTRY_SOURCE_METADATA.sourceId,
+    ipRegistryContractVersion: IP_REGISTRY_SOURCE_METADATA.contractVersion,
+    ipRegistryFetchedAt: fetchedAt,
+    applicantRegionMatch: applicant.match,
+    applicantRegionMatchSource: "ip_registry_applicant_address",
+    applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
+    applicantRegionMatchConfidence: applicant.confidence,
+    applicantRegionEvidence: applicant.evidence,
+    goodsMatchMethod: goods.method,
+    goodsMatchConfidence: goods.confidence,
+    goodsMatchVersion: GOODS_MATCH_VERSION,
+    goodsReviewRequired: goods.reviewRequired,
+    goodsEvidence: goods.evidence,
+    registryEvidence: {
+      registrationNumber: record.registrationNumber || hit.registrationNumber || null,
+      applicationNumber: record.applicationNumber || hit.applicationNumber || null,
+      productCount: goods.productCount,
+      classMatchedProductCount: goods.classMatchedProductCount,
+    },
+  };
+}
+
+function registryNumbers(document) {
+  const result = [];
+  const seen = new Set();
+  for (const entry of document.results || []) {
+    for (const hit of entry.hits || []) {
+      const number = normalizeRegistrationNumber(hit.registrationNumber);
+      if (number && !seen.has(number)) {
+        seen.add(number);
+        result.push(number);
+      }
+    }
+  }
+  return result;
+}
+
+async function mapConcurrent(values, concurrency, worker) {
+  const output = new Array(values.length);
+  let cursor = 0;
+  async function runWorker() {
+    while (cursor < values.length) {
+      const index = cursor++;
+      output[index] = await worker(values[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, runWorker));
+  return output;
+}
 
 function createRequestBudget(maxRequests) {
   let used = 0;
@@ -42,39 +231,33 @@ function createRequestBudget(maxRequests) {
   };
 }
 
-// 실키 검증(2026-08-11) 중 hits 46건을 무제한 동시 호출로 보강했더니 25건 전부 HTTP 429가
-// 났다 — fetchWithRetry의 지수 백오프로도 회복이 안 될 만큼 이 서비스의 초당 허용량이
-// 낮다. runWithConcurrency로 동시 호출 수를 좁혀 재시도가 실제로 회복할 시간을 준다.
-async function runWithConcurrency(items, concurrency, worker) {
-  const results = new Array(items.length);
-  let nextIndex = 0;
-
-  async function runOne() {
-    while (nextIndex < items.length) {
-      const current = nextIndex++;
-      results[current] = await worker(items[current], current);
-    }
-  }
-
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, () => runOne());
-  await Promise.all(workers);
-  return results;
-}
-
 function createIpRegistryContext({
   client,
   adminList = loadAdminCodes(),
-  maxRequests = 50,
+  maxRequests = 3,
   concurrency = 3,
 } = {}) {
   if (!client) throw new Error("createIpRegistryContext: client가 필요합니다.");
+  if (!Number.isInteger(maxRequests) || maxRequests < 1 || maxRequests > 100) {
+    throw new Error("maxRequests는 1~100 정수여야 합니다.");
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
+    throw new Error("concurrency는 1~5 정수여야 합니다.");
+  }
   return {
     client,
     adminList,
     concurrency,
     budget: createRequestBudget(maxRequests),
-    cache: new Map(), // registrationNumber -> Promise<{status, enrichment?, error?}>
-    stats: { requested: 0, cacheHits: 0, skippedBudget: 0, errors: 0 },
+    cache: new Map(),
+    stats: {
+      requested: 0,
+      completed: 0,
+      notFound: 0,
+      cacheHits: 0,
+      skippedBudget: 0,
+      errors: 0,
+    },
   };
 }
 
@@ -85,77 +268,86 @@ async function lookupMarkHistory(context, registrationNumber) {
   }
   if (!context.budget.reserve()) {
     context.stats.skippedBudget++;
-    const skipped = Promise.resolve({ status: "skipped_budget" });
+    const skipped = Promise.resolve({ status: "not_collected" });
     context.cache.set(registrationNumber, skipped);
     return skipped;
   }
   context.stats.requested++;
   const promise = context.client
     .getMarkHistory(registrationNumber)
-    .then((enrichment) => ({ status: "ok", enrichment }))
+    .then((record) => {
+      if (!record?.found) {
+        context.stats.notFound++;
+        return { status: "not_found", record };
+      }
+      context.stats.completed++;
+      return { status: "complete", record };
+    })
     .catch((error) => {
       context.stats.errors++;
-      return { status: "error", error: error instanceof Error ? error.message : String(error) };
+      return {
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      };
     });
   context.cache.set(registrationNumber, promise);
   return promise;
 }
 
-function designatedGoodsEvidence(enrichment) {
-  return {
-    registrationNumber: enrichment.registrationNumber,
-    productList: enrichment.productList,
-    source: IP_REGISTRY_SOURCE_METADATA.sourceId,
-    contractVersion: IP_REGISTRY_CONTRACT_VERSION,
-  };
-}
-
-/**
- * @param {object[]} hits ③ 배치의 한 쿼리(entry) 안의 hits
- * @param {string} queryRegionText entry.query.region ("경상북도 안동시" 형태)
- * @param {ReturnType<typeof createIpRegistryContext>} context
- */
-async function enrichHitsWithIpRegistry(hits, queryRegionText, context) {
+async function enrichHitsWithIpRegistry(hits, queryInput, context) {
   if (!context || !Array.isArray(hits) || hits.length === 0) return hits;
-  const queryRegion = normalizeAreaBrandRegion(queryRegionText, context.adminList);
-
-  return runWithConcurrency(hits, context.concurrency, async (hit) => {
-    const rgstNo = normalizeRegistrationNumber(hit.registrationNumber);
-    if (!rgstNo) return { ...hit, ipRegistryLookup: { status: "no_registration_number" } };
-
-    const result = await lookupMarkHistory(context, rgstNo);
-    if (result.status !== "ok") {
-      return { ...hit, ipRegistryLookup: { status: result.status, error: result.error || null } };
-    }
-
-    const { enrichment } = result;
-    const enriched = { ...hit, ipRegistryLookup: { status: "ok" } };
-
-    if (enrichment.applicantAddr) {
-      const applicantRegion = normalizeAreaBrandRegion(enrichment.applicantAddr, context.adminList);
-      const classified = classifyRegionalBrandMatch(queryRegion, applicantRegion);
-      enriched.applicantRegion = {
-        raw: enrichment.applicantAddr,
-        sido: applicantRegion.sido || null,
-        sigungu: applicantRegion.sigungu || null,
-        status: applicantRegion.status,
-        level: applicantRegion.level,
+  const query =
+    queryInput && typeof queryInput === "object"
+      ? queryInput
+      : { region: queryInput || "" };
+  const fetchedAt = new Date().toISOString();
+  return mapConcurrent(hits, context.concurrency, async (hit) => {
+    const registrationNumber = normalizeRegistrationNumber(hit.registrationNumber);
+    if (!registrationNumber) {
+      return {
+        ...hit,
+        ipRegistryStatus: "not_applicable",
+        ipRegistryLookup: { status: "no_registration_number" },
       };
-      enriched.applicantRegionMatchSource = IP_REGISTRY_SOURCE_METADATA.sourceId;
-      enriched.applicantRegionMatchVersion = APPLICANT_REGION_MATCH_VERSION;
-      // classifyRegionalBrandMatch는 'inside'/'outside'/'unverified' 문자열을 준다.
-      // 04-analyze-brand의 regionCategory()는 applicantRegionMatch가 boolean이면 바로
-      // inside/outside로 읽으므로, 확신하지 못하는 unverified는 필드를 아예 비워 과신하지
-      // 않는다(지역브랜드 조인 때와 같은 원칙).
-      if (classified.match === "inside") enriched.applicantRegionMatch = true;
-      else if (classified.match === "outside") enriched.applicantRegionMatch = false;
     }
-
-    if (enrichment.productList.length > 0) {
-      enriched.designatedGoodsEvidence = designatedGoodsEvidence(enrichment);
+    const result = await lookupMarkHistory(context, registrationNumber);
+    if (result.status !== "complete") {
+      return {
+        ...hit,
+        ipRegistryStatus: result.status,
+        ipRegistryError: result.error || undefined,
+        ipRegistryLookup: {
+          status: result.status === "not_collected" ? "skipped_budget" : result.status,
+          error: result.error || null,
+        },
+      };
     }
-
-    return enriched;
+    const enriched = enrichHit(hit, query, result.record, fetchedAt);
+    const firstRegion = enriched.applicantRegionEvidence[0];
+    return {
+      ...enriched,
+      ipRegistryLookup: { status: "ok" },
+      applicantRegion: firstRegion
+        ? {
+            sido: firstRegion.sido,
+            sigungu: firstRegion.sigungu,
+            status: firstRegion.regionStatus,
+            level: firstRegion.regionLevel,
+          }
+        : undefined,
+      designatedGoodsEvidence:
+        result.record.products.length > 0
+          ? {
+              registrationNumber: result.record.registrationNumber,
+              productList: result.record.products.map((row) => ({
+                productClsCd: row.classCode,
+                desProduct: row.designatedProductName,
+              })),
+              source: IP_REGISTRY_SOURCE_METADATA.sourceId,
+              contractVersion: IP_REGISTRY_SOURCE_METADATA.contractVersion,
+            }
+          : undefined,
+    };
   });
 }
 
@@ -163,10 +355,11 @@ function summarizeIpRegistryMatches(results) {
   const counts = { inside: 0, outside: 0, unverified: 0, referenced: 0, goodsReferenced: 0 };
   for (const entry of results || []) {
     for (const hit of entry.hits || []) {
-      if (hit.applicantRegionMatchSource) {
+      if (hit.ipRegistryStatus === "complete") {
         counts.referenced++;
-        if (hit.applicantRegionMatch === true) counts.inside++;
-        else if (hit.applicantRegionMatch === false) counts.outside++;
+        const match = hit.applicantRegionMatch;
+        if (match === "inside" || match === true) counts.inside++;
+        else if (match === "outside" || match === false) counts.outside++;
         else counts.unverified++;
       }
       if (hit.designatedGoodsEvidence) counts.goodsReferenced++;
@@ -177,25 +370,185 @@ function summarizeIpRegistryMatches(results) {
 
 function ipRegistryValidationMetadata(context, results) {
   if (!context) return { enabled: false };
-  const metadata = {
+  const matchCounts = summarizeIpRegistryMatches(results);
+  const goodsMatchCounts = {
+    normalized_exact: 0,
+    normalized_contains: 0,
+    class_only: 0,
+    mismatch: 0,
+    unverified: 0,
+  };
+  for (const entry of results || []) {
+    for (const hit of entry.hits || []) {
+      if (goodsMatchCounts[hit.goodsMatchMethod] !== undefined) {
+        goodsMatchCounts[hit.goodsMatchMethod]++;
+      }
+    }
+  }
+  const fetchedAt = new Date().toISOString();
+  const status =
+    context.stats.errors === context.stats.requested && context.stats.requested > 0
+      ? "error"
+      : context.stats.errors > 0 || context.stats.skippedBudget > 0
+        ? "partial"
+        : "complete";
+  return {
     enabled: true,
-    sourceMetadata: IP_REGISTRY_SOURCE_METADATA,
-    contractVersion: IP_REGISTRY_CONTRACT_VERSION,
-    requestStats: context.stats,
-    criteria: {
-      lookupKey: "registrationNumber(등록번호) — applicationNumber 아님, 미등록 상표는 대상 아님",
-      regionNormalization: "국토교통부 법정동코드 시도·시군구명 완전일치, 고유한 시/군/구 접미사 복원",
-      ambiguousRegionPolicy: "복수 후보 또는 미매칭 지역은 추정하지 않고 unverified(applicantRegionMatch 미설정)",
-      statisticalMeaning: "실제 출원인 주소이며 04-analyze-brand의 applicantRegionMatch 본류에 직접 반영",
+    status,
+    fetchedAt,
+    sourceMetadata: { ...IP_REGISTRY_SOURCE_METADATA, fetchedAt },
+    policy: {
+      registrationNumberOnly: true,
+      unregisteredHits: "not_applicable",
+      classOnlyStatistics: "candidate_only_until_issue_12_policy",
+      goodsMatchVersion: GOODS_MATCH_VERSION,
+      applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
+    },
+    requestStats: { ...context.stats },
+    requestedRegistrationCount: context.stats.requested,
+    completeRegistrationCount: context.stats.completed,
+    notFoundRegistrationCount: context.stats.notFound,
+    errorRegistrationCount: context.stats.errors,
+    notCollectedRegistrationCount: context.stats.skippedBudget,
+    applicantRegionCounts: {
+      inside: matchCounts.inside,
+      outside: matchCounts.outside,
+      unverified: matchCounts.unverified,
+    },
+    goodsMatchCounts,
+    matchCounts,
+  };
+}
+
+async function enrichDocument(document, client, options = {}) {
+  if (!document || !Array.isArray(document.results)) {
+    throw new Error("입력은 ③단계 결과 JSON이어야 합니다 (results 배열 필요).");
+  }
+  const allNumbers = registryNumbers(document);
+  const limit = Number(options.limit ?? 3);
+  const concurrency = Number(options.concurrency ?? 1);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("limit은 1~100 정수여야 합니다.");
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
+    throw new Error("concurrency는 1~5 정수여야 합니다.");
+  }
+  const selected = allNumbers.slice(0, limit);
+  const selectedSet = new Set(selected);
+  const fetchedAt = options.fetchedAt || new Date().toISOString();
+  const fetched = await mapConcurrent(selected, concurrency, async (registrationNumber) => {
+    try {
+      const record = await client.getMarkHistory({ registrationNumber });
+      return { registrationNumber, status: record.found ? "complete" : "not_found", record };
+    } catch (error) {
+      return {
+        registrationNumber,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+  const fetchedByNumber = new Map(fetched.map((row) => [row.registrationNumber, row]));
+  const counts = {
+    registeredHitCount: 0,
+    noRegistrationHitCount: 0,
+    completeHitCount: 0,
+    notFoundHitCount: 0,
+    errorHitCount: 0,
+    notCollectedHitCount: 0,
+  };
+  const applicantRegionCounts = { inside: 0, outside: 0, unverified: 0 };
+  const goodsMatchCounts = {
+    normalized_exact: 0,
+    normalized_contains: 0,
+    class_only: 0,
+    mismatch: 0,
+    unverified: 0,
+  };
+  const results = document.results.map((entry) => ({
+    ...entry,
+    hits: (entry.hits || []).map((hit) => {
+      const number = normalizeRegistrationNumber(hit.registrationNumber);
+      if (!number) {
+        counts.noRegistrationHitCount++;
+        return { ...hit, ipRegistryStatus: "not_applicable" };
+      }
+      counts.registeredHitCount++;
+      if (!selectedSet.has(number)) {
+        counts.notCollectedHitCount++;
+        return { ...hit, ipRegistryStatus: "not_collected" };
+      }
+      const fetchedRow = fetchedByNumber.get(number);
+      if (!fetchedRow || fetchedRow.status === "error") {
+        counts.errorHitCount++;
+        return {
+          ...hit,
+          ipRegistryStatus: "error",
+          ipRegistryError: fetchedRow?.error || "등록원부 조회 결과 없음",
+        };
+      }
+      if (fetchedRow.status === "not_found") {
+        counts.notFoundHitCount++;
+        return { ...hit, ipRegistryStatus: "not_found" };
+      }
+      counts.completeHitCount++;
+      const enriched = enrichHit(hit, entry.query || {}, fetchedRow.record, fetchedAt);
+      applicantRegionCounts[enriched.applicantRegionMatch]++;
+      goodsMatchCounts[enriched.goodsMatchMethod]++;
+      return enriched;
+    }),
+  }));
+  const errorRegistrationCount = fetched.filter((row) => row.status === "error").length;
+  const notFoundRegistrationCount = fetched.filter((row) => row.status === "not_found").length;
+  const completeRegistrationCount = fetched.filter((row) => row.status === "complete").length;
+  const notCollectedRegistrationCount = Math.max(0, allNumbers.length - selected.length);
+  const status =
+    errorRegistrationCount === selected.length && selected.length > 0
+      ? "error"
+      : errorRegistrationCount > 0 || notCollectedRegistrationCount > 0
+        ? "partial"
+        : "complete";
+  return {
+    ...document,
+    results,
+    ipRegistryEnrichment: {
+      enabled: true,
+      status,
+      fetchedAt,
+      sourceMetadata: { ...IP_REGISTRY_SOURCE_METADATA, fetchedAt },
+      policy: {
+        registrationNumberOnly: true,
+        unregisteredHits: "not_applicable",
+        classOnlyStatistics: "candidate_only_until_issue_12_policy",
+        goodsMatchVersion: GOODS_MATCH_VERSION,
+        applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
+      },
+      uniqueRegistrationCount: allNumbers.length,
+      requestedRegistrationCount: selected.length,
+      completeRegistrationCount,
+      notFoundRegistrationCount,
+      errorRegistrationCount,
+      notCollectedRegistrationCount,
+      counts,
+      applicantRegionCounts,
+      goodsMatchCounts,
     },
   };
-  if (results) metadata.matchCounts = summarizeIpRegistryMatches(results);
-  return metadata;
 }
 
 module.exports = {
+  APPLICANT_REGION_MATCH_VERSION,
+  GOODS_MATCH_VERSION,
+  classifyApplicantRegionMatch,
   createIpRegistryContext,
+  enrichDocument,
+  enrichHit,
   enrichHitsWithIpRegistry,
-  summarizeIpRegistryMatches,
+  evaluateApplicantRegions,
+  evaluateGoods,
+  normalizeApplicantAddress,
+  normalizeGoodsText,
   ipRegistryValidationMetadata,
+  registryNumbers,
+  summarizeIpRegistryMatches,
 };
