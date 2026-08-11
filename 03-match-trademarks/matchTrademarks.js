@@ -27,6 +27,12 @@ const {
   loadAreaBrandDocument,
   summarizeRegionalBrandMatches,
 } = require("./lib/areaBrandEnricher");
+const { createClient: createIpRegistryClient } = require("./lib/ipRegistryClient");
+const {
+  createIpRegistryContext,
+  enrichHitsWithIpRegistry,
+  ipRegistryValidationMetadata,
+} = require("./lib/ipRegistryEnricher");
 
 function parseArgs(argv) {
   const args = {
@@ -36,6 +42,8 @@ function parseArgs(argv) {
     "max-requests": 100,
     "max-pages": 5,
     "max-hits-per-query": 100,
+    "max-registry-requests": 50,
+    "registry-concurrency": 3,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -69,6 +77,10 @@ function printUsageAndExit(message) {
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --area-brands <path> 농사로 areaBrandLst JSON을 출원번호로 조인(선택)",
+      "  --enrich-registry    등록번호가 있는 hit를 등록원부 API로 보강(출원인 주소·지정상품, 선택)",
+      "  --max-registry-requests <n> 등록원부 API 호출 상한 (기본 50)",
+      "  --registry-concurrency <n> 등록원부 API 동시 호출 수 (기본 3, 429 방지)",
+      "  --registryApiKey <key> IP_REGISTRY_API_KEY 대신 직접 인증키 전달",
       "  --out <path>         결과를 JSON 파일로 저장",
       "  --apiKey <key>       KIPRIS_API_KEY 대신 직접 인증키 전달",
     ].join("\n")
@@ -581,7 +593,24 @@ function validateNumericArgs(args) {
   if (!Number.isInteger(maxHitsPerQuery) || maxHitsPerQuery < 1) {
     printUsageAndExit("--max-hits-per-query 는 1 이상의 정수여야 합니다.");
   }
-  return { numOfRows, pageNo, concurrency, maxRequests, maxPages, maxHitsPerQuery };
+  const maxRegistryRequests = Number(args["max-registry-requests"]);
+  if (!Number.isInteger(maxRegistryRequests) || maxRegistryRequests < 1) {
+    printUsageAndExit("--max-registry-requests 는 1 이상의 정수여야 합니다.");
+  }
+  const registryConcurrency = Number(args["registry-concurrency"]);
+  if (!Number.isInteger(registryConcurrency) || registryConcurrency < 1) {
+    printUsageAndExit("--registry-concurrency 는 1 이상의 정수여야 합니다.");
+  }
+  return {
+    numOfRows,
+    pageNo,
+    concurrency,
+    maxRequests,
+    maxPages,
+    maxHitsPerQuery,
+    maxRegistryRequests,
+    registryConcurrency,
+  };
 }
 
 async function main() {
@@ -604,6 +633,14 @@ async function main() {
   const areaBrands = areaBrandDocument?.brands || null;
   const areaBrandContext = areaBrandDocument
     ? createAreaBrandContext(areaBrands, undefined, areaBrandDocument.metadata)
+    : null;
+  const registryApiKey = args.registryApiKey || process.env.IP_REGISTRY_API_KEY;
+  const ipRegistryContext = args["enrich-registry"]
+    ? createIpRegistryContext({
+        client: createIpRegistryClient({ apiKey: registryApiKey }),
+        maxRequests: numeric.maxRegistryRequests,
+        concurrency: numeric.registryConcurrency,
+      })
     : null;
 
   if (args.input) {
@@ -671,6 +708,13 @@ async function main() {
       areaBrandContext,
     });
     const results = batch.results;
+    if (ipRegistryContext) {
+      for (const entry of results) {
+        if (entry.status === "ok" && Array.isArray(entry.hits)) {
+          entry.hits = await enrichHitsWithIpRegistry(entry.hits, entry.query.region, ipRegistryContext);
+        }
+      }
+    }
     const output = {
       schemaVersion: "1.2",
       mode: "batch",
@@ -695,6 +739,7 @@ async function main() {
         areaBrandsPath,
         results
       ),
+      ipRegistryValidation: ipRegistryValidationMetadata(ipRegistryContext, results),
       completedAt: new Date().toISOString(),
       results,
     };
@@ -726,6 +771,10 @@ async function main() {
     areaBrandsPath,
     [output]
   );
+  if (ipRegistryContext) {
+    output.hits = await enrichHitsWithIpRegistry(output.hits, query.region, ipRegistryContext);
+  }
+  output.ipRegistryValidation = ipRegistryValidationMetadata(ipRegistryContext, [output]);
   const outPath = writeJson(output, args.out);
   console.error(
     `[matchTrademarks] pages=${output.pages.fetchedCount}, filtered=${output.hits.length}, collection=${output.collectionStatus}, keywordTotal=${output.keywordTotalCount}${outPath ? ` -> ${outPath}` : ""}`
