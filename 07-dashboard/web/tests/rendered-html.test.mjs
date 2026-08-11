@@ -34,3 +34,10 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "ip_registry"));
   assert.ok(snapshot.warnings.some((warning) => warning.includes("전국 모집단")));
 });
+
+test("generates a self-contained standalone dashboard", async () => {
+  const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
+  assert.match(html, /dashboard-snapshot-v1/);
+  assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);
+});

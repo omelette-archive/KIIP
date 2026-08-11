@@ -28,6 +28,13 @@ npm test
 npm run lint
 ```
 
+서버 없이 파일 하나만 배포하려면 다음 명령으로 [`../dashboard.html`](../dashboard.html)을
+재생성한다. 생성 파일 안에 현재 스냅샷·스타일·동작 코드가 모두 포함된다.
+
+```powershell
+npm run build:html
+```
+
 GitHub Actions는 파이프라인 검증과 별도로 웹 빌드·스냅샷 계약 테스트를 실행한다. 운영 데이터
 갱신은 상위 수집 작업 완료 → 스냅샷 생성 → `sync:snapshot` → 새 사이트 버전 배포 순서다.
 현재 실키 자동 수집 주기와 무인 배포 권한 연결은 #42의 잔여 범위다.
