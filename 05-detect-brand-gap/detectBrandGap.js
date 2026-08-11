@@ -66,6 +66,11 @@ function detectGaps(analysis) {
       // 대부분 false/null이다. ⑥단계가 문장 생성 시 검증 여부에 따라 문장을 넣거나 뺀다.
       regionMatchVerified: bucket.regionVerificationRate === 1,
       localApplicantShare: bucket.localApplicantShare,
+      goodsMatchCounts: bucket.goodsMatchCounts || null,
+      goodsConfirmedHitCount: bucket.goodsConfirmedHitCount || 0,
+      goodsReviewRequiredHitCount: bucket.goodsReviewRequiredHitCount || 0,
+      goodsMismatchHitCount: bucket.goodsMismatchHitCount || 0,
+      goodsVerificationRate: bucket.goodsVerificationRate ?? null,
       ...scored,
     };
   });
@@ -85,6 +90,7 @@ function detectGaps(analysis) {
       "확정 후 05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
     "지역 내·외 출원 비중(localApplicantShare)은 ③단계 주소 매칭이 검증되기 전까지 점수에 " +
       "쓰지 않는다 — regionMatchVerified는 참고용 메타데이터일 뿐이다.",
+    "지정상품 normalized_contains/class_only 후보는 #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않는다.",
   ];
   const nonRepresentativeCount = rows.filter((row) => !row.representative).length;
   if (nonRepresentativeCount > 0) {
@@ -108,9 +114,12 @@ function detectGaps(analysis) {
       activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준)",
       weights: { activity: 0.7, registration: 0.3 },
       localApplicantShareIncluded: false,
+      designatedGoodsPolicy:
+        "normalized_exact만 확정 근거; 후보·불일치는 메타데이터로 보존하고 점수 입력은 기존 합계 유지",
+      designatedGoodsCriteriaIssue: "#12",
       rationale: "출원인 주소 검증률이 낮은 값을 점수에 섞지 않아 동일 입력의 결정론성을 유지",
       criteriaIssue: "#29",
-      lastUpdatedAt: "2026-08-10",
+      lastUpdatedAt: "2026-08-11",
     },
     warnings,
     rows,

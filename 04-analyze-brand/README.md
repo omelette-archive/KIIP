@@ -10,6 +10,7 @@
 - 연도별 건수와 최근/직전 동일 기간 증감, 최근 브랜드 예시
 - 오류·부분 수집·날짜 누락·지역 미검증 데이터 품질 지표
 - 출원인 주소 근거와 농사로 지역브랜드 근거의 분리 집계
+- 등록원부 지정상품의 확정·검토후보·불일치·미검증 집계
 - ③의 출처 계보를 버킷과 ④ 산출물에 전달
 
 ## 사용법
@@ -26,8 +27,8 @@ node 04-analyze-brand/analyzeBrands.js \
 
 ## 출력 계약
 
-현재 `schemaVersion`은 `1.2`, 분석 규칙은
-`brand-analysis-v2-regional-brand-separated`다.
+현재 `schemaVersion`은 `1.3`, 분석 규칙은
+`brand-analysis-v3-ip-registry-evidence`다.
 
 ```text
 {
@@ -51,13 +52,17 @@ node 04-analyze-brand/analyzeBrands.js \
 지역 관련 지표는 다음처럼 엄격히 분리한다.
 
 - `localApplicantShare`: 출원인 주소가 검증된 hit만 `inside / (inside + outside)`로 계산한다.
-  현재 KIPRIS 단어검색에는 주소가 없어 보통 `null`이며 #11의 별도 조인이 필요하다.
+  등록번호가 있는 hit는 등록원부 주소로 보강하며 나머지는 `unverified`로 유지한다.
 - `regionalBrandCounts`: 농사로 출원번호 근거를 `inside|outside|unverified|notReferenced`로 집계한다.
 - `regionalBrandReferenceHitCount`, `regionalBrandVerifiedHitCount`,
   `regionalBrandReferenceRate`, `regionalBrandInsideShare`: 지역브랜드 연관성만 나타낸다.
 
 농사로 지역브랜드를 출원인 주소로 간주하지 않는다. 이 구분의 근거와 규칙 버전은
 [`docs/data-source-provenance.md`](../docs/data-source-provenance.md)에 기록한다.
+
+지정상품은 `goodsMatchCounts`, `goodsConfirmedHitCount`, `goodsReviewRequiredHitCount`,
+`goodsMismatchHitCount`, `goodsVerificationRate`로 제공한다. #12 기준 확정 전에는 후보를 기존 상표
+합계에서 자동 제외하지 않는다.
 
 ## 3건 E2E 확인 결과
 

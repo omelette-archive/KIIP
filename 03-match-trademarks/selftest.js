@@ -24,6 +24,7 @@ const {
 } = require("./lib/areaBrandEnricher");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
+const { runIpRegistryTests } = require("./ipRegistrySelftest");
 const {
   parseCsvLine,
   readNormalizedCsv,
@@ -110,6 +111,8 @@ function ok(label) {
 }
 
 async function run() {
+  await runIpRegistryTests();
+
   console.log("1) xmlLite.parseTrademarkResponse");
   {
     const parsed = parseTrademarkResponse(SAMPLE_OK_XML);

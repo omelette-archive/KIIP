@@ -8,9 +8,12 @@
 
 - KIPRIS 결과는 ②의 `niceClass`로 필터링한다. 류가 없으면 잠정 식품류
   `29·30·31·32·33·40·43`을 사용하며 결과의 `query.classCodeFallbackApplied`에 표시한다.
-  이 목록은 업무 확정 기준이 아닌 노이즈 완화용 v1 규칙이다. 지정상품 상세 대조는 #12다.
-- 출원인 주소는 KIPRIS 단어검색 응답에 없다. 따라서 `applicantRegionMatch`와
-  `localApplicantShare`는 #11에서 별도 데이터가 확보될 때까지 미검증 상태다.
+  이 목록은 업무 확정 기준이 아닌 노이즈 완화용 v1 규칙이다.
+- KIPRIS 단어검색에 없는 출원인 주소·지정상품은 등록번호가 있는 hit만 등록원부
+  `getMarkHistory`로 별도 보강한다. 주소는 법정동코드로 판정하고, 지정상품은
+  `normalized_exact|normalized_contains|class_only|mismatch|unverified` 근거를 남긴다.
+- #12의 세부 기준이 확정되기 전에는 `normalized_contains|class_only`를 후보로만 표시하고 기존
+  상표 합계에서 자동 제외하지 않는다. 등록번호가 없는 출원중·거절 건은 `not_applicable`이다.
 - 농사로 지역브랜드의 `aplcnoInfo`와 KIPRIS `applicationNumber`는 숫자 외 문자를 제거한 뒤
   완전일치할 때만 연결한다. 이름·유사문자열 조인은 하지 않는다
   (`area-brand-application-region-join-v1`).
@@ -26,7 +29,7 @@
 
 ```bash
 cp .env.example .env
-# KIPRIS_API_KEY, NONGSARO_LOCAL_BRAND_API_KEY 입력
+# KIPRIS_API_KEY, NONGSARO_LOCAL_BRAND_API_KEY, IP_REGISTRY_API_KEY 입력
 ```
 
 키는 로컬 `.env`에만 두며, 위치와 worktree 복사 방법은
@@ -77,14 +80,29 @@ node 03-match-trademarks/matchTrademarks.js \
 `regionalBrandMatch=inside` 3건이었다. 쿼리 1건은 첫 페이지 상한 때문에 `partial`이며 데이터
 오류가 아니다. 이 소량 결과는 연결 가능성 검증용이며 농사로 전체 602건 결과를 대표하지 않는다.
 
+## 등록원부 3건 보강
+
+```bash
+node 03-match-trademarks/enrichIpRegistry.js \
+  --input 03-match-trademarks/output/area-brand-validation-result.json \
+  --limit 3 --concurrency 1 \
+  --out 03-match-trademarks/output/area-brand-ip-registry-sample.json
+```
+
+기본 호출 상한은 등록번호 3개다. 2026-08-11 실키 결과는 등록번호 고유 13개 중 3개 요청,
+성공 3·오류 0·미수집 10이었다. 출원인 주소 판정은 inside 2·outside 0·unverified 1,
+지정상품은 세 건 모두 `class_only` 후보였다. 이는 샘플 기술 검증이며 전체 분포가 아니다.
+
 ## 출처와 버전 필드
 
 - 수집 JSON: `contractVersion`, `sourceMetadata`, `fetchedAt`
 - ③ JSON: `trademarkSourceMetadata`, 입력별 `provenance`, `regionalBrandValidation`
 - 조인된 hit: `regionalBrandMatchVersion`, `regionalBrandMatchSource`,
   `regionalBrandEvidence`
+- 등록원부 보강 hit: `applicantRegionMatch*`, `applicantRegionEvidence`, `goodsMatch*`,
+  `goodsEvidence`, `registryEvidence`
 - 현재 계약: KIPRIS `kipris-trademark-word-search-v1`, 농사로
-  `nongsaro-area-brand-v1`
+  `nongsaro-area-brand-v1`, 등록원부 `ip-registry-mark-history-v1`
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
 출원번호를 보존한다. 키 값과 인증 URL은 저장하지 않는다.
@@ -96,9 +114,12 @@ node 03-match-trademarks/matchTrademarks.js \
 ├── matchTrademarks.js               KIPRIS 단건·배치 및 선택적 지역브랜드 조인
 ├── fetchAreaBrands.js               농사로 지역브랜드 소량 수집
 ├── buildAreaBrandValidationInput.js 별도 검증자료를 ③ 입력 CSV로 변환
+├── enrichIpRegistry.js              등록번호 기반 주소·지정상품 소량 보강
 ├── lib/areaBrandClient.js           농사로 XML·페이지·계약 메타데이터
 ├── lib/areaBrandEnricher.js         행정구역 정규화·출원번호 완전일치 조인
 ├── lib/kiprisClient.js              KIPRIS 호출·계약 메타데이터
+├── lib/ipRegistryClient.js          등록원부 JSON 호출·응답 계약
+├── lib/ipRegistryEnricher.js        주소 판정·지정상품 근거 분류
 └── output/                           로컬 산출물(git-ignored)
 ```
 

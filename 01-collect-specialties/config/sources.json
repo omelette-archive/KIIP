@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastVerifiedAt": "2026-08-10",
+  "lastVerifiedAt": "2026-08-11",
   "sources": [
     {
       "id": "admin_codes",
@@ -103,6 +103,32 @@
       "implementation": {
         "status": "sample_join_live_validated",
         "adapter": "03-match-trademarks/lib/areaBrandClient.js + lib/areaBrandEnricher.js"
+      }
+    },
+    {
+      "id": "ip_registry",
+      "name": "지식재산처 등록원부 실시간 정보 조회",
+      "role": "trademark_applicant_address_and_goods_enrichment",
+      "dataVersion": "ip-registry-mark-history-v1",
+      "lastVerifiedAt": "2026-08-11",
+      "catalogUrl": "https://www.data.go.kr/data/15124946/openapi.do",
+      "providerUrl": "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getMarkHistory",
+      "formats": ["JSON"],
+      "authentication": {
+        "required": true,
+        "keyEnv": "IP_REGISTRY_API_KEY",
+        "baseUrlEnv": "IP_REGISTRY_API_BASE_URL",
+        "defaultBaseUrl": "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc",
+        "approval": "data_go_kr_service_application"
+      },
+      "quota": {
+        "type": "provider_policy",
+        "value": null,
+        "verification": "승인 계정의 data.go.kr 개발계정 활용 정책 기준; 샘플은 --limit 3"
+      },
+      "implementation": {
+        "status": "sample_enrichment_live_validated",
+        "adapter": "03-match-trademarks/lib/ipRegistryClient.js + lib/ipRegistryEnricher.js"
       }
     }
   ]

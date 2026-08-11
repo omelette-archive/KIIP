@@ -1,0 +1,347 @@
+"use strict";
+
+const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes");
+const { splitRegion } = require("../../01-collect-specialties/lib/normalize");
+const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
+const { normalizeClassCode } = require("./filters");
+const {
+  IP_REGISTRY_SOURCE_METADATA,
+  normalizeRegistrationNumber,
+} = require("./ipRegistryClient");
+
+const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v1";
+const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v0-review";
+
+function clean(value) {
+  return value === undefined || value === null
+    ? ""
+    : String(value).normalize("NFC").trim().replace(/\s+/g, " ");
+}
+
+function normalizeGoodsText(value) {
+  return clean(value).toLowerCase().replace(/[^0-9a-z가-힣]/g, "");
+}
+
+function normalizeApplicantAddress(address, adminList = loadAdminCodes()) {
+  const raw = clean(address);
+  if (!raw) return { status: "unmatched", level: null, reason: "empty_address" };
+  const split = splitRegion(raw, adminList);
+  if (!split.matched) {
+    return {
+      status: split.ambiguous ? "ambiguous" : "unmatched",
+      level: null,
+      reason: split.ambiguous ? "ambiguous_sigungu" : "address_not_in_admin_master",
+      candidateSidos: split.candidateSidos || [],
+    };
+  }
+  return {
+    status: "matched",
+    level: "sigungu",
+    sido: split.sido,
+    sigungu: split.sigungu,
+    normalizedRegion: `${split.sido} ${split.sigungu}`,
+    method: "admin_sigungu_in_masked_address",
+  };
+}
+
+function classifyApplicantRegionMatch(queryRegion, applicantRegion) {
+  if (queryRegion.status !== "matched" || applicantRegion.status !== "matched") {
+    return { match: "unverified", confidence: "unverified_registry_address" };
+  }
+  if (queryRegion.sido !== applicantRegion.sido) {
+    return { match: "outside", confidence: "exact_registry_address_sido" };
+  }
+  if (queryRegion.level === "sigungu" && applicantRegion.level === "sigungu") {
+    return {
+      match: queryRegion.sigungu === applicantRegion.sigungu ? "inside" : "outside",
+      confidence: "exact_registry_address_sigungu",
+    };
+  }
+  return { match: "inside", confidence: "exact_registry_address_sido" };
+}
+
+function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes()) {
+  const queryRegion = normalizeAreaBrandRegion(queryRegionText, adminList);
+  const evidence = (applicants || []).map((applicant) => {
+    const region = normalizeApplicantAddress(applicant.address, adminList);
+    const result = classifyApplicantRegionMatch(queryRegion, region);
+    return {
+      normalizedRegion: region.normalizedRegion || null,
+      regionStatus: region.status,
+      regionLevel: region.level,
+      sido: region.sido || null,
+      sigungu: region.sigungu || null,
+      nationality: applicant.nationality || null,
+      representative: applicant.representative || null,
+      match: result.match,
+      confidence: result.confidence,
+    };
+  });
+  if (evidence.length === 0) {
+    return { match: "unverified", confidence: "no_applicant_address", evidence: [] };
+  }
+  const matches = [...new Set(evidence.map((row) => row.match))];
+  const confidences = [...new Set(evidence.map((row) => row.confidence))];
+  if (matches.length !== 1 || confidences.length !== 1) {
+    return {
+      match: "unverified",
+      confidence: "multiple_conflicting_applicant_addresses",
+      evidence,
+    };
+  }
+  return { match: matches[0], confidence: confidences[0], evidence };
+}
+
+function queryClassCodes(value) {
+  return new Set(
+    clean(value)
+      .split(/[|,;\s]+/)
+      .filter(Boolean)
+      .map(normalizeClassCode)
+  );
+}
+
+function evaluateGoods(query, products) {
+  const target = normalizeGoodsText(query?.item);
+  const wantedClasses = queryClassCodes(query?.classCode);
+  const normalizedProducts = (products || []).map((product) => ({
+    classCode: product.classCode ? normalizeClassCode(product.classCode) : null,
+    designatedProductName: clean(product.designatedProductName) || null,
+    normalizedName: normalizeGoodsText(product.designatedProductName),
+  }));
+  const classMatched = normalizedProducts.filter(
+    (product) => wantedClasses.size === 0 || (product.classCode && wantedClasses.has(product.classCode))
+  );
+  const exact = target
+    ? classMatched.filter((product) => product.normalizedName === target)
+    : [];
+  const contains = target
+    ? classMatched.filter(
+        (product) =>
+          product.normalizedName &&
+          product.normalizedName !== target &&
+          (product.normalizedName.includes(target) || target.includes(product.normalizedName))
+      )
+    : [];
+  let method = "unverified";
+  let confidence = "unverified";
+  let reviewRequired = true;
+  if (exact.length > 0) {
+    method = "normalized_exact";
+    confidence = "high";
+    reviewRequired = false;
+  } else if (contains.length > 0) {
+    method = "normalized_contains";
+    confidence = "review_required";
+  } else if (classMatched.length > 0) {
+    method = "class_only";
+    confidence = "candidate_only";
+  } else if (normalizedProducts.length > 0) {
+    method = "mismatch";
+    confidence = "high";
+  }
+  return {
+    method,
+    confidence,
+    reviewRequired,
+    targetNormalized: target || null,
+    productCount: normalizedProducts.length,
+    classMatchedProductCount: classMatched.length,
+    evidence: [...exact, ...contains]
+      .filter(
+        (row, index, all) =>
+          all.findIndex(
+            (candidate) =>
+              candidate.classCode === row.classCode &&
+              candidate.designatedProductName === row.designatedProductName
+          ) === index
+      )
+      .slice(0, 50)
+      .map(({ classCode, designatedProductName }) => ({ classCode, designatedProductName })),
+  };
+}
+
+function enrichHit(hit, query, record, fetchedAt) {
+  const applicant = evaluateApplicantRegions(query?.region, record.applicants);
+  const goods = evaluateGoods(query, record.products);
+  return {
+    ...hit,
+    ipRegistryStatus: "complete",
+    ipRegistrySource: IP_REGISTRY_SOURCE_METADATA.sourceId,
+    ipRegistryContractVersion: IP_REGISTRY_SOURCE_METADATA.contractVersion,
+    ipRegistryFetchedAt: fetchedAt,
+    applicantRegionMatch: applicant.match,
+    applicantRegionMatchSource: "ip_registry_applicant_address",
+    applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
+    applicantRegionMatchConfidence: applicant.confidence,
+    applicantRegionEvidence: applicant.evidence,
+    goodsMatchMethod: goods.method,
+    goodsMatchConfidence: goods.confidence,
+    goodsMatchVersion: GOODS_MATCH_VERSION,
+    goodsReviewRequired: goods.reviewRequired,
+    goodsEvidence: goods.evidence,
+    registryEvidence: {
+      registrationNumber: record.registrationNumber || hit.registrationNumber || null,
+      applicationNumber: record.applicationNumber || hit.applicationNumber || null,
+      productCount: goods.productCount,
+      classMatchedProductCount: goods.classMatchedProductCount,
+    },
+  };
+}
+
+function registryNumbers(document) {
+  const result = [];
+  const seen = new Set();
+  for (const entry of document.results || []) {
+    for (const hit of entry.hits || []) {
+      const number = normalizeRegistrationNumber(hit.registrationNumber);
+      if (number && !seen.has(number)) {
+        seen.add(number);
+        result.push(number);
+      }
+    }
+  }
+  return result;
+}
+
+async function mapConcurrent(values, concurrency, worker) {
+  const output = new Array(values.length);
+  let cursor = 0;
+  async function runWorker() {
+    while (cursor < values.length) {
+      const index = cursor++;
+      output[index] = await worker(values[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, values.length) }, runWorker));
+  return output;
+}
+
+async function enrichDocument(document, client, options = {}) {
+  if (!document || !Array.isArray(document.results)) {
+    throw new Error("입력은 ③단계 결과 JSON이어야 합니다 (results 배열 필요).");
+  }
+  const allNumbers = registryNumbers(document);
+  const limit = Number(options.limit ?? 3);
+  const concurrency = Number(options.concurrency ?? 1);
+  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
+    throw new Error("limit은 1~100 정수여야 합니다.");
+  }
+  if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
+    throw new Error("concurrency는 1~5 정수여야 합니다.");
+  }
+  const selected = allNumbers.slice(0, limit);
+  const selectedSet = new Set(selected);
+  const fetchedAt = options.fetchedAt || new Date().toISOString();
+  const fetched = await mapConcurrent(selected, concurrency, async (registrationNumber) => {
+    try {
+      const record = await client.getMarkHistory({ registrationNumber });
+      return { registrationNumber, status: record.found ? "complete" : "not_found", record };
+    } catch (error) {
+      return {
+        registrationNumber,
+        status: "error",
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  });
+  const fetchedByNumber = new Map(fetched.map((row) => [row.registrationNumber, row]));
+  const counts = {
+    registeredHitCount: 0,
+    noRegistrationHitCount: 0,
+    completeHitCount: 0,
+    notFoundHitCount: 0,
+    errorHitCount: 0,
+    notCollectedHitCount: 0,
+  };
+  const applicantRegionCounts = { inside: 0, outside: 0, unverified: 0 };
+  const goodsMatchCounts = {
+    normalized_exact: 0,
+    normalized_contains: 0,
+    class_only: 0,
+    mismatch: 0,
+    unverified: 0,
+  };
+  const results = document.results.map((entry) => ({
+    ...entry,
+    hits: (entry.hits || []).map((hit) => {
+      const number = normalizeRegistrationNumber(hit.registrationNumber);
+      if (!number) {
+        counts.noRegistrationHitCount++;
+        return { ...hit, ipRegistryStatus: "not_applicable" };
+      }
+      counts.registeredHitCount++;
+      if (!selectedSet.has(number)) {
+        counts.notCollectedHitCount++;
+        return { ...hit, ipRegistryStatus: "not_collected" };
+      }
+      const fetchedRow = fetchedByNumber.get(number);
+      if (!fetchedRow || fetchedRow.status === "error") {
+        counts.errorHitCount++;
+        return {
+          ...hit,
+          ipRegistryStatus: "error",
+          ipRegistryError: fetchedRow?.error || "등록원부 조회 결과 없음",
+        };
+      }
+      if (fetchedRow.status === "not_found") {
+        counts.notFoundHitCount++;
+        return { ...hit, ipRegistryStatus: "not_found" };
+      }
+      counts.completeHitCount++;
+      const enriched = enrichHit(hit, entry.query || {}, fetchedRow.record, fetchedAt);
+      applicantRegionCounts[enriched.applicantRegionMatch]++;
+      goodsMatchCounts[enriched.goodsMatchMethod]++;
+      return enriched;
+    }),
+  }));
+  const errorRegistrationCount = fetched.filter((row) => row.status === "error").length;
+  const notFoundRegistrationCount = fetched.filter((row) => row.status === "not_found").length;
+  const completeRegistrationCount = fetched.filter((row) => row.status === "complete").length;
+  const notCollectedRegistrationCount = Math.max(0, allNumbers.length - selected.length);
+  const status =
+    errorRegistrationCount === selected.length && selected.length > 0
+      ? "error"
+      : errorRegistrationCount > 0 || notCollectedRegistrationCount > 0
+        ? "partial"
+        : "complete";
+  return {
+    ...document,
+    results,
+    ipRegistryEnrichment: {
+      enabled: true,
+      status,
+      fetchedAt,
+      sourceMetadata: { ...IP_REGISTRY_SOURCE_METADATA, fetchedAt },
+      policy: {
+        registrationNumberOnly: true,
+        unregisteredHits: "not_applicable",
+        classOnlyStatistics: "candidate_only_until_issue_12_policy",
+        goodsMatchVersion: GOODS_MATCH_VERSION,
+        applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
+      },
+      uniqueRegistrationCount: allNumbers.length,
+      requestedRegistrationCount: selected.length,
+      completeRegistrationCount,
+      notFoundRegistrationCount,
+      errorRegistrationCount,
+      notCollectedRegistrationCount,
+      counts,
+      applicantRegionCounts,
+      goodsMatchCounts,
+    },
+  };
+}
+
+module.exports = {
+  APPLICANT_REGION_MATCH_VERSION,
+  GOODS_MATCH_VERSION,
+  classifyApplicantRegionMatch,
+  enrichDocument,
+  enrichHit,
+  evaluateApplicantRegions,
+  evaluateGoods,
+  normalizeApplicantAddress,
+  normalizeGoodsText,
+  registryNumbers,
+};
