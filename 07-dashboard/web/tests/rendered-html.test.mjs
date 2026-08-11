@@ -43,6 +43,29 @@ test("renders tab navigation and a data-connected ranking table (레퍼런스 �
   assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
+test("renders matching criteria prominently and keeps real trademark names alongside the notice-name grouping", async () => {
+  const response = await render();
+  const html = await response.text();
+  // 판정 기준은 하단 <details>가 아니라 항상 보이는 섹션이어야 한다(2026-08-11 피드백:
+  // "작은글씨는 아니면 위에 잘 넣을수있으면 넣고").
+  assert.match(html, /class="criteria"/);
+  assert.match(html, /판정 기준과 매칭 방법/);
+  assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
+  assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
+  assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
+
+  // 품목(고시명칭)은 그룹핑 기준일 뿐이고, 실제로 어떤 상표명이 출원됐는지는 별도 필드로
+  // 보존돼 있어야 한다(2026-08-11 피드백: "핵심은 사과지만 출원 상표명도 보여야").
+  const snapshot = JSON.parse(
+    await readFile(new URL("../public/data/dashboard-snapshot.json", import.meta.url), "utf8")
+  );
+  const withTrademarks = snapshot.regions
+    .flatMap((region) => region.items)
+    .find((item) => Array.isArray(item.recentTrademarks) && item.recentTrademarks.length > 0);
+  assert.ok(withTrademarks, "샘플에 최소 1개 품목은 실제 출원 상표명을 보존해야 함");
+  assert.ok(withTrademarks.recentTrademarks[0].title, "출원 상표명 텍스트가 있어야 함");
+});
+
 test("ships a valid dashboard snapshot", async () => {
   const raw = await readFile(new URL("../public/data/dashboard-snapshot.json", import.meta.url), "utf8");
   const snapshot = JSON.parse(raw);
@@ -64,5 +87,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /id="ranking"/);
   assert.match(html, /id="region-view"/);
   assert.match(html, /id="item-view"[^>]*hidden/);
+  assert.match(html, /id="criteria"/, "판정 기준 컨테이너가 있어야 함(React판과 동일 기능)");
+  assert.match(html, /function trademarkListHtml/, "실제 출원 상표명·지정상품을 그리는 로직이 임베드돼야 함");
   assert.match(html, /dashboardClient\(/);
 });

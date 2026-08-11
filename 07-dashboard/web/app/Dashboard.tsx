@@ -10,6 +10,16 @@ type Metric = {
   blockingIssue?: string | null;
 };
 
+type Trademark = {
+  title: string | null;
+  applicationNumber: string | null;
+  applicationDate: string | null;
+  applicant: string | null;
+  applicationStatus: string | null;
+  goodsMatchMethod: string | null;
+  designatedGoods: string[] | null;
+};
+
 type Item = {
   specialtyId: string | null;
   itemName: string | null;
@@ -25,6 +35,8 @@ type Item = {
     goodsReviewCandidateCount: Metric;
     gapScore: Metric;
   };
+  // 품목(고시명칭)은 그룹핑 기준일 뿐이다 — 실제 출원 상표명·지정상품도 근거로 함께 보여준다.
+  recentTrademarks: Trademark[];
 };
 
 type Region = {
@@ -90,6 +102,12 @@ function number(value: number | null | undefined) {
 
 function percent(value: number | null | undefined) {
   return typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
+}
+
+// applicationDate는 KIPRIS 원문 형식(YYYYMMDD)을 그대로 옮겨온 값이라 별도 포맷터가 필요하다.
+function yyyymmdd(value: string | null | undefined) {
+  const match = String(value || "").match(/^(\d{4})(\d{2})(\d{2})$/);
+  return match ? `${match[1]}.${match[2]}.${match[3]}` : value || "미기록";
 }
 
 function date(value: string | null | undefined) {
@@ -239,6 +257,47 @@ export default function Dashboard({ snapshot }: { snapshot: Snapshot }) {
           <span>현재 범위</span>
           <strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}개 품목</strong>
           <p>소규모 E2E 검증 자료입니다. 전국 통계로 해석하지 않습니다.</p>
+        </div>
+      </section>
+
+      <section className="criteria" aria-label="판정 기준과 매칭 방법">
+        <div className="section-heading">
+          <div>
+            <p className="eyebrow">HOW THIS IS BUILT</p>
+            <h2>판정 기준과 매칭 방법</h2>
+          </div>
+        </div>
+        <div className="criteria-grid">
+          <article>
+            <span>대표 특산품 판정</span>
+            <strong>GI 출처 또는 상표 출원 3건 이상</strong>
+            <small>#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)</small>
+          </article>
+          <article>
+            <span>품목 매칭</span>
+            <strong>고시상품명칭 정확 일치</strong>
+            <small>지식재산처 고시상품명칭 13판(2026) 기준. 부분·복수 일치는 추정하지 않고 사람 검토로 분리</small>
+          </article>
+          <article>
+            <span>지역 매칭</span>
+            <strong>법정동코드 완전일치</strong>
+            <small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small>
+          </article>
+          <article>
+            <span>상표 검색</span>
+            <strong>KIPRIS 단어검색(고시명칭 기준)</strong>
+            <small>NICE류가 있으면 해당 류만, 미상이면 식품 관련 기본 류(29·30·31·32·33·40·43)로 좁힘</small>
+          </article>
+          <article>
+            <span>고유 상표 / 등록 상표</span>
+            <strong>출원번호 중복 제거 / 상태=등록만</strong>
+            <small>③단계가 저장한 hit 기준. KIPRIS 전체 검색 건수(totalCount)와 다를 수 있음</small>
+          </article>
+          <article>
+            <span>출원인 지역 매칭</span>
+            <strong>등록원부 실시간 조회(등록번호 기준)</strong>
+            <small>등록 완료된 상표만 대상. 주소가 검증된 표본만 지역 내·외 비중 계산에 사용</small>
+          </article>
         </div>
       </section>
 
@@ -425,7 +484,7 @@ export default function Dashboard({ snapshot }: { snapshot: Snapshot }) {
 
                 <div className="item-title">
                   <div>
-                    <span>선택 품목</span>
+                    <span>{selectedRegion.region} / 선택 품목</span>
                     <h3>{selectedItem.noticeName || selectedItem.itemName || "미지정 품목"}</h3>
                   </div>
                   <span className="class-chip">NICE {selectedItem.niceClass || "미확정"}</span>
@@ -453,6 +512,34 @@ export default function Dashboard({ snapshot }: { snapshot: Snapshot }) {
                     <small>#29 건수 기준 반영 전 preview</small>
                   </article>
                 </div>
+
+                {selectedItem.recentTrademarks.length > 0 && (
+                  <div className="trademark-list" aria-label="최근 출원 상표">
+                    <p className="eyebrow">RECENT FILINGS — {selectedItem.noticeName || selectedItem.itemName}는 품목 그룹핑 기준일 뿐, 실제 출원 상표명입니다</p>
+                    <ul>
+                      {selectedItem.recentTrademarks.map((trademark, index) => (
+                        <li key={trademark.applicationNumber || index}>
+                          <div className="trademark-list-head">
+                            <strong>{trademark.title || "제목 미기록"}</strong>
+                            <span className={`state state-${trademark.applicationStatus === "등록" ? "complete_nonzero" : "partial"}`}>
+                              {trademark.applicationStatus || "상태 미기록"}
+                            </span>
+                          </div>
+                          <small>
+                            {trademark.applicant || "출원인 미기록"} · 출원 {yyyymmdd(trademark.applicationDate)}
+                          </small>
+                          {trademark.designatedGoods && trademark.designatedGoods.length > 0 && (
+                            <div className="goods-chips">
+                              {trademark.designatedGoods.map((goods) => (
+                                <span className="goods-chip" key={goods}>{goods}</span>
+                              ))}
+                            </div>
+                          )}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
 
                 <div className="review-strip">
                   <div>

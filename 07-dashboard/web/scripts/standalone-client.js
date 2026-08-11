@@ -11,6 +11,10 @@ function dashboardClient(snapshot) {
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
   const date = (value) => value ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록";
+  const yyyymmdd = (value) => {
+    const match = String(value || "").match(/^(\d{4})(\d{2})(\d{2})$/);
+    return match ? `${match[1]}.${match[2]}.${match[3]}` : (value || "미기록");
+  };
   const metric = (label, value, formatter = number) => `<article class="detail ${value?.availability === "blocked" ? "blocked" : ""}"><span>${label}</span><strong>${formatter(value?.value)}</strong><small>${esc(value?.rationale || labels[value?.status] || value?.status || "근거 확인 중")}${value?.blockingIssue ? ` · <a class="issue" href="https://github.com/omelette-archive/KIIP/issues/${value.blockingIssue.slice(1)}">${value.blockingIssue}</a>` : ""}</small></article>`;
 
   // 지역×품목을 평탄화한다. 레퍼런스의 "등록상표 랭킹"·"품목별 조회"는 품목을 전국 단위로
@@ -47,6 +51,23 @@ function dashboardClient(snapshot) {
     });
     return acc;
   }, { trademarks: 0, registered: 0, review: 0 });
+
+  // 판정 기준·매칭 방법은 스냅샷 데이터가 아니라 파이프라인 규칙 자체를 설명하는 고정 텍스트다.
+  document.querySelector("#criteria").innerHTML = [
+    ["대표 특산품 판정", "GI 출처 또는 상표 출원 3건 이상", "#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)"],
+    ["품목 매칭", "고시상품명칭 정확 일치", "지식재산처 고시상품명칭 13판(2026) 기준. 부분·복수 일치는 추정하지 않고 사람 검토로 분리"],
+    ["지역 매칭", "법정동코드 완전일치", "국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만"],
+    ["상표 검색", "KIPRIS 단어검색(고시명칭 기준)", "NICE류가 있으면 해당 류만, 미상이면 식품 관련 기본 류(29·30·31·32·33·40·43)로 좁힘"],
+    ["고유 상표 / 등록 상표", "출원번호 중복 제거 / 상태=등록만", "③단계가 저장한 hit 기준. KIPRIS 전체 검색 건수(totalCount)와 다를 수 있음"],
+    ["출원인 지역 매칭", "등록원부 실시간 조회(등록번호 기준)", "등록 완료된 상표만 대상. 주소가 검증된 표본만 지역 내·외 비중 계산에 사용"],
+  ].map(([label, value, note]) => `<article><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`).join("");
+
+  function trademarkListHtml(item) {
+    const list = item.recentTrademarks || [];
+    if (list.length === 0) return "";
+    const rows = list.map((t) => `<li><div class="trademark-list-head"><strong>${esc(t.title || "제목 미기록")}</strong><span class="state ${t.applicationStatus === "등록" ? "" : "partial"}">${esc(t.applicationStatus || "상태 미기록")}</span></div><small>${esc(t.applicant || "출원인 미기록")} · 출원 ${esc(yyyymmdd(t.applicationDate))}</small>${t.designatedGoods && t.designatedGoods.length ? `<div class="goods-chips">${t.designatedGoods.map((g) => `<span class="goods-chip">${esc(g)}</span>`).join("")}</div>` : ""}</li>`).join("");
+    return `<div class="trademark-list" aria-label="최근 출원 상표"><p class="eyebrow">RECENT FILINGS — ${esc(item.noticeName || item.itemName || "")}는 품목 그룹핑 기준일 뿐, 실제 출원 상표명입니다</p><ul>${rows}</ul></div>`;
+  }
 
   document.querySelector("#generated").textContent = `마지막 생성 ${date(snapshot.generatedAt)}`;
   document.querySelector("#coverage").textContent = `${snapshot.coverage.observedRegionCount}개 지역 · ${snapshot.coverage.regionItemCount}개 품목`;
@@ -92,7 +113,7 @@ function dashboardClient(snapshot) {
     if (!region) { document.querySelector("#detail").innerHTML = '<p class="empty">표시할 지역이 없습니다.</p>'; return; }
     const item = region.items.find((row) => row.specialtyId === selectedItem) || region.items[0];
     selectedItem = item?.specialtyId || "";
-    document.querySelector("#detail").innerHTML = `<div class="content-top"><div><p class="eyebrow">REGION DETAIL</p><h2>${esc(region.region)}</h2></div><span class="state ${region.dataState === "partial" ? "partial" : ""}">${labels[region.dataState] || region.dataState}</span></div><div class="items">${region.items.map((row) => `<button class="item-button ${row.specialtyId === selectedItem ? "active" : ""}" data-item="${esc(row.specialtyId)}">${esc(row.noticeName || row.itemName || "미지정 품목")}</button>`).join("")}</div>${item ? `<div class="detail-grid">${metric("고유 상표", item.metrics.uniqueTrademarkCount)}${metric("등록 상표", item.metrics.registeredTrademarkCount)}${metric("등록률", item.metrics.registrationRate, percent)}${metric("지역 출원인 비중", item.metrics.localApplicantShare, percent)}${metric("지정상품 자동 확인", item.metrics.confirmedGoodsMatchCount)}${metric("지정상품 검토 후보", item.metrics.goodsReviewCandidateCount)}${metric("브랜드 공백 점수", item.metrics.gapScore)}</div>` : ""}`;
+    document.querySelector("#detail").innerHTML = `<div class="content-top"><div><p class="eyebrow">REGION DETAIL</p><h2>${esc(region.region)}</h2></div><span class="state ${region.dataState === "partial" ? "partial" : ""}">${labels[region.dataState] || region.dataState}</span></div><div class="items">${region.items.map((row) => `<button class="item-button ${row.specialtyId === selectedItem ? "active" : ""}" data-item="${esc(row.specialtyId)}">${esc(row.noticeName || row.itemName || "미지정 품목")}</button>`).join("")}</div>${item ? `<p class="item-breadcrumb">${esc(region.region)} / ${esc(item.noticeName || item.itemName || "미지정 품목")}</p><div class="detail-grid">${metric("고유 상표", item.metrics.uniqueTrademarkCount)}${metric("등록 상표", item.metrics.registeredTrademarkCount)}${metric("등록률", item.metrics.registrationRate, percent)}${metric("지역 출원인 비중", item.metrics.localApplicantShare, percent)}${metric("지정상품 자동 확인", item.metrics.confirmedGoodsMatchCount)}${metric("지정상품 검토 후보", item.metrics.goodsReviewCandidateCount)}${metric("브랜드 공백 점수", item.metrics.gapScore)}</div>${trademarkListHtml(item)}` : ""}`;
     document.querySelectorAll("[data-item]").forEach((button) => { button.onclick = () => { selectedItem = button.dataset.item; renderRegionView(); }; });
   }
 
