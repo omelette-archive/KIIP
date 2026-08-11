@@ -40,6 +40,7 @@
 | `brand-analysis-v2-regional-brand-separated` | 출원인 주소와 지역브랜드 연관성을 별도 집계 | `localApplicantShare`에는 출원인 주소만 사용. 농사로 근거는 `regionalBrand*` 지표로만 제공 |
 | `gap-score-v1-representative-gi-or-count3` | 대표 특산품: GI 출처 또는 상표 출원 3건 이상(OR). 활동량 0.7·등록률 0.3 | 대표 특산품 판정은 #29에서 확정(2026-08-11). 활동량 포화 건수·가중치는 아직 파이프라인 검증용 예시이며 #29 잔여 범위에서 확정 예정 |
 | `strategy-template-v0-example` | ⑤ 근거 수치만 고정 템플릿으로 문장화 | AI가 사실·점수를 만들지 않게 재현 가능한 초안을 먼저 생성. 개별 AI 검토는 #16의 별도 기록 |
+| `review-selection-v1` | ⑥-2 검토 대상: `collectionPartial` 또는 `regionMatchVerified=false`(OR), 상한 `limit`(기본 20)건 | #16에서 확정(2026-08-11). 근거가 이미 검증된 briefing은 사람이 다시 볼 필요가 없다는 판단. `gapScore` 내림차순으로 결정론적으로 자름 |
 
 ## 4. 산출물 계보
 
@@ -54,6 +55,10 @@
   `goodsEvidence`, `registryEvidence`를 기록하고 원본 전체 주소는 산출물에 복사하지 않는다.
 - ④ JSON: `analysisVersion`, `provenance`, `methodology`, 버킷별 `sourceProvenance`를 기록한다.
 - ⑤·⑥ JSON: 상위 단계 `provenance`와 현재 `scoreVersion`/`templateVersion`, 방법론을 이어받는다.
+- ⑥-2 검토(append-only, `strategy.json`과 분리된 별도 파일): `review-proposals.jsonl`에
+  `candidateId`·`proposalVersion`·`modelProvider`/`modelName`/`promptVersion`·`error`를,
+  `review-decisions.jsonl`에 `decision`·`reviewer`·`reviewedAt`을 기록한다. 승인 결과를
+  반영한 `strategy-reviewed.json`은 원본 `sentences`를 `originalSentences`로 항상 보존한다.
 - ⑦ 스냅샷: 상위 출처와 분석·점수·템플릿·지도 경계 버전을 이어받고 `sample|full`,
   `complete|partial|error|not_collected` 상태를 값과 분리해 기록한다. 상세 계약은
   [`dashboard-data-contract.md`](dashboard-data-contract.md)를 따른다.

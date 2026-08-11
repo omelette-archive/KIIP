@@ -66,6 +66,9 @@ function detectGaps(analysis) {
       sourceProvenance: bucket.sourceProvenance || [],
       uniqueTrademarkCount: bucket.uniqueTrademarkCount,
       registrationRate: bucket.registrationRate,
+      // ③단계 페이지·hit·요청 상한에 걸려 부분 수집된 검색 수 — ⑥-2가 "사람이 봐야 할" 후보를
+      // 고를 때 근거가 불완전한 행을 가려내는 데 쓴다(이슈 #16).
+      partialQueryCount: bucket.partialQueryCount || 0,
       // 참고용 메타데이터일 뿐 점수에는 안 쓴다 — 이슈 #11(출원인 주소 조인) 완료 전까지는
       // 대부분 false/null이다. ⑥단계가 문장 생성 시 검증 여부에 따라 문장을 넣거나 뺀다.
       regionMatchVerified: bucket.regionVerificationRate === 1,

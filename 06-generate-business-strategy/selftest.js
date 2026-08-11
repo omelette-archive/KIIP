@@ -12,6 +12,7 @@ const {
   TEMPLATE_VERSION,
 } = require("./lib/templates");
 const { generateStrategies } = require("./generateStrategy");
+const { runReviewTests } = require("./reviewSelftest");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -56,13 +57,14 @@ console.log("3) buildBriefing — 문장·근거를 함께 담고 환각 없이 
   const row = {
     region: "경기도 안성시", itemName: "배", noticeName: "신선한 배", niceClass: "31",
     gapScore: 0.8, uniqueTrademarkCount: 1, registrationRate: 0,
-    regionMatchVerified: true, localApplicantShare: 0.1,
+    regionMatchVerified: true, localApplicantShare: 0.1, partialQueryCount: 2,
     scoreInputs: { uniqueTrademarkCount: 1, registrationRate: 0, activityScore: 0.2, registrationScore: 0 },
   };
   const briefing = buildBriefing(row);
   assert.strictEqual(briefing.isGapAlert, row.gapScore >= GAP_ALERT_THRESHOLD);
   assert.strictEqual(briefing.sentences.length, 2, "공백 문장 + 지역외비중 문장");
   assert.strictEqual(briefing.evidence.uniqueTrademarkCount, 1);
+  assert.strictEqual(briefing.evidence.collectionPartial, true, "⑤의 partialQueryCount>0이 evidence.collectionPartial로 전파됨(#16 선정 조건)");
   assert.deepStrictEqual(briefing.evidence.scoreInputs, row.scoreInputs, "⑤의 점수 근거를 그대로 보존");
   ok("문장은 evidence의 수치에서만 생성되고, 근거 필드가 함께 남음");
 }
@@ -95,4 +97,9 @@ console.log("5) generateStrategies — 입력 계약 위반 시 명확한 오류
   ok("⑤ 출력 형태가 아니면 즉시 실패");
 }
 
-console.log("\n모든 자체 테스트 통과");
+runReviewTests()
+  .then(() => console.log("\n모든 자체 테스트 통과"))
+  .catch((err) => {
+    console.error(`자체 테스트 실패: ${err.message}`);
+    process.exit(1);
+  });
