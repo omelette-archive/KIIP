@@ -29,3 +29,28 @@ jobs:
 
       - name: Validate pipeline
         run: node scripts/validatePipeline.js
+
+  dashboard-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    defaults:
+      run:
+        working-directory: 07-dashboard/web
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: 07-dashboard/web/package-lock.json
+
+      - name: Install dashboard dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+
+      - name: Validate dashboard build and snapshot contract
+        run: npm test
