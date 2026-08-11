@@ -11,7 +11,7 @@ const { loadCache, saveCache } = require("./lib/trademarkApplicantCache");
 loadEnv();
 
 function parseArgs(argv) {
-  const args = { limit: 10, concurrency: 1 };
+  const args = { limit: 10, concurrency: 1, "checkpoint-every": 100 };
   for (let i = 0; i < argv.length; i++) {
     if (!argv[i].startsWith("--")) continue;
     const key = argv[i].slice(2);
@@ -32,9 +32,10 @@ function usage(message) {
     "",
     "옵션:",
     "  --out <path>        보강 결과 JSON",
-    "  --limit <n>         이번 실행의 신규 출원번호 호출 상한 (기본 10, 최대 1000)",
+    "  --limit <n>         이번 실행의 신규 출원번호 호출 상한 (기본 10, 최대 50000)",
     "  --concurrency <n>   동시 호출 수 (기본 1, 최대 5)",
     "  --cache <path>      영속 캐시 (기본: output/trademark-applicant-region-cache.json)",
+    "  --checkpoint-every <n> 성공 n건마다 캐시 저장 (기본 100)",
     "  --dry-run           호출 없이 캐시·잔여량 확인",
   ].join("\n"));
   process.exit(message ? 1 : 0);
@@ -51,6 +52,10 @@ async function main() {
   );
   const document = JSON.parse(fs.readFileSync(inputPath, "utf8").replace(/^\uFEFF/, ""));
   const entries = loadCache(cachePath);
+  const checkpointEvery = Number(args["checkpoint-every"]);
+  if (!Number.isInteger(checkpointEvery) || checkpointEvery < 1 || checkpointEvery > 10000) {
+    usage("--checkpoint-every는 1~10000 정수여야 합니다.");
+  }
   const numbers = applicationNumbers(document);
   const cached = numbers.filter((number) => entries.has(number)).length;
   const uncached = numbers.length - cached;
@@ -61,10 +66,20 @@ async function main() {
     );
     return;
   }
+  let completedThisRun = 0;
   const output = await enrichApplicantRegions(document, createClient(), {
     limit: Number(args.limit),
     concurrency: Number(args.concurrency),
     cacheEntries: entries,
+    onCacheUpdate: () => {
+      completedThisRun++;
+      if (completedThisRun % checkpointEvery === 0) {
+        saveCache(cachePath, entries);
+        console.error(
+          `[enrichApplicantRegions] checkpoint new=${completedThisRun}, cache=${entries.size}`
+        );
+      }
+    },
   });
   saveCache(cachePath, entries);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });

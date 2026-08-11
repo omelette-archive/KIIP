@@ -1,6 +1,6 @@
 # 데이터 출처·기준·버전 관리
 
-최종 갱신: 2026-08-11
+최종 갱신: 2026-08-12
 목적: 산출물의 숫자와 판정이 어떤 원본·규칙·시점에서 나왔는지 다른 작업자가 역추적할 수 있게 한다.
 
 ## 1. 원칙
@@ -25,7 +25,7 @@
 | `nongsaro` | 농촌진흥청 농사로 지역특산물 | <https://www.data.go.kr/data/15101361/openapi.do> | `localSpcprd/localSpcprdLst`, 실계약 검증 2026-08-10 | 지역특산물 원본 수집 |
 | `nongsaro_area_brand` | 농촌진흥청 농사로 지역브랜드 | <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344> | `nongsaro-area-brand-v1`, `areaBrandLst`, 실계약 검증 2026-08-10 | KIPRIS 출원번호·지역 연관성 검증자료 |
 | `kipris_trademark` | 지식재산처 KIPRISPlus 상표 단어검색 | <https://plus.kipris.or.kr> | `kipris-trademark-word-search-v1`, 실키 검증 2026-08-10 | 상표 후보·출원번호·상태·NICE류 수집 |
-| `kipris_trademark_applicant` | 지식재산처 KIPRISPlus 상표 출원 속보 출원인 | <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001> | `kipris-trademark-applicant-address-v1`, `trademarkApplicantInfo`, 실키 2건·캐시 재사용 검증 2026-08-11 | 출원번호 기준 출원인 주소 지역 귀속(#50) |
+| `kipris_trademark_applicant` | 지식재산처 KIPRISPlus 상표 출원 속보 출원인 | <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001> | `kipris-trademark-applicant-address-v1`, `trademarkApplicantInfo`, 고유 출원 23,912건 전체 알파 검증 2026-08-12 | 출원번호 기준 출원인 주소 지역 귀속(#50) |
 | `kipo_notice_goods` | 지식재산처 고시상품명칭 | <https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120> | NICE 13판(2026), 다운로드 2026-08-05 | 품목→고시명칭·NICE류·유사군 후보 사전 |
 | `ip_registry` | 지식재산처 등록원부 실시간 정보 조회 (`getMarkHistory`) | <https://www.data.go.kr/data/15124946/openapi.do> | `ip-registry-mark-history-v1`, 실키·3건 보강 검증 2026-08-11 | 등록번호 기준 출원인 주소(#11)·지정상품(#12) 보강 |
 

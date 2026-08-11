@@ -43,25 +43,35 @@ async function enrichApplicantRegions(document, client, options = {}) {
   }
   const limit = Number(options.limit ?? 10);
   const concurrency = Number(options.concurrency ?? 1);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 1000) {
-    throw new Error("limit은 1~1000 정수여야 합니다.");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 50000) {
+    throw new Error("limit은 1~50000 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
   }
   const cacheEntries = options.cacheEntries instanceof Map ? options.cacheEntries : new Map();
+  const maxConsecutiveErrors = Number(options.maxConsecutiveErrors ?? 20);
+  if (!Number.isInteger(maxConsecutiveErrors) || maxConsecutiveErrors < 1 || maxConsecutiveErrors > 1000) {
+    throw new Error("maxConsecutiveErrors는 1~1000 정수여야 합니다.");
+  }
   const adminList = options.adminList || loadAdminCodes();
   const allNumbers = applicationNumbers(document);
   const cachedNumbers = allNumbers.filter((number) => cacheEntries.get(number)?.status === "complete");
   const selected = allNumbers.filter((number) => !cacheEntries.has(number)).slice(0, limit);
   let cursor = 0;
   let rateLimitError = null;
+  let haltError = null;
+  let consecutiveErrors = 0;
   const fetched = [];
   async function worker() {
     while (cursor < selected.length) {
       const applicationNumber = selected[cursor++];
-      if (rateLimitError) {
-        fetched.push({ applicationNumber, status: "rate_limited", requested: false });
+      if (rateLimitError || haltError) {
+        fetched.push({
+          applicationNumber,
+          status: rateLimitError ? "rate_limited" : "circuit_breaker",
+          requested: false,
+        });
         continue;
       }
       try {
@@ -70,13 +80,21 @@ async function enrichApplicantRegions(document, client, options = {}) {
           status: "complete",
           fetchedAt: options.fetchedAt || new Date().toISOString(),
           found: response.found,
+          resultCode: response.resultCode || null,
+          terminalReason: response.retryExhausted ? "empty_after_retries" : null,
           applicants: sanitizeApplicants(response.applicants, adminList),
         };
         cacheEntries.set(applicationNumber, entry);
         fetched.push({ applicationNumber, ...entry, requested: true });
+        consecutiveErrors = 0;
+        if (typeof options.onCacheUpdate === "function") {
+          await options.onCacheUpdate({ applicationNumber, entry, cacheEntries });
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         if (isRateLimitError(error)) rateLimitError = message;
+        consecutiveErrors++;
+        if (!rateLimitError && consecutiveErrors >= maxConsecutiveErrors) haltError = message;
         fetched.push({ applicationNumber, status: "error", error: message, requested: true });
       }
     }
@@ -100,7 +118,11 @@ async function enrichApplicantRegions(document, client, options = {}) {
         counts.notCollected++;
         return { ...hit, applicationApplicantLookup: { status: "not_collected" } };
       }
-      const evaluated = evaluateApplicantRegions(entry.query?.region || "", cached.applicants);
+      const evaluated = evaluateApplicantRegions(
+        entry.query?.region || "",
+        cached.applicants,
+        adminList
+      );
       counts[evaluated.match]++;
       return {
         ...hit,
@@ -142,8 +164,9 @@ async function enrichApplicantRegions(document, client, options = {}) {
       newlyCompleteApplicationCount: newlyComplete,
       completeApplicationCount: totalComplete,
       errorApplicationCount: errors,
-      notCollectedApplicationCount: Math.max(0, allNumbers.length - totalComplete - errors),
+      notCollectedApplicationCount: Math.max(0, allNumbers.length - totalComplete),
       rateLimitDetected: Boolean(rateLimitError),
+      circuitBreakerDetected: Boolean(haltError),
       applicantRegionCounts: counts,
     },
   };

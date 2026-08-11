@@ -14,7 +14,7 @@ const SOURCE_METADATA = Object.freeze({
   endpoint: DEFAULT_ENDPOINT,
   operation: "trademarkInfoSearchService/trademarkApplicantInfo",
   contractVersion: CONTRACT_VERSION,
-  lastContractVerifiedAt: "2026-08-11",
+  lastContractVerifiedAt: "2026-08-12",
 });
 
 function clean(value) {
@@ -69,19 +69,37 @@ function createClient({
   apiKey = process.env.KIPRIS_API_KEY,
   endpoint = process.env.KIPRIS_APPLICANT_API_BASE_URL || DEFAULT_ENDPOINT,
   fetchImpl,
+  emptyRetries = 3,
+  emptyRetryDelay = 250,
 } = {}) {
   if (!apiKey) throw new Error("KIPRIS_API_KEY가 필요합니다.");
   async function getApplicants(applicationNumber) {
     const normalized = normalizeApplicationNumber(applicationNumber);
     if (!normalized) throw new Error("trademarkApplicantInfo에는 applicationNumber가 필요합니다.");
-    const url = new URL(endpoint);
-    url.searchParams.set("applicationNumber", normalized);
-    url.searchParams.set("accessKey", apiKey);
-    const response = await fetchWithRetry(url.toString(), {}, fetchImpl);
-    if (!response.ok) throw new Error(`trademarkApplicantInfo: API 오류 (${response.status})`);
-    const xml = await response.text();
-    if (!xml.trim()) throw new Error("trademarkApplicantInfo: 빈 응답");
-    return { applicationNumber: normalized, ...parseApplicantResponse(xml) };
+    for (let attempt = 0; attempt <= emptyRetries; attempt++) {
+      const url = new URL(endpoint);
+      url.searchParams.set("applicationNumber", normalized);
+      url.searchParams.set("accessKey", apiKey);
+      const response = await fetchWithRetry(url.toString(), {}, fetchImpl);
+      if (!response.ok) throw new Error(`trademarkApplicantInfo: API 오류 (${response.status})`);
+      const xml = await response.text();
+      if (!xml.trim()) throw new Error("trademarkApplicantInfo: 빈 응답");
+      const parsed = parseApplicantResponse(xml);
+      if (parsed.found || parsed.resultCode === "20") {
+        return { applicationNumber: normalized, ...parsed };
+      }
+      if (attempt < emptyRetries) {
+        await new Promise((resolve) => setTimeout(resolve, emptyRetryDelay * (attempt + 1)));
+      }
+    }
+    return {
+      applicationNumber: normalized,
+      found: false,
+      resultCode: "00",
+      resultMsg: "success_without_applicant_after_retries",
+      applicants: [],
+      retryExhausted: true,
+    };
   }
   return { getApplicants };
 }

@@ -875,10 +875,19 @@ async function run() {
     assert.strictEqual(parsed.applicants[0].address, "강원특별자치도 양양군 상세주소 123");
 
     let requestedUrl = null;
+    let applicantRequestCount = 0;
     const applicantClient = createTrademarkApplicantClient({
       apiKey: "test-key",
+      emptyRetryDelay: 0,
       fetchImpl: async (url) => {
         requestedUrl = new URL(url);
+        applicantRequestCount++;
+        if (applicantRequestCount < 3) {
+          return { ok: true, status: 200, text: async () => `
+            <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+            <body><items></items></body></response>`,
+          };
+        }
         return { ok: true, status: 200, text: async () => `
           <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
           <body><items><trademarkApplicantInfo><applicantAddress>강원특별자치도 양양군</applicantAddress>
@@ -890,6 +899,21 @@ async function run() {
     assert.ok(requestedUrl.pathname.endsWith("/trademarkApplicantInfo"));
     assert.strictEqual(requestedUrl.searchParams.get("applicationNumber"), "4020261234567");
     assert.strictEqual(requestedUrl.searchParams.get("accessKey"), "test-key");
+    assert.strictEqual(applicantRequestCount, 3, "성공 코드의 빈 항목은 완료로 캐시하지 않고 재시도");
+
+    const terminalEmpty = await createTrademarkApplicantClient({
+      apiKey: "test-key",
+      emptyRetries: 0,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => `
+          <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+          <body><items></items></body></response>`,
+      }),
+    }).getApplicants("40-2026-7654321");
+    assert.strictEqual(terminalEmpty.retryExhausted, true);
+    assert.strictEqual(terminalEmpty.found, false);
 
     const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
     let calls = 0;
@@ -907,7 +931,13 @@ async function run() {
     };
     const entries = new Map();
     const first = await enrichApplicantRegions(document, fakeClient, {
-      limit: 1, concurrency: 1, cacheEntries: entries, adminList,
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: entries,
+      adminList,
+      onCacheUpdate: ({ cacheEntries }) => {
+        assert.strictEqual(cacheEntries.size, 1);
+      },
     });
     assert.strictEqual(first.applicationApplicantEnrichment.completeApplicationCount, 1);
     assert.strictEqual(first.results[0].hits[0].applicantRegionMatch, "inside");
@@ -916,8 +946,17 @@ async function run() {
 
     const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-applicant-cache-"));
     const cachePath = path.join(cacheDir, "cache.json");
+    entries.set("20", {
+      status: "complete",
+      fetchedAt: "2026-08-11T00:00:00.000Z",
+      found: false,
+      resultCode: "20",
+      applicants: [],
+    });
     saveTrademarkApplicantCache(cachePath, entries, "2026-08-11T00:00:00.000Z");
     const reloaded = loadTrademarkApplicantCache(cachePath);
+    assert.strictEqual(reloaded.get("20").resultCode, "20");
+    reloaded.delete("20");
     const second = await enrichApplicantRegions(document, fakeClient, {
       limit: 1, concurrency: 1, cacheEntries: reloaded, adminList,
     });

@@ -68,8 +68,10 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 단어검색 응답만으로는 불가능하며, 검색 결과의 출원번호를 별도 주소 오퍼레이션에 입력해야 한다.
 
 - **출원번호 경로(본류)**: KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은
-  `applicationNumber`를 입력받고 `applicantAddress`를 제공한다. 2026-08-11 실키 2건에서
-  성공 2·오류 0과 영속 캐시 재사용을 확인했다. 등록번호가 없는 출원·심사 중 상표도 대상이다.
+  `applicationNumber`를 입력받고 `applicantAddress`를 제공한다. 2026-08-12 전체 알파의 고유
+  출원번호 23,912건을 수집했고 오류·미수집·429 없이 완료했다. 정상 출원인 응답은 22,994건,
+  제공기관 정상 무결과는 916건, 반복 빈 항목 미검증 종료는 2건이다. 등록번호가 없는
+  출원·심사 중 상표도 대상이다.
   공식 카탈로그는 <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001>다.
 - ~~data.go.kr의 `특허청_KIPRISPlus_출원인 법인_REST API`(`15059277`)~~ — 2026-08-10 필드
   확인 결과 출원인코드·법인번호·사업자등록번호·대리인명만 제공하고 **주소는 없음**. 기각.
@@ -89,6 +91,11 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 마스터와 대조해 `applicantRegionMatch`로 정규화하고 `localApplicantShare` 본류에 반영한다.
 출원인 이름·고객번호·전체 상세주소는 캐시에 저장하지 않는다. 호출 상한 밖은 `not_collected`로
 남기며, 주소 커버리지가 끝나기 전 지역 지표는 확정하지 않는다.
+
+실측 중 `resultCode=00`인데 출원인 항목이 비어 있는 응답이 빠른 병렬 호출에서 일시적으로
+발생했다. 이를 완료로 캐시하면 안 되므로 빈 항목은 재시도하고, `resultCode=20` 정상 무결과와
+재시도 후에도 빈 2건을 별도 종료 상태로 기록한다. 동시성 2에서 재수집해 초기 지역 검증률
+28.8%를 최종 87.6%로 복구했다.
 
 ## 품목(품목/상품류) 매칭
 
