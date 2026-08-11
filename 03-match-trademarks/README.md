@@ -99,21 +99,39 @@ node 03-match-trademarks/enrichIpRegistry.js \
 기본 영속 캐시는 `output/ip-registry-cache.json`이다. 성공한 등록번호의 응답은 다음 실행에서
 API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 `--limit`만큼 추가 조회한다. 캐시에는
 키·출원인 이름·전체 상세주소를 저장하지 않고 주소에서 정규화한 시도·시군구와 지정상품만
-보존한다. 등록번호가 아직 없는 출원·심사 중 상표는 이 등록원부 API의 조회 대상이 아니므로
-출원번호 기반 공식 주소 소스가 확보되기 전까지 `not_applicable`로 남는다. 캐시를 사용하지 않을
-때만 `--no-cache`를 명시한다.
+보존한다. 캐시를 사용하지 않을 때만 `--no-cache`를 명시한다.
+
+## 출원번호 기반 출원인 주소 보강
+
+```bash
+node 03-match-trademarks/enrichApplicantRegions.js \
+  --input 03-match-trademarks/output/search-result.json \
+  --limit 10 --concurrency 1 \
+  --cache 03-match-trademarks/output/trademark-applicant-region-cache.json \
+  --out 03-match-trademarks/output/applicant-regions.json
+```
+
+KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은 출원번호를 입력받고
+`applicantAddress`를 반환한다. 따라서 등록번호가 아직 없는 출원·심사 중 상표도 조회할 수 있다.
+2026-08-11 실키 2건을 순차 조회해 성공 2·오류 0, 두 번째 실행의 첫 조회 캐시 재사용을 확인했다.
+기본 캐시는 출원인 이름·고객번호·전체 상세주소를 저장하지 않고 정규화한 시도·시군구만 누적한다.
+1출원번호당 1호출이므로 전체 알파 입력 23,912개는 호출 한도 안에서 여러 실행으로 나눠 수집한다.
+부분 캐시 상태에서는 지역 지표를 확정하지 않는다.
 
 ## 출처와 버전 필드
 
 - 수집 JSON: `contractVersion`, `sourceMetadata`, `fetchedAt`
 - ③ JSON: `trademarkSourceMetadata`, 입력별 `provenance`, `regionalBrandValidation`,
-  `ipRegistryEnrichment`
+  `ipRegistryEnrichment`, `applicationApplicantEnrichment`
 - 조인된 hit: `regionalBrandMatchVersion`, `regionalBrandMatchSource`,
   `regionalBrandEvidence`
 - 등록원부 보강 hit: `applicantRegionMatch*`, `applicantRegionEvidence`, `goodsMatch*`,
   `goodsEvidence`, `registryEvidence`
+- 출원번호 주소 보강 hit: `applicantRegionMatch*`, `applicantRegionEvidence`,
+  `applicationApplicantLookup`
 - 현재 계약: KIPRIS `kipris-trademark-word-search-v1`, 농사로
-  `nongsaro-area-brand-v1`, 등록원부 `ip-registry-mark-history-v1`
+  `nongsaro-area-brand-v1`, 등록원부 `ip-registry-mark-history-v1`, 출원인 주소
+  `kipris-trademark-applicant-address-v1`
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
 출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을 보존한다.
@@ -127,11 +145,15 @@ API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 
 ├── fetchAreaBrands.js               농사로 지역브랜드 소량 수집
 ├── buildAreaBrandValidationInput.js 별도 검증자료의 validation_only 감사 CSV 생성
 ├── enrichIpRegistry.js              등록번호 기반 주소·지정상품 소량 보강
+├── enrichApplicantRegions.js        출원번호 기반 주소 지역 누적 보강
 ├── lib/areaBrandClient.js           농사로 XML·페이지·계약 메타데이터
 ├── lib/areaBrandEnricher.js         행정구역 정규화·출원번호 완전일치 조인
 ├── lib/kiprisClient.js              KIPRIS 호출·계약 메타데이터
 ├── lib/ipRegistryClient.js          등록원부 JSON 호출·응답 계약
 ├── lib/ipRegistryEnricher.js        주소 판정·지정상품 근거 분류
+├── lib/trademarkApplicantClient.js  출원 속보 출원인 주소 응답 계약
+├── lib/trademarkApplicantEnricher.js 출원번호 조회·지역 판정
+├── lib/trademarkApplicantCache.js   상세주소 비저장 영속 캐시
 └── output/                           로컬 산출물(git-ignored)
 ```
 

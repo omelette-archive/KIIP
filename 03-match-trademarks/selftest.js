@@ -34,6 +34,17 @@ const {
   ipRegistryValidationMetadata,
 } = require("./lib/ipRegistryEnricher");
 const { loadCache: loadIpRegistryCache, saveCache: saveIpRegistryCache } = require("./lib/ipRegistryCache");
+const {
+  createClient: createTrademarkApplicantClient,
+  parseApplicantResponse,
+} = require("./lib/trademarkApplicantClient");
+const {
+  enrichApplicantRegions,
+} = require("./lib/trademarkApplicantEnricher");
+const {
+  loadCache: loadTrademarkApplicantCache,
+  saveCache: saveTrademarkApplicantCache,
+} = require("./lib/trademarkApplicantCache");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
@@ -849,6 +860,80 @@ async function run() {
     });
     assert.strictEqual(ipRegistryValidationMetadata(null).enabled, false);
     ok("활성화 여부·기준·요약 통계를 함께 보존해 감사 가능함");
+  }
+
+  console.log("12-3) 출원번호 기반 상표 출원인 주소 — 응답 파싱·영속 누적");
+  {
+    const parsed = parseApplicantResponse(`
+      <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+      <body><items><trademarkApplicantInfo>
+      <nameKoreanLong>저장하지 않을 이름</nameKoreanLong>
+      <applicantAddress>강원특별자치도 양양군 상세주소 123</applicantAddress>
+      <nationalCode>KR</nationalCode><applicantCode>123</applicantCode><seq>1</seq>
+      </trademarkApplicantInfo></items></body></response>`);
+    assert.strictEqual(parsed.found, true);
+    assert.strictEqual(parsed.applicants[0].address, "강원특별자치도 양양군 상세주소 123");
+
+    let requestedUrl = null;
+    const applicantClient = createTrademarkApplicantClient({
+      apiKey: "test-key",
+      fetchImpl: async (url) => {
+        requestedUrl = new URL(url);
+        return { ok: true, status: 200, text: async () => `
+          <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+          <body><items><trademarkApplicantInfo><applicantAddress>강원특별자치도 양양군</applicantAddress>
+          </trademarkApplicantInfo></items></body></response>`,
+        };
+      },
+    });
+    await applicantClient.getApplicants("40-2026-1234567");
+    assert.ok(requestedUrl.pathname.endsWith("/trademarkApplicantInfo"));
+    assert.strictEqual(requestedUrl.searchParams.get("applicationNumber"), "4020261234567");
+    assert.strictEqual(requestedUrl.searchParams.get("accessKey"), "test-key");
+
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let calls = 0;
+    const fakeClient = {
+      getApplicants: async (applicationNumber) => {
+        calls++;
+        return { applicationNumber, found: true, applicants: parsed.applicants };
+      },
+    };
+    const document = {
+      results: [{
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+        hits: ["A1", "A2"].map((applicationNumber) => ({ applicationNumber })),
+      }],
+    };
+    const entries = new Map();
+    const first = await enrichApplicantRegions(document, fakeClient, {
+      limit: 1, concurrency: 1, cacheEntries: entries, adminList,
+    });
+    assert.strictEqual(first.applicationApplicantEnrichment.completeApplicationCount, 1);
+    assert.strictEqual(first.results[0].hits[0].applicantRegionMatch, "inside");
+    assert.strictEqual(entries.get("1").applicants[0].address, "강원특별자치도 양양군");
+    assert.ok(!JSON.stringify([...entries.values()]).includes("저장하지 않을 이름"));
+
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-applicant-cache-"));
+    const cachePath = path.join(cacheDir, "cache.json");
+    saveTrademarkApplicantCache(cachePath, entries, "2026-08-11T00:00:00.000Z");
+    const reloaded = loadTrademarkApplicantCache(cachePath);
+    const second = await enrichApplicantRegions(document, fakeClient, {
+      limit: 1, concurrency: 1, cacheEntries: reloaded, adminList,
+    });
+    assert.strictEqual(calls, 2, "첫 출원번호는 캐시 재사용하고 두 번째 출원번호만 추가 호출");
+    assert.strictEqual(second.applicationApplicantEnrichment.cachedApplicationCount, 1);
+    assert.strictEqual(second.applicationApplicantEnrichment.completeApplicationCount, 2);
+    assert.deepStrictEqual(
+      second.results[0].hits.map((hit) => hit.applicantRegionMatch),
+      ["inside", "inside"]
+    );
+    const cacheDocument = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    const persistedEntries = JSON.stringify(cacheDocument.entries);
+    assert.ok(!persistedEntries.includes("상세주소"));
+    assert.ok(!persistedEntries.includes("applicantCode"));
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    ok("등록번호 없는 출원도 출원번호로 주소를 조회하고 시도·시군구 캐시에 누적함");
   }
 
   console.log("\n모든 자체 테스트 통과");

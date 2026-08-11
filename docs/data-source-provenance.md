@@ -25,6 +25,7 @@
 | `nongsaro` | 농촌진흥청 농사로 지역특산물 | <https://www.data.go.kr/data/15101361/openapi.do> | `localSpcprd/localSpcprdLst`, 실계약 검증 2026-08-10 | 지역특산물 원본 수집 |
 | `nongsaro_area_brand` | 농촌진흥청 농사로 지역브랜드 | <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344> | `nongsaro-area-brand-v1`, `areaBrandLst`, 실계약 검증 2026-08-10 | KIPRIS 출원번호·지역 연관성 검증자료 |
 | `kipris_trademark` | 지식재산처 KIPRISPlus 상표 단어검색 | <https://plus.kipris.or.kr> | `kipris-trademark-word-search-v1`, 실키 검증 2026-08-10 | 상표 후보·출원번호·상태·NICE류 수집 |
+| `kipris_trademark_applicant` | 지식재산처 KIPRISPlus 상표 출원 속보 출원인 | <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001> | `kipris-trademark-applicant-address-v1`, `trademarkApplicantInfo`, 실키 2건·캐시 재사용 검증 2026-08-11 | 출원번호 기준 출원인 주소 지역 귀속(#50) |
 | `kipo_notice_goods` | 지식재산처 고시상품명칭 | <https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120> | NICE 13판(2026), 다운로드 2026-08-05 | 품목→고시명칭·NICE류·유사군 후보 사전 |
 | `ip_registry` | 지식재산처 등록원부 실시간 정보 조회 (`getMarkHistory`) | <https://www.data.go.kr/data/15124946/openapi.do> | `ip-registry-mark-history-v1`, 실키·3건 보강 검증 2026-08-11 | 등록번호 기준 출원인 주소(#11)·지정상품(#12) 보강 |
 
@@ -41,6 +42,7 @@
 | `area-brand-region-normalization-v1` | 법정동코드의 시도·시군구 완전일치, 고유한 경우에만 시/군/구 접미사 복원 | `구미`→`구미시`처럼 후보가 하나일 때만 복원. `고성`처럼 복수 시도 후보면 `unverified` |
 | `area-brand-application-region-join-v1` | 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`에서 숫자 외 문자를 제거한 뒤 완전일치 | 하이픈 표시 차이만 제거하며 이름·유사 문자열 조인은 하지 않음 |
 | `ip-registry-applicant-region-v1` | 등록원부 `applicantAddr`에 포함된 시도·시군구를 법정동코드로 완전 대조 | 복수·미매칭 주소는 추정하지 않고 `unverified`; 등록번호 없는 hit는 `not_applicable` |
+| `kipris-trademark-applicant-region-v1` | 출원 속보 `applicantAddress`를 법정동코드 시도·시군구와 완전 대조 | 등록번호가 없는 출원도 출원번호로 조회. 복수·미매칭은 `unverified`; 캐시에는 전체 주소가 아닌 정규화 지역만 저장 |
 | `ip-registry-designated-goods-v0-review` | 지정상품과 검색 품목을 문자 정규화 후 exact/contains/class-only/mismatch로 분리 | exact만 확정 근거. contains/class-only는 #12 확정 전 검토 후보이며 합계에서 자동 제외하지 않음 |
 | `brand-analysis-v2-regional-brand-separated` | 출원인 주소와 지역브랜드 연관성을 별도 집계 | `localApplicantShare`에는 출원인 주소만 사용. 농사로 근거는 `regionalBrand*` 지표로만 제공 |
 | `gap-score-v1-representative-gi-or-count3` | 대표 특산품: GI 출처 또는 상표 출원 3건 이상(OR). 활동량 0.7·등록률 0.3 | 대표 특산품 판정은 #29에서 확정(2026-08-11). 활동량 포화 건수·가중치는 아직 파이프라인 검증용 예시이며 #29 잔여 범위에서 확정 예정 |
@@ -58,6 +60,8 @@
   `regionalBrandMatchSource`, `regionalBrandEvidence`를 기록한다.
 - 등록원부로 보강된 hit: `applicantRegionMatch*`, `applicantRegionEvidence`, `goodsMatch*`,
   `goodsEvidence`, `registryEvidence`를 기록하고 원본 전체 주소는 산출물에 복사하지 않는다.
+- 출원번호로 보강된 hit: `applicationApplicantLookup`, `applicantRegionMatch*`,
+  `applicantRegionEvidence`를 기록하고 출원인 이름·고객번호·원본 전체 주소는 캐시에 저장하지 않는다.
 - ④ JSON: `analysisVersion`, `provenance`, `methodology`, 버킷별 `sourceProvenance`를 기록한다.
 - ⑤·⑥ JSON: 상위 단계 `provenance`와 현재 `scoreVersion`/`templateVersion`, 방법론을 이어받는다.
 - ⑥-2 검토(append-only, `strategy.json`과 분리된 별도 파일): `review-proposals.jsonl`에

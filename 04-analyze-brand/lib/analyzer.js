@@ -567,6 +567,15 @@ function analyzeEntries(parsed, providedOptions = {}) {
       );
     }
   }
+  if (inputDocument?.applicationApplicantEnrichment?.enabled) {
+    const applicants = inputDocument.applicationApplicantEnrichment;
+    if (applicants.status !== "complete") {
+      warnings.push(
+        `출원번호 기반 출원인 주소 보강이 ${applicants.status} 상태입니다(완료 ${applicants.completeApplicationCount || 0}, ` +
+          `오류 ${applicants.errorApplicationCount || 0}, 미수집 ${applicants.notCollectedApplicationCount || 0}).`
+      );
+    }
+  }
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
 
   return {
@@ -584,6 +593,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
         inputDocument?.ipRegistryEnrichment?.enabled
           ? inputDocument.ipRegistryEnrichment.sourceMetadata
           : null,
+        inputDocument?.applicationApplicantEnrichment?.enabled
+          ? inputDocument.applicationApplicantEnrichment.sourceMetadata
+          : null,
       ].filter(Boolean),
     },
     methodology: {
@@ -597,7 +609,13 @@ function analyzeEntries(parsed, providedOptions = {}) {
         "출원인 주소 근거만 지역 건수·등록률·localApplicantShare에 사용하며, 수집 또는 주소 검증이 불완전하면 regionalMetricAvailability=blocked",
       regionalBrandMetric: "농사로 지역브랜드 출원번호 연관성은 별도 regionalBrand* 지표로 집계",
       applicantRegionMetricVersion:
-        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion || null,
+        inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion ||
+        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion ||
+        null,
+      applicantRegionMetricVersions: [
+        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion,
+        inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion,
+      ].filter(Boolean),
       designatedGoodsPolicy:
         "normalized_exact만 확정 근거, normalized_contains/class_only는 검토 후보; #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않음",
       designatedGoodsMatchVersion:

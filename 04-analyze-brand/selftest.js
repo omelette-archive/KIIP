@@ -336,6 +336,18 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
         goodsMatchVersion: "ip-registry-designated-goods-v0-review",
       },
     },
+    applicationApplicantEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeApplicationCount: 1,
+      errorApplicationCount: 0,
+      notCollectedApplicationCount: 2,
+      sourceMetadata: {
+        sourceId: "kipris_trademark_applicant",
+        contractVersion: "kipris-trademark-applicant-address-v1",
+      },
+      policy: { applicantRegionMatchVersion: "kipris-trademark-applicant-region-v1" },
+    },
     results: [{
       status: "ok",
       query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
@@ -362,7 +374,13 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   assert.strictEqual(row.trademarkExamples[0].goodsMatchMethod, "normalized_exact");
   assert.strictEqual(row.trademarkExamples[0].goodsEvidence[0].designatedProductName, "신선한 사과");
   assert.ok(r.provenance.sources.some((source) => source.sourceId === "ip_registry"));
+  assert.ok(r.provenance.sources.some((source) => source.sourceId === "kipris_trademark_applicant"));
   assert.ok(r.warnings.some((warning) => warning.includes("등록원부 보강이 partial")));
+  assert.ok(r.warnings.some((warning) => warning.includes("출원번호 기반 출원인 주소 보강이 partial")));
+  assert.strictEqual(
+    r.methodology.applicantRegionMetricVersion,
+    "kipris-trademark-applicant-region-v1"
+  );
   assert.ok(r.warnings.some((warning) => warning.includes("#12")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }

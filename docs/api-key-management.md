@@ -21,7 +21,7 @@ Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
 
 | 환경변수 | 용도 | 현재 코드 사용 |
 |---|---|---|
-| `KIPRIS_API_KEY` | KIPRISPlus 상표 검색 | 사용 |
+| `KIPRIS_API_KEY` | KIPRISPlus 상표 검색·출원번호 기반 출원인 주소 조회 | 사용 |
 | `GI_API_KEY` | 농식품 공공데이터포털 지리적표시 API | 사용 |
 | `NONGSARO_API_KEY` | 농사로 지역특산물 API | 사용 |
 | `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 수집·KIPRIS 출원번호 조인에 사용 |
@@ -37,6 +37,10 @@ Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
 등록원부 키는 `03-match-trademarks/matchTrademarks.js --enrich-registry` 또는 별도
 `enrichIpRegistry.js`에서만 사용한다. 공공데이터포털에서 받은 키라도 기존
 `DATA_GO_KR_API_KEY`와 용도를 섞지 않고 별도 변수명으로 보존한다.
+
+KIPRIS 키는 상표 단어검색뿐 아니라 `enrichApplicantRegions.js`의 출원번호 기반
+`trademarkApplicantInfo` 조회에도 사용한다. 후자는 원문 주소를 산출물에 복사하지 않고
+시도·시군구로 정규화한 캐시만 저장한다.
 
 ## 취급 규칙
 
