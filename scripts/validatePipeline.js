@@ -128,6 +128,7 @@ function validateContracts(tempDir) {
   const analysisPath = path.join(tempDir, "analysis.json");
   const gapPath = path.join(tempDir, "gap.json");
   const strategyPath = path.join(tempDir, "strategy.json");
+  const dashboardPath = path.join(tempDir, "dashboard-snapshot.json");
 
   runNode("② 샘플 정규화", [
     "02-normalize-items/normalizeItems.js",
@@ -209,11 +210,34 @@ function validateContracts(tempDir) {
   assert.ok(strategy.briefings[0].sentences.length > 0);
   assert.ok(!strategy.briefings[0].sentences[0].includes("은(는)"), "조사가 은/는 중 하나로 확정돼야 함");
   console.log("[validatePipeline] ⑤→⑥ 계약 통과 (고정 템플릿 문장 생성, AI 미사용)");
+
+  runNode("⑦ 대시보드 통합 스냅샷", [
+    "07-dashboard/buildDashboardSnapshot.js",
+    "--analysis",
+    analysisPath,
+    "--gap",
+    gapPath,
+    "--strategy",
+    strategyPath,
+    "--mode",
+    "sample",
+    "--out",
+    dashboardPath,
+  ]);
+  const dashboard = JSON.parse(fs.readFileSync(dashboardPath, "utf8"));
+  assert.strictEqual(dashboard.schemaVersion, "dashboard-snapshot-v1");
+  assert.strictEqual(dashboard.mode, "sample");
+  assert.strictEqual(dashboard.coverage.regionItemCount, analysis.regionItems.length);
+  assert.strictEqual(dashboard.rankings.length, gap.ranking.length);
+  assert.strictEqual(dashboard.briefings.length, strategy.briefings.length);
+  assert.ok(dashboard.regions.every((region) => region.regionCode));
+  assert.ok(dashboard.warnings.some((warning) => warning.includes("전국 모집단")));
+  console.log("[validatePipeline] ④·⑤·⑥→⑦ 계약 통과 (샘플·상태·출처·버전 보존)");
 }
 
 function main() {
   validateSyntax();
-  for (const phase of ["01", "02", "03", "04", "05", "06"]) {
+  for (const phase of ["01", "02", "03", "04", "05", "06", "07"]) {
     const directory = fs
       .readdirSync(ROOT)
       .find((name) => name.startsWith(`${phase}-`));

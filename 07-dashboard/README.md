@@ -1,7 +1,7 @@
 # ⑦ 대시보드 서비스
 
-**상태**: 📋 예정 (미착수, 실제 구현 기준) · [`prototypes/`](prototypes/)에 레이아웃 검토용
-정적 HTML 목업 2개 있음(①~④ 실제 샘플 데이터 사용, 코드는 아님)
+**상태**: 🟡 데이터 계층 착수 · `dashboard-snapshot-v1` 샘플 어댑터 구현 ·
+[`prototypes/`](prototypes/)에 레이아웃 검토용 정적 HTML 목업 2개 있음
 
 > 참고: 초기에 샘플(합성) 데이터로 시군구 통계 대시보드 v1을 만들었다가, 실데이터 파이프라인
 > 방향으로 전환하며 제거했다. `prototypes/`의 목업은 그 실수를 반복하지 않으려고 합성 데이터가
@@ -9,6 +9,10 @@
 > 레이아웃/지도 드릴다운 인터랙션 방향을 검토한 베이스 자료일 뿐이다.
 
 전체 기획은 [`docs/project-plan.md`](../docs/project-plan.md)의 ⑦ 참고.
+지표 의미·준비도·통합 스냅샷·출처 표시 계약은
+[`docs/dashboard-data-contract.md`](../docs/dashboard-data-contract.md)를 기준으로 한다.
+UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며, 화면 참고일 뿐 데이터 출처나
+업무 기준으로 사용하지 않는다.
 
 ## 기능 (기획 문서 기준)
 
@@ -40,11 +44,15 @@
 레퍼런스는 「지역_품목_전처리후_최종(0810, 1992개)」(146개 지자체, 1,992개 지자체×품목 조합)
 데이터셋을 쓴다고 밝히고 있다 — 규모 가늠용 참고치일 뿐 우리 파이프라인의 목표 수치는 아니다.
 
-### 이미 있는 것 — 그대로 매핑 가능
+### 기존 산출물로 초안 구현 가능
 
 - **지자체별/품목별 조회** → ④ `regions`/`items` 버킷이 이미 이 형태
-- **등록상표 랭킹의 건수** → ④ `uniqueTrademarkCount` 내림차순 정렬
-- **공백률 지도의 기반 점수** → ⑤ `gapScore` (단, 지금은 지역×품목 단위만 있음 — 아래 참고)
+- **등록상표 랭킹의 건수** → ④ `statusCounts.registered` 기준 집계
+- **공백률 지도의 기반 점수** → ⑤ `gapScore` (단, 지금은 지역×품목 단위이며 #29 확정 전
+  `예시 기준`으로만 표시)
+
+샘플·부분 수집 상태와 지표별 정확한 계산 정의는
+[`dashboard-data-contract.md`](../docs/dashboard-data-contract.md)를 따른다.
 
 ### 추가로 모아야 할 데이터 (신규 수집소스 필요)
 
@@ -73,14 +81,35 @@
 ## 할 일
 
 - [ ] 개발 방법(기획 문서: Python + Streamlit) 확정 또는 재검토
-- [ ] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-business-strategy/` 출력을 읽어오는 데이터 계층 설계
+- [x] 지표 정의·데이터 상태·출처·버전·통합 스냅샷 초안 설계 —
+      [`docs/dashboard-data-contract.md`](../docs/dashboard-data-contract.md)
+- [x] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-business-strategy/` 출력을 합치는
+      `dashboard-snapshot-v1` 샘플 어댑터 구현 — [`buildDashboardSnapshot.js`](buildDashboardSnapshot.js)
+- [x] 법정동코드 정확 매칭 `regionCode`와 고시명칭·NICE류 기반 `specialtyId` 추가
+- [ ] 현재 기준 지도 경계 GeoJSON 확보(현재 스냅샷의 지도 상태는 `blocked`)
 - [x] 브랜드 공백 지도 시각화 방식 검토 — [`prototypes/brand-map.html`](prototypes/brand-map.html)에서
       지도 기반(시도→시군구 드릴다운) 방향으로 목업 완료. 실제 구현 프레임워크(Streamlit 등)로
       이 인터랙션을 어떻게 옮길지는 아직 미정
 - [ ] 실시간 신규 출원 모니터링 갱신 주기/알림 방식 결정
-- [ ] 위 "추가로 모아야 할 데이터"·"추가로 구조화해야 할 것" 항목을 개별 이슈로 분리할지,
-      ⑦ 착수 시점에 한 번에 설계할지 결정
+- [ ] 통합 스냅샷과 후속 데이터 갭 구현 — [#37](https://github.com/omelette-archive/KIIP/issues/37)
 
 ## 입력
 
 `04-analyze-brand/`, `05-detect-brand-gap/`, `06-generate-business-strategy/`의 모든 출력
+
+실제 UI는 이 파일들을 직접 각각 읽지 않고 `dashboard-snapshot-v1`로 결합한 읽기 전용 산출물을
+입력으로 사용한다. 샘플·부분 수집·오류·미수집 상태를 0건과 구분해야 한다.
+
+## 통합 스냅샷 생성
+
+```powershell
+node 07-dashboard/buildDashboardSnapshot.js `
+  --analysis 04-analyze-brand/output/analysis.json `
+  --gap 05-detect-brand-gap/output/gap.json `
+  --strategy 06-generate-business-strategy/output/strategy.json `
+  --mode sample `
+  --out 07-dashboard/output/dashboard-snapshot.json
+```
+
+`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 지도 경계
+데이터가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지된다.

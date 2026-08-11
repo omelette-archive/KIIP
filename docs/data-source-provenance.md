@@ -50,6 +50,9 @@
   `regionalBrandMatchSource`, `regionalBrandEvidence`를 기록한다.
 - ④ JSON: `analysisVersion`, `provenance`, `methodology`, 버킷별 `sourceProvenance`를 기록한다.
 - ⑤·⑥ JSON: 상위 단계 `provenance`와 현재 `scoreVersion`/`templateVersion`, 방법론을 이어받는다.
+- ⑦ 스냅샷: 상위 출처와 분석·점수·템플릿·지도 경계 버전을 이어받고 `sample|full`,
+  `complete|partial|error|not_collected` 상태를 값과 분리해 기록한다. 상세 계약은
+  [`dashboard-data-contract.md`](dashboard-data-contract.md)를 따른다.
 
 파일 경로는 로컬 재현에 유용하므로 산출물의 `inputFile`/`sourceFile`에 남길 수 있다. API 키와
 인증 URL은 출처가 아니므로 어떤 산출물에도 기록하지 않는다.
