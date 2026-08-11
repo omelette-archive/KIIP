@@ -37,6 +37,15 @@ function bucket(overrides = {}) {
     regionalBrandInsideShare: null,
     goodsConfirmedHitCount: 1,
     goodsReviewRequiredHitCount: 0,
+    trademarkExamples: [{
+      title: "사과애",
+      applicationNumber: "40-2025-0000001",
+      applicationDate: "20250102",
+      applicationStatus: "등록",
+      goodsMatchMethod: "normalized_exact",
+      goodsReviewRequired: false,
+      goodsEvidence: [{ classCode: "31", designatedProductName: "신선한 사과" }],
+    }],
     ipRegistryStatusCounts: {
       complete: 1,
       not_applicable: 0,
@@ -227,6 +236,11 @@ assert.strictEqual(andong.items[0].metrics.gapScore.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.gapScore.blockingIssue, "#29");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.blockingIssue, "#12");
+assert.strictEqual(andong.items[0].trademarkExamples[0].title, "사과애");
+assert.strictEqual(
+  andong.items[0].trademarkExamples[0].goodsEvidence[0].designatedProductName,
+  "신선한 사과"
+);
 assert.ok(andong.items[0].metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
 assert.ok(andong.items[0].metrics.uniqueTrademarkCount.sourceIds.includes("kipris_trademark"));
 assert.strictEqual(boseong.dataState, "complete_zero");

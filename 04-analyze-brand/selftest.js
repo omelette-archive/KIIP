@@ -307,6 +307,10 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
     applicantRegionMatch,
     applicantRegionMatchSource: "ip_registry_applicant_address",
     goodsMatchMethod,
+    goodsReviewRequired: goodsMatchMethod !== "normalized_exact",
+    goodsEvidence: goodsMatchMethod === "normalized_exact"
+      ? [{ classCode: "31", designatedProductName: "신선한 사과" }]
+      : [],
   });
   const r = analyzeEntries({
     schemaVersion: "1.1",
@@ -344,10 +348,49 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   assert.strictEqual(row.goodsVerificationRate, 0.6667);
   assert.strictEqual(row.ipRegistryStatusCounts.complete, 2);
   assert.strictEqual(row.ipRegistryStatusCounts.not_collected, 1);
+  assert.strictEqual(row.trademarkExamples[0].title, "등록원부-40-1");
+  assert.strictEqual(row.trademarkExamples[0].goodsMatchMethod, "normalized_exact");
+  assert.strictEqual(row.trademarkExamples[0].goodsEvidence[0].designatedProductName, "신선한 사과");
   assert.ok(r.provenance.sources.some((source) => source.sourceId === "ip_registry"));
   assert.ok(r.warnings.some((warning) => warning.includes("등록원부 보강이 partial")));
   assert.ok(r.warnings.some((warning) => warning.includes("#12")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
+}
+
+console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무와 무관하게 집계 제외");
+{
+  const brandOnlyEntry = {
+    status: "ok",
+    query: { region: "경상북도", item: "데일리", classCode: null },
+    itemName: "데일리",
+    noticeName: null,
+    provenance: { matchPurpose: "regional_brand_application_join_validation" },
+    hits: [hit("50-1", "데일리", "20250101", "등록", "inside")],
+  };
+  const normalEntry = {
+    status: "ok",
+    query: { region: "경상북도 영양군", item: "신선한 사과", classCode: "31" },
+    noticeName: "신선한 사과",
+    provenance: { matchPurpose: null },
+    hits: [hit("50-2", "영양사과", "20250101", "등록", "inside")],
+  };
+
+  const withBrandOnly = analyzeEntries([brandOnlyEntry], { asOfYear: 2026 });
+  assert.strictEqual(withBrandOnly.regionItems.length, 0);
+  assert.strictEqual(withBrandOnly.exclusions.validationOnlyExcludedCount, 1);
+  assert.ok(withBrandOnly.warnings.some((warning) => warning.includes("출원번호 대조 전용")));
+
+  const withNormalOnly = analyzeEntries([normalEntry], { asOfYear: 2026 });
+  assert.strictEqual(withNormalOnly.regionItems.length, 1);
+
+  const brandOnlyWithNotice = {
+    ...brandOnlyEntry,
+    noticeName: "신선한 사과",
+  };
+  const withNoticeFilled = analyzeEntries([brandOnlyWithNotice], { asOfYear: 2026 });
+  assert.strictEqual(withNoticeFilled.regionItems.length, 0);
+  assert.strictEqual(withNoticeFilled.exclusions.validationOnlyExcludedCount, 1);
+  ok("validation_only 자료는 출원번호 evidence에만 쓰고 특산품 통계를 오염시키지 않음");
 }
 
 console.log("\n모든 자체 테스트 통과");

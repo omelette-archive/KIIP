@@ -64,9 +64,12 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 ### 2.3 지역·품목 상세
 
 - 원본 품목명, 표준 품목명, 고시명칭, NICE류
-- 제목: `안동시의 사과`; 건수: `사과 관련 상표 출원 N건`; 근거: `고시명칭 신선한 사과 · NICE 31류`
+- 제목: `안동시 / 사과`; 건수: `사과 관련 상표 출원 N건`; 근거: `고시명칭 신선한 사과 · NICE 31류`
 - 고유 상표 수, 등록률, 상태 분포, 연도별 추이
 - 최근 상표명·출원번호·출원일·상태
+- 상표명(예: `사과애`)은 대표 특산품명을 대체하지 않고 `관련 출원 상표 사례` 목록에 표시한다.
+- 각 상표 사례에는 가능한 경우 지정상품 매칭 방식과 근거 명칭을 붙인다. `normalized_exact`만
+  확정, `normalized_contains|class_only`는 검토 후보, 미보강은 `unverified`로 표시한다.
 - KIPRIS 키워드 전체 건수와 실제 저장 hit 건수의 분리 표시
 - 지정상품 대조 결과: `normalized_exact|normalized_contains|class_only|mismatch|unverified` (#12)
 - 출원인 주소 판정: `inside|outside|unverified` (#11)

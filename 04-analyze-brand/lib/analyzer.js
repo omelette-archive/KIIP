@@ -254,6 +254,7 @@ function finalizeBucket(bucket, options) {
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
   const recentBrands = [];
+  const trademarkExamples = [];
 
   const recentEnd = options.asOfYear - 1;
   const recentStart = recentEnd - options.recentYears + 1;
@@ -270,6 +271,16 @@ function finalizeBucket(bucket, options) {
     }
     goodsMatchCounts[goodsMatchCategory(hit)]++;
     ipRegistryStatusCounts[ipRegistryStatusCategory(hit)]++;
+    trademarkExamples.push({
+      title: clean(hit.title) || null,
+      applicationNumber: clean(hit.applicationNumber) || null,
+      applicationDate: clean(hit.applicationDate) || null,
+      applicant: clean(hit.applicant) || null,
+      applicationStatus: clean(hit.applicationStatus) || null,
+      goodsMatchMethod: clean(hit.goodsMatchMethod) || "unverified",
+      goodsReviewRequired: Boolean(hit.goodsReviewRequired),
+      goodsEvidence: Array.isArray(hit.goodsEvidence) ? hit.goodsEvidence.slice(0, 3) : [],
+    });
     const year = applicationYear(hit.applicationDate);
     if (year === null) {
       invalidApplicationDateCount++;
@@ -312,6 +323,11 @@ function finalizeBucket(bucket, options) {
     applicationYearCounts[String(year)] = yearCounts.get(year);
   }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
+  trademarkExamples.sort(
+    (a, b) =>
+      clean(b.applicationDate).localeCompare(clean(a.applicationDate)) ||
+      clean(a.title).localeCompare(clean(b.title), "ko")
+  );
 
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
@@ -335,6 +351,7 @@ function finalizeBucket(bucket, options) {
         : null,
     recentTrend: trendOf(recentApplicationCount, previousApplicationCount),
     recentBrands: recentBrands.slice(0, options.maxRecentBrands),
+    trademarkExamples: trademarkExamples.slice(0, options.maxRecentBrands),
     regionCounts,
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),

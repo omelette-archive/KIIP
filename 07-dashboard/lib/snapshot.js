@@ -286,6 +286,17 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       matchingBasis: "notice_name_and_nice_class",
       dataState: state,
       sources: rowSourceIds(row),
+      trademarkExamples: Array.isArray(row.trademarkExamples)
+        ? row.trademarkExamples.map((example) => ({
+            title: clean(example.title) || null,
+            applicationNumber: clean(example.applicationNumber) || null,
+            applicationDate: clean(example.applicationDate) || null,
+            applicationStatus: clean(example.applicationStatus) || null,
+            goodsMatchMethod: clean(example.goodsMatchMethod) || "unverified",
+            goodsReviewRequired: Boolean(example.goodsReviewRequired),
+            goodsEvidence: Array.isArray(example.goodsEvidence) ? example.goodsEvidence : [],
+          }))
+        : [],
       metrics: {
         uniqueTrademarkCount: makeMetric(count(row, "uniqueTrademarkCount"), row, {
           state,
