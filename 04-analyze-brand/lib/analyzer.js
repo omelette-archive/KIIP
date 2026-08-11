@@ -98,12 +98,16 @@ function entryDimensions(entry) {
   const sigungu = clean(entry.sigungu) || clean(input.sigungu) || regionParts.slice(1).join(" ");
   const region =
     queryRegion || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
-  const itemName =
-    clean(entry.itemName) ||
+  const noticeName =
+    clean(entry.noticeName) ||
+    clean(input.noticeName) ||
     clean(query.item) ||
     clean(query.searchString) ||
-    clean(input.noticeName) ||
+    null;
+  const itemName =
     clean(input.itemName) ||
+    clean(entry.itemName) ||
+    noticeName ||
     clean(input.rawItemName) ||
     "미지정 품목";
   return {
@@ -111,9 +115,13 @@ function entryDimensions(entry) {
     sigungu,
     region,
     itemName,
-    noticeName: clean(entry.noticeName) || clean(input.noticeName) || null,
+    noticeName,
     niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
   };
+}
+
+function matchPurpose(entry) {
+  return clean(entry.provenance?.matchPurpose) || clean(entry.input?.matchPurpose);
 }
 
 // ③단계 신 계약은 전체 건수를 keywordTotalCount로 준다(구 계약/다른 소스 대비 totalCount·
@@ -246,6 +254,7 @@ function finalizeBucket(bucket, options) {
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
   const recentBrands = [];
+  const trademarkExamples = [];
 
   const recentEnd = options.asOfYear - 1;
   const recentStart = recentEnd - options.recentYears + 1;
@@ -262,6 +271,16 @@ function finalizeBucket(bucket, options) {
     }
     goodsMatchCounts[goodsMatchCategory(hit)]++;
     ipRegistryStatusCounts[ipRegistryStatusCategory(hit)]++;
+    trademarkExamples.push({
+      title: clean(hit.title) || null,
+      applicationNumber: clean(hit.applicationNumber) || null,
+      applicationDate: clean(hit.applicationDate) || null,
+      applicant: clean(hit.applicant) || null,
+      applicationStatus: clean(hit.applicationStatus) || null,
+      goodsMatchMethod: clean(hit.goodsMatchMethod) || "unverified",
+      goodsReviewRequired: Boolean(hit.goodsReviewRequired),
+      goodsEvidence: Array.isArray(hit.goodsEvidence) ? hit.goodsEvidence.slice(0, 3) : [],
+    });
     const year = applicationYear(hit.applicationDate);
     if (year === null) {
       invalidApplicationDateCount++;
@@ -274,14 +293,6 @@ function finalizeBucket(bucket, options) {
           applicationDate: clean(hit.applicationDate) || null,
           applicant: clean(hit.applicant) || null,
           applicationStatus: clean(hit.applicationStatus) || null,
-          // 대표 특산품(고시명칭)은 "품목" 그룹핑 기준일 뿐, 실제로 어떤 상표명이 출원됐고
-          // 등록원부 지정상품이 무엇인지도 대시보드에서 확인할 수 있어야 한다 — 품목 하나를
-          // 완전히 대체하지 않고 근거로 함께 보여주기 위한 필드.
-          goodsMatchMethod: clean(hit.goodsMatchMethod) || null,
-          designatedGoods:
-            Array.isArray(hit.goodsEvidence) && hit.goodsEvidence.length > 0
-              ? hit.goodsEvidence.map((g) => clean(g.designatedProductName)).filter(Boolean).slice(0, 3)
-              : null,
         });
       }
     }
@@ -312,6 +323,11 @@ function finalizeBucket(bucket, options) {
     applicationYearCounts[String(year)] = yearCounts.get(year);
   }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
+  trademarkExamples.sort(
+    (a, b) =>
+      clean(b.applicationDate).localeCompare(clean(a.applicationDate)) ||
+      clean(a.title).localeCompare(clean(b.title), "ko")
+  );
 
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
@@ -335,6 +351,7 @@ function finalizeBucket(bucket, options) {
         : null,
     recentTrend: trendOf(recentApplicationCount, previousApplicationCount),
     recentBrands: recentBrands.slice(0, options.maxRecentBrands),
+    trademarkExamples: trademarkExamples.slice(0, options.maxRecentBrands),
     regionCounts,
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
@@ -384,20 +401,23 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
-  // buildAreaBrandValidationInput.js는 지역브랜드 출원번호 조인을 검증하려고 고시명칭 정제
-  // 없이 브랜드명을 itemName으로 직접 써서 KIPRIS를 검색한다(matchPurpose로 표시).
-  // 대표 특산품 판정·대시보드 "품목" 표시는 반드시 고시명칭(noticeName) 기준이어야 하는데,
-  // 이 자료를 실수로 그대로 흘려보내면 "사과" 대신 "데일리" 같은 브랜드명이 품목으로
-  // 노출된다(2026-08-11 실사례). noticeName이 없는 이 출처 행이 섞였는지 감지해 경고한다.
-  let brandNameOnlyRowCount = 0;
+  const unresolvedBucket = createBucket({});
+  let validationOnlyExcludedCount = 0;
+  let unresolvedNoticeNameCount = 0;
 
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
-    const dimensions = entryDimensions(entry);
-    if (entry.provenance?.matchPurpose === "regional_brand_application_join_validation" && !dimensions.noticeName) {
-      brandNameOnlyRowCount++;
+    if (matchPurpose(entry) === "regional_brand_application_join_validation") {
+      validationOnlyExcludedCount++;
+      continue;
     }
-    const key = [dimensions.region, dimensions.itemName, dimensions.niceClass || ""].join("\u001f");
+    const dimensions = entryDimensions(entry);
+    if (!dimensions.noticeName) {
+      unresolvedNoticeNameCount++;
+      addEntry(unresolvedBucket, entry);
+      continue;
+    }
+    const key = [dimensions.region, dimensions.noticeName, dimensions.niceClass || ""].join("\u001f");
     if (!regionItemBuckets.has(key)) regionItemBuckets.set(key, createBucket(dimensions));
     addEntry(regionItemBuckets.get(key), entry);
   }
@@ -415,11 +435,12 @@ function analyzeEntries(parsed, providedOptions = {}) {
       value: { sido: bucket.sido, sigungu: bucket.sigungu, region: bucket.region },
     }, bucket);
     combinedBucket(itemBuckets, {
-      groupKey: `${bucket.itemName}\u001f${bucket.niceClass || ""}`,
+      groupKey: `${bucket.noticeName}\u001f${bucket.niceClass || ""}`,
       value: { itemName: bucket.itemName, noticeName: bucket.noticeName, niceClass: bucket.niceClass },
     }, bucket);
     mergeBucket(summaryBucket, bucket);
   }
+  mergeBucket(summaryBucket, unresolvedBucket);
 
   const finalizeAll = (buckets) => sortAggregates([...buckets.values()].map((b) => finalizeBucket(b, options)));
   const summary = finalizeBucket(summaryBucket, options);
@@ -427,11 +448,14 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
   const warnings = [];
-  if (brandNameOnlyRowCount > 0) {
+  if (validationOnlyExcludedCount > 0) {
     warnings.push(
-      `${brandNameOnlyRowCount}개 지역×품목 행은 지역브랜드 출원번호 조인 검증용 자료(고시명칭 정제 전 ` +
-        "브랜드명 기반)입니다. 대표 특산품 판정·대시보드 품목 표시에는 쓰면 안 됩니다 — " +
-        "②단계 고시명칭 정제를 거친 자료로 다시 생성하세요."
+      `${validationOnlyExcludedCount}개 농사로 지역브랜드 검증 행은 출원번호 대조 전용이므로 특산품 집계에서 제외했습니다.`
+    );
+  }
+  if (unresolvedNoticeNameCount > 0) {
+    warnings.push(
+      `${unresolvedNoticeNameCount}개 행은 ② 고시명칭이 확정되지 않아 지역×특산품 집계에서 제외했습니다.`
     );
   }
   if (summary.erroredQueryCount > 0) {
@@ -489,6 +513,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
       ].filter(Boolean),
     },
     methodology: {
+      analysisUnit: "지역 × ② 표준 특산품명(표시) × 고시상품명칭·NICE류(집계 키)",
+      trademarkTitlePolicy: "상표명은 개별 hit 근거로만 보존하며 품목명·집계 키로 사용하지 않음",
+      regionalBrandValidationPolicy: "농사로 areaBrandLst는 출원번호 검증 전용이며 특산품 마스터·집계 입력에서 제외",
       trademarkCountBasis: "03단계가 저장한 hit를 출원번호 우선 키로 중복 제거",
       partialCollectionPolicy: "partial hit도 포함하되 경고와 partialQueryCount를 함께 제공",
       applicantRegionMetric: "출원인 주소 근거만 localApplicantShare에 사용",
@@ -507,6 +534,10 @@ function analyzeEntries(parsed, providedOptions = {}) {
       recentYears,
       recentPeriodExcludesCurrentYear: true,
       maxRecentBrands,
+    },
+    exclusions: {
+      validationOnlyExcludedCount,
+      unresolvedNoticeNameCount,
     },
     warnings,
     summary,

@@ -1,9 +1,9 @@
 # ⑦ 대시보드 서비스
 
 **상태**: 🟡 `dashboard-snapshot-v1` 샘플 어댑터와 실제 웹 대시보드 구현 ·
-[`web/`](web/)은 데이터 연결·검색·지역/품목 상세·출처 표시가 동작하며 배포 상태는 #42에서 관리.
-2026-08-11 레퍼런스 화면 구성에 맞춰 요약/지자체별 조회/품목별 조회 3탭 + 등록상표 랭킹
-테이블을 추가(아래 "레퍼런스 화면 구성" 표 참고, 새 데이터 수집 없이 기존 산출물만 사용).
+[`web/`](web/)은 요약(전국 지도·랭킹)/지자체별 조회/품목별 조회/특화작목 비교(준비 상태 표시)
+4개 탭, 판정 기준 상시 노출, 지역·품목 상세, 실제 출원 상표 사례, 출처 표시가 동작하며
+배포 상태는 #42에서 관리
 
 > 참고: 초기에 샘플(합성) 데이터로 시군구 통계 대시보드 v1을 만들었다가, 실데이터 파이프라인
 > 방향으로 전환하며 제거했다. `prototypes/`의 목업은 그 실수를 반복하지 않으려고 합성 데이터가
@@ -20,6 +20,7 @@ UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며,
 
 - 지역별 브랜드 현황
 - 특산품별 상표 출원현황
+- 지역·대표 특산품 상세의 관련 출원 상표명 및 지정상품 근거
 - 실시간 신규 출원 모니터링
 - 브랜드 공백 지도(Brand Gap Map)
 - 지역 간 비교 분석
@@ -34,30 +35,24 @@ UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며,
 
 ### 레퍼런스 화면 구성
 
-| 화면 | 표시 내용 | 상태 |
-|---|---|---|
-| 상표 공백률 지도 | 광역 단위 색상 맵, 전국 공백률 31.0%(레퍼런스 집계 기준) | ⬜ GeoJSON 경계 미확보(`blocked`) |
-| 지자체별 조회 | 광역자치단체별 등록상표 현황 | ✅ 구현(시군구 단위, 시도 롤업은 미구현) |
-| 품목별 조회 | 특정 품목 중심 데이터 | 🟡 구현했지만 지역×품목 행 단위(품목 전국 재집계 아님) |
-| 특화작목 비교 | 9개 도별, 정책 지정 특화작목 vs 실제 출원 품목 TOP5, 일치 여부 | ⬜ 신규 공식 데이터 미확보 |
-| 등록상표 랭킹 | TOP 10/50, 컬럼: 순위·품목·등록상표·지리적표시·대표 출원지역 TOP3 | 🟡 구현했지만 지리적표시·대표출원지역TOP3 컬럼 제외 |
-| 비즈니스 확장 분석 | 원물→가공품→서비스 단계별 출원 현황 | ⬜ NICE류 3단계 매핑 미구현, ②단계 필터 정책과 상충 |
+| 화면 | 표시 내용 |
+|---|---|
+| 상표 공백률 지도 | 광역 단위 색상 맵, 전국 공백률 31.0%(레퍼런스 집계 기준) |
+| 지자체별 조회 | 광역자치단체별 등록상표 현황 |
+| 품목별 조회 | 특정 품목 중심 데이터 |
+| 특화작목 비교 | 9개 도별, 정책 지정 특화작목 vs 실제 출원 품목 TOP5, 일치 여부 |
+| 등록상표 랭킹 | TOP 10/50, 컬럼: 순위·품목·등록상표·지리적표시·대표 출원지역 TOP3 |
+| 비즈니스 확장 분석 | 원물→가공품→서비스 단계별 출원 현황 |
 
 레퍼런스는 「지역_품목_전처리후_최종(0810, 1992개)」(146개 지자체, 1,992개 지자체×품목 조합)
 데이터셋을 쓴다고 밝히고 있다 — 규모 가늠용 참고치일 뿐 우리 파이프라인의 목표 수치는 아니다.
 
 ### 기존 산출물로 초안 구현 가능
 
-- **지자체별/품목별 조회** → ④ `regions`/`items` 버킷이 이미 이 형태. ✅ 2026-08-11
-  `web/app/Dashboard.tsx`에 탭으로 구현. 단, "품목별 조회"는 서버 집계가 아니라 이미 받아온
-  스냅샷을 클라이언트에서 품목명 기준으로 다시 묶은 것이다(지역×품목 행 단위 유지, 아래
-  "대표 출원지역 TOP3"와 다름)
-- **등록상표 랭킹의 건수** → ④ `statusCounts.registered` 기준 집계. ✅ 2026-08-11 구현. 단
-  레퍼런스는 품목 단위 전국 랭킹이고 우리는 지역×품목 행 단위 랭킹이다 — 품목 재집계
-  로직(대표 출원지역 TOP3)이 없어 같은 품목명이 지역마다 별도 행으로 나온다. 화면에도 이
-  차이를 문구로 명시한다
-- **공백률 지도의 기반 점수** → ⑤ `gapScore` (단, 지금은 지역×품목 단위이며 #29 잔여 범위
-  확정 전 `예시 기준`으로만 표시)
+- **지자체별/품목별 조회** → ④ `regions`/`items` 버킷이 이미 이 형태
+- **등록상표 랭킹의 건수** → ④ `statusCounts.registered` 기준 집계
+- **공백률 지도의 기반 점수** → ⑤ `gapScore` (단, 지금은 지역×품목 단위이며 #29 확정 전
+  `예시 기준`으로만 표시)
 
 샘플·부분 수집 상태와 지표별 정확한 계산 정의는
 [`dashboard-data-contract.md`](../docs/dashboard-data-contract.md)를 따른다.
@@ -95,24 +90,20 @@ UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며,
 - [x] `04-analyze-brand/` · `05-detect-brand-gap/` · `06-generate-business-strategy/` 출력을 합치는
       `dashboard-snapshot-v1` 샘플 어댑터 구현 — [`buildDashboardSnapshot.js`](buildDashboardSnapshot.js)
 - [x] 법정동코드 정확 매칭 `regionCode`와 고시명칭·NICE류 기반 `specialtyId` 추가
-- [ ] 현재 기준 지도 경계 GeoJSON 확보(현재 스냅샷의 지도 상태는 `blocked`)
+- [ ] 현재 기준 지도 경계 GeoJSON 확보(공백 점수용 운영 경계는 계속 `blocked`)
 - [x] 브랜드 공백 지도 시각화 방식 검토 — [`prototypes/brand-map.html`](prototypes/brand-map.html)에서
-      지도 기반(시도→시군구 드릴다운) 방향으로 목업 완료. 실제 구현 프레임워크(Streamlit 등)로
-      이 인터랙션을 어떻게 옮길지는 아직 미정
+      검토한 시도→시군구 드릴다운을 React 웹과 단일 HTML에 구현. 2013 KOSTAT 참고 경계는
+      상표 건수·등록률·수집 범위 표시에만 사용하고, 현재 경계·점수 미확정 상태를 화면에 명시
 - [ ] 실시간 신규 출원 모니터링 갱신 주기/알림 방식 결정
-- [x] 샘플 스냅샷을 읽는 웹 UI, 지역·품목 검색/선택, 근거·부분수집·차단 상태 표시
-- [x] 레퍼런스 화면 구성에 맞춘 3탭(요약/지자체별 조회/품목별 조회) + 등록상표 랭킹
-      TOP 10/50 테이블 추가(2026-08-11, 새 데이터 수집 없이 기존 산출물만 사용).
-      React(`Dashboard.tsx`)와 단독 HTML(`standalone-client.js`) 양쪽에 동일하게 반영
+- [x] 샘플 스냅샷을 읽는 웹 UI, 전국 지도, 지역·품목 조회, 특화작목 비교 준비 화면,
+      근거·부분수집·차단 상태 표시
 - [x] 판정 기준·매칭 방법을 하단 `<details>`가 아니라 항상 보이는 "판정 기준과 매칭 방법"
-      섹션으로 상단에 노출(2026-08-11 피드백 반영) — 대표 특산품/품목·지역 매칭/상표 검색/
-      고유·등록 상표/출원인 지역 매칭 6개 기준을 근거·버전과 함께 표시
-- [x] 지역/품목 표시를 "영양군 / 사과" 형태의 breadcrumb로 정리(2026-08-11 피드백 반영,
-      기존 `선택 품목` 라벨을 지역명과 결합)
+      섹션으로 4개 탭 모두에서 상단에 노출(2026-08-11 피드백 반영) — 대표 특산품/품목·지역
+      매칭/상표 검색/고유·등록 상표/출원인 지역 매칭 6개 기준을 근거·버전과 함께 표시.
+      React(`Dashboard.tsx`)와 단독 HTML(`standalone-client.js`) 양쪽에 동일하게 반영
 - [x] 품목(고시명칭)은 그룹핑 기준일 뿐 실제 출원 상표명이 사라지면 안 된다는 피드백 반영
-      (2026-08-11) — ④의 `recentBrands`에 지정상품 근거(`goodsMatchMethod`/`designatedGoods`)를
-      추가하고, ⑦이 `item.recentTrademarks`(최대 5건)로 옮겨 지역 상세 화면에 실제 상표명·
-      출원일·출원인·지정상품 칩으로 표시
+      (2026-08-11, 예: "사과애") — ④가 `trademarkExamples`(hit별 상표명·출원일·상태·
+      지정상품 근거)를 만들고 ⑦이 그대로 전달, 지역 상세 화면의 "관련 출원 상표 사례"에 표시
 - [ ] 실키 수집 스케줄과 사이트 무인 재배포 연결(#42)
 - [ ] 통합 스냅샷과 후속 데이터 갭 구현 — [#37](https://github.com/omelette-archive/KIIP/issues/37)
 
@@ -122,6 +113,11 @@ UI 아이디에이션 참고 사이트는 <https://local-k-tm.pages.dev/>이며,
 
 실제 UI는 이 파일들을 직접 각각 읽지 않고 `dashboard-snapshot-v1`로 결합한 읽기 전용 산출물을
 입력으로 사용한다. 샘플·부분 수집·오류·미수집 상태를 0건과 구분해야 한다.
+
+품목 주 라벨은 상표명이 아니라 ② 표준 특산품명(`itemName`, 예: `사과`)이다. `specialtyId`와
+상표 건수 집계는 고시명칭·NICE류(`noticeName + niceClass`, 예: `신선한 사과 + 31류`)를 기준으로
+한다. 고시명칭 또는 NICE류가 없는 행은 스냅샷 생성 단계에서 오류로 차단한다. 농사로
+`areaBrandLst`는 출원번호 검증자료이며 대시보드 품목 목록의 입력이 아니다.
 
 ## 통합 스냅샷 생성
 
@@ -134,51 +130,7 @@ node 07-dashboard/buildDashboardSnapshot.js `
   --out 07-dashboard/output/dashboard-snapshot.json
 ```
 
-`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 지도 경계
-데이터가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지된다.
-
-### ⚠️ 샘플은 반드시 ①→⑦ 정식 경로로 만든다 — "품목"은 고시명칭 기준이어야 함
-
-`analysis.json`(④)의 입력을 만들 때 `01-collect-specialties`(실제 특산물 수집) →
-`02-normalize-items/normalizeItems.js`(고시명칭 정제) → `03-match-trademarks`를 거쳐야
-한다. `03-match-trademarks/buildAreaBrandValidationInput.js`(지역브랜드 출원번호 조인
-*기능 자체*를 검증하는 별도 도구)의 출력을 대시보드 샘플에 재사용하면 안 된다 — 그 CSV는
-`noticeName`을 비워두고 브랜드명을 `itemName`으로 직접 쓰기 때문에, 지역의 대표
-특산품(예: "사과") 대신 특정 상표/브랜드명(예: "데일리")이 "품목"으로 노출된다
-(2026-08-11 실사례 — `docs/dashboard-data-contract.md` §3.1, `docs/data-source-provenance.md`
-§1 참고). `04-analyze-brand/lib/analyzer.js`가 이 오용을 감지하면 `warnings`에 경고를
-남기니, 경고가 보이면 입력을 다시 만든다.
-
-실제로 검증된 재현 절차(2026-08-11, 경상북도 영양군·충청남도 천안시 5개 품목):
-
-```powershell
-node 01-collect-specialties/collectSpecialties.js --sources nongsaro --limit 40 `
-  --out 01-collect-specialties/output/specialties-sample.csv
-
-node 02-normalize-items/normalizeItems.js --input 01-collect-specialties/output/specialties-sample.csv `
-  --out 02-normalize-items/output/normalized-sample.csv
-
-node 03-match-trademarks/matchTrademarks.js --input 02-normalize-items/output/normalized-sample.csv `
-  --numOfRows 30 --max-pages 2 --max-hits-per-query 30 --max-requests 10 `
-  --enrich-registry --max-registry-requests 15 --registry-concurrency 3 `
-  --out 03-match-trademarks/output/stage3-sample.json
-
-node 04-analyze-brand/analyzeBrands.js --input 03-match-trademarks/output/stage3-sample.json `
-  --out 04-analyze-brand/output/analysis.json --asOfYear 2026
-node 05-detect-brand-gap/detectBrandGap.js --input 04-analyze-brand/output/analysis.json `
-  --out 05-detect-brand-gap/output/gap.json
-node 06-generate-business-strategy/generateStrategy.js --input 05-detect-brand-gap/output/gap.json `
-  --out 06-generate-business-strategy/output/strategy.json
-node 07-dashboard/buildDashboardSnapshot.js --analysis 04-analyze-brand/output/analysis.json `
-  --gap 05-detect-brand-gap/output/gap.json --strategy 06-generate-business-strategy/output/strategy.json `
-  --mode sample --out 07-dashboard/output/dashboard-snapshot.json
-
-cd 07-dashboard/web
-npm run sync:snapshot -- ../output/dashboard-snapshot.json
-npm run build:html
-```
-
-이 절차로 만든 현재 샘플은 "신선한 사과"·"신선한 배"·"신선한 포도"(경상북도 영양군),
-"신선한 토마토"(충청남도 천안시)를 실제 고시명칭 기준 품목으로 보여준다. "오미자"(천안시)는
-②단계에서 고시명칭 정확 일치가 없어 검토대기로 남았고, ③단계에서 검색 자체를 건너뛴
-사례로 그대로 유지했다 — 대표 특산품이라고 추정해서 채우지 않는다.
+`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 기준 지도
+경계가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지한다. 다만 UI는 출처와
+연도를 표시한 참고 경계 위에 상표 건수·등록률·수집 범위를 그리며, 데이터 없는 지역은 0건이 아닌
+`데이터 없음`으로 표시한다. 브랜드 공백 색상은 점수와 운영 경계가 준비될 때까지 비활성화한다.

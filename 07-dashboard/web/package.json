@@ -9,6 +9,7 @@
     "dev": "vinext dev",
     "build": "vinext build",
     "build:html": "node scripts/build-standalone-html.mjs",
+    "sync:map": "node scripts/extract-map-geometry.mjs",
     "start": "vinext start",
     "test": "npm run build && npm run build:html && node --test tests/rendered-html.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",

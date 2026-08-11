@@ -92,6 +92,16 @@ function writeStage3Fixture(filePath) {
         stopReason: "source_exhausted",
         inputIndex: 0,
         source: "지리적표시",
+        input: {
+          sido: "경상북도",
+          sigungu: "안동시",
+          rawItemName: "안동사과",
+          itemName: "사과",
+          noticeName: "신선한 사과",
+          niceClass: "31",
+          status: "ok",
+          source: "지리적표시",
+        },
         query: {
           region: "경상북도 안동시",
           regionMatch: "unverified",
@@ -202,7 +212,9 @@ function validateContracts(tempDir) {
   assert.strictEqual(analysis.summary.sourceTotalCount, 7);
   assert.strictEqual(analysis.summary.uniqueTrademarkCount, 1);
   assert.ok(!analysis.regionItems.some((row) => row.region === "미지정 지역"));
-  const andongApple = analysis.regionItems.find((row) => row.itemName === "신선한 사과");
+  const andongApple = analysis.regionItems.find(
+    (row) => row.itemName === "사과" && row.noticeName === "신선한 사과"
+  );
   assert.deepStrictEqual(andongApple.sources, ["지리적표시"], "③의 source가 ④ 버킷까지 전파돼야 함");
   assert.strictEqual(andongApple.localApplicantShare, 1);
   assert.strictEqual(andongApple.goodsConfirmedHitCount, 1);
@@ -219,7 +231,7 @@ function validateContracts(tempDir) {
   const gap = JSON.parse(fs.readFileSync(gapPath, "utf8"));
   assert.strictEqual(gap.rows.length, analysis.regionItems.length);
   assert.strictEqual(gap.ranking.length, 1, "지리적표시 출처 1건만 대표 특산품으로 랭킹에 남아야 함");
-  assert.strictEqual(gap.ranking[0].itemName, "신선한 사과");
+  assert.strictEqual(gap.ranking[0].itemName, "사과");
   assert.ok(typeof gap.ranking[0].gapScore === "number");
   console.log("[validatePipeline] ④→⑤ 계약 통과 (대표 특산품만 랭킹, 점수 산출)");
 

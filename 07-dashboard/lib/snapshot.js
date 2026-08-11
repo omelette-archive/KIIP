@@ -251,6 +251,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
 
   const regionGroups = new Map();
   for (const row of analysis.regionItems) {
+    if (!clean(row.noticeName) || !clean(row.niceClass)) {
+      throw new Error(
+        `대시보드 품목은 ② 고시명칭·NICE류 확정 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
+      );
+    }
     const regionIdentity = resolveRegion(row, regionIndex);
     const specialty = specialtyIdentity(row);
     if (specialty.specialtyId) {
@@ -278,8 +283,20 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       itemName: clean(row.itemName) || null,
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
+      matchingBasis: "notice_name_and_nice_class",
       dataState: state,
       sources: rowSourceIds(row),
+      trademarkExamples: Array.isArray(row.trademarkExamples)
+        ? row.trademarkExamples.map((example) => ({
+            title: clean(example.title) || null,
+            applicationNumber: clean(example.applicationNumber) || null,
+            applicationDate: clean(example.applicationDate) || null,
+            applicationStatus: clean(example.applicationStatus) || null,
+            goodsMatchMethod: clean(example.goodsMatchMethod) || "unverified",
+            goodsReviewRequired: Boolean(example.goodsReviewRequired),
+            goodsEvidence: Array.isArray(example.goodsEvidence) ? example.goodsEvidence : [],
+          }))
+        : [],
       metrics: {
         uniqueTrademarkCount: makeMetric(count(row, "uniqueTrademarkCount"), row, {
           state,
@@ -353,24 +370,6 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           blockingIssue: "#29",
         }),
       },
-      // 품목(noticeName)은 대표 특산품 그룹핑 기준일 뿐이다 — 실제로 어떤 상표명이
-      // 출원됐고 등록원부 지정상품이 무엇인지도 근거로 함께 보여준다("사과"만 보이고
-      // 실제 출원 상표명은 어디에도 안 보이면 안 된다는 2026-08-11 피드백 반영).
-      // ④의 recentBrands(최근 기간 hit, 최대 maxRecentBrands건)를 화면 표시용으로 5건까지만 옮긴다.
-      recentTrademarks: Array.isArray(row.recentBrands)
-        ? row.recentBrands.slice(0, 5).map((brand) => ({
-            title: clean(brand.title) || null,
-            applicationNumber: clean(brand.applicationNumber) || null,
-            applicationDate: clean(brand.applicationDate) || null,
-            applicant: clean(brand.applicant) || null,
-            applicationStatus: clean(brand.applicationStatus) || null,
-            goodsMatchMethod: clean(brand.goodsMatchMethod) || null,
-            designatedGoods:
-              Array.isArray(brand.designatedGoods) && brand.designatedGoods.length > 0
-                ? brand.designatedGoods
-                : null,
-          }))
-        : [],
       briefing: briefing
         ? {
             templateVersion: strategy.templateVersion || null,
@@ -458,7 +457,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       rank: index + 1,
       ...identityFor(row),
       region: clean(row.region) || null,
-      itemName: clean(row.noticeName) || clean(row.itemName) || null,
+      itemName: clean(row.itemName) || null,
+      noticeName: clean(row.noticeName) || null,
       gapScore: makeMetric(row.gapScore ?? null, row, {
         availability: "preview",
         status: metricStatus(state),

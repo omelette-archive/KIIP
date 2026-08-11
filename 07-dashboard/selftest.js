@@ -37,6 +37,15 @@ function bucket(overrides = {}) {
     regionalBrandInsideShare: null,
     goodsConfirmedHitCount: 1,
     goodsReviewRequiredHitCount: 0,
+    trademarkExamples: [{
+      title: "사과애",
+      applicationNumber: "40-2025-0000001",
+      applicationDate: "20250102",
+      applicationStatus: "등록",
+      goodsMatchMethod: "normalized_exact",
+      goodsReviewRequired: false,
+      goodsEvidence: [{ classCode: "31", designatedProductName: "신선한 사과" }],
+    }],
     ipRegistryStatusCounts: {
       complete: 1,
       not_applicable: 0,
@@ -59,19 +68,7 @@ function bucket(overrides = {}) {
 }
 
 function fixture() {
-  const andong = bucket({
-    recentBrands: [
-      {
-        title: "안동사과애",
-        applicationNumber: "4020250000001",
-        applicationDate: "20250601",
-        applicant: "안동사과영농조합",
-        applicationStatus: "등록",
-        goodsMatchMethod: "normalized_exact",
-        designatedGoods: ["신선한사과", "미가공사과"],
-      },
-    ],
-  });
+  const andong = bucket();
   const boseong = bucket({
     sido: "전라남도",
     sigungu: "보성군",
@@ -239,12 +236,13 @@ assert.strictEqual(andong.items[0].metrics.gapScore.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.gapScore.blockingIssue, "#29");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.blockingIssue, "#12");
+assert.strictEqual(andong.items[0].trademarkExamples[0].title, "사과애");
+assert.strictEqual(
+  andong.items[0].trademarkExamples[0].goodsEvidence[0].designatedProductName,
+  "신선한 사과"
+);
 assert.ok(andong.items[0].metrics.confirmedGoodsMatchCount.sourceIds.includes("ip_registry"));
 assert.ok(andong.items[0].metrics.uniqueTrademarkCount.sourceIds.includes("kipris_trademark"));
-assert.strictEqual(andong.items[0].recentTrademarks.length, 1, "품목(고시명칭)은 그룹핑 기준일 뿐, 실제 출원 상표명도 근거로 남아야 함");
-assert.strictEqual(andong.items[0].recentTrademarks[0].title, "안동사과애");
-assert.deepStrictEqual(andong.items[0].recentTrademarks[0].designatedGoods, ["신선한사과", "미가공사과"]);
-assert.deepStrictEqual(boseong.items[0].recentTrademarks, [], "recentBrands가 없는 행은 빈 배열(추정하지 않음)");
 assert.strictEqual(boseong.dataState, "complete_zero");
 assert.strictEqual(snapshot.map.availability, "blocked");
 assert.strictEqual(snapshot.coverage.targetRegionCount, null);

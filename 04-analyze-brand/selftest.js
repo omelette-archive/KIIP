@@ -48,8 +48,9 @@ const input = [
     sido: "경상북도",
     sigungu: "안동시",
     itemName: "사과",
+    noticeName: "신선한 사과",
     niceClass: "31",
-    query: { region: "경상북도 안동시", searchString: "사과" },
+    query: { region: "경상북도 안동시", searchString: "신선한 사과" },
     error: "테스트 오류",
   },
   {
@@ -169,9 +170,8 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   const skippedRow = r.regionItems.find(
     (row) => row.region === "경상북도 안동시" && row.itemName === "하회탈"
   );
-  assert.ok(skippedRow, "skipped 행도 input의 실제 지역·품목으로 버킷팅되어야 함");
-  assert.strictEqual(skippedRow.skippedQueryCount, 1);
-  assert.strictEqual(skippedRow.successfulQueryCount, 0);
+  assert.strictEqual(skippedRow, undefined, "고시명칭 미확정 행은 지역×특산품 집계에 노출하면 안 됨");
+  assert.strictEqual(r.exclusions.unresolvedNoticeNameCount, 1);
 
   assert.ok(
     r.warnings.some((w) => w.includes("검토대기·제외")),
@@ -231,7 +231,8 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
   const boseongTea = r.regionItems.find((row) => row.region === "전라남도 보성군");
   assert.deepStrictEqual(boseongTea.sources, ["농사로"], "검색 자체가 오류난 행도 출처는 유실되지 않음");
   const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
-  assert.deepStrictEqual(andongTree.sources, ["샘플"], "skipped 행은 input.source에서 읽어야 함");
+  assert.strictEqual(andongTree, undefined, "분석 제외 품목을 집계 차원에 만들면 안 됨");
+  assert.ok(r.summary.skippedQueryCount > 0, "제외 행은 운영 요약에는 남아야 함");
   assert.strictEqual(r.schemaVersion, "1.3");
   ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
 }
@@ -277,6 +278,27 @@ console.log("6) 농사로 지역브랜드 조인 신호 — 출원인 주소 지
   ok("출원번호 지역브랜드 연관성은 별도 지표로 집계되고 localApplicantShare를 오염시키지 않음");
 }
 
+console.log("6-1) 지역브랜드명은 특산품 집계 차원에서 제외");
+{
+  const r = analyzeEntries([{
+    status: "ok",
+    input: {
+      sido: "전라남도",
+      sigungu: "나주시",
+      rawItemName: "배",
+      itemName: "상큼愛",
+      matchPurpose: "regional_brand_application_join_validation",
+    },
+    provenance: { matchPurpose: "regional_brand_application_join_validation" },
+    query: { region: "전라남도 나주시", item: "상큼愛" },
+    hits: [hit("40-9", "상큼愛", "20250101", "등록", "unverified")],
+  }], { asOfYear: 2026 });
+  assert.strictEqual(r.regionItems.length, 0);
+  assert.strictEqual(r.exclusions.validationOnlyExcludedCount, 1);
+  assert.ok(r.warnings.some((warning) => warning.includes("출원번호 대조 전용")));
+  ok("상표·브랜드명은 개별 검증 근거일 뿐 특산품명이나 집계 키가 아님");
+}
+
 console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
 {
   const enrichedHit = (number, applicantRegionMatch, goodsMatchMethod) => ({
@@ -285,6 +307,10 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
     applicantRegionMatch,
     applicantRegionMatchSource: "ip_registry_applicant_address",
     goodsMatchMethod,
+    goodsReviewRequired: goodsMatchMethod !== "normalized_exact",
+    goodsEvidence: goodsMatchMethod === "normalized_exact"
+      ? [{ classCode: "31", designatedProductName: "신선한 사과" }]
+      : [],
   });
   const r = analyzeEntries({
     schemaVersion: "1.1",
@@ -322,13 +348,16 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   assert.strictEqual(row.goodsVerificationRate, 0.6667);
   assert.strictEqual(row.ipRegistryStatusCounts.complete, 2);
   assert.strictEqual(row.ipRegistryStatusCounts.not_collected, 1);
+  assert.strictEqual(row.trademarkExamples[0].title, "등록원부-40-1");
+  assert.strictEqual(row.trademarkExamples[0].goodsMatchMethod, "normalized_exact");
+  assert.strictEqual(row.trademarkExamples[0].goodsEvidence[0].designatedProductName, "신선한 사과");
   assert.ok(r.provenance.sources.some((source) => source.sourceId === "ip_registry"));
   assert.ok(r.warnings.some((warning) => warning.includes("등록원부 보강이 partial")));
   assert.ok(r.warnings.some((warning) => warning.includes("#12")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
-console.log("8) 지역브랜드 조인 검증용 브랜드명 자료(고시명칭 미정제)가 섞이면 경고");
+console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무와 무관하게 집계 제외");
 {
   const brandOnlyEntry = {
     status: "ok",
@@ -347,56 +376,21 @@ console.log("8) 지역브랜드 조인 검증용 브랜드명 자료(고시명�
   };
 
   const withBrandOnly = analyzeEntries([brandOnlyEntry], { asOfYear: 2026 });
-  assert.ok(
-    withBrandOnly.warnings.some((warning) => warning.includes("브랜드명 기반") && warning.includes("고시명칭")),
-    "noticeName 없이 join-validation 자료만 있으면 경고가 있어야 함"
-  );
+  assert.strictEqual(withBrandOnly.regionItems.length, 0);
+  assert.strictEqual(withBrandOnly.exclusions.validationOnlyExcludedCount, 1);
+  assert.ok(withBrandOnly.warnings.some((warning) => warning.includes("출원번호 대조 전용")));
 
   const withNormalOnly = analyzeEntries([normalEntry], { asOfYear: 2026 });
-  assert.ok(
-    !withNormalOnly.warnings.some((warning) => warning.includes("브랜드명 기반")),
-    "고시명칭이 있는 정상 자료만 있으면 이 경고가 없어야 함"
-  );
+  assert.strictEqual(withNormalOnly.regionItems.length, 1);
 
   const brandOnlyWithNotice = {
     ...brandOnlyEntry,
     noticeName: "신선한 사과",
   };
   const withNoticeFilled = analyzeEntries([brandOnlyWithNotice], { asOfYear: 2026 });
-  assert.ok(
-    !withNoticeFilled.warnings.some((warning) => warning.includes("브랜드명 기반")),
-    "matchPurpose가 join-validation이어도 noticeName이 채워져 있으면 경고하지 않음(고시명칭 정제까지 마친 자료로 간주)"
-  );
-  ok("buildAreaBrandValidationInput.js류 브랜드명 자료가 고시명칭 정제 없이 섞이면 감지해 경고함");
-}
-
-console.log("9) recentBrands — 품목(고시명칭)은 그룹핑 기준일 뿐, 실제 출원 상표명·지정상품도 근거로 보존");
-{
-  const goodsHit = (number, title, designatedGoods) => ({
-    ...hit(number, title, "20250101", "등록", "inside"),
-    goodsMatchMethod: "normalized_exact",
-    goodsEvidence: designatedGoods.map((name) => ({ classCode: "31", designatedProductName: name })),
-  });
-  const r = analyzeEntries({
-    results: [{
-      status: "ok",
-      query: { region: "경상북도 영양군", item: "신선한 사과", classCode: "31" },
-      hits: [
-        goodsHit("60-1", "사과애", ["신선한사과", "미가공사과", "신선한과실"]),
-        { ...hit("60-2", "무명 사과", "20250101", "등록", "inside") }, // 지정상품 근거 없는 일반 hit
-      ],
-    }],
-  }, { asOfYear: 2026 });
-  const row = r.regionItems[0];
-  assert.strictEqual(row.itemName, "신선한 사과", "품목 그룹핑 키 자체는 여전히 고시명칭(정규화된 품목)이어야 함");
-  assert.strictEqual(row.recentBrands.length, 2);
-  const branded = row.recentBrands.find((b) => b.title === "사과애");
-  assert.ok(branded, "실제 출원 상표명(예: 사과애)이 recentBrands에 그대로 보존돼야 함");
-  assert.strictEqual(branded.goodsMatchMethod, "normalized_exact");
-  assert.deepStrictEqual(branded.designatedGoods, ["신선한사과", "미가공사과", "신선한과실"]);
-  const unbranded = row.recentBrands.find((b) => b.title === "무명 사과");
-  assert.strictEqual(unbranded.designatedGoods, null, "지정상품 근거가 없으면 null(추정하지 않음)");
-  ok("품목은 고시명칭 기준으로 묶이지만, 실제 상표명과 지정상품은 recentBrands에 근거로 보존됨");
+  assert.strictEqual(withNoticeFilled.regionItems.length, 0);
+  assert.strictEqual(withNoticeFilled.exclusions.validationOnlyExcludedCount, 1);
+  ok("validation_only 자료는 출원번호 evidence에만 쓰고 특산품 통계를 오염시키지 않음");
 }
 
 console.log("\n모든 자체 테스트 통과");

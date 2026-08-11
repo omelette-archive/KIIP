@@ -250,27 +250,26 @@ node 03-match-trademarks/fetchAreaBrands.js `
   --out 03-match-trademarks/output/area-brand-sample.json
 ```
 
-별도 검증자료를 ③ 입력으로 바꾸고 KIPRIS 조인과 ④ 분석까지 실행한다.
+별도 검증자료는 정상 특산품 검색 결과에 출원번호 근거로만 조인한다. ③ 입력은 반드시 ①→②를
+거친 고시명칭 확정 CSV다.
 
 ```powershell
-node 03-match-trademarks/buildAreaBrandValidationInput.js `
-  --input 03-match-trademarks/output/area-brand-sample.json `
-  --limit 3 `
-  --out 03-match-trademarks/output/area-brand-validation-input.csv
-
 node 03-match-trademarks/matchTrademarks.js `
-  --input 03-match-trademarks/output/area-brand-validation-input.csv `
+  --input 02-normalize-items/output/nongsaro-key-smoke-normalized.csv `
   --area-brands 03-match-trademarks/output/area-brand-sample.json `
   --numOfRows 100 --max-pages 1 --max-hits-per-query 100 --max-requests 3 `
-  --out 03-match-trademarks/output/area-brand-validation-result.json
+  --out 03-match-trademarks/output/specialty-search-with-area-brand.json
 
 node 04-analyze-brand/analyzeBrands.js `
-  --input 03-match-trademarks/output/area-brand-validation-result.json `
-  --out 04-analyze-brand/output/area-brand-validation-analysis.json `
+  --input 03-match-trademarks/output/specialty-search-with-area-brand.json `
+  --out 04-analyze-brand/output/specialty-search-analysis.json `
   --asOfYear 2026
 ```
 
-2026-08-10 측정값은 입력 3건, KIPRIS 성공 3건, 오류 0건, 출원번호 완전일치 조인 3건,
+`buildAreaBrandValidationInput.js`를 실행하면 지역브랜드 원문 검토용 `validation_only` CSV가
+생성된다. `brandName`은 별도 열에 남고 `analysisEligible=false`이므로 ③·④ 통계에는 들어가지 않는다.
+
+2026-08-10 과거 측정값은 입력 3건, KIPRIS 성공 3건, 오류 0건, 출원번호 완전일치 조인 3건,
 지역브랜드 inside 3건이다. 총 고유 KIPRIS hit는 21건이었다. 한 쿼리는 `--max-pages=1` 상한으로
 `partial`이며 오류가 아니다. 출원인 주소가 없으므로 `localApplicantShare`는 세 행 모두
 `null`이고, 농사로 근거는 별도 `regionalBrand*` 지표로만 반영됐다.
@@ -278,7 +277,8 @@ node 04-analyze-brand/analyzeBrands.js `
 `signguNm`은 법정동코드 완전일치와 고유 접미사 복원만 허용한다. `구미`는 `구미시`로 복원할 수
 있지만 `고성`처럼 여러 시도에 후보가 있으면 `unverified`로 남긴다. 조인 규칙은
 `area-brand-application-region-join-v1`, 분석 규칙은
-`brand-analysis-v2-regional-brand-separated`다. 공식 출처와 전체 기준은
+`brand-analysis-v2-regional-brand-separated`다. 이 과거 브랜드명 검색 결과는 조인 기술 검증
+기록일 뿐 특산품 집계·대시보드 입력으로 재사용하지 않는다. 공식 출처와 전체 기준은
 [`data-source-provenance.md`](data-source-provenance.md)에 기록한다.
 
 이 데이터는 특산물 원본이 아니라 이미 등록·출원된 지역 브랜드 검증자료이므로 ① 특산물

@@ -19,6 +19,10 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 5. 예시 점수와 승인된 정책 기준을 구분하고 `scoreVersion`을 화면에 표시한다.
 6. 모든 카드·지도·표는 기준일, 출처, 규칙 버전, 표본 범위를 역추적할 수 있어야 한다.
 7. 샘플 실행은 항상 `sample` 배지를 표시하고 전국 통계·정책 결론으로 표현하지 않는다.
+8. 분석 단위는 `지역 × 표준 특산품 × 고시상품명칭·NICE류`다. `사과애`, `상큼愛` 같은
+   상표·지역브랜드명은 개별 hit 근거일 뿐 품목명이나 집계 키로 사용하지 않는다.
+9. 화면의 주 라벨은 사람이 이해하기 쉬운 ② `itemName`(예: `사과`), 검색·집계 근거는
+   `noticeName + niceClass`(예: `신선한 사과 + 31류`)로 분리해 함께 표시한다.
 
 ## 2. 화면 구성과 지표 정의
 
@@ -60,8 +64,12 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 ### 2.3 지역·품목 상세
 
 - 원본 품목명, 표준 품목명, 고시명칭, NICE류
+- 제목: `안동시 / 사과`; 건수: `사과 관련 상표 출원 N건`; 근거: `고시명칭 신선한 사과 · NICE 31류`
 - 고유 상표 수, 등록률, 상태 분포, 연도별 추이
 - 최근 상표명·출원번호·출원일·상태
+- 상표명(예: `사과애`)은 대표 특산품명을 대체하지 않고 `관련 출원 상표 사례` 목록에 표시한다.
+- 각 상표 사례에는 가능한 경우 지정상품 매칭 방식과 근거 명칭을 붙인다. `normalized_exact`만
+  확정, `normalized_contains|class_only`는 검토 후보, 미보강은 `unverified`로 표시한다.
 - KIPRIS 키워드 전체 건수와 실제 저장 hit 건수의 분리 표시
 - 지정상품 대조 결과: `normalized_exact|normalized_contains|class_only|mismatch|unverified` (#12)
 - 출원인 주소 판정: `inside|outside|unverified` (#11)
@@ -148,23 +156,23 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 `molit-legal-dong-20260703`, `specialty-id-v1-notice-class-sha256`으로 남긴다. 상위 단계에서
 안정 ID를 직접 제공하게 되면 조용히 교체하지 않고 ID 버전을 올리고 이전 ID 매핑을 보존한다.
 
-**"품목"은 반드시 고시명칭(②의 `noticeName`) 기준이어야 하며, 상표명·브랜드명이 대신
-들어가면 안 된다.** 지역의 대표 특산품(예: "사과")을 보여줘야 할 자리에 특정 상표/브랜드
-이름(예: "데일리")이 나오면 안 된다는 뜻이다 — 사용자가 보고 싶은 것은 "이 지역의 사과가
-얼마나 출원됐는가"이지 "이 지역의 특정 상표 하나"가 아니다.
+`areaBrandLst`의 `brandName`은 이 결합 키에 절대 넣지 않는다. 해당 데이터는 출원번호 완전일치로
+KIPRIS hit에 검증 근거를 붙이는 용도이며, 대표 특산품 목록은 ① 수집 원본을 ② 고시명칭 사전으로
+정규화한 결과에서만 만든다.
 
-- 2026-08-11 실사례: `03-match-trademarks/buildAreaBrandValidationInput.js`는 지역브랜드
-  출원번호 조인 기능 자체를 검증하려고 고시명칭 정제 없이 브랜드명(`brand.brandName`)을
-  `itemName`으로 직접 써서 KIPRIS를 검색한다(`matchPurpose:
-  "regional_brand_application_join_validation"`). 이 CSV를 대시보드 샘플 생성에 그대로
-  재사용해서 "경상북도"의 대표 품목이 "데일리"(브랜드명)로 표시되는 문제가 있었다.
-- 대시보드용 샘플·운영 데이터는 반드시 ①(실제 특산물 수집) → ②(`normalizeItems.js`로
-  고시명칭 정제) → ③ → ④ → ⑤ → ⑥ → ⑦ 정식 경로로 생성해야 한다.
-  `buildAreaBrandValidationInput.js`의 출력은 지역브랜드 조인 기능 자체를 검증하는 용도로만
-  쓰고, 대시보드에 반영해선 안 된다.
-- `04-analyze-brand/lib/analyzer.js`가 `matchPurpose === "regional_brand_application_join_validation"`
-  이면서 `noticeName`이 없는 행을 감지하면 경고를 남긴다(고시명칭 정제 없이 섞였다는 뜻).
-  이 경고가 뜨면 입력을 다시 만들어야 한다.
+### 3.1.1 필요한 파일과 검토 산출물
+
+| 파일 | 역할 |
+|---|---|
+| `01-collect-specialties/output/*.csv` | 지역과 원 특산품명 원본. 지역브랜드 상표명 파일은 제외 |
+| `02-normalize-items/data/고시상품명칭_13판_2026.csv` | 특허청 고시상품명칭/NICE 13판(2026) 기준 사전 |
+| `02-normalize-items/output/normalized.csv` | `itemName`, `noticeName`, `niceClass`, 근거 버전을 가진 ③ 입력 |
+| `02-normalize-items/output/review-required.csv` | 정확 일치하지 않은 명칭의 사람 검토 큐 |
+| `03-match-trademarks/output/*.json` | 고시명칭 검색 결과와 상표명 hit 사례 |
+| `04-analyze-brand/output/*.json` | 지역×고시명칭·NICE류 집계 |
+
+운영 파일명은 실행별로 달라질 수 있지만 필드 계약은 유지한다. 고시명칭이나 NICE류가 비어 있는
+행은 ③ 호출 및 ⑦ 스냅샷 생성에서 차단한다.
 
 ### 3.2 각 지표 공통 메타데이터
 
@@ -205,7 +213,7 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 | 농사로 지역브랜드 연관성 | 구현됨 | 출원인 주소와 분리 표시 |
 | ⑤ 브랜드 공백 점수 | 예시 기준 | `preview` 및 #29 표시 |
 | ⑥-1 고정 전략 | 구현됨 | 원문·evidence 표시 가능 |
-| ⑦ 통합 스냅샷 | 샘플 어댑터 구현됨 | UI 입력 가능. 지도 경계는 `blocked` |
+| ⑦ 통합 스냅샷 | 샘플 어댑터·웹 구현됨 | 참고 경계 지도는 표시, 운영 경계·공백 점수 모드는 `blocked` |
 | 출원인 주소 | 등록원부 3건 보강 구현, #11 진행 | 검증률 100% 버킷만 사용, 나머지 비활성화 |
 | 지정상품 상세 | 등록원부 3건 보강 구현, #12 기준 진행 | exact만 확정 근거, contains/class-only 후보 경고 |
 | GI 과거 전체 | #22 진행 | 전체 커버리지로 표현 금지 |
@@ -216,6 +224,11 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 
 현재 목업은 `southkorea-maps`의 2013년 KOSTAT 경계를 사용하고 표시명만 현재 파이프라인 명칭으로
 보정한다. 실제 서비스에서는 다음을 충족하는 별도 버전 관리가 필요하다.
+
+웹 UI와 단일 HTML은 이 경계를 `reference_only`로 명시해 전국 지도 틀과 시도→시군구 탐색에
+사용한다. 현재 샘플이 존재하는 지역에만 상표 건수·등록률·수집 범위 색상을 표시하고, 나머지는
+0건이 아닌 `데이터 없음`으로 둔다. 현재 경계와 ⑤ 점수가 모두 준비되기 전까지 브랜드 공백
+색상 모드는 비활성화한다.
 
 - 현재 행정구역 코드와 경계가 일치하는 공식 또는 이용허락 가능한 GeoJSON
 - `geographyVersion`, 제공기관, 원본 URL, 다운로드일
