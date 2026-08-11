@@ -160,10 +160,12 @@ function makeBatchQuery(row) {
   }
 
   const region = [row.sido, row.sigungu].filter(Boolean).join(" ").trim();
-  const item = (row.noticeName || row.itemName || row.rawItemName || "").trim();
+  // 분석 검색어는 상표명이나 원문 품목명이 아니라 ②에서 확정한 고시상품명칭만 쓴다.
+  const item = String(row.noticeName || "").trim();
   if (!region) return { skipReason: "지역 정보 없음" };
-  if (!item) return { skipReason: "검색 품목 없음" };
-  return { region, item, classCode: row.niceClass || null };
+  if (!item) return { skipReason: "② 단계 고시명칭 미확정" };
+  if (!String(row.niceClass || "").trim()) return { skipReason: "② 단계 NICE류 미확정" };
+  return { region, item, classCode: row.niceClass };
 }
 
 function countSearchableRows(rows) {
@@ -221,6 +223,7 @@ function buildBatchPlan(rows) {
       inputIndex,
       queryKey: makeSearchKey(query),
       query,
+      input: row,
       source: row.source || null,
       provenance: sourceProvenance(row),
     };
@@ -493,6 +496,7 @@ async function runBatch(rows, client, options) {
     const group = byKey.get(entry.queryKey);
     const mapped = {
       inputIndex: entry.inputIndex,
+      input: entry.input,
       source: entry.source,
       provenance: entry.provenance,
       queryKey: entry.queryKey,

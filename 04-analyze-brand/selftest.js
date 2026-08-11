@@ -48,8 +48,9 @@ const input = [
     sido: "경상북도",
     sigungu: "안동시",
     itemName: "사과",
+    noticeName: "신선한 사과",
     niceClass: "31",
-    query: { region: "경상북도 안동시", searchString: "사과" },
+    query: { region: "경상북도 안동시", searchString: "신선한 사과" },
     error: "테스트 오류",
   },
   {
@@ -169,9 +170,8 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   const skippedRow = r.regionItems.find(
     (row) => row.region === "경상북도 안동시" && row.itemName === "하회탈"
   );
-  assert.ok(skippedRow, "skipped 행도 input의 실제 지역·품목으로 버킷팅되어야 함");
-  assert.strictEqual(skippedRow.skippedQueryCount, 1);
-  assert.strictEqual(skippedRow.successfulQueryCount, 0);
+  assert.strictEqual(skippedRow, undefined, "고시명칭 미확정 행은 지역×특산품 집계에 노출하면 안 됨");
+  assert.strictEqual(r.exclusions.unresolvedNoticeNameCount, 1);
 
   assert.ok(
     r.warnings.some((w) => w.includes("검토대기·제외")),
@@ -231,7 +231,8 @@ console.log("5) ①단계 source(지리적표시/농사로/샘플) 집계 전파
   const boseongTea = r.regionItems.find((row) => row.region === "전라남도 보성군");
   assert.deepStrictEqual(boseongTea.sources, ["농사로"], "검색 자체가 오류난 행도 출처는 유실되지 않음");
   const andongTree = r.regionItems.find((row) => row.itemName === "사과나무");
-  assert.deepStrictEqual(andongTree.sources, ["샘플"], "skipped 행은 input.source에서 읽어야 함");
+  assert.strictEqual(andongTree, undefined, "분석 제외 품목을 집계 차원에 만들면 안 됨");
+  assert.ok(r.summary.skippedQueryCount > 0, "제외 행은 운영 요약에는 남아야 함");
   assert.strictEqual(r.schemaVersion, "1.3");
   ok("regionItems/regions/items 각 버킷에 distinct 수집출처 목록이 담김");
 }
@@ -275,6 +276,27 @@ console.log("6) 농사로 지역브랜드 조인 신호 — 출원인 주소 지
   assert.strictEqual(row.localApplicantShare, null, "지역브랜드 연관성을 출원인 주소로 간주하면 안 됨");
   assert.ok(r.warnings.some((warning) => warning.includes("출원인 주소 근거가 아닙니다")));
   ok("출원번호 지역브랜드 연관성은 별도 지표로 집계되고 localApplicantShare를 오염시키지 않음");
+}
+
+console.log("6-1) 지역브랜드명은 특산품 집계 차원에서 제외");
+{
+  const r = analyzeEntries([{
+    status: "ok",
+    input: {
+      sido: "전라남도",
+      sigungu: "나주시",
+      rawItemName: "배",
+      itemName: "상큼愛",
+      matchPurpose: "regional_brand_application_join_validation",
+    },
+    provenance: { matchPurpose: "regional_brand_application_join_validation" },
+    query: { region: "전라남도 나주시", item: "상큼愛" },
+    hits: [hit("40-9", "상큼愛", "20250101", "등록", "unverified")],
+  }], { asOfYear: 2026 });
+  assert.strictEqual(r.regionItems.length, 0);
+  assert.strictEqual(r.exclusions.validationOnlyExcludedCount, 1);
+  assert.ok(r.warnings.some((warning) => warning.includes("출원번호 대조 전용")));
+  ok("상표·브랜드명은 개별 검증 근거일 뿐 특산품명이나 집계 키가 아님");
 }
 
 console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");

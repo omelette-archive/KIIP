@@ -98,12 +98,16 @@ function entryDimensions(entry) {
   const sigungu = clean(entry.sigungu) || clean(input.sigungu) || regionParts.slice(1).join(" ");
   const region =
     queryRegion || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
-  const itemName =
-    clean(entry.itemName) ||
+  const noticeName =
+    clean(entry.noticeName) ||
+    clean(input.noticeName) ||
     clean(query.item) ||
     clean(query.searchString) ||
-    clean(input.noticeName) ||
+    null;
+  const itemName =
     clean(input.itemName) ||
+    clean(entry.itemName) ||
+    noticeName ||
     clean(input.rawItemName) ||
     "미지정 품목";
   return {
@@ -111,9 +115,13 @@ function entryDimensions(entry) {
     sigungu,
     region,
     itemName,
-    noticeName: clean(entry.noticeName) || clean(input.noticeName) || null,
+    noticeName,
     niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
   };
+}
+
+function matchPurpose(entry) {
+  return clean(entry.provenance?.matchPurpose) || clean(entry.input?.matchPurpose);
 }
 
 // ③단계 신 계약은 전체 건수를 keywordTotalCount로 준다(구 계약/다른 소스 대비 totalCount·
@@ -376,11 +384,23 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
+  const unresolvedBucket = createBucket({});
+  let validationOnlyExcludedCount = 0;
+  let unresolvedNoticeNameCount = 0;
 
   for (const entry of entries) {
     if (!entry || typeof entry !== "object") continue;
+    if (matchPurpose(entry) === "regional_brand_application_join_validation") {
+      validationOnlyExcludedCount++;
+      continue;
+    }
     const dimensions = entryDimensions(entry);
-    const key = [dimensions.region, dimensions.itemName, dimensions.niceClass || ""].join("\u001f");
+    if (!dimensions.noticeName) {
+      unresolvedNoticeNameCount++;
+      addEntry(unresolvedBucket, entry);
+      continue;
+    }
+    const key = [dimensions.region, dimensions.noticeName, dimensions.niceClass || ""].join("\u001f");
     if (!regionItemBuckets.has(key)) regionItemBuckets.set(key, createBucket(dimensions));
     addEntry(regionItemBuckets.get(key), entry);
   }
@@ -398,11 +418,12 @@ function analyzeEntries(parsed, providedOptions = {}) {
       value: { sido: bucket.sido, sigungu: bucket.sigungu, region: bucket.region },
     }, bucket);
     combinedBucket(itemBuckets, {
-      groupKey: `${bucket.itemName}\u001f${bucket.niceClass || ""}`,
+      groupKey: `${bucket.noticeName}\u001f${bucket.niceClass || ""}`,
       value: { itemName: bucket.itemName, noticeName: bucket.noticeName, niceClass: bucket.niceClass },
     }, bucket);
     mergeBucket(summaryBucket, bucket);
   }
+  mergeBucket(summaryBucket, unresolvedBucket);
 
   const finalizeAll = (buckets) => sortAggregates([...buckets.values()].map((b) => finalizeBucket(b, options)));
   const summary = finalizeBucket(summaryBucket, options);
@@ -410,6 +431,16 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
   const warnings = [];
+  if (validationOnlyExcludedCount > 0) {
+    warnings.push(
+      `${validationOnlyExcludedCount}개 농사로 지역브랜드 검증 행은 출원번호 대조 전용이므로 특산품 집계에서 제외했습니다.`
+    );
+  }
+  if (unresolvedNoticeNameCount > 0) {
+    warnings.push(
+      `${unresolvedNoticeNameCount}개 행은 ② 고시명칭이 확정되지 않아 지역×특산품 집계에서 제외했습니다.`
+    );
+  }
   if (summary.erroredQueryCount > 0) {
     warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
   }
@@ -465,6 +496,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
       ].filter(Boolean),
     },
     methodology: {
+      analysisUnit: "지역 × ② 표준 특산품명(표시) × 고시상품명칭·NICE류(집계 키)",
+      trademarkTitlePolicy: "상표명은 개별 hit 근거로만 보존하며 품목명·집계 키로 사용하지 않음",
+      regionalBrandValidationPolicy: "농사로 areaBrandLst는 출원번호 검증 전용이며 특산품 마스터·집계 입력에서 제외",
       trademarkCountBasis: "03단계가 저장한 hit를 출원번호 우선 키로 중복 제거",
       partialCollectionPolicy: "partial hit도 포함하되 경고와 partialQueryCount를 함께 제공",
       applicantRegionMetric: "출원인 주소 근거만 localApplicantShare에 사용",
@@ -483,6 +517,10 @@ function analyzeEntries(parsed, providedOptions = {}) {
       recentYears,
       recentPeriodExcludesCurrentYear: true,
       maxRecentBrands,
+    },
+    exclusions: {
+      validationOnlyExcludedCount,
+      unresolvedNoticeNameCount,
     },
     warnings,
     summary,

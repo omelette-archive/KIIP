@@ -19,6 +19,10 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 5. 예시 점수와 승인된 정책 기준을 구분하고 `scoreVersion`을 화면에 표시한다.
 6. 모든 카드·지도·표는 기준일, 출처, 규칙 버전, 표본 범위를 역추적할 수 있어야 한다.
 7. 샘플 실행은 항상 `sample` 배지를 표시하고 전국 통계·정책 결론으로 표현하지 않는다.
+8. 분석 단위는 `지역 × 표준 특산품 × 고시상품명칭·NICE류`다. `사과애`, `상큼愛` 같은
+   상표·지역브랜드명은 개별 hit 근거일 뿐 품목명이나 집계 키로 사용하지 않는다.
+9. 화면의 주 라벨은 사람이 이해하기 쉬운 ② `itemName`(예: `사과`), 검색·집계 근거는
+   `noticeName + niceClass`(예: `신선한 사과 + 31류`)로 분리해 함께 표시한다.
 
 ## 2. 화면 구성과 지표 정의
 
@@ -60,6 +64,7 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 ### 2.3 지역·품목 상세
 
 - 원본 품목명, 표준 품목명, 고시명칭, NICE류
+- 제목: `안동시의 사과`; 건수: `사과 관련 상표 출원 N건`; 근거: `고시명칭 신선한 사과 · NICE 31류`
 - 고유 상표 수, 등록률, 상태 분포, 연도별 추이
 - 최근 상표명·출원번호·출원일·상태
 - KIPRIS 키워드 전체 건수와 실제 저장 hit 건수의 분리 표시
@@ -147,6 +152,24 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 `고시명칭 + NICE류` 조합의 SHA-256 축약값을 `specialtyId`로 만든다. 버전은 각각
 `molit-legal-dong-20260703`, `specialty-id-v1-notice-class-sha256`으로 남긴다. 상위 단계에서
 안정 ID를 직접 제공하게 되면 조용히 교체하지 않고 ID 버전을 올리고 이전 ID 매핑을 보존한다.
+
+`areaBrandLst`의 `brandName`은 이 결합 키에 절대 넣지 않는다. 해당 데이터는 출원번호 완전일치로
+KIPRIS hit에 검증 근거를 붙이는 용도이며, 대표 특산품 목록은 ① 수집 원본을 ② 고시명칭 사전으로
+정규화한 결과에서만 만든다.
+
+### 3.1.1 필요한 파일과 검토 산출물
+
+| 파일 | 역할 |
+|---|---|
+| `01-collect-specialties/output/*.csv` | 지역과 원 특산품명 원본. 지역브랜드 상표명 파일은 제외 |
+| `02-normalize-items/data/고시상품명칭_13판_2026.csv` | 특허청 고시상품명칭/NICE 13판(2026) 기준 사전 |
+| `02-normalize-items/output/normalized.csv` | `itemName`, `noticeName`, `niceClass`, 근거 버전을 가진 ③ 입력 |
+| `02-normalize-items/output/review-required.csv` | 정확 일치하지 않은 명칭의 사람 검토 큐 |
+| `03-match-trademarks/output/*.json` | 고시명칭 검색 결과와 상표명 hit 사례 |
+| `04-analyze-brand/output/*.json` | 지역×고시명칭·NICE류 집계 |
+
+운영 파일명은 실행별로 달라질 수 있지만 필드 계약은 유지한다. 고시명칭이나 NICE류가 비어 있는
+행은 ③ 호출 및 ⑦ 스냅샷 생성에서 차단한다.
 
 ### 3.2 각 지표 공통 메타데이터
 

@@ -58,28 +58,28 @@ node 03-match-trademarks/matchTrademarks.js \
 `--max-hits-per-query`, `--checkpoint`, `--resume`, `--dry-run`, `--area-brands`,
 `--enrich-registry`, `--max-registry-requests`, `--registry-concurrency`다.
 
-## 농사로 지역브랜드 3건 E2E
+## 농사로 지역브랜드 3건 검증자료
 
 ```bash
 node 03-match-trademarks/fetchAreaBrands.js \
   --limit 3 \
   --out 03-match-trademarks/output/area-brand-sample.json
 
-node 03-match-trademarks/buildAreaBrandValidationInput.js \
-  --input 03-match-trademarks/output/area-brand-sample.json \
-  --limit 3 \
-  --out 03-match-trademarks/output/area-brand-validation-input.csv
-
 node 03-match-trademarks/matchTrademarks.js \
-  --input 03-match-trademarks/output/area-brand-validation-input.csv \
+  --input 02-normalize-items/output/sample-normalized.csv \
   --area-brands 03-match-trademarks/output/area-brand-sample.json \
   --numOfRows 100 --max-pages 1 --max-hits-per-query 100 --max-requests 3 \
-  --out 03-match-trademarks/output/area-brand-validation-result.json
+  --out 03-match-trademarks/output/specialty-search-with-area-brand.json
 ```
 
-2026-08-10 실키 검증 결과: 입력 3건, 요청 성공 3건, 오류 0건, 출원번호 조인 3건,
+`--input`은 반드시 ① 특산품을 ② 고시명칭으로 정규화한 CSV다. `areaBrandLst.brandName`을
+검색어로 쓰지 않는다. `buildAreaBrandValidationInput.js`는 필요하면 지역브랜드 원문의 지역·주요품목·
+브랜드명을 검토하는 `validation_only` 감사표를 만들 뿐, 그 CSV는 분석 검색 입력이 아니다.
+
+2026-08-10 과거 연결 검증 결과: 입력 3건, 요청 성공 3건, 오류 0건, 출원번호 조인 3건,
 `regionalBrandMatch=inside` 3건이었다. 쿼리 1건은 첫 페이지 상한 때문에 `partial`이며 데이터
-오류가 아니다. 이 소량 결과는 연결 가능성 검증용이며 농사로 전체 602건 결과를 대표하지 않는다.
+오류가 아니다. 당시 브랜드명 검색 산출물은 연결 가능성 확인용으로만 보존하며 특산품 통계나
+대시보드에는 사용하지 않는다.
 
 ## 등록원부 3건 보강
 
@@ -117,7 +117,7 @@ node 03-match-trademarks/enrichIpRegistry.js \
 03-match-trademarks/
 ├── matchTrademarks.js               KIPRIS 단건·배치 및 선택적 지역브랜드 조인
 ├── fetchAreaBrands.js               농사로 지역브랜드 소량 수집
-├── buildAreaBrandValidationInput.js 별도 검증자료를 ③ 입력 CSV로 변환
+├── buildAreaBrandValidationInput.js 별도 검증자료의 validation_only 감사 CSV 생성
 ├── enrichIpRegistry.js              등록번호 기반 주소·지정상품 소량 보강
 ├── lib/areaBrandClient.js           농사로 XML·페이지·계약 메타데이터
 ├── lib/areaBrandEnricher.js         행정구역 정규화·출원번호 완전일치 조인

@@ -49,11 +49,13 @@ function main() {
       sido: matched ? region.sido : "",
       sigungu: matched ? region.sigungu : brand.regionName,
       rawItemName: brand.primaryProductName,
-      itemName: brand.brandName,
+      itemName: brand.primaryProductName,
+      brandName: brand.brandName,
       noticeName: "",
       niceClass: "",
-      excluded: "false",
-      status: matched ? "ok" : "review_required",
+      excluded: "true",
+      status: "validation_only",
+      analysisEligible: "false",
       source: "농사로 지역브랜드검증",
       sourceId: document.metadata.sourceId,
       sourceContractVersion: document.metadata.contractVersion,
@@ -63,11 +65,13 @@ function main() {
       sourceApplicationNumber: brand.applicationNumber,
       normalizationVersion: "area-brand-region-normalization-v1",
       matchPurpose: "regional_brand_application_join_validation",
-      reviewReason: matched ? "" : `지역 정규화 ${region.status}: ${region.reason}`,
+      reviewReason: matched
+        ? "지역브랜드 출원번호 검증자료이며 특산품 고시명칭 집계 입력이 아님"
+        : `지역 정규화 ${region.status}: ${region.reason}`,
     };
   });
   const fields = [
-    "sido", "sigungu", "rawItemName", "itemName", "noticeName", "niceClass", "excluded", "status",
+    "sido", "sigungu", "rawItemName", "itemName", "brandName", "noticeName", "niceClass", "excluded", "status", "analysisEligible",
     "source", "sourceId", "sourceContractVersion", "sourceFetchedAt", "sourceUrl", "sourceContentId",
     "sourceApplicationNumber", "normalizationVersion", "matchPurpose", "reviewReason",
   ];
@@ -75,7 +79,7 @@ function main() {
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, "﻿" + lines.join("\n") + "\n", "utf8");
   console.error(
-    `[buildAreaBrandValidationInput] rows=${rows.length}, ok=${rows.filter((row) => row.status === "ok").length}, review=${rows.filter((row) => row.status !== "ok").length} -> ${outPath}`
+    `[buildAreaBrandValidationInput] rows=${rows.length}, validationOnly=${rows.length} -> ${outPath}`
   );
 }
 

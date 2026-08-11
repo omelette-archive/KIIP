@@ -1,16 +1,16 @@
 {
   "schemaVersion": "dashboard-snapshot-v1",
-  "snapshotId": "dashboard-7c4edf80c008201741c9",
-  "generatedAt": "2026-08-11T00:56:00.071Z",
+  "snapshotId": "dashboard-751956174ab2c74d350c",
+  "generatedAt": "2026-08-11T02:06:37.866Z",
   "mode": "sample",
   "asOf": {
     "sourceMinFetchedAt": "2026-08-06",
-    "sourceMaxFetchedAt": "2026-08-11T00:22:04.010Z",
-    "analysisGeneratedAt": "2026-08-11T00:25:25.974Z"
+    "sourceMaxFetchedAt": "2026-08-10T06:25:44.575Z",
+    "analysisGeneratedAt": "2026-08-11T02:06:37.580Z"
   },
   "versions": {
     "analysisVersion": "brand-analysis-v3-ip-registry-evidence",
-    "scoreVersion": "gap-score-v0-example",
+    "scoreVersion": "gap-score-v1-representative-gi-or-count3",
     "templateVersion": "strategy-template-v0-example",
     "dashboardContractVersion": "dashboard-data-contract-v0-draft",
     "regionCodeVersion": "molit-legal-dong-20260703",
@@ -19,10 +19,10 @@
   },
   "coverage": {
     "targetRegionCount": null,
-    "observedRegionCount": 3,
+    "observedRegionCount": 1,
     "regionItemCount": 3,
-    "completeQueryCount": 2,
-    "partialQueryCount": 1,
+    "completeQueryCount": 0,
+    "partialQueryCount": 3,
     "errorQueryCount": 0,
     "skippedQueryCount": 0
   },
@@ -42,26 +42,17 @@
       "idOrigin": "source_registry"
     },
     {
-      "sourceId": "ip_registry",
-      "sourceLabel": "등록원부 실시간 정보 조회 서비스",
-      "sourceContractVersion": "ip-registry-mark-history-v1",
-      "sourceFetchedAt": "2026-08-11T00:22:04.010Z",
-      "sourceUrl": "https://www.data.go.kr/data/15124946/openapi.do",
-      "sourceLastVerifiedAt": "2026-08-11",
-      "idOrigin": "upstream"
-    },
-    {
       "sourceId": "kipris_trademark",
       "sourceLabel": "상표 단어검색",
       "sourceContractVersion": "kipris-trademark-word-search-v1",
-      "sourceFetchedAt": "2026-08-10T07:39:41.209Z",
+      "sourceFetchedAt": "2026-08-10T06:25:44.575Z",
       "sourceUrl": "https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSearch",
       "sourceLastVerifiedAt": "2026-08-10",
       "idOrigin": "upstream"
     },
     {
-      "sourceId": "label-1e1386ec3cb1",
-      "sourceLabel": "농사로 지역브랜드검증",
+      "sourceId": "label-ee12f051eaf0",
+      "sourceLabel": "농사로",
       "sourceContractVersion": null,
       "sourceFetchedAt": null,
       "sourceUrl": null,
@@ -69,26 +60,23 @@
       "idOrigin": "derived_from_label"
     },
     {
-      "sourceId": "nongsaro_area_brand",
-      "sourceLabel": "농사로 지역브랜드검증",
-      "sourceContractVersion": "nongsaro-area-brand-v1",
-      "sourceFetchedAt": "2026-08-10T07:39:40.262Z",
-      "sourceUrl": "https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344",
+      "sourceId": "nongsaro",
+      "sourceLabel": "농사로",
+      "sourceContractVersion": "localSpcprd-contract-v1",
+      "sourceFetchedAt": null,
+      "sourceUrl": "https://www.data.go.kr/data/15101361/openapi.do",
       "sourceLastVerifiedAt": "2026-08-10",
       "idOrigin": "upstream"
     }
   ],
   "warnings": [
-    "1개 검색은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.",
+    "3개 검색은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.",
     "출원인 주소 기반 지역 매칭이 끝나지 않은 상표가 있어 지역 내·외 비중은 검증된 건만 기준으로 계산했습니다.",
-    "농사로 지역브랜드 출원번호 조인은 등록된 지역브랜드 연관성 검증 신호이며 출원인 주소 근거가 아닙니다. localApplicantShare에는 포함하지 않았습니다.",
-    "등록원부 보강이 partial 상태입니다(완료 3, 오류 0, 미수집 10).",
-    "3개 상표는 지정상품 normalized_contains/class_only 검토 후보이며 #12 기준 확정 전 확정 매칭으로 해석하면 안 됩니다.",
     "건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.",
-    "대표 특산품 판정 기준과 활용도 가중치는 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
-    "지역 내·외 출원 비중(localApplicantShare)은 ③단계 주소 매칭이 검증되기 전까지 점수에 쓰지 않는다 — regionMatchVerified는 참고용 메타데이터일 뿐이다.",
+    "대표 특산품 판정 기준(GI 출처 또는 상표 출원 3건 이상)은 #29에서 확정됐지만, 활용도 포화 건수·가중치는 아직 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
+    "지역 내·외 출원 비중(localApplicantShare)은 ③단계 --enrich-registry로 검증된 값만 신뢰할 수 있다 — 미실행 입력은 대부분 unverified다. regionMatchVerified는 참고용 메타데이터일 뿐 점수에는 아직 쓰지 않는다.",
     "지정상품 normalized_contains/class_only 후보는 #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않는다.",
-    "3개 지역×품목은 대표 특산품 판정 기준을 충족하지 않아 순위에서 제외됨.",
+    "2개 지역×품목은 대표 특산품 판정 기준을 충족하지 않아 순위에서 제외됨.",
     "문장 임계값(공백 경고 기준, 지역 외 비중 경고 기준)은 예시값이다(templateVersion 참고) — 실제 기준 확정 후 06-generate-business-strategy/lib/templates.js만 교체하면 된다.",
     "AI 검토(⑥-2)를 거치지 않은 고정 템플릿 초안이다. 문장은 evidence 필드의 수치에서만 만들어지며 그 밖의 사실을 추가하지 않는다.",
     "샘플 실행 결과이며 전국 모집단 통계나 정책 결론으로 해석하면 안 됩니다.",
@@ -97,62 +85,63 @@
   ],
   "regions": [
     {
-      "regionCode": "4700000000",
+      "regionCode": "4776000000",
       "regionCodeStatus": "resolved",
       "sido": "경상북도",
-      "sigungu": null,
-      "region": "경상북도",
+      "sigungu": "영양군",
+      "region": "경상북도 영양군",
       "items": [
         {
-          "specialtyId": "sp-v1-bc0ed7a1bea387de",
+          "specialtyId": "sp-v1-4debfa8c194c8caf",
           "specialtyIdStatus": "resolved",
-          "itemName": "데일리",
-          "noticeName": null,
-          "niceClass": null,
+          "itemName": "사과",
+          "noticeName": "신선한 사과",
+          "niceClass": "31",
+          "matchingBasis": "notice_name_and_nice_class",
           "dataState": "partial",
           "sources": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
+            "label-ee12f051eaf0",
+            "nongsaro"
           ],
           "metrics": {
             "uniqueTrademarkCount": {
-              "value": 16,
+              "value": 3,
               "availability": "available",
               "status": "partial",
               "sourceIds": [
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
               "blockingIssue": null
             },
             "registeredTrademarkCount": {
-              "value": 8,
+              "value": 1,
               "availability": "available",
               "status": "partial",
               "sourceIds": [
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "④ statusCounts.registered",
               "blockingIssue": null
             },
             "registrationRate": {
-              "value": 0.5,
+              "value": 0.3333,
               "availability": "available",
               "status": "partial",
               "sourceIds": [
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "registered / uniqueTrademarkCount",
               "blockingIssue": null
@@ -162,56 +151,210 @@
               "availability": "blocked",
               "status": "partial",
               "sourceIds": [
-                "ip_registry",
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "출원인 주소가 검증된 hit만 사용",
               "blockingIssue": "#11"
             },
             "regionalBrandInsideShare": {
-              "value": 1,
-              "availability": "available",
+              "value": null,
+              "availability": "blocked",
               "status": "partial",
               "sourceIds": [
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "brand-analysis-v3-ip-registry-evidence",
               "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
               "blockingIssue": null
             },
             "confirmedGoodsMatchCount": {
               "value": 0,
-              "availability": "preview",
+              "availability": "blocked",
               "status": "partial",
               "sourceIds": [
-                "ip_registry",
                 "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
               "blockingIssue": "#12"
             },
             "goodsReviewCandidateCount": {
-              "value": 1,
+              "value": 0,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "ip-registry-designated-goods-v0-review",
+              "rationale": "normalized_contains 또는 class_only 후보",
+              "blockingIssue": "#12"
+            },
+            "gapScore": {
+              "value": 0.48,
               "availability": "preview",
               "status": "partial",
               "sourceIds": [
-                "ip_registry",
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
+              "calculatedAt": "2026-08-11T02:06:37.663Z",
+              "methodVersion": "gap-score-v1-representative-gi-or-count3",
+              "rationale": "⑤ 예시 점수 기준",
+              "blockingIssue": "#29"
+            }
+          },
+          "briefing": {
+            "templateVersion": "strategy-template-v0-example",
+            "isGapAlert": false,
+            "sentences": [
+              "경상북도 영양군은 대표 특산품(신선한 사과)의 상표 활용도가 비교적 양호함(고유 상표 3건, 등록률 33%).",
+              "경상북도 영양군의 지역 내·외 출원 비중은 출원인 주소 매칭이 검증되지 않아 이번 초안에서는 판단하지 않음."
+            ],
+            "evidence": {
+              "uniqueTrademarkCount": 3,
+              "registrationRate": 0.3333,
+              "localApplicantShare": null,
+              "regionMatchVerified": false,
+              "collectionPartial": true,
+              "scoreInputs": {
+                "uniqueTrademarkCount": 3,
+                "registrationRate": 0.3333,
+                "activityScore": 0.6,
+                "registrationScore": 0.3333
+              },
+              "sourceProvenance": [
+                {
+                  "sourceLabel": "농사로",
+                  "sourceId": "nongsaro",
+                  "sourceContractVersion": "localSpcprd-contract-v1",
+                  "sourceUrl": "https://www.data.go.kr/data/15101361/openapi.do",
+                  "sourceLastVerifiedAt": "2026-08-10"
+                }
+              ]
+            },
+            "aiReviewApplied": false
+          }
+        },
+        {
+          "specialtyId": "sp-v1-3f58f6631c556a58",
+          "specialtyIdStatus": "resolved",
+          "itemName": "배",
+          "noticeName": "신선한 배",
+          "niceClass": "31",
+          "matchingBasis": "notice_name_and_nice_class",
+          "dataState": "partial",
+          "sources": [
+            "label-ee12f051eaf0",
+            "nongsaro"
+          ],
+          "metrics": {
+            "uniqueTrademarkCount": {
+              "value": 2,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
+              "blockingIssue": null
+            },
+            "registeredTrademarkCount": {
+              "value": 0,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "④ statusCounts.registered",
+              "blockingIssue": null
+            },
+            "registrationRate": {
+              "value": 0,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "registered / uniqueTrademarkCount",
+              "blockingIssue": null
+            },
+            "localApplicantShare": {
+              "value": null,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "출원인 주소가 검증된 hit만 사용",
+              "blockingIssue": "#11"
+            },
+            "regionalBrandInsideShare": {
+              "value": null,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
+              "blockingIssue": null
+            },
+            "confirmedGoodsMatchCount": {
+              "value": 0,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "ip-registry-designated-goods-v0-review",
+              "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
+              "blockingIssue": "#12"
+            },
+            "goodsReviewCandidateCount": {
+              "value": 0,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
               "methodVersion": "ip-registry-designated-goods-v0-review",
               "rationale": "normalized_contains 또는 class_only 후보",
               "blockingIssue": "#12"
@@ -221,12 +364,139 @@
               "availability": "blocked",
               "status": "partial",
               "sourceIds": [
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
+                "label-ee12f051eaf0",
+                "nongsaro"
               ],
-              "calculatedAt": "2026-08-11T00:25:26.052Z",
-              "methodVersion": "gap-score-v0-example",
-              "rationale": "대표 특산품 판정 기준(예시: 지리적표시 등록)을 충족하지 않음",
+              "calculatedAt": "2026-08-11T02:06:37.663Z",
+              "methodVersion": "gap-score-v1-representative-gi-or-count3",
+              "rationale": "대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 3건 이상)을 충족하지 않음",
+              "blockingIssue": "#29"
+            }
+          },
+          "briefing": null
+        },
+        {
+          "specialtyId": "sp-v1-52ab3589aa2f58bf",
+          "specialtyIdStatus": "resolved",
+          "itemName": "복숭아",
+          "noticeName": "신선한 복숭아",
+          "niceClass": "31",
+          "matchingBasis": "notice_name_and_nice_class",
+          "dataState": "partial",
+          "sources": [
+            "label-ee12f051eaf0",
+            "nongsaro"
+          ],
+          "metrics": {
+            "uniqueTrademarkCount": {
+              "value": 2,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
+              "blockingIssue": null
+            },
+            "registeredTrademarkCount": {
+              "value": 0,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "④ statusCounts.registered",
+              "blockingIssue": null
+            },
+            "registrationRate": {
+              "value": 0,
+              "availability": "available",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "registered / uniqueTrademarkCount",
+              "blockingIssue": null
+            },
+            "localApplicantShare": {
+              "value": null,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "출원인 주소가 검증된 hit만 사용",
+              "blockingIssue": "#11"
+            },
+            "regionalBrandInsideShare": {
+              "value": null,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
+              "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
+              "blockingIssue": null
+            },
+            "confirmedGoodsMatchCount": {
+              "value": 0,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "ip-registry-designated-goods-v0-review",
+              "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
+              "blockingIssue": "#12"
+            },
+            "goodsReviewCandidateCount": {
+              "value": 0,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "kipris_trademark",
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.580Z",
+              "methodVersion": "ip-registry-designated-goods-v0-review",
+              "rationale": "normalized_contains 또는 class_only 후보",
+              "blockingIssue": "#12"
+            },
+            "gapScore": {
+              "value": null,
+              "availability": "blocked",
+              "status": "partial",
+              "sourceIds": [
+                "label-ee12f051eaf0",
+                "nongsaro"
+              ],
+              "calculatedAt": "2026-08-11T02:06:37.663Z",
+              "methodVersion": "gap-score-v1-representative-gi-or-count3",
+              "rationale": "대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 3건 이상)을 충족하지 않음",
               "blockingIssue": "#29"
             }
           },
@@ -236,397 +506,40 @@
       "dataState": "partial",
       "metrics": {
         "uniqueTrademarkCount": {
-          "value": 16,
+          "value": 7,
           "availability": "available",
           "status": "partial",
           "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
+            "label-ee12f051eaf0",
+            "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
+          "calculatedAt": "2026-08-11T02:06:37.580Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
         },
         "registeredTrademarkCount": {
-          "value": 8,
-          "availability": "available",
-          "status": "partial",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        },
-        "registrationRate": {
-          "value": 0.5,
-          "availability": "available",
-          "status": "partial",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        }
-      }
-    },
-    {
-      "regionCode": "4719000000",
-      "regionCodeStatus": "resolved",
-      "sido": "경상북도",
-      "sigungu": "구미시",
-      "region": "경상북도 구미시",
-      "items": [
-        {
-          "specialtyId": "sp-v1-62e0f82896320fd8",
-          "specialtyIdStatus": "resolved",
-          "itemName": "일선정품",
-          "noticeName": null,
-          "niceClass": null,
-          "dataState": "complete_nonzero",
-          "sources": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "metrics": {
-            "uniqueTrademarkCount": {
-              "value": 2,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
-              "blockingIssue": null
-            },
-            "registeredTrademarkCount": {
-              "value": 2,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "④ statusCounts.registered",
-              "blockingIssue": null
-            },
-            "registrationRate": {
-              "value": 1,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "registered / uniqueTrademarkCount",
-              "blockingIssue": null
-            },
-            "localApplicantShare": {
-              "value": 1,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "ip_registry",
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "출원인 주소가 검증된 hit만 사용",
-              "blockingIssue": null
-            },
-            "regionalBrandInsideShare": {
-              "value": 1,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
-              "blockingIssue": null
-            },
-            "confirmedGoodsMatchCount": {
-              "value": 0,
-              "availability": "preview",
-              "status": "complete",
-              "sourceIds": [
-                "ip_registry",
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
-              "blockingIssue": "#12"
-            },
-            "goodsReviewCandidateCount": {
-              "value": 2,
-              "availability": "preview",
-              "status": "complete",
-              "sourceIds": [
-                "ip_registry",
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "normalized_contains 또는 class_only 후보",
-              "blockingIssue": "#12"
-            },
-            "gapScore": {
-              "value": null,
-              "availability": "blocked",
-              "status": "complete",
-              "sourceIds": [
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:26.052Z",
-              "methodVersion": "gap-score-v0-example",
-              "rationale": "대표 특산품 판정 기준(예시: 지리적표시 등록)을 충족하지 않음",
-              "blockingIssue": "#29"
-            }
-          },
-          "briefing": null
-        }
-      ],
-      "dataState": "complete_nonzero",
-      "metrics": {
-        "uniqueTrademarkCount": {
-          "value": 2,
-          "availability": "available",
-          "status": "complete",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        },
-        "registeredTrademarkCount": {
-          "value": 2,
-          "availability": "available",
-          "status": "complete",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        },
-        "registrationRate": {
           "value": 1,
           "availability": "available",
-          "status": "complete",
+          "status": "partial",
           "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
+            "label-ee12f051eaf0",
+            "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        }
-      }
-    },
-    {
-      "regionCode": "1200000000",
-      "regionCodeStatus": "resolved",
-      "sido": "전남광주통합특별시",
-      "sigungu": null,
-      "region": "전남광주통합특별시",
-      "items": [
-        {
-          "specialtyId": "sp-v1-4bafc97685108357",
-          "specialtyIdStatus": "resolved",
-          "itemName": "상큼愛",
-          "noticeName": null,
-          "niceClass": null,
-          "dataState": "complete_nonzero",
-          "sources": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "metrics": {
-            "uniqueTrademarkCount": {
-              "value": 3,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "④ 저장 hit를 출원번호 우선 키로 중복 제거",
-              "blockingIssue": null
-            },
-            "registeredTrademarkCount": {
-              "value": 3,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "④ statusCounts.registered",
-              "blockingIssue": null
-            },
-            "registrationRate": {
-              "value": 1,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "registered / uniqueTrademarkCount",
-              "blockingIssue": null
-            },
-            "localApplicantShare": {
-              "value": null,
-              "availability": "blocked",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "출원인 주소가 검증된 hit만 사용",
-              "blockingIssue": "#11"
-            },
-            "regionalBrandInsideShare": {
-              "value": 1,
-              "availability": "available",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-              "rationale": "농사로 지역브랜드 출원번호 연관성; 출원인 주소와 별도",
-              "blockingIssue": null
-            },
-            "confirmedGoodsMatchCount": {
-              "value": 0,
-              "availability": "blocked",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
-              "blockingIssue": "#12"
-            },
-            "goodsReviewCandidateCount": {
-              "value": 0,
-              "availability": "blocked",
-              "status": "complete",
-              "sourceIds": [
-                "kipris_trademark",
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:25.974Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "normalized_contains 또는 class_only 후보",
-              "blockingIssue": "#12"
-            },
-            "gapScore": {
-              "value": null,
-              "availability": "blocked",
-              "status": "complete",
-              "sourceIds": [
-                "label-1e1386ec3cb1",
-                "nongsaro_area_brand"
-              ],
-              "calculatedAt": "2026-08-11T00:25:26.052Z",
-              "methodVersion": "gap-score-v0-example",
-              "rationale": "대표 특산품 판정 기준(예시: 지리적표시 등록)을 충족하지 않음",
-              "blockingIssue": "#29"
-            }
-          },
-          "briefing": null
-        }
-      ],
-      "dataState": "complete_nonzero",
-      "metrics": {
-        "uniqueTrademarkCount": {
-          "value": 3,
-          "availability": "available",
-          "status": "complete",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
-          "methodVersion": "brand-analysis-v3-ip-registry-evidence",
-          "rationale": null,
-          "blockingIssue": null
-        },
-        "registeredTrademarkCount": {
-          "value": 3,
-          "availability": "available",
-          "status": "complete",
-          "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
-          ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
+          "calculatedAt": "2026-08-11T02:06:37.580Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
         },
         "registrationRate": {
-          "value": 1,
+          "value": 0.1429,
           "availability": "available",
-          "status": "complete",
+          "status": "partial",
           "sourceIds": [
-            "label-1e1386ec3cb1",
-            "nongsaro_area_brand"
+            "label-ee12f051eaf0",
+            "nongsaro"
           ],
-          "calculatedAt": "2026-08-11T00:25:25.974Z",
+          "calculatedAt": "2026-08-11T02:06:37.580Z",
           "methodVersion": "brand-analysis-v3-ip-registry-evidence",
           "rationale": null,
           "blockingIssue": null
@@ -634,7 +547,65 @@
       }
     }
   ],
-  "rankings": [],
-  "briefings": [],
+  "rankings": [
+    {
+      "rank": 1,
+      "regionCode": "4776000000",
+      "specialtyId": "sp-v1-4debfa8c194c8caf",
+      "region": "경상북도 영양군",
+      "itemName": "사과",
+      "noticeName": "신선한 사과",
+      "gapScore": {
+        "value": 0.48,
+        "availability": "preview",
+        "status": "partial",
+        "sourceIds": [
+          "label-ee12f051eaf0",
+          "nongsaro"
+        ],
+        "calculatedAt": "2026-08-11T02:06:37.663Z",
+        "methodVersion": "gap-score-v1-representative-gi-or-count3",
+        "rationale": "⑤ 예시 점수 기준",
+        "blockingIssue": "#29"
+      }
+    }
+  ],
+  "briefings": [
+    {
+      "regionCode": "4776000000",
+      "specialtyId": "sp-v1-4debfa8c194c8caf",
+      "region": "경상북도 영양군",
+      "itemName": "신선한 사과",
+      "templateVersion": "strategy-template-v0-example",
+      "isGapAlert": false,
+      "sentences": [
+        "경상북도 영양군은 대표 특산품(신선한 사과)의 상표 활용도가 비교적 양호함(고유 상표 3건, 등록률 33%).",
+        "경상북도 영양군의 지역 내·외 출원 비중은 출원인 주소 매칭이 검증되지 않아 이번 초안에서는 판단하지 않음."
+      ],
+      "evidence": {
+        "uniqueTrademarkCount": 3,
+        "registrationRate": 0.3333,
+        "localApplicantShare": null,
+        "regionMatchVerified": false,
+        "collectionPartial": true,
+        "scoreInputs": {
+          "uniqueTrademarkCount": 3,
+          "registrationRate": 0.3333,
+          "activityScore": 0.6,
+          "registrationScore": 0.3333
+        },
+        "sourceProvenance": [
+          {
+            "sourceLabel": "농사로",
+            "sourceId": "nongsaro",
+            "sourceContractVersion": "localSpcprd-contract-v1",
+            "sourceUrl": "https://www.data.go.kr/data/15101361/openapi.do",
+            "sourceLastVerifiedAt": "2026-08-10"
+          }
+        ]
+      },
+      "aiReviewApplied": false
+    }
+  ],
   "alerts": []
 }

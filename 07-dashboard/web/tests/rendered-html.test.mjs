@@ -36,7 +36,13 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "sample");
   assert.ok(snapshot.regions.length > 0);
-  assert.ok(snapshot.sources.some((source) => source.sourceId === "ip_registry"));
+  assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
+  assert.ok(snapshot.sources.some((source) => source.sourceId === "nongsaro"));
+  const items = snapshot.regions.flatMap((region) => region.items);
+  assert.ok(items.every((item) => item.itemName && item.noticeName && item.niceClass));
+  assert.ok(items.every((item) => item.matchingBasis === "notice_name_and_nice_class"));
+  assert.ok(items.some((item) => item.itemName === "사과" && item.noticeName === "신선한 사과"));
+  assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(snapshot.warnings.some((warning) => warning.includes("전국 모집단")));
 });
 

@@ -344,9 +344,13 @@ async function run() {
       makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
       /분석 제외/
     );
+    assert.match(
+      makeBatchQuery({ sido: "경상북도", sigungu: "안동시", itemName: "상큼愛", status: "ok" }).skipReason,
+      /고시명칭 미확정/
+    );
     assert.strictEqual(
       countSearchableRows([
-        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", status: "ok" },
+        { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", noticeName: "신선한 사과", niceClass: "31", status: "ok" },
         { rawItemName: "검토", status: "review_required" },
         { rawItemName: "제외", excluded: "true", status: "ok" },
       ]),
@@ -442,6 +446,7 @@ async function run() {
     assert.strictEqual(batch.results[0].provenance.sourceId, "gi");
     assert.strictEqual(batch.results[0].provenance.sourceContractVersion, "provider-live-api");
     assert.strictEqual(batch.results[0].provenance.sourceLastVerifiedAt, "2026-08-10");
+    assert.strictEqual(batch.results[0].input.noticeName, "사과", "④가 표준 품목명과 고시명칭을 구분하도록 ② 원본 행을 보존해야 함");
     assert.strictEqual(batch.results[1].provenance.sourceId, "sample", "skipped 행도 출처 계보를 잃으면 안 됨");
     ok("검색 가능한 행만 호출하고 입력 순서대로 상태를 보존함, source도 함께 전파됨");
   }

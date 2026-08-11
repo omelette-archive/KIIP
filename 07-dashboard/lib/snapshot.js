@@ -251,6 +251,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
 
   const regionGroups = new Map();
   for (const row of analysis.regionItems) {
+    if (!clean(row.noticeName) || !clean(row.niceClass)) {
+      throw new Error(
+        `대시보드 품목은 ② 고시명칭·NICE류 확정 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
+      );
+    }
     const regionIdentity = resolveRegion(row, regionIndex);
     const specialty = specialtyIdentity(row);
     if (specialty.specialtyId) {
@@ -278,6 +283,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       itemName: clean(row.itemName) || null,
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
+      matchingBasis: "notice_name_and_nice_class",
       dataState: state,
       sources: rowSourceIds(row),
       metrics: {
@@ -440,7 +446,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       rank: index + 1,
       ...identityFor(row),
       region: clean(row.region) || null,
-      itemName: clean(row.noticeName) || clean(row.itemName) || null,
+      itemName: clean(row.itemName) || null,
+      noticeName: clean(row.noticeName) || null,
       gapScore: makeMetric(row.gapScore ?? null, row, {
         availability: "preview",
         status: metricStatus(state),
