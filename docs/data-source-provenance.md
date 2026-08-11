@@ -1,6 +1,6 @@
 # 데이터 출처·기준·버전 관리
 
-최종 갱신: 2026-08-10
+최종 갱신: 2026-08-11
 목적: 산출물의 숫자와 판정이 어떤 원본·규칙·시점에서 나왔는지 다른 작업자가 역추적할 수 있게 한다.
 
 ## 1. 원칙
@@ -22,7 +22,7 @@
 | `nongsaro_area_brand` | 농촌진흥청 농사로 지역브랜드 | <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344> | `nongsaro-area-brand-v1`, `areaBrandLst`, 실계약 검증 2026-08-10 | KIPRIS 출원번호·지역 연관성 검증자료 |
 | `kipris_trademark` | 지식재산처 KIPRISPlus 상표 단어검색 | <https://plus.kipris.or.kr> | `kipris-trademark-word-search-v1`, 실키 검증 2026-08-10 | 상표 후보·출원번호·상태·NICE류 수집 |
 | `kipo_notice_goods` | 지식재산처 고시상품명칭 | <https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120> | NICE 13판(2026), 다운로드 2026-08-05 | 품목→고시명칭·NICE류·유사군 후보 사전 |
-| `ip_registry` | 지식재산처 등록원부 실시간 정보 조회 (`getMarkHistory`) | <https://www.data.go.kr/data/15124946/openapi.do> | `apis.data.go.kr/1430000/PttRgstRtInfoInqSvc`, 실키 검증 2026-08-11 | 등록번호 기준 출원인 주소(#11)·지정상품(#12) 보강 — 파이프라인 미연결 |
+| `ip_registry` | 지식재산처 등록원부 실시간 정보 조회 (`getMarkHistory`) | <https://www.data.go.kr/data/15124946/openapi.do> | `apis.data.go.kr/1430000/PttRgstRtInfoInqSvc`, 실키 검증 2026-08-11 | 등록번호 기준 출원인 주소(#11)·지정상품(#12) 보강 — ③단계 `--enrich-registry`로 연결됨(2026-08-11) |
 
 기계 판독 가능한 API 출처 목록은
 [`01-collect-specialties/config/sources.json`](../01-collect-specialties/config/sources.json)이 기준이다.
@@ -48,6 +48,10 @@
 - ③ JSON: `trademarkSourceMetadata`, 입력 행 `provenance`, `regionalBrandValidation`을 기록한다.
 - 지역브랜드가 출원번호로 조인된 hit: `regionalBrandMatchVersion`,
   `regionalBrandMatchSource`, `regionalBrandEvidence`를 기록한다.
+- 등록원부로 보강된 hit(`--enrich-registry`): `applicantRegionMatchVersion`
+  (`ip-registry-applicant-region-v1`), `applicantRegionMatchSource`, `applicantRegion`,
+  `designatedGoodsEvidence`를 기록한다. 이 주소는 지역브랜드 연관 지역과 달리 실제 출원인
+  주소이므로 `applicantRegionMatch` 본류에 직접 반영한다(§6 참고).
 - ④ JSON: `analysisVersion`, `provenance`, `methodology`, 버킷별 `sourceProvenance`를 기록한다.
 - ⑤·⑥ JSON: 상위 단계 `provenance`와 현재 `scoreVersion`/`templateVersion`, 방법론을 이어받는다.
 - ⑦ 스냅샷: 상위 출처와 분석·점수·템플릿·지도 경계 버전을 이어받고 `sample|full`,
@@ -75,3 +79,18 @@ KIPRIS 요청 3건이 모두 성공했고, 출원번호 완전일치 근거가 �
 쿼리 1건은 검증 실행의 `--max-pages=1` 보호 상한 때문에 `partial`이다. 이는 오류가 아니며,
 위 숫자는 602건 전체의 분포나 정책 효과를 설명하는 통계가 아니라 연결 계약과 지표 분리를
 확인한 소량 기술 검증 결과다.
+
+## 7. 2026-08-11 등록원부(`getMarkHistory`) 연결 검증 기록
+
+③단계에 `--enrich-registry`를 연결하고 실키로 검증했다. 1차 시도(강원특별자치도 양양군 ×
+사과, hit 46건, 동시 호출 제한 없음)는 등록번호가 있는 25건 전부 `getMarkHistory` HTTP 429를
+받았다 — `lib/fetchWithRetry.js`의 지수 백오프(최대 3회)로도 회복되지 않을 만큼 이 서비스의
+초당 허용량이 낮았다. `lib/ipRegistryEnricher.js`에 동시 호출 제한(`concurrency`, 기본 3,
+CLI `--registry-concurrency`)을 추가해 재현했더니 요청 8건 중 오류 0건으로 전부 성공했다.
+
+성공한 8건의 실제 출원인 주소 판정: `applicantRegionMatch=inside` 1건("양양 해풍 사과",
+등록번호 4025303310000, 출원인 주소 강원특별자치도 양양군 — 쿼리 지역과 일치),
+`outside` 7건(충청북도 제천시·경상북도 영주시·경상남도 사천시·충청남도 공주시·전북특별자치도
+익산시 2건·강원특별자치도 평창군). 지정상품 보강(`designatedGoodsEvidence`)은 7건에서
+확인했다. 이 결과는 지역 판정 로직이 실제 출원인 주소를 기준으로 정확히 갈리는 것을 확인한
+소량 기술 검증이며, 상표 46건 전체의 대표 통계가 아니다.
