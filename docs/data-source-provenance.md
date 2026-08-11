@@ -22,6 +22,7 @@
 | `nongsaro_area_brand` | 농촌진흥청 농사로 지역브랜드 | <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344> | `nongsaro-area-brand-v1`, `areaBrandLst`, 실계약 검증 2026-08-10 | KIPRIS 출원번호·지역 연관성 검증자료 |
 | `kipris_trademark` | 지식재산처 KIPRISPlus 상표 단어검색 | <https://plus.kipris.or.kr> | `kipris-trademark-word-search-v1`, 실키 검증 2026-08-10 | 상표 후보·출원번호·상태·NICE류 수집 |
 | `kipo_notice_goods` | 지식재산처 고시상품명칭 | <https://kipo.go.kr/ko/kpoContentView.do?menuCd=SCD0201120> | NICE 13판(2026), 다운로드 2026-08-05 | 품목→고시명칭·NICE류·유사군 후보 사전 |
+| `ip_registry` | 지식재산처 등록원부 실시간 정보 조회 (`getMarkHistory`) | <https://www.data.go.kr/data/15124946/openapi.do> | `apis.data.go.kr/1430000/PttRgstRtInfoInqSvc`, 실키 검증 2026-08-11 | 등록번호 기준 출원인 주소(#11)·지정상품(#12) 보강 — 파이프라인 미연결 |
 
 기계 판독 가능한 API 출처 목록은
 [`01-collect-specialties/config/sources.json`](../01-collect-specialties/config/sources.json)이 기준이다.
