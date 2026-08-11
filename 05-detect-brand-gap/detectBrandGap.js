@@ -11,7 +11,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { GAP_SCORE_VERSION, scoreBucket } = require("./lib/scorer");
+const {
+  GAP_SCORE_VERSION,
+  REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD,
+  scoreBucket,
+} = require("./lib/scorer");
 
 function parseArgs(argv) {
   const args = {};
@@ -86,10 +90,12 @@ function detectGaps(analysis) {
     );
 
   const warnings = [
-    "대표 특산품 판정 기준과 활용도 가중치는 예시값이다(scoreVersion 참고) — 실제 기준 " +
-      "확정 후 05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
-    "지역 내·외 출원 비중(localApplicantShare)은 ③단계 주소 매칭이 검증되기 전까지 점수에 " +
-      "쓰지 않는다 — regionMatchVerified는 참고용 메타데이터일 뿐이다.",
+    "대표 특산품 판정 기준(GI 출처 또는 상표 출원 3건 이상)은 #29에서 확정됐지만, 활용도 " +
+      "포화 건수·가중치는 아직 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 " +
+      "05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
+    "지역 내·외 출원 비중(localApplicantShare)은 ③단계 --enrich-registry로 검증된 값만 " +
+      "신뢰할 수 있다 — 미실행 입력은 대부분 unverified다. regionMatchVerified는 참고용 " +
+      "메타데이터일 뿐 점수에는 아직 쓰지 않는다.",
     "지정상품 normalized_contains/class_only 후보는 #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않는다.",
   ];
   const nonRepresentativeCount = rows.filter((row) => !row.representative).length;
@@ -110,9 +116,12 @@ function detectGaps(analysis) {
       upstream: analysis.provenance || null,
     },
     methodology: {
-      representativeBasis: "sources에 지리적표시가 포함된 지역×품목만 대표 특산품으로 인정(예시 기준)",
-      activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준)",
+      representativeBasis:
+        `sources에 지리적표시가 포함되었거나 고유 상표 출원이 ${REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD}건 ` +
+        "이상인 지역×품목을 대표 특산품으로 인정(#29 확정, 2026-08-11)",
+      activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준, 미확정)",
       weights: { activity: 0.7, registration: 0.3 },
+      weightsConfirmed: false,
       localApplicantShareIncluded: false,
       designatedGoodsPolicy:
         "normalized_exact만 확정 근거; 후보·불일치는 메타데이터로 보존하고 점수 입력은 기존 합계 유지",

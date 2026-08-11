@@ -8,6 +8,7 @@ const {
   activityScore,
   registrationScore,
   ACTIVITY_SATURATION_COUNT,
+  REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD,
   GAP_SCORE_VERSION,
 } = require("./lib/scorer");
 const { detectGaps } = require("./detectBrandGap");
@@ -16,14 +17,30 @@ function ok(label) {
   console.log(`  ok - ${label}`);
 }
 
-console.log("1) isRepresentative — 예시 기준(지리적표시 등록)");
+console.log("1) isRepresentative — GI 출처 또는 상표 3건 이상(OR, #29 확정 기준)");
 {
-  assert.strictEqual(isRepresentative({ sources: ["지리적표시"] }), true);
-  assert.strictEqual(isRepresentative({ sources: ["농사로"] }), false);
+  assert.strictEqual(isRepresentative({ sources: ["지리적표시"] }), true, "GI 출처만으로도 대표");
+  assert.strictEqual(isRepresentative({ sources: ["농사로"] }), false, "GI도 없고 상표도 없으면 비대표");
   assert.strictEqual(isRepresentative({ sources: ["농사로", "지리적표시"] }), true);
   assert.strictEqual(isRepresentative({ sources: [] }), false);
   assert.strictEqual(isRepresentative({}), false, "sources 필드가 없어도 죽지 않아야 함");
-  ok("sources에 지리적표시가 있어야만 대표 특산품으로 판정됨(예시 기준)");
+
+  assert.strictEqual(
+    isRepresentative({ sources: ["농사로"], uniqueTrademarkCount: REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD }),
+    true,
+    "GI가 없어도 상표 출원이 임계값 이상이면 대표(OR 조건)"
+  );
+  assert.strictEqual(
+    isRepresentative({ sources: ["농사로"], uniqueTrademarkCount: REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD - 1 }),
+    false,
+    "임계값 미만이고 GI도 없으면 비대표"
+  );
+  assert.strictEqual(
+    isRepresentative({ sources: [], uniqueTrademarkCount: 100 }),
+    true,
+    "GI 출처가 아예 없어도 상표 건수만으로 대표 판정 가능"
+  );
+  ok("GI 출처가 있거나(OR) 고유 상표 출원이 3건 이상이면 대표 특산품으로 판정됨(#29 확정)");
 }
 
 console.log("2) activityScore/registrationScore — 0~1 정규화");
@@ -94,6 +111,28 @@ console.log("5) detectGaps — ④ 출력 -> 랭킹, 비대표 제외, 결정론
   assert.ok(resultA.warnings.some((w) => w.includes("예시값")));
   assert.ok(resultA.warnings.some((w) => w.includes("localApplicantShare")));
   ok("랭킹은 대표 품목만 공백 점수 내림차순, 비대표는 사유와 함께 보존, 동일 입력은 동일 출력");
+}
+
+console.log("5-1) detectGaps — GI 미등록이어도 상표 3건 이상이면 랭킹에 포함(#29 확정 OR 조건)");
+{
+  const analysis = {
+    generatedAt: "2026-08-11T00:00:00.000Z",
+    regionItems: [
+      { region: "경상남도 합천군", sido: "경상남도", sigungu: "합천군", itemName: "딸기", noticeName: "신선한 딸기", niceClass: "31",
+        sources: ["농사로"], uniqueTrademarkCount: 3, registrationRate: 0.2, regionVerificationRate: 0 },
+      { region: "충청북도 제천시", sido: "충청북도", sigungu: "제천시", itemName: "인삼", noticeName: "인삼", niceClass: "5",
+        sources: ["농사로"], uniqueTrademarkCount: 2, registrationRate: 0, regionVerificationRate: 0 },
+    ],
+  };
+  const result = detectGaps(analysis);
+  const strawberry = result.rows.find((row) => row.itemName === "딸기");
+  const ginseng = result.rows.find((row) => row.itemName === "인삼");
+  assert.strictEqual(strawberry.representative, true, "GI가 없어도 상표 3건이면 대표로 랭킹에 포함");
+  assert.strictEqual(typeof strawberry.gapScore, "number");
+  assert.strictEqual(ginseng.representative, false, "상표 2건은 임계값(3건) 미만이라 여전히 비대표");
+  assert.ok(result.methodology.representativeBasis.includes("3건"));
+  assert.strictEqual(result.methodology.weightsConfirmed, false, "가중치는 아직 미확정임을 산출물에 명시");
+  ok("대표 특산품 판정에서 GI 출처와 상표 3건 이상 OR 조건이 실제 랭킹까지 정확히 반영됨");
 }
 
 console.log("6) detectGaps — 입력 계약 위반 시 명확한 오류");
