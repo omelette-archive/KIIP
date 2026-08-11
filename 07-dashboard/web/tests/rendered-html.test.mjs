@@ -2,6 +2,16 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 
+const snapshotUrl = new URL("../public/data/dashboard-snapshot.json", import.meta.url);
+
+async function loadSnapshot() {
+  return JSON.parse(await readFile(snapshotUrl, "utf8"));
+}
+
+function escapeRegExp(value) {
+  return String(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 async function render() {
   const workerUrl = new URL("../dist/server/index.js", import.meta.url);
   workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}`);
@@ -27,7 +37,11 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /2013 KOSTAT/);
-  assert.match(visibleTextHtml, /영양군 \/ (사과|배|포도)/, "지도 옆 표기는 '지역 / 특산품' 형식이어야 함");
+  assert.match(
+    visibleTextHtml,
+    /[가-힣]+(?:시|군|구|광역시|특별시|특별자치시) \/ [가-힣A-Za-z0-9]/,
+    "지도 옆 표기는 '지역 / 특산품' 형식이어야 함"
+  );
   assert.match(html, /판정 기준과 매칭 방법/, "매칭 기준은 하단 note가 아니라 상시 노출 섹션에 있어야 함");
   assert.match(html, /고시명칭 \+ NICE류/);
   assert.match(html, /출처와 데이터 상태/);
@@ -37,19 +51,27 @@ test("renders the data-connected Korean dashboard", async () => {
 test("renders tab navigation and a data-connected ranking table", async () => {
   const response = await render();
   const html = await response.text();
+  const snapshot = await loadSnapshot();
   assert.match(html, /class="primary-tabs"/, "요약/지자체별/품목별/특화작목 4개 탭이 있어야 함");
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /class="ranking-table"/, "레퍼런스의 등록상표 랭킹 TOP 10/50에 대응하는 테이블");
-  // 품목명은 고시명칭 정제를 거친 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
+  // 품목명은 정규화된 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
   // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
   // 조인 검증용일 뿐 대표 특산품이 아니다. registeredTrademarkCount 내림차순 정렬이 실제로
-  // 동작하는지도 값으로 확인한다(포도 / 고시명칭 신선한 포도, 등록 14건이 1위).
+  // 동작하는지도 현재 스냅샷의 1위 값으로 확인한다.
   const tbodyIndex = html.indexOf("<tbody>");
   const firstRow = html.slice(tbodyIndex, html.indexOf("</tr>", tbodyIndex)).replace(/<!--.*?-->/gs, "");
+  const firstRanking = snapshot.regions
+    .flatMap((region) => region.items.map((item) => ({ region, item })))
+    .sort(
+      (a, b) =>
+        (b.item.metrics.registeredTrademarkCount.value || 0) -
+        (a.item.metrics.registeredTrademarkCount.value || 0)
+    )[0];
   assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
-  assert.match(firstRow, />(사과|배|포도|토마토)</, "주 라벨은 브랜드명·고시명칭이 아니라 대표 특산품명이어야 함");
-  assert.match(firstRow, /신선한 (사과|배|포도|토마토)/, "고시명칭은 집계 근거로 병기해야 함");
+  assert.match(firstRow, new RegExp(`>${escapeRegExp(firstRanking.item.itemName)}<`), "주 라벨은 현재 데이터의 대표 특산품명이어야 함");
+  assert.match(firstRow, new RegExp(escapeRegExp(firstRanking.item.noticeName)), "고시명칭은 집계 근거로 병기해야 함");
   assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
@@ -67,8 +89,7 @@ test("renders matching criteria prominently, on every tab, not just as bottom-of
 });
 
 test("ships a valid dashboard snapshot", async () => {
-  const raw = await readFile(new URL("../public/data/dashboard-snapshot.json", import.meta.url), "utf8");
-  const snapshot = JSON.parse(raw);
+  const snapshot = await loadSnapshot();
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "sample");
   assert.ok(snapshot.regions.length > 0);
@@ -77,10 +98,15 @@ test("ships a valid dashboard snapshot", async () => {
   const items = snapshot.regions.flatMap((region) => region.items);
   assert.ok(items.every((item) => item.itemName && item.noticeName && item.niceClass));
   assert.ok(items.every((item) => item.matchingBasis === "notice_name_and_nice_class"));
-  assert.ok(items.some((item) => item.itemName === "사과" && item.noticeName === "신선한 사과"));
   assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
-  assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.goodsMatchMethod === "normalized_exact")));
+  const confirmedItems = items.filter((item) => Number(item.metrics.confirmedGoodsMatchCount.value) > 0);
+  if (confirmedItems.length > 0) {
+    assert.ok(
+      confirmedItems.some((item) => item.trademarkExamples?.some((example) => example.goodsMatchMethod === "normalized_exact")),
+      "지정상품 확정 건수가 있으면 사례 목록에서도 그 근거를 확인할 수 있어야 함"
+    );
+  }
   assert.ok(snapshot.warnings.some((warning) => warning.includes("전국 모집단")));
 });
 

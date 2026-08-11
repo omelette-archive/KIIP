@@ -141,6 +141,26 @@ async function run() {
     ok("마스터엔 통합 후 이름만 있어도, 소스가 통합 전 옛 시도명을 써도 정확히 좁혀짐");
   }
 
+  console.log("3-4) normalize.splitRegion — 포함관계 시군구와 광역 단위 원본");
+  {
+    const containmentAdminList = [
+      { code: "A1", sido: "경기도", sigungu: "남양주시" },
+      { code: "A2", sido: "경기도", sigungu: "양주시" },
+      { code: "B1", sido: "부산광역시", sigungu: "중구" },
+      { code: "X1", sido: "전남광주통합특별시", sigungu: "목포시" },
+    ];
+    assert.deepStrictEqual(splitRegion("경기도 > 남양주시", containmentAdminList), {
+      sido: "경기도", sigungu: "남양주시", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("부산광역시", containmentAdminList), {
+      sido: "부산광역시", sigungu: "", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("광주광역시", containmentAdminList), {
+      sido: "전남광주통합특별시", sigungu: "", matched: true,
+    });
+    ok("가장 긴 시군구명을 우선하고 시군구 없는 광역 원본은 시도 단위로 보존");
+  }
+
   console.log("4) normalize.fromGiRegistrations / fromNongsaro");
   {
     const gi = fromGiRegistrations(
