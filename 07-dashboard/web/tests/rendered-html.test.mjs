@@ -30,7 +30,7 @@ test("renders the data-connected Korean dashboard", async () => {
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
-  assert.match(html, /지역 특산품의 상표 공백/);
+  assert.match(html, /지역 특산품의 상표 흐름/);
   assert.match(html, /전체 범위 알파 · 부분 수집/);
   assert.match(html, /어디까지 됐고, 왜 아직 지도 수치가 막혀 있나/);
   assert.match(html, /37,563/);
