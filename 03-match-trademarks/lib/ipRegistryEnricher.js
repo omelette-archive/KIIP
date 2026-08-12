@@ -224,10 +224,20 @@ function sanitizeRegistryRecordForCache(record, adminList = loadAdminCodes()) {
   };
 }
 
+// storageMode=query_facts(③ 기본 저장 방식)에서는 hit가 entry가 아니라
+// document.queryFacts[queryKey]에 한 번만 저장된다. 여기서 안 읽으면 등록번호를 하나도
+// 못 찾는다(2026-08-12 발견 — 지정상품 매칭 기준 완화가 실데이터에 전혀 반영되지 않던 원인).
+function factHitSources(document) {
+  if (document?.storageMode === "query_facts" && document.queryFacts) {
+    return Object.values(document.queryFacts);
+  }
+  return document.results || [];
+}
+
 function registryNumbers(document) {
   const result = [];
   const seen = new Set();
-  for (const entry of document.results || []) {
+  for (const entry of factHitSources(document)) {
     for (const hit of entry.hits || []) {
       const number = normalizeRegistrationNumber(hit.registrationNumber);
       if (number && !seen.has(number)) {
@@ -555,9 +565,8 @@ async function enrichDocument(document, client, options = {}) {
     mismatch: 0,
     unverified: 0,
   };
-  const results = document.results.map((entry) => ({
-    ...entry,
-    hits: (entry.hits || []).map((hit) => {
+  function enrichHits(hits, query) {
+    return (hits || []).map((hit) => {
       const number = normalizeRegistrationNumber(hit.registrationNumber);
       if (!number) {
         counts.noRegistrationHitCount++;
@@ -590,12 +599,27 @@ async function enrichDocument(document, client, options = {}) {
         return { ...hit, ipRegistryStatus: "not_found" };
       }
       counts.completeHitCount++;
-      const enriched = enrichHit(hit, entry.query || {}, fetchedRow.record, fetchedAt);
+      const enriched = enrichHit(hit, query || {}, fetchedRow.record, fetchedAt);
       applicantRegionCounts[enriched.applicantRegionMatch]++;
       goodsMatchCounts[enriched.goodsMatchMethod]++;
       return enriched;
-    }),
-  }));
+    });
+  }
+
+  // query_facts 저장 방식은 각 고유 쿼리의 hits를 한 번만(지역행마다 복제하지 않고) 보강한다
+  // — results는 그대로 두고 queryFacts만 갱신해 압축 저장 구조를 유지한다.
+  const isQueryFacts = document.storageMode === "query_facts" && document.queryFacts;
+  const queryFacts = isQueryFacts
+    ? Object.fromEntries(
+        Object.entries(document.queryFacts).map(([key, fact]) => [
+          key,
+          { ...fact, hits: enrichHits(fact.hits, fact.query) },
+        ])
+      )
+    : undefined;
+  const results = isQueryFacts
+    ? document.results
+    : document.results.map((entry) => ({ ...entry, hits: enrichHits(entry.hits, entry.query) }));
   const errorRegistrationCount = fetched.filter((row) => row.status === "error").length;
   const notFoundRegistrationCount = fetched.filter((row) => row.status === "not_found").length;
   const completeRegistrationCount = fetched.filter((row) => row.status === "complete").length;
@@ -618,6 +642,7 @@ async function enrichDocument(document, client, options = {}) {
   return {
     ...document,
     results,
+    ...(queryFacts ? { queryFacts } : {}),
     ipRegistryEnrichment: {
       enabled: true,
       status,
