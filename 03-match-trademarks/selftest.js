@@ -58,6 +58,7 @@ const {
   searchOne,
   runBatch,
   loadCheckpoint,
+  compactBatchOutput,
 } = require("./matchTrademarks");
 
 const SAMPLE_OK_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -350,9 +351,32 @@ async function run() {
       makeBatchQuery({ status: "error", rawItemName: "실패품목" }).skipReason,
       /상위 단계/
     );
+    // 검토대기(review_required)라도 지역·품목명이 있으면 원물명 자체로 KIPRIS를 검색한다
+    // — 고시명칭 확정 여부와 "실제 그 이름으로 상표가 있는지 확인"은 별개다(2026-08-12
+    // 피드백). 공식 분류가 없으니 classCode는 null(식품 기본류 fallback 적용).
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동 오미자",
+        itemName: "오미자",
+        noticeName: "",
+        status: "review_required",
+      }),
+      { region: "경상북도 안동시", item: "오미자", classCode: null }
+    );
     assert.match(
       makeBatchQuery({ status: "review_required", rawItemName: "안동하회탈" }).skipReason,
-      /상위 단계/
+      /지역 정보 없음/
+    );
+    assert.match(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        itemName: "",
+        status: "review_required",
+      }).skipReason,
+      /품목명 미확정/
     );
     assert.match(
       makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
@@ -531,6 +555,17 @@ async function run() {
     assert.deepStrictEqual(calledPages, [], "완료 쿼리는 재실행 시 API를 다시 호출하면 안 됨");
     assert.strictEqual(reused.resumedQueryCount, 1);
     assert.ok(reused.results.every((row) => row.reusedFromCheckpoint));
+    const compact = compactBatchOutput({
+      schemaVersion: "1.2",
+      mode: "batch",
+      results: reused.results,
+    });
+    assert.strictEqual(compact.schemaVersion, "1.3");
+    assert.strictEqual(compact.storageMode, "query_facts");
+    assert.strictEqual(compact.queryFactCount, 1);
+    assert.strictEqual(Object.values(compact.queryFacts)[0].hits.length, 5);
+    assert.ok(compact.results.every((row) => !Object.hasOwn(row, "hits")));
+    assert.ok(compact.results.every((row) => row.query?.region), "지역행에는 지역 질의 차원을 보존해야 함");
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
   }
 
@@ -581,13 +616,18 @@ async function run() {
       );
       const rows = readNormalizedCsv(normalizedInputPath);
       const plan = buildBatchPlan(rows);
-      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "skipped"]);
+      // review_required 행(고시명칭 미확정)도 itemName·지역이 있으면 검색 계획에 포함한다
+      // — 원물명 그대로 실제 출원 상표가 있는지는 확인할 수 있어야 하므로(2026-08-12).
+      // classCode는 공식 분류가 없어 null(식품 기본류 fallback).
+      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "planned"]);
       assert.strictEqual(plan[0].query.item, "신선한 사과");
-      assert.match(plan[1].reason, /review_required/);
+      assert.strictEqual(plan[0].query.classCode, "31");
+      assert.strictEqual(plan[1].query.item, "하회탈");
+      assert.strictEqual(plan[1].query.classCode, null);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
+    ok("① 원시 CSV의 직접 투입을 거부하고, ② 확정 행은 고시명칭으로, 검토대기 행은 원물명으로 검색 계획에 포함함");
   }
 
   console.log("11) ipRegistryClient.getMarkHistory — 요청 구성·응답 요약·오류 코드(000이 성공)");
@@ -993,6 +1033,29 @@ async function run() {
       second.results[0].hits.map((hit) => hit.applicantRegionMatch),
       ["inside", "inside"]
     );
+    const compactDocument = {
+      schemaVersion: "1.3",
+      mode: "batch",
+      storageMode: "query_facts",
+      queryFacts: {
+        apple: {
+          queryKey: "apple",
+          query: { region: null, item: "신선한 사과", classCode: "31" },
+          hits: [{ applicationNumber: "A1" }, { applicationNumber: "A2" }],
+        },
+      },
+      results: [{
+        queryKey: "apple",
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+      }],
+    };
+    const compact = await enrichApplicantRegions(compactDocument, fakeClient, {
+      limit: 0, cacheOnly: true, concurrency: 1, cacheEntries: reloaded, adminList,
+    });
+    assert.strictEqual(compact.results[0].hits, undefined, "지역행에는 hit를 다시 복제하지 않아야 함");
+    assert.strictEqual(compact.queryFacts.apple.hits.length, 2);
+    assert.ok(compact.queryFacts.apple.hits[0].applicantRegionEvidence.length > 0);
+    assert.strictEqual(compact.applicationApplicantEnrichment.applicantRegionCounts.inside, 2);
     const cacheDocument = JSON.parse(fs.readFileSync(cachePath, "utf8"));
     const persistedEntries = JSON.stringify(cacheDocument.entries);
     assert.ok(!persistedEntries.includes("상세주소"));

@@ -183,17 +183,22 @@ function validateContracts(tempDir) {
   const plan = JSON.parse(fs.readFileSync(planPath, "utf8"));
   assert.strictEqual(plan.mode, "batch-dry-run");
   assert.strictEqual(plan.inputCount, 5);
-  assert.strictEqual(plan.searchableRowCount, 3);
-  assert.strictEqual(plan.uniqueQueryCount, 3);
+  // 검토대기(review_required) 행도 고시명칭이 아니라 원물명(itemName)으로 검색 계획에
+  // 포함한다(2026-08-12) — "안동하회탈"(하회탈)이 4번째 planned 행이다. excluded=true인
+  // "안동사과나무"만 계속 건너뛴다.
+  assert.strictEqual(plan.searchableRowCount, 4);
+  assert.strictEqual(plan.uniqueQueryCount, 4);
   assert.strictEqual(plan.duplicateQueryRowCount, 0);
-  assert.strictEqual(plan.estimatedMinRequestCount, 3);
-  assert.strictEqual(plan.estimatedMaxRequestCount, 15);
-  assert.strictEqual(plan.skippedCount, 2);
+  assert.strictEqual(plan.estimatedMinRequestCount, 4);
+  assert.strictEqual(plan.estimatedMaxRequestCount, 20);
+  assert.strictEqual(plan.skippedCount, 1);
   assert.deepStrictEqual(
     plan.results.map((row) => row.status),
-    ["planned", "planned", "planned", "skipped", "skipped"]
+    ["planned", "planned", "planned", "skipped", "planned"]
   );
-  console.log("[validatePipeline] ②→③ 계약 통과 (5행: 호출 예정 3, 건너뜀 2)");
+  assert.strictEqual(plan.results[4].query.item, "하회탈");
+  assert.strictEqual(plan.results[4].query.classCode, null);
+  console.log("[validatePipeline] ②→③ 계약 통과 (5행: 호출 예정 4[검토대기 원물명 포함], 건너뜀 1)");
 
   writeStage3Fixture(stage3Path);
   runNode("④ 분석 CLI", [
