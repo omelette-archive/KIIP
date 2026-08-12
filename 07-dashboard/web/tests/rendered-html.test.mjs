@@ -93,7 +93,11 @@ test("renders tab navigation and a data-connected ranking table", async () => {
     assert.doesNotMatch(firstRow, />1<\/td>/, "지역 귀속 미검증 전국 후보로 순위를 만들면 안 됨");
     assert.match(html, /검증 중/, "차단된 지역 지표는 0건이 아니라 검증 중으로 표시해야 함");
   }
-  assert.doesNotMatch(html, /데일리|일선정품|상큼愛/, "고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
+  // 랭킹 표 자체에 옛 브랜드명이 품목 라벨로 남아있으면 안 된다. html 전체를 검사하면
+  // 무관한 실제 원물명에 우연히 같은 글자가 포함된 경우(예: "꿀다림 데일리허니")까지
+  // 걸려서 firstRow(랭킹 1위 행)만 검사한다 — line 128의 정확 일치 검사가 전체 스냅샷은
+  // 이미 커버한다.
+  assert.doesNotMatch(firstRow, /데일리|일선정품|상큼愛/, "랭킹 표에 고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
 test("renders matching criteria prominently, on every tab, not just as bottom-of-page small print", async () => {
@@ -114,22 +118,33 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
-  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 127);
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 65);
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 861);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 481);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 31188);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 43384);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nongsaro"));
   const items = snapshot.regions.flatMap((region) => region.items);
-  assert.ok(items.every((item) => item.itemName && item.noticeName && item.niceClass));
-  assert.ok(items.every((item) => item.matchingBasis === "notice_name_and_nice_class"));
+  assert.ok(items.every((item) => item.itemName && item.noticeName));
+  // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과는 matchingBasis=
+  // raw_item_name_unclassified이고 niceClass가 없는 게 정상이다(2026-08-12) — 공식
+  // 분류 행만 niceClass가 있어야 한다.
+  assert.ok(
+    items.every((item) =>
+      item.matchingBasis === "notice_name_and_nice_class"
+        ? Boolean(item.niceClass)
+        : item.matchingBasis === "raw_item_name_unclassified"
+    )
+  );
+  assert.ok(items.some((item) => item.matchingBasis === "notice_name_and_nice_class"));
+  assert.ok(items.some((item) => item.matchingBasis === "raw_item_name_unclassified"));
   assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 65, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
+  assert.equal(availableItems.length, 481, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
