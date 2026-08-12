@@ -32,13 +32,16 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
   assert.match(html, /지역 특산품의 상표 흐름/);
   assert.match(html, /전체 범위 알파 · 부분 수집/);
-  assert.match(html, /어디까지 됐고, 왜 아직 지도 수치가 막혀 있나/);
+  assert.match(html, /지역 특산품의 상표 흐름을/);
+  assert.match(html, /알파 데이터의 현재 준비 상태/);
+  assert.match(html, /실제로 수집된 상표를 살펴보세요/);
   assert.match(html, /37,563/);
   assert.match(html, /완료 20 · 부분 106/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
+  assert.match(html, /데이터 개요/);
   assert.match(html, /2013 KOSTAT/);
   assert.match(
     visibleTextHtml,
@@ -55,7 +58,7 @@ test("renders tab navigation and a data-connected ranking table", async () => {
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지자체별/품목별/특화작목 4개 탭이 있어야 함");
+  assert.match(html, /class="primary-tabs"/, "요약/지자체별/품목별/특화작목/데이터 개요 5개 탭이 있어야 함");
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /class="ranking-table"/, "레퍼런스의 등록상표 랭킹 TOP 10/50에 대응하는 테이블");
@@ -150,6 +153,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /dashboard-map-geometry-v1/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /특화작목 비교/);
+  assert.match(html, /데이터 개요/);
+  assert.match(html, /특산물과 상표가<br>데이터가 되기까지/);
+  assert.match(html, /고유 특산품명/);
+  assert.match(html, /상표 매칭 결과/);
   assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);
   // 단일 HTML은 클라이언트가 지도·탭·랭킹·판정 기준을 같은 데이터로 렌더링한다.
   assert.match(html, /primary-tabs/);
