@@ -40,5 +40,16 @@
 등록원부 보강 후 ④ 분석과 ⑦ 스냅샷을 다시 생성하고 이 현황판의 숫자를 갱신한다. 현재 HTML은 정적 알파 기록이며,
 실시간 API 호출 화면이 아니다.
 
+보강 결과를 먼저 빠르게 점검하려면 다음 명령을 사용한다.
+
+```powershell
+node scripts/review-enrichment-output.mjs `
+  03-match-trademarks/output/alpha-full-20260812-v4-ip-registry.json
+```
+
+이 명령은 `query_facts` 압축 구조 인식 여부, 등록원부 `complete` 건수, 출원인 주소
+`inside/outside/unverified`, 지정상품 `normalized_exact/normalized_contains/class_only` 분포와
+누락 경고를 출력한다.
+
 관련 구현: [`03-match-trademarks`](../../03-match-trademarks), [`04-analyze-brand`](../../04-analyze-brand),
 [`07-dashboard`](../../07-dashboard), [스냅샷](../../07-dashboard/web/public/data/dashboard-snapshot.json)
