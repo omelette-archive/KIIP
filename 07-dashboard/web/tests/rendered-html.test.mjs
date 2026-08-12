@@ -110,7 +110,7 @@ test("renders matching criteria prominently, on every tab, not just as bottom-of
   assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
   assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
   assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
-  assert.match(html, /기본 100% 완료 · 알파는 임계값 명시/, "출원인 지역 매칭 차단 기준이 명시돼야 함");
+  assert.match(html, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
 });
 
 test("ships a valid dashboard snapshot", async () => {
@@ -119,7 +119,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
   assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 861);
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 481);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 671);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 43384);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -144,7 +144,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 481, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
+  assert.equal(availableItems.length, 671, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(

@@ -414,17 +414,13 @@ function finalizeBucket(bucket, options) {
     bucket.erroredQueryCount === 0 &&
     bucket.skippedQueryCount === 0 &&
     regionalCollectionRate >= options.regionalCoverageThreshold;
-  const regionalAddressVerificationComplete =
-    isRegionalBucket &&
-    (uniqueTrademarkCount === 0 ||
-      regionVerifiedHitCount / uniqueTrademarkCount >= options.regionalCoverageThreshold);
   const regionalMetricBlockingReasons = [];
   if (isRegionalBucket && !regionalCollectionComplete) {
     regionalMetricBlockingReasons.push("collection_incomplete");
   }
-  if (isRegionalBucket && !regionalAddressVerificationComplete) {
-    regionalMetricBlockingReasons.push("applicant_address_unverified");
-  }
+  // 출원인 주소 확보율은 참고 지표로만 보존한다. 주소가 일부 없더라도
+  // 수집이 완료된 지역·품목은 확보된 값 그대로 표시하며, 지역 귀속 확정값으로
+  // 과해석되지 않도록 대시보드에서 확보율과 주의 문구를 함께 노출한다.
   const regionalMetricAvailability = !isRegionalBucket
     ? null
     : regionalMetricBlockingReasons.length === 0
