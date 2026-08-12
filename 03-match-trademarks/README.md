@@ -50,6 +50,8 @@ node 03-match-trademarks/matchTrademarks.js \
 ```
 
 `status=review_required|error` 또는 `excluded=true`인 ② 행은 검색하지 않고 `skipped`로 보존한다.
+미확정 원물명의 상표 존재 여부를 별도로 탐색할 때만 `--include-review-required`를 명시한다.
+이 결과는 `matchingBasis=raw_item_name_unclassified`로 표시해 고시명칭 확정 결과와 구분한다.
 같은 `(검색어, NICE류)`는 한 번만 호출하며 `--resume`으로 완료 쿼리는 재사용하고 부분·오류
 쿼리만 이어서 수집한다. `collectionStatus=partial`은 오류가 아니라 실행 상한에 도달한 결과이며
 완전 모집단으로 해석하면 안 된다.
@@ -57,6 +59,11 @@ node 03-match-trademarks/matchTrademarks.js \
 주요 옵션은 `--numOfRows`, `--concurrency`, `--max-requests`, `--max-pages`,
 `--max-hits-per-query`, `--checkpoint`, `--resume`, `--dry-run`, `--area-brands`,
 `--enrich-registry`, `--max-registry-requests`, `--registry-concurrency`다.
+
+배치 출력은 기본적으로 `storageMode=query_facts`를 사용한다. KIPRIS hit 배열은 고유
+`noticeName + NICE류` 검색 조합별 `queryFacts`에 한 번만 저장하고, `results`의 지역×품목 행은
+`queryKey`로 참조한다. ④ 분석은 참조를 메모리에서 연결한 뒤 출원인 주소 근거를 각 지역에 다시
+대조한다. 과거 도구 호환이 꼭 필요할 때만 `--storage-mode expanded`를 명시한다.
 
 ## 농사로 지역브랜드 3건 검증자료
 
@@ -110,6 +117,9 @@ node 03-match-trademarks/enrichApplicantRegions.js \
   --cache 03-match-trademarks/output/trademark-applicant-region-cache.json \
   --out 03-match-trademarks/output/applicant-regions.json
 ```
+
+이미 수집한 주소 캐시만 새 query fact 결과에 적용할 때는 `--cache-only`를 사용한다. 이 모드는
+신규 API 요청을 보내지 않고, 캐시에 없는 출원번호를 `not_collected`로 유지한다.
 
 KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은 출원번호를 입력받고
 `applicantAddress`를 반환한다. 따라서 등록번호가 아직 없는 출원·심사 중 상표도 조회할 수 있다.

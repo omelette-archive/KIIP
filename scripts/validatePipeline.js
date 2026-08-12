@@ -175,6 +175,7 @@ function validateContracts(tempDir) {
     "03-match-trademarks/matchTrademarks.js",
     "--input",
     normalizedPath,
+    "--include-review-required",
     "--dry-run",
     "--out",
     planPath,

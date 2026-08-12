@@ -210,6 +210,38 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
   assert.strictEqual(batchResult.summary.uniqueQueryCount, 2);
   assert.strictEqual(batchResult.summary.partialUniqueQueryCount, 1);
   assert.strictEqual(batchResult.summary.erroredUniqueQueryCount, 1);
+  const compactDocument = {
+    ...batchDocument,
+    schemaVersion: "1.3",
+    storageMode: "query_facts",
+    queryFacts: {
+      "사과\u001f31": {
+        ...newFormatInput[0],
+        query: { ...newFormatInput[0].query, region: null },
+      },
+    },
+    results: [
+      {
+        inputIndex: 0,
+        queryKey: "사과\u001f31",
+        query: { ...newFormatInput[0].query },
+        input: newFormatInput[0].input,
+        status: "ok",
+        collectionStatus: "partial",
+      },
+    ],
+    inputCount: 1,
+    searchableRowCount: 1,
+    successCount: 1,
+    partialCount: 1,
+    errorCount: 0,
+    skippedCount: 0,
+    uniqueQueryCount: 1,
+  };
+  const compactResult = analyzeEntries(compactDocument, { asOfYear: 2026 });
+  assert.strictEqual(compactResult.regionItems.length, 1);
+  assert.strictEqual(compactResult.regionItems[0].uniqueTrademarkCount, 1);
+  assert.strictEqual(compactResult.summary.partialRowCount, 1);
   ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
 }
 

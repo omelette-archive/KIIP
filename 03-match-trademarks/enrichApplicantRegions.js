@@ -36,6 +36,7 @@ function usage(message) {
     "  --concurrency <n>   동시 호출 수 (기본 1, 최대 5)",
     "  --cache <path>      영속 캐시 (기본: output/trademark-applicant-region-cache.json)",
     "  --checkpoint-every <n> 성공 n건마다 캐시 저장 (기본 100)",
+    "  --cache-only         신규 API 호출 없이 현재 캐시만 결과에 적용",
     "  --dry-run           호출 없이 캐시·잔여량 확인",
   ].join("\n"));
   process.exit(message ? 1 : 0);
@@ -68,7 +69,8 @@ async function main() {
   }
   let completedThisRun = 0;
   const output = await enrichApplicantRegions(document, createClient(), {
-    limit: Number(args.limit),
+    limit: args["cache-only"] ? 0 : Number(args.limit),
+    cacheOnly: Boolean(args["cache-only"]),
     concurrency: Number(args.concurrency),
     cacheEntries: entries,
     onCacheUpdate: () => {

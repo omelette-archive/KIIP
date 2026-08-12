@@ -362,7 +362,7 @@ async function run() {
         itemName: "오미자",
         noticeName: "",
         status: "review_required",
-      }),
+      }, { includeReviewRequired: true }),
       { region: "경상북도 안동시", item: "오미자", classCode: null }
     );
     assert.match(
@@ -371,11 +371,18 @@ async function run() {
     );
     assert.match(
       makeBatchQuery({
+        sido: "경상북도", sigungu: "안동시", itemName: "오미자", status: "review_required",
+      }).skipReason,
+      /상위 단계/,
+      "미확정 원물명 검색은 명시적으로 켜기 전에는 기본 파이프라인에서 제외해야 함"
+    );
+    assert.match(
+      makeBatchQuery({
         sido: "경상북도",
         sigungu: "안동시",
         itemName: "",
         status: "review_required",
-      }).skipReason,
+      }, { includeReviewRequired: true }).skipReason,
       /품목명 미확정/
     );
     assert.match(
@@ -615,7 +622,7 @@ async function run() {
         "utf8"
       );
       const rows = readNormalizedCsv(normalizedInputPath);
-      const plan = buildBatchPlan(rows);
+      const plan = buildBatchPlan(rows, { includeReviewRequired: true });
       // review_required 행(고시명칭 미확정)도 itemName·지역이 있으면 검색 계획에 포함한다
       // — 원물명 그대로 실제 출원 상표가 있는지는 확인할 수 있어야 하므로(2026-08-12).
       // classCode는 공식 분류가 없어 null(식품 기본류 fallback).

@@ -27,6 +27,7 @@ test("renders the data-connected Korean dashboard", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
+  const snapshot = await loadSnapshot();
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
@@ -38,8 +39,12 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
     "지도는 상표 예시보다 먼저 보여야 함",
   );
-  assert.match(html, /37,563/);
-  assert.match(html, /완료 20 · 부분 106/);
+  assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
+  assert.match(
+    html,
+    new RegExp(`완료 ${snapshot.pipelineStatus.uniqueQueryCounts.complete} · 부분 ${snapshot.pipelineStatus.uniqueQueryCounts.partial}`),
+  );
+  assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
@@ -109,8 +114,10 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
-  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 126);
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 42);
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 127);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 65);
+  assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 31188);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -122,7 +129,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 42, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
+  assert.equal(availableItems.length, 65, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(

@@ -16,7 +16,10 @@ const MATCH_VERSION = "kipris-trademark-applicant-region-v1";
 function applicationNumbers(document) {
   const seen = new Set();
   const result = [];
-  for (const entry of document.results || []) {
+  const entries = document?.storageMode === "query_facts"
+    ? Object.values(document.queryFacts || {})
+    : document.results || [];
+  for (const entry of entries) {
     for (const hit of entry.hits || []) {
       const number = normalizeApplicationNumber(hit.applicationNumber);
       if (number && !seen.has(number)) {
@@ -41,10 +44,11 @@ async function enrichApplicantRegions(document, client, options = {}) {
   if (!document || !Array.isArray(document.results)) {
     throw new Error("입력은 ③단계 결과 JSON이어야 합니다 (results 배열 필요).");
   }
+  const cacheOnly = Boolean(options.cacheOnly);
   const limit = Number(options.limit ?? 10);
   const concurrency = Number(options.concurrency ?? 1);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 50000) {
-    throw new Error("limit은 1~50000 정수여야 합니다.");
+  if (!Number.isInteger(limit) || limit < (cacheOnly ? 0 : 1) || limit > 50000) {
+    throw new Error(cacheOnly ? "cacheOnly 실행의 limit은 0~50000 정수여야 합니다." : "limit은 1~50000 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
@@ -57,7 +61,9 @@ async function enrichApplicantRegions(document, client, options = {}) {
   const adminList = options.adminList || loadAdminCodes();
   const allNumbers = applicationNumbers(document);
   const cachedNumbers = allNumbers.filter((number) => cacheEntries.get(number)?.status === "complete");
-  const selected = allNumbers.filter((number) => !cacheEntries.has(number)).slice(0, limit);
+  const selected = cacheOnly
+    ? []
+    : allNumbers.filter((number) => !cacheEntries.has(number)).slice(0, limit);
   let cursor = 0;
   let rateLimitError = null;
   let haltError = null;
@@ -105,9 +111,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
   for (const row of fetched) if (row.status === "complete") available.set(row.applicationNumber, row);
 
   const counts = { inside: 0, outside: 0, unverified: 0, notCollected: 0, noApplicationNumber: 0 };
-  const results = document.results.map((entry) => ({
-    ...entry,
-    hits: (entry.hits || []).map((hit) => {
+  const enrichHitForRegion = (hit, queryRegion) => {
       const number = normalizeApplicationNumber(hit.applicationNumber);
       if (!number) {
         counts.noApplicationNumber++;
@@ -119,7 +123,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
         return { ...hit, applicationApplicantLookup: { status: "not_collected" } };
       }
       const evaluated = evaluateApplicantRegions(
-        entry.query?.region || "",
+        queryRegion || "",
         cached.applicants,
         adminList
       );
@@ -137,8 +141,45 @@ async function enrichApplicantRegions(document, client, options = {}) {
           found: Boolean(cached.found),
         },
       };
-    }),
-  }));
+  };
+  let results;
+  let queryFacts = document.queryFacts;
+  if (document.storageMode === "query_facts") {
+    queryFacts = Object.fromEntries(Object.entries(document.queryFacts || {}).map(([key, fact]) => [
+      key,
+      {
+        ...fact,
+        hits: (fact.hits || []).map((hit) => enrichHitForRegion(hit, "")),
+      },
+    ]));
+    counts.inside = 0;
+    counts.outside = 0;
+    counts.unverified = 0;
+    counts.notCollected = 0;
+    counts.noApplicationNumber = 0;
+    for (const entry of document.results || []) {
+      const fact = queryFacts[entry.queryKey];
+      for (const hit of fact?.hits || []) {
+        const number = normalizeApplicationNumber(hit.applicationNumber);
+        if (!number) counts.noApplicationNumber++;
+        else if (!available.has(number)) counts.notCollected++;
+        else {
+          const evaluated = evaluateApplicantRegions(
+            entry.query?.region || "",
+            available.get(number).applicants,
+            adminList
+          );
+          counts[evaluated.match]++;
+        }
+      }
+    }
+    results = document.results;
+  } else {
+    results = document.results.map((entry) => ({
+      ...entry,
+      hits: (entry.hits || []).map((hit) => enrichHitForRegion(hit, entry.query?.region || "")),
+    }));
+  }
   const requested = fetched.filter((row) => row.requested).length;
   const errors = fetched.filter((row) => row.status === "error").length;
   const newlyComplete = fetched.filter((row) => row.status === "complete").length;
@@ -146,6 +187,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
   const fetchedAt = new Date().toISOString();
   return {
     ...document,
+    queryFacts,
     results,
     applicationApplicantEnrichment: {
       enabled: true,
@@ -156,6 +198,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
         lookupKey: "applicationNumber",
         addressStorage: "normalized_sido_sigungu_only",
         applicantRegionMatchVersion: MATCH_VERSION,
+        storageUnit: document.storageMode === "query_facts" ? "query_fact_hit_with_region_row_evaluation" : "expanded_region_row_hit",
       },
       uniqueApplicationCount: allNumbers.length,
       cachedApplicationCount: cachedNumbers.length,

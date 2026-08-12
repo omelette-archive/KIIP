@@ -77,6 +77,7 @@ function printUsageAndExit(message) {
       "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
       "  --storage-mode <mode> 배치 저장 구조: query-facts(기본, hit 1회 저장) | expanded(호환용)",
+      "  --include-review-required 고시명칭 미확정 행을 원물명으로 탐색(별도 실험용, 기본 꺼짐)",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --area-brands <path> 농사로 areaBrandLst JSON을 출원번호로 조인(선택)",
       "  --enrich-registry    등록번호가 있는 hit를 등록원부 API로 보강(출원인 주소·지정상품, 선택)",
@@ -153,7 +154,7 @@ function isCsvTrue(value) {
   return ["true", "1", "yes", "y"].includes(String(value || "").trim().toLowerCase());
 }
 
-function makeBatchQuery(row) {
+function makeBatchQuery(row, options = {}) {
   if (row.status === "error") {
     return { skipReason: `상위 단계 status=${row.status}` };
   }
@@ -174,7 +175,7 @@ function makeBatchQuery(row) {
   // 고시명칭이 아직 확정되지 않은(검토대기) 원물명도, 실제로 그 이름으로 출원된 상표가
   // 있는지는 확인할 수 있다. 공식 분류가 없으니 NICE류는 식품 관련 기본류 fallback을
   // 쓰고, classCodeFallbackApplied=true(및 noticeName 비어있음)로 미분류 검색임을 남긴다.
-  if (row.status === "review_required") {
+  if (row.status === "review_required" && options.includeReviewRequired) {
     const item = String(row.itemName || "").trim();
     if (!item) return { skipReason: "② 단계 품목명 미확정" };
     return { region, item, classCode: null };
@@ -183,8 +184,8 @@ function makeBatchQuery(row) {
   return { skipReason: `상위 단계 status=${row.status}` };
 }
 
-function countSearchableRows(rows) {
-  return rows.reduce((count, row) => count + (makeBatchQuery(row).skipReason ? 0 : 1), 0);
+function countSearchableRows(rows, options = {}) {
+  return rows.reduce((count, row) => count + (makeBatchQuery(row, options).skipReason ? 0 : 1), 0);
 }
 
 function normalizeQueryClasses(classCode) {
@@ -220,9 +221,9 @@ function sourceProvenance(row) {
   };
 }
 
-function buildBatchPlan(rows) {
+function buildBatchPlan(rows, options = {}) {
   return rows.map((row, inputIndex) => {
-    const query = makeBatchQuery(row);
+    const query = makeBatchQuery(row, options);
     if (query.skipReason) {
       return {
         status: "skipped",
@@ -479,7 +480,7 @@ async function runBatch(rows, client, options) {
     concurrency: 2,
     ...options,
   };
-  const plan = buildBatchPlan(rows);
+  const plan = buildBatchPlan(rows, options);
   const groups = groupPlannedQueries(plan);
   const budget = options.requestBudget || createRequestBudget(options.maxRequests);
   const checkpointQueries = options.checkpointQueries || {};
@@ -727,9 +728,10 @@ async function main() {
   if (args.input) {
     const inputPath = path.resolve(args.input);
     const rows = readNormalizedCsv(inputPath);
-    const plan = buildBatchPlan(rows);
+    const batchPlanOptions = { includeReviewRequired: Boolean(args["include-review-required"]) };
+    const plan = buildBatchPlan(rows, batchPlanOptions);
     const uniqueQueries = groupPlannedQueries(plan);
-    const searchableRows = countSearchableRows(rows);
+    const searchableRows = countSearchableRows(rows, batchPlanOptions);
     const estimatedMinRequests = Math.min(uniqueQueries.length, numeric.maxRequests);
     const estimatedMaxRequests = Math.min(
       uniqueQueries.length * numeric.maxPages,
@@ -747,6 +749,7 @@ async function main() {
         estimatedMinRequestCount: estimatedMinRequests,
         estimatedMaxRequestCount: estimatedMaxRequests,
         maxRequestCount: numeric.maxRequests,
+        reviewRequiredSearchEnabled: batchPlanOptions.includeReviewRequired,
         regionalBrandValidation: areaBrandValidationMetadata(areaBrandContext, areaBrandsPath),
         skippedCount: plan.filter((row) => row.status === "skipped").length,
         completedAt: new Date().toISOString(),
@@ -783,6 +786,7 @@ async function main() {
     );
     const batch = await runBatch(rows, client, {
       ...numeric,
+      ...batchPlanOptions,
       resume: Boolean(args.resume),
       checkpointQueries: checkpoint.queries || {},
       saveCheckpoint,
@@ -812,6 +816,7 @@ async function main() {
       erroredUniqueQueryCount: batch.uniqueQueryStatusCounts.error,
       uniqueQueryStatusCounts: batch.uniqueQueryStatusCounts,
       duplicateQueryRowCount: searchableRows - batch.uniqueQueryCount,
+      reviewRequiredSearchEnabled: batchPlanOptions.includeReviewRequired,
       requestCount: batch.requestCount,
       resumedQueryCount: batch.resumedQueryCount,
       successCount: results.filter((row) => row.status === "ok").length,
