@@ -362,14 +362,23 @@ function finalizeBucket(bucket, options) {
   const uniqueTrademarkCount = bucket.hits.size;
   const isRegionalBucket = Boolean(clean(bucket.region));
   const regionalUniqueTrademarkCount = isRegionalBucket ? regionCounts.inside : null;
+  // threshold=1(기본)은 기존 all-or-nothing 게이트와 동일하다. 1 미만은 명시적으로 요청한
+  // 알파/미리보기 실행에서만 쓰고, 그 결과에는 항상 completenessThreshold를 남겨 완화된
+  // 기준으로 나왔다는 걸 구분할 수 있게 한다.
+  const regionalCollectionRate =
+    bucket.queryCount > 0
+      ? (bucket.successfulQueryCount - bucket.partialQueryCount) / bucket.queryCount
+      : 0;
   const regionalCollectionComplete =
     isRegionalBucket &&
     bucket.successfulQueryCount > 0 &&
-    bucket.partialQueryCount === 0 &&
     bucket.erroredQueryCount === 0 &&
-    bucket.skippedQueryCount === 0;
+    bucket.skippedQueryCount === 0 &&
+    regionalCollectionRate >= options.regionalCoverageThreshold;
   const regionalAddressVerificationComplete =
-    isRegionalBucket && (uniqueTrademarkCount === 0 || regionVerifiedHitCount === uniqueTrademarkCount);
+    isRegionalBucket &&
+    (uniqueTrademarkCount === 0 ||
+      regionVerifiedHitCount / uniqueTrademarkCount >= options.regionalCoverageThreshold);
   const regionalMetricBlockingReasons = [];
   if (isRegionalBucket && !regionalCollectionComplete) {
     regionalMetricBlockingReasons.push("collection_incomplete");
@@ -460,6 +469,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const asOfYear = Number(providedOptions.asOfYear ?? new Date().getUTCFullYear());
   const recentYears = Number(providedOptions.recentYears ?? 3);
   const maxRecentBrands = Number(providedOptions.maxRecentBrands ?? 10);
+  const regionalCoverageThreshold = Number(providedOptions.regionalCoverageThreshold ?? 1);
   if (!Number.isInteger(asOfYear) || asOfYear < 1801 || asOfYear > 2200) {
     throw new Error("asOfYear는 1801~2200 범위의 정수여야 합니다.");
   }
@@ -469,7 +479,14 @@ function analyzeEntries(parsed, providedOptions = {}) {
   if (!Number.isInteger(maxRecentBrands) || maxRecentBrands < 1 || maxRecentBrands > 100) {
     throw new Error("maxRecentBrands는 1~100 범위의 정수여야 합니다.");
   }
-  const options = { asOfYear, recentYears, maxRecentBrands };
+  if (
+    !Number.isFinite(regionalCoverageThreshold) ||
+    regionalCoverageThreshold < 0 ||
+    regionalCoverageThreshold > 1
+  ) {
+    throw new Error("regionalCoverageThreshold는 0~1 범위의 숫자여야 합니다.");
+  }
+  const options = { asOfYear, recentYears, maxRecentBrands, regionalCoverageThreshold };
   const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
@@ -577,6 +594,12 @@ function analyzeEntries(parsed, providedOptions = {}) {
     }
   }
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
+  if (regionalCoverageThreshold < 1) {
+    warnings.push(
+      `regionalCoverageThreshold=${regionalCoverageThreshold}로 완화된 알파 실행입니다 — 수집·주소 검증이 ` +
+        `100% 미만이어도 지역 지표를 노출합니다. 배포용 공식 수치가 아니라 알파 미리보기로만 사용하세요.`
+    );
+  }
 
   return {
     schemaVersion: "1.4",
@@ -628,6 +651,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
       recentYears,
       recentPeriodExcludesCurrentYear: true,
       maxRecentBrands,
+      regionalCoverageThreshold,
     },
     exclusions: {
       validationOnlyExcludedCount,
