@@ -44,6 +44,7 @@ function parseArgs(argv) {
     "max-hits-per-query": 100,
     "max-registry-requests": 3,
     "registry-concurrency": 3,
+    "storage-mode": "query-facts",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -75,6 +76,8 @@ function printUsageAndExit(message) {
       "  --max-hits-per-query <n> 쿼리당 필터 통과 hit 상한 (기본 100)",
       "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
+      "  --storage-mode <mode> 배치 저장 구조: query-facts(기본, hit 1회 저장) | expanded(호환용)",
+      "  --include-review-required 고시명칭 미확정 행을 원물명으로 탐색(별도 실험용, 기본 꺼짐)",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
       "  --area-brands <path> 농사로 areaBrandLst JSON을 출원번호로 조인(선택)",
       "  --enrich-registry    등록번호가 있는 hit를 등록원부 API로 보강(출원인 주소·지정상품, 선택)",
@@ -151,8 +154,8 @@ function isCsvTrue(value) {
   return ["true", "1", "yes", "y"].includes(String(value || "").trim().toLowerCase());
 }
 
-function makeBatchQuery(row) {
-  if (row.status && row.status !== "ok") {
+function makeBatchQuery(row, options = {}) {
+  if (row.status === "error") {
     return { skipReason: `상위 단계 status=${row.status}` };
   }
   if (isCsvTrue(row.excluded)) {
@@ -160,16 +163,29 @@ function makeBatchQuery(row) {
   }
 
   const region = [row.sido, row.sigungu].filter(Boolean).join(" ").trim();
-  // 분석 검색어는 상표명이나 원문 품목명이 아니라 ②에서 확정한 고시상품명칭만 쓴다.
-  const item = String(row.noticeName || "").trim();
   if (!region) return { skipReason: "지역 정보 없음" };
-  if (!item) return { skipReason: "② 단계 고시명칭 미확정" };
-  if (!String(row.niceClass || "").trim()) return { skipReason: "② 단계 NICE류 미확정" };
-  return { region, item, classCode: row.niceClass };
+
+  const notice = String(row.noticeName || "").trim();
+  if (row.status === "ok") {
+    if (!notice) return { skipReason: "② 단계 고시명칭 미확정" };
+    if (!String(row.niceClass || "").trim()) return { skipReason: "② 단계 NICE류 미확정" };
+    return { region, item: notice, classCode: row.niceClass };
+  }
+
+  // 고시명칭이 아직 확정되지 않은(검토대기) 원물명도, 실제로 그 이름으로 출원된 상표가
+  // 있는지는 확인할 수 있다. 공식 분류가 없으니 NICE류는 식품 관련 기본류 fallback을
+  // 쓰고, classCodeFallbackApplied=true(및 noticeName 비어있음)로 미분류 검색임을 남긴다.
+  if (row.status === "review_required" && options.includeReviewRequired) {
+    const item = String(row.itemName || "").trim();
+    if (!item) return { skipReason: "② 단계 품목명 미확정" };
+    return { region, item, classCode: null };
+  }
+
+  return { skipReason: `상위 단계 status=${row.status}` };
 }
 
-function countSearchableRows(rows) {
-  return rows.reduce((count, row) => count + (makeBatchQuery(row).skipReason ? 0 : 1), 0);
+function countSearchableRows(rows, options = {}) {
+  return rows.reduce((count, row) => count + (makeBatchQuery(row, options).skipReason ? 0 : 1), 0);
 }
 
 function normalizeQueryClasses(classCode) {
@@ -205,9 +221,9 @@ function sourceProvenance(row) {
   };
 }
 
-function buildBatchPlan(rows) {
+function buildBatchPlan(rows, options = {}) {
   return rows.map((row, inputIndex) => {
-    const query = makeBatchQuery(row);
+    const query = makeBatchQuery(row, options);
     if (query.skipReason) {
       return {
         status: "skipped",
@@ -464,7 +480,7 @@ async function runBatch(rows, client, options) {
     concurrency: 2,
     ...options,
   };
-  const plan = buildBatchPlan(rows);
+  const plan = buildBatchPlan(rows, options);
   const groups = groupPlannedQueries(plan);
   const budget = options.requestBudget || createRequestBudget(options.maxRequests);
   const checkpointQueries = options.checkpointQueries || {};
@@ -485,7 +501,15 @@ async function runBatch(rows, client, options) {
         options.resume ? saved : null
       );
       checkpointQueries[group.queryKey] = collected;
-      if (options.saveCheckpoint) options.saveCheckpoint(checkpointQueries);
+      const checkpointChanged =
+        !saved ||
+        Number(collected.pages?.nextPage) !== Number(saved.pages?.nextPage) ||
+        collected.collectionStatus !== saved.collectionStatus ||
+        collected.stopReason !== saved.stopReason ||
+        (collected.hits?.length || 0) !== (saved.hits?.length || 0);
+      if (options.saveCheckpoint && checkpointChanged) {
+        options.saveCheckpoint(checkpointQueries);
+      }
     }
     return { ...group, collected, reusedFromCheckpoint: collected === saved };
   });
@@ -511,9 +535,15 @@ async function runBatch(rows, client, options) {
     );
     return mapped;
   });
+  const uniqueQueryStatusCounts = { complete: 0, partial: 0, error: 0 };
+  for (const group of collectedGroups) {
+    const status = group.collected?.collectionStatus;
+    if (Object.hasOwn(uniqueQueryStatusCounts, status)) uniqueQueryStatusCounts[status]++;
+  }
   return {
     results,
     uniqueQueryCount: groups.length,
+    uniqueQueryStatusCounts,
     requestCount: budget.used,
     resumedQueryCount,
   };
@@ -559,17 +589,62 @@ function areaBrandValidationMetadata(context, sourceFile, results) {
 function loadCheckpoint(filePath, options) {
   if (!fs.existsSync(filePath)) throw new Error(`재개할 체크포인트가 없습니다: ${filePath}`);
   const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  const expected = {
-    numOfRows: options.numOfRows,
-    maxPages: options.maxPages,
-    maxHitsPerQuery: options.maxHitsPerQuery,
-  };
-  for (const [key, value] of Object.entries(expected)) {
-    if (Number(parsed.options?.[key]) !== Number(value)) {
-      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${value}와 다릅니다.`);
+  for (const key of ["numOfRows", "maxHitsPerQuery"]) {
+    if (Number(parsed.options?.[key]) !== Number(options[key])) {
+      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${options[key]}와 다릅니다.`);
     }
   }
+  const savedMaxPages = Number(parsed.options?.maxPages);
+  const currentMaxPages = Number(options.maxPages);
+  if (!Number.isInteger(savedMaxPages) || currentMaxPages < savedMaxPages) {
+    throw new Error(
+      `체크포인트 maxPages=${parsed.options?.maxPages}보다 현재 값 ${options.maxPages}가 작습니다.`
+    );
+  }
   return parsed;
+}
+
+function compactBatchOutput(output) {
+  const queryFacts = {};
+  const results = (output.results || []).map((entry) => {
+    if (!entry.queryKey || !Array.isArray(entry.hits)) return entry;
+    if (!queryFacts[entry.queryKey]) {
+      const {
+        inputIndex,
+        input,
+        source,
+        provenance,
+        reusedFromCheckpoint,
+        ...fact
+      } = entry;
+      queryFacts[entry.queryKey] = {
+        ...fact,
+        query: {
+          ...(fact.query || {}),
+          region: null,
+          regionMatch: "not_applicable",
+        },
+      };
+    }
+    const {
+      hits,
+      keywordTotalCount,
+      pages,
+      fetchedAt,
+      stopReason,
+      error,
+      ...reference
+    } = entry;
+    return reference;
+  });
+  return {
+    ...output,
+    schemaVersion: "1.3",
+    storageMode: "query_facts",
+    queryFactCount: Object.keys(queryFacts).length,
+    queryFacts,
+    results,
+  };
 }
 
 function validateNumericArgs(args) {
@@ -579,6 +654,9 @@ function validateNumericArgs(args) {
   const maxRequests = Number(args["max-requests"]);
   const maxPages = Number(args["max-pages"]);
   const maxHitsPerQuery = Number(args["max-hits-per-query"]);
+  if (!["query-facts", "expanded"].includes(String(args["storage-mode"]))) {
+    printUsageAndExit("--storage-mode 은 query-facts 또는 expanded 여야 합니다.");
+  }
   if (!Number.isInteger(numOfRows) || numOfRows < 1 || numOfRows > 100) {
     printUsageAndExit("--numOfRows 는 1~100 사이의 정수여야 합니다.");
   }
@@ -650,9 +728,10 @@ async function main() {
   if (args.input) {
     const inputPath = path.resolve(args.input);
     const rows = readNormalizedCsv(inputPath);
-    const plan = buildBatchPlan(rows);
+    const batchPlanOptions = { includeReviewRequired: Boolean(args["include-review-required"]) };
+    const plan = buildBatchPlan(rows, batchPlanOptions);
     const uniqueQueries = groupPlannedQueries(plan);
-    const searchableRows = countSearchableRows(rows);
+    const searchableRows = countSearchableRows(rows, batchPlanOptions);
     const estimatedMinRequests = Math.min(uniqueQueries.length, numeric.maxRequests);
     const estimatedMaxRequests = Math.min(
       uniqueQueries.length * numeric.maxPages,
@@ -670,6 +749,7 @@ async function main() {
         estimatedMinRequestCount: estimatedMinRequests,
         estimatedMaxRequestCount: estimatedMaxRequests,
         maxRequestCount: numeric.maxRequests,
+        reviewRequiredSearchEnabled: batchPlanOptions.includeReviewRequired,
         regionalBrandValidation: areaBrandValidationMetadata(areaBrandContext, areaBrandsPath),
         skippedCount: plan.filter((row) => row.status === "skipped").length,
         completedAt: new Date().toISOString(),
@@ -706,6 +786,7 @@ async function main() {
     );
     const batch = await runBatch(rows, client, {
       ...numeric,
+      ...batchPlanOptions,
       resume: Boolean(args.resume),
       checkpointQueries: checkpoint.queries || {},
       saveCheckpoint,
@@ -719,7 +800,7 @@ async function main() {
         }
       }
     }
-    const output = {
+    let output = {
       schemaVersion: "1.2",
       mode: "batch",
       trademarkSourceMetadata: {
@@ -730,7 +811,12 @@ async function main() {
       inputCount: rows.length,
       searchableRowCount: searchableRows,
       uniqueQueryCount: batch.uniqueQueryCount,
+      completeUniqueQueryCount: batch.uniqueQueryStatusCounts.complete,
+      partialUniqueQueryCount: batch.uniqueQueryStatusCounts.partial,
+      erroredUniqueQueryCount: batch.uniqueQueryStatusCounts.error,
+      uniqueQueryStatusCounts: batch.uniqueQueryStatusCounts,
       duplicateQueryRowCount: searchableRows - batch.uniqueQueryCount,
+      reviewRequiredSearchEnabled: batchPlanOptions.includeReviewRequired,
       requestCount: batch.requestCount,
       resumedQueryCount: batch.resumedQueryCount,
       successCount: results.filter((row) => row.status === "ok").length,
@@ -747,6 +833,7 @@ async function main() {
       completedAt: new Date().toISOString(),
       results,
     };
+    if (args["storage-mode"] === "query-facts") output = compactBatchOutput(output);
     const outPath = writeJson(output, args.out);
     console.error(
       `[matchTrademarks] batch done. requests=${output.requestCount}, success=${output.successCount}, partial=${output.partialCount}, error=${output.errorCount}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`
@@ -811,4 +898,5 @@ module.exports = {
   runWithConcurrency,
   loadCheckpoint,
   areaBrandValidationMetadata,
+  compactBatchOutput,
 };

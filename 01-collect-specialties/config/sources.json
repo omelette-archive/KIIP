@@ -130,6 +130,32 @@
         "status": "sample_enrichment_live_validated",
         "adapter": "03-match-trademarks/lib/ipRegistryClient.js + lib/ipRegistryEnricher.js"
       }
+    },
+    {
+      "id": "kipris_trademark_applicant",
+      "name": "지식재산처 KIPRISPlus 상표 출원 속보 출원인",
+      "role": "trademark_applicant_address_enrichment",
+      "dataVersion": "kipris-trademark-applicant-address-v1",
+      "lastVerifiedAt": "2026-08-12",
+      "catalogUrl": "https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001",
+      "providerUrl": "https://plus.kipris.or.kr/openapi/rest/trademarkInfoSearchService/trademarkApplicantInfo",
+      "formats": ["XML"],
+      "authentication": {
+        "required": true,
+        "keyEnv": "KIPRIS_API_KEY",
+        "baseUrlEnv": "KIPRIS_APPLICANT_API_BASE_URL",
+        "defaultBaseUrl": "https://plus.kipris.or.kr/openapi/rest/trademarkInfoSearchService/trademarkApplicantInfo",
+        "approval": "kiprisplus_open_api_key"
+      },
+      "quota": {
+        "type": "account_policy_unverified",
+        "value": null,
+        "verification": "공개 안내와 현재 승인 계정 정책의 동일 여부는 미확인. 2026-08-12 고유 출원번호 23,912건 수집 중 429·호출량 제한 응답은 없었으나 실제 계정 상한은 여전히 미확인"
+      },
+      "implementation": {
+        "status": "full_alpha_collection_live_validated",
+        "adapter": "03-match-trademarks/lib/trademarkApplicantClient.js + lib/trademarkApplicantEnricher.js"
+      }
     }
   ]
 }

@@ -3,8 +3,8 @@
  * KIPRIS Plus 상표 검색(trademarkInfoSearchService/getWordSearch) 클라이언트.
  * korean-patent-mcp 의 api-client.ts 호출 방식을 포팅 (참고: docs/kipris-api-notes.md).
  *
- * 알려진 제약: getWordSearch 응답에는 출원인 주소/지역 필드가 없다. 전체 지역 조인은 #11,
- * 농사로 지역브랜드 subset 검증은 #24에서 관리한다.
+ * 알려진 제약: getWordSearch 응답에는 출원인 주소/지역 필드가 없다. 출원번호 주소 보강은
+ * trademarkApplicantClient, 농사로 지역브랜드 subset 검증은 #24에서 관리한다.
  */
 
 const { fetchWithRetry } = require("./fetchWithRetry");

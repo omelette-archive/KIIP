@@ -1,10 +1,20 @@
 {
-  "version": "specialty-approved-aliases-20260811-v1",
-  "approvedAt": "2026-08-11",
+  "version": "specialty-approved-aliases-20260812-v2",
+  "approvedAt": "2026-08-12",
   "approvalIssue": "#51",
   "approvalChannel": "user_confirmation_in_work_session",
   "proposalCommentUrl": "https://github.com/omelette-archive/KIIP/issues/51#issuecomment-5249928480",
   "basis": "농사로 실데이터 검토대기 1,049건의 반복 표현을 지식재산처 고시상품명칭 13판(2026)에 연결하고 사용자 승인 후 확정",
+  "changeLog": [
+    {
+      "date": "2026-08-11",
+      "note": "1차 승인 5묶음(파프리카·방울토마토·애호박/단호박·메론·버섯류)"
+    },
+    {
+      "date": "2026-08-12",
+      "note": "2차 승인 — 검토대기 상위 빈도 원물명 중 사전에 원물 표기가 없고 가공/일반 범주명만 있는 4~5개. itemName은 원물명 그대로 유지하고 noticeName만 검색용으로 별도 연결한다(병합·삭제 아님). 감/단감·오미자·잡곡·매실·대추는 사전에 원물 항목이 없거나 후보가 여럿(가공품)이라 계속 검토대기로 남김"
+    }
+  ],
   "rules": [
     {
       "aliases": ["파프리카", "풋고추", "꽈리고추"],
@@ -35,6 +45,36 @@
       "noticeName": "생버섯",
       "niceClass": "31",
       "similarGroupCode": "G0202"
+    },
+    {
+      "aliases": ["한우"],
+      "noticeName": "소고기",
+      "niceClass": "29",
+      "similarGroupCode": "G0701"
+    },
+    {
+      "aliases": ["벌꿀"],
+      "noticeName": "꿀",
+      "niceClass": "30",
+      "similarGroupCode": "G0302"
+    },
+    {
+      "aliases": ["밤"],
+      "noticeName": "생밤",
+      "niceClass": "31",
+      "similarGroupCode": "G0211"
+    },
+    {
+      "aliases": ["참다래"],
+      "noticeName": "신선한 키위",
+      "niceClass": "31",
+      "similarGroupCode": "G0211"
+    },
+    {
+      "aliases": ["화훼"],
+      "noticeName": "꽃",
+      "niceClass": "31",
+      "similarGroupCode": "G0212"
     }
   ]
 }

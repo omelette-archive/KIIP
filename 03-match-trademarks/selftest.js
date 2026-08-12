@@ -33,6 +33,18 @@ const {
   enrichHitsWithIpRegistry,
   ipRegistryValidationMetadata,
 } = require("./lib/ipRegistryEnricher");
+const { loadCache: loadIpRegistryCache, saveCache: saveIpRegistryCache } = require("./lib/ipRegistryCache");
+const {
+  createClient: createTrademarkApplicantClient,
+  parseApplicantResponse,
+} = require("./lib/trademarkApplicantClient");
+const {
+  enrichApplicantRegions,
+} = require("./lib/trademarkApplicantEnricher");
+const {
+  loadCache: loadTrademarkApplicantCache,
+  saveCache: saveTrademarkApplicantCache,
+} = require("./lib/trademarkApplicantCache");
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
@@ -45,6 +57,8 @@ const {
   buildSearchOutput,
   searchOne,
   runBatch,
+  loadCheckpoint,
+  compactBatchOutput,
 } = require("./matchTrademarks");
 
 const SAMPLE_OK_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -337,9 +351,39 @@ async function run() {
       makeBatchQuery({ status: "error", rawItemName: "실패품목" }).skipReason,
       /상위 단계/
     );
+    // 검토대기(review_required)라도 지역·품목명이 있으면 원물명 자체로 KIPRIS를 검색한다
+    // — 고시명칭 확정 여부와 "실제 그 이름으로 상표가 있는지 확인"은 별개다(2026-08-12
+    // 피드백). 공식 분류가 없으니 classCode는 null(식품 기본류 fallback 적용).
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        rawItemName: "안동 오미자",
+        itemName: "오미자",
+        noticeName: "",
+        status: "review_required",
+      }, { includeReviewRequired: true }),
+      { region: "경상북도 안동시", item: "오미자", classCode: null }
+    );
     assert.match(
       makeBatchQuery({ status: "review_required", rawItemName: "안동하회탈" }).skipReason,
-      /상위 단계/
+      /지역 정보 없음/
+    );
+    assert.match(
+      makeBatchQuery({
+        sido: "경상북도", sigungu: "안동시", itemName: "오미자", status: "review_required",
+      }).skipReason,
+      /상위 단계/,
+      "미확정 원물명 검색은 명시적으로 켜기 전에는 기본 파이프라인에서 제외해야 함"
+    );
+    assert.match(
+      makeBatchQuery({
+        sido: "경상북도",
+        sigungu: "안동시",
+        itemName: "",
+        status: "review_required",
+      }, { includeReviewRequired: true }).skipReason,
+      /품목명 미확정/
     );
     assert.match(
       makeBatchQuery({ excluded: "true", rawItemName: "사과나무" }).skipReason,
@@ -500,6 +544,7 @@ async function run() {
     const interrupted = await runBatch(rows, client, { ...baseOptions, maxRequests: 2 });
     assert.deepStrictEqual(calledPages, [1, 2], "중복된 두 지역 행이 페이지를 각각 호출하면 안 됨");
     assert.strictEqual(interrupted.uniqueQueryCount, 1);
+    assert.deepStrictEqual(interrupted.uniqueQueryStatusCounts, { complete: 0, partial: 1, error: 0 });
     assert.strictEqual(interrupted.results[0].collectionStatus, "partial");
     assert.strictEqual(interrupted.results[0].stopReason, "request_budget");
     assert.strictEqual(interrupted.results[0].hits.length, 4);
@@ -509,6 +554,7 @@ async function run() {
     const resumed = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
     assert.deepStrictEqual(calledPages, [3], "재개 시 다음 미완료 페이지만 호출해야 함");
     assert.strictEqual(resumed.results[0].collectionStatus, "complete");
+    assert.deepStrictEqual(resumed.uniqueQueryStatusCounts, { complete: 1, partial: 0, error: 0 });
     assert.strictEqual(resumed.results[0].hits.length, 5);
 
     calledPages.length = 0;
@@ -516,7 +562,41 @@ async function run() {
     assert.deepStrictEqual(calledPages, [], "완료 쿼리는 재실행 시 API를 다시 호출하면 안 됨");
     assert.strictEqual(reused.resumedQueryCount, 1);
     assert.ok(reused.results.every((row) => row.reusedFromCheckpoint));
+    const compact = compactBatchOutput({
+      schemaVersion: "1.2",
+      mode: "batch",
+      results: reused.results,
+    });
+    assert.strictEqual(compact.schemaVersion, "1.3");
+    assert.strictEqual(compact.storageMode, "query_facts");
+    assert.strictEqual(compact.queryFactCount, 1);
+    assert.strictEqual(Object.values(compact.queryFacts)[0].hits.length, 5);
+    assert.ok(compact.results.every((row) => !Object.hasOwn(row, "hits")));
+    assert.ok(compact.results.every((row) => row.query?.region), "지역행에는 지역 질의 차원을 보존해야 함");
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
+  }
+
+  console.log("9-3) max_pages 부분 체크포인트 — 상한을 늘려 다음 페이지부터 재개");
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-"));
+    const checkpointPath = path.join(dir, "checkpoint.json");
+    fs.writeFileSync(checkpointPath, JSON.stringify({
+      schemaVersion: "1.0",
+      options: { numOfRows: 20, maxPages: 5, maxHitsPerQuery: 600 },
+      queries: {},
+    }));
+    assert.doesNotThrow(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 600,
+    }), "maxPages 증가는 이미 저장한 페이지를 보존하며 안전하게 허용해야 함");
+    assert.throws(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 4, maxHitsPerQuery: 600,
+    }), /보다 현재 값 4가 작습니다/);
+    assert.throws(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 1200,
+    }), /maxHitsPerQuery/,
+    "hit 상한 변경은 마지막 수집 페이지의 잘린 hit를 잃을 수 있어 계속 차단해야 함");
+    fs.rmSync(dir, { recursive: true, force: true });
+    ok("페이지 상한 증가는 허용하고 페이지 크기·hit 상한 변경은 안전을 위해 차단");
   }
 
   console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");
@@ -542,14 +622,19 @@ async function run() {
         "utf8"
       );
       const rows = readNormalizedCsv(normalizedInputPath);
-      const plan = buildBatchPlan(rows);
-      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "skipped"]);
+      const plan = buildBatchPlan(rows, { includeReviewRequired: true });
+      // review_required 행(고시명칭 미확정)도 itemName·지역이 있으면 검색 계획에 포함한다
+      // — 원물명 그대로 실제 출원 상표가 있는지는 확인할 수 있어야 하므로(2026-08-12).
+      // classCode는 공식 분류가 없어 null(식품 기본류 fallback).
+      assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "planned"]);
       assert.strictEqual(plan[0].query.item, "신선한 사과");
-      assert.match(plan[1].reason, /review_required/);
+      assert.strictEqual(plan[0].query.classCode, "31");
+      assert.strictEqual(plan[1].query.item, "하회탈");
+      assert.strictEqual(plan[1].query.classCode, null);
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
-    ok("① 원시 CSV의 직접 투입을 거부하고 ② 확정/검토 행을 호출 예정/건너뜀으로 분리함");
+    ok("① 원시 CSV의 직접 투입을 거부하고, ② 확정 행은 고시명칭으로, 검토대기 행은 원물명으로 검색 계획에 포함함");
   }
 
   console.log("11) ipRegistryClient.getMarkHistory — 요청 구성·응답 요약·오류 코드(000이 성공)");
@@ -759,6 +844,62 @@ async function run() {
     ok("선택 상한과 실제 요청 수를 구분하고 회로 차단된 건을 미수집으로 기록");
   }
 
+  console.log("12-1e) 등록원부 영속 캐시 — 성공 응답 누적·상세주소 비저장");
+  {
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let calls = 0;
+    const fakeClient = {
+      getMarkHistory: async ({ registrationNumber }) => {
+        calls++;
+        return summarizeMarkHistory({
+          rgstNo: registrationNumber,
+          applNo: `A${registrationNumber}`,
+          applicant: [{ applicantAddr: "강원특별자치도 양양군 상세주소 123" }],
+          productList: [{ productClsCd: "31", desProduct: "신선한사과" }],
+        });
+      },
+    };
+    const document = {
+      results: [{
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+        hits: ["1", "2"].map((registrationNumber) => ({ registrationNumber })),
+      }],
+    };
+    const entries = new Map();
+    const first = await enrichDocument(document, fakeClient, {
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: entries,
+      adminList,
+    });
+    assert.strictEqual(calls, 1);
+    assert.strictEqual(first.ipRegistryEnrichment.completeRegistrationCount, 1);
+    assert.strictEqual(entries.get("1").record.applicants[0].address, "강원특별자치도 양양군");
+    assert.ok(!JSON.stringify(entries.get("1")).includes("상세주소"));
+
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-registry-cache-"));
+    const cachePath = path.join(cacheDir, "cache.json");
+    saveIpRegistryCache(cachePath, entries, "2026-08-11T00:00:00.000Z");
+    const reloaded = loadIpRegistryCache(cachePath);
+    const second = await enrichDocument(document, fakeClient, {
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: reloaded,
+      adminList,
+    });
+    assert.strictEqual(calls, 2, "등록번호 1은 캐시 재사용, 미수집 등록번호 2만 추가 호출");
+    assert.strictEqual(second.ipRegistryEnrichment.cachedRegistrationCount, 1);
+    assert.strictEqual(second.ipRegistryEnrichment.newlyCompleteRegistrationCount, 1);
+    assert.strictEqual(second.ipRegistryEnrichment.completeRegistrationCount, 2);
+    assert.strictEqual(second.ipRegistryEnrichment.notCollectedRegistrationCount, 0);
+    assert.deepStrictEqual(
+      second.results[0].hits.map((hit) => hit.applicantRegionMatch),
+      ["inside", "inside"]
+    );
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    ok("성공 주소를 시도·시군구로만 영속 저장하고 다음 실행은 미수집 등록번호부터 조회함");
+  }
+
   console.log("12-2) ipRegistryValidationMetadata — 요약 통계·기준 문서화");
   {
     const adminList = [
@@ -792,6 +933,142 @@ async function run() {
     });
     assert.strictEqual(ipRegistryValidationMetadata(null).enabled, false);
     ok("활성화 여부·기준·요약 통계를 함께 보존해 감사 가능함");
+  }
+
+  console.log("12-3) 출원번호 기반 상표 출원인 주소 — 응답 파싱·영속 누적");
+  {
+    const parsed = parseApplicantResponse(`
+      <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+      <body><items><trademarkApplicantInfo>
+      <nameKoreanLong>저장하지 않을 이름</nameKoreanLong>
+      <applicantAddress>강원특별자치도 양양군 상세주소 123</applicantAddress>
+      <nationalCode>KR</nationalCode><applicantCode>123</applicantCode><seq>1</seq>
+      </trademarkApplicantInfo></items></body></response>`);
+    assert.strictEqual(parsed.found, true);
+    assert.strictEqual(parsed.applicants[0].address, "강원특별자치도 양양군 상세주소 123");
+
+    let requestedUrl = null;
+    let applicantRequestCount = 0;
+    const applicantClient = createTrademarkApplicantClient({
+      apiKey: "test-key",
+      emptyRetryDelay: 0,
+      fetchImpl: async (url) => {
+        requestedUrl = new URL(url);
+        applicantRequestCount++;
+        if (applicantRequestCount < 3) {
+          return { ok: true, status: 200, text: async () => `
+            <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+            <body><items></items></body></response>`,
+          };
+        }
+        return { ok: true, status: 200, text: async () => `
+          <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+          <body><items><trademarkApplicantInfo><applicantAddress>강원특별자치도 양양군</applicantAddress>
+          </trademarkApplicantInfo></items></body></response>`,
+        };
+      },
+    });
+    await applicantClient.getApplicants("40-2026-1234567");
+    assert.ok(requestedUrl.pathname.endsWith("/trademarkApplicantInfo"));
+    assert.strictEqual(requestedUrl.searchParams.get("applicationNumber"), "4020261234567");
+    assert.strictEqual(requestedUrl.searchParams.get("accessKey"), "test-key");
+    assert.strictEqual(applicantRequestCount, 3, "성공 코드의 빈 항목은 완료로 캐시하지 않고 재시도");
+
+    const terminalEmpty = await createTrademarkApplicantClient({
+      apiKey: "test-key",
+      emptyRetries: 0,
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => `
+          <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+          <body><items></items></body></response>`,
+      }),
+    }).getApplicants("40-2026-7654321");
+    assert.strictEqual(terminalEmpty.retryExhausted, true);
+    assert.strictEqual(terminalEmpty.found, false);
+
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let calls = 0;
+    const fakeClient = {
+      getApplicants: async (applicationNumber) => {
+        calls++;
+        return { applicationNumber, found: true, applicants: parsed.applicants };
+      },
+    };
+    const document = {
+      results: [{
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+        hits: ["A1", "A2"].map((applicationNumber) => ({ applicationNumber })),
+      }],
+    };
+    const entries = new Map();
+    const first = await enrichApplicantRegions(document, fakeClient, {
+      limit: 1,
+      concurrency: 1,
+      cacheEntries: entries,
+      adminList,
+      onCacheUpdate: ({ cacheEntries }) => {
+        assert.strictEqual(cacheEntries.size, 1);
+      },
+    });
+    assert.strictEqual(first.applicationApplicantEnrichment.completeApplicationCount, 1);
+    assert.strictEqual(first.results[0].hits[0].applicantRegionMatch, "inside");
+    assert.strictEqual(entries.get("1").applicants[0].address, "강원특별자치도 양양군");
+    assert.ok(!JSON.stringify([...entries.values()]).includes("저장하지 않을 이름"));
+
+    const cacheDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-applicant-cache-"));
+    const cachePath = path.join(cacheDir, "cache.json");
+    entries.set("20", {
+      status: "complete",
+      fetchedAt: "2026-08-11T00:00:00.000Z",
+      found: false,
+      resultCode: "20",
+      applicants: [],
+    });
+    saveTrademarkApplicantCache(cachePath, entries, "2026-08-11T00:00:00.000Z");
+    const reloaded = loadTrademarkApplicantCache(cachePath);
+    assert.strictEqual(reloaded.get("20").resultCode, "20");
+    reloaded.delete("20");
+    const second = await enrichApplicantRegions(document, fakeClient, {
+      limit: 1, concurrency: 1, cacheEntries: reloaded, adminList,
+    });
+    assert.strictEqual(calls, 2, "첫 출원번호는 캐시 재사용하고 두 번째 출원번호만 추가 호출");
+    assert.strictEqual(second.applicationApplicantEnrichment.cachedApplicationCount, 1);
+    assert.strictEqual(second.applicationApplicantEnrichment.completeApplicationCount, 2);
+    assert.deepStrictEqual(
+      second.results[0].hits.map((hit) => hit.applicantRegionMatch),
+      ["inside", "inside"]
+    );
+    const compactDocument = {
+      schemaVersion: "1.3",
+      mode: "batch",
+      storageMode: "query_facts",
+      queryFacts: {
+        apple: {
+          queryKey: "apple",
+          query: { region: null, item: "신선한 사과", classCode: "31" },
+          hits: [{ applicationNumber: "A1" }, { applicationNumber: "A2" }],
+        },
+      },
+      results: [{
+        queryKey: "apple",
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+      }],
+    };
+    const compact = await enrichApplicantRegions(compactDocument, fakeClient, {
+      limit: 0, cacheOnly: true, concurrency: 1, cacheEntries: reloaded, adminList,
+    });
+    assert.strictEqual(compact.results[0].hits, undefined, "지역행에는 hit를 다시 복제하지 않아야 함");
+    assert.strictEqual(compact.queryFacts.apple.hits.length, 2);
+    assert.ok(compact.queryFacts.apple.hits[0].applicantRegionEvidence.length > 0);
+    assert.strictEqual(compact.applicationApplicantEnrichment.applicantRegionCounts.inside, 2);
+    const cacheDocument = JSON.parse(fs.readFileSync(cachePath, "utf8"));
+    const persistedEntries = JSON.stringify(cacheDocument.entries);
+    assert.ok(!persistedEntries.includes("상세주소"));
+    assert.ok(!persistedEntries.includes("applicantCode"));
+    fs.rmSync(cacheDir, { recursive: true, force: true });
+    ok("등록번호 없는 출원도 출원번호로 주소를 조회하고 시도·시군구 캐시에 누적함");
   }
 
   console.log("\n모든 자체 테스트 통과");

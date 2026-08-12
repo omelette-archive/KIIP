@@ -195,6 +195,33 @@ function enrichHit(hit, query, record, fetchedAt) {
   };
 }
 
+function sanitizeRegistryRecordForCache(record, adminList = loadAdminCodes()) {
+  const applicants = (record?.applicants || [])
+    .map((applicant) => {
+      const region = normalizeApplicantAddress(applicant.address, adminList);
+      return {
+        address: region.normalizedRegion || null,
+        nationality: applicant.nationality || null,
+        representative: applicant.representative || null,
+      };
+    })
+    .filter((applicant) => applicant.address || applicant.nationality);
+  return {
+    found: Boolean(record?.found),
+    resultCode: record?.resultCode || null,
+    resultMsg: record?.resultMsg || null,
+    totalCount: Number(record?.totalCount) || 0,
+    applicationNumber: record?.applicationNumber || null,
+    registrationNumber: record?.registrationNumber || null,
+    registrationDate: record?.registrationDate || null,
+    applicants,
+    products: (record?.products || []).map((product) => ({
+      classCode: product.classCode || null,
+      designatedProductName: product.designatedProductName || null,
+    })),
+  };
+}
+
 function registryNumbers(document) {
   const result = [];
   const seen = new Set();
@@ -451,14 +478,21 @@ async function enrichDocument(document, client, options = {}) {
   const allNumbers = registryNumbers(document);
   const limit = Number(options.limit ?? 3);
   const concurrency = Number(options.concurrency ?? 1);
+  const cacheEntries = options.cacheEntries instanceof Map ? options.cacheEntries : new Map();
+  const adminList = options.adminList || loadAdminCodes();
   if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
     throw new Error("limit은 1~100 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
   }
-  const selected = allNumbers.slice(0, limit);
-  const selectedSet = new Set(selected);
+  const cachedByNumber = new Map(
+    allNumbers
+      .filter((number) => cacheEntries.get(number)?.status === "complete")
+      .map((number) => [number, cacheEntries.get(number)])
+  );
+  const uncachedNumbers = allNumbers.filter((number) => !cachedByNumber.has(number));
+  const selected = uncachedNumbers.slice(0, limit);
   const fetchedAt = options.fetchedAt || new Date().toISOString();
   let rateLimitError = null;
   const fetched = await mapConcurrent(selected, concurrency, async (registrationNumber) => {
@@ -472,6 +506,13 @@ async function enrichDocument(document, client, options = {}) {
     }
     try {
       const record = await client.getMarkHistory({ registrationNumber });
+      if (record.found) {
+        cacheEntries.set(registrationNumber, {
+          status: "complete",
+          fetchedAt,
+          record: sanitizeRegistryRecordForCache(record, adminList),
+        });
+      }
       return {
         registrationNumber,
         status: record.found ? "complete" : "not_found",
@@ -489,7 +530,13 @@ async function enrichDocument(document, client, options = {}) {
       };
     }
   });
-  const fetchedByNumber = new Map(fetched.map((row) => [row.registrationNumber, row]));
+  const fetchedByNumber = new Map(
+    [...cachedByNumber.entries()].map(([registrationNumber, entry]) => [
+      registrationNumber,
+      { registrationNumber, status: "complete", record: entry.record, requested: false, cached: true },
+    ])
+  );
+  for (const row of fetched) fetchedByNumber.set(row.registrationNumber, row);
   const counts = {
     registeredHitCount: 0,
     noRegistrationHitCount: 0,
@@ -515,11 +562,11 @@ async function enrichDocument(document, client, options = {}) {
         return { ...hit, ipRegistryStatus: "not_applicable" };
       }
       counts.registeredHitCount++;
-      if (!selectedSet.has(number)) {
+      const fetchedRow = fetchedByNumber.get(number);
+      if (!fetchedRow) {
         counts.notCollectedHitCount++;
         return { ...hit, ipRegistryStatus: "not_collected" };
       }
-      const fetchedRow = fetchedByNumber.get(number);
       if (fetchedRow?.status === "rate_limited") {
         counts.notCollectedHitCount++;
         return {
@@ -550,11 +597,16 @@ async function enrichDocument(document, client, options = {}) {
   const errorRegistrationCount = fetched.filter((row) => row.status === "error").length;
   const notFoundRegistrationCount = fetched.filter((row) => row.status === "not_found").length;
   const completeRegistrationCount = fetched.filter((row) => row.status === "complete").length;
+  const cachedRegistrationCount = cachedByNumber.size;
+  const totalCompleteRegistrationCount = cachedRegistrationCount + completeRegistrationCount;
   const requestedRegistrationCount = fetched.filter((row) => row.requested).length;
   const rateLimitSkippedRegistrationCount = fetched.filter(
     (row) => row.status === "rate_limited"
   ).length;
-  const notCollectedRegistrationCount = Math.max(0, allNumbers.length - requestedRegistrationCount);
+  const notCollectedRegistrationCount = Math.max(
+    0,
+    allNumbers.length - totalCompleteRegistrationCount - notFoundRegistrationCount - errorRegistrationCount
+  );
   const status =
     errorRegistrationCount === selected.length && selected.length > 0
       ? "error"
@@ -579,7 +631,9 @@ async function enrichDocument(document, client, options = {}) {
       uniqueRegistrationCount: allNumbers.length,
       selectedRegistrationCount: selected.length,
       requestedRegistrationCount,
-      completeRegistrationCount,
+      cachedRegistrationCount,
+      newlyCompleteRegistrationCount: completeRegistrationCount,
+      completeRegistrationCount: totalCompleteRegistrationCount,
       notFoundRegistrationCount,
       errorRegistrationCount,
       notCollectedRegistrationCount,
@@ -607,5 +661,6 @@ module.exports = {
   isRateLimitError,
   ipRegistryValidationMetadata,
   registryNumbers,
+  sanitizeRegistryRecordForCache,
   summarizeIpRegistryMatches,
 };

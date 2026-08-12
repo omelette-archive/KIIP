@@ -62,28 +62,40 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 
 공통 헤더: `resultCode`/`resultMsg`, 총 건수는 `totalCount`.
 
-## ⚠️ 알려진 제약 — 지역(주소) 필드 없음
+## 지역(주소) 보강 — 별도 출원인 오퍼레이션 필요
 
 `getWordSearch` 응답에는 **출원인 주소/지역 필드가 없다** (이름만 제공). 즉 "지역 기준 매칭"은
-상표 검색 API 단독으로는 불가능해 보인다.
+단어검색 응답만으로는 불가능하며, 검색 결과의 출원번호를 별도 주소 오퍼레이션에 입력해야 한다.
 
+- **출원번호 경로(본류)**: KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은
+  `applicationNumber`를 입력받고 `applicantAddress`를 제공한다. 2026-08-12 전체 알파의 고유
+  출원번호 23,912건을 수집했고 오류·미수집·429 없이 완료했다. 정상 출원인 응답은 22,994건,
+  제공기관 정상 무결과는 916건, 반복 빈 항목 미검증 종료는 2건이다. 등록번호가 없는
+  출원·심사 중 상표도 대상이다.
+  공식 카탈로그는 <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001>다.
 - ~~data.go.kr의 `특허청_KIPRISPlus_출원인 법인_REST API`(`15059277`)~~ — 2026-08-10 필드
   확인 결과 출원인코드·법인번호·사업자등록번호·대리인명만 제공하고 **주소는 없음**. 기각.
   (이전 버전 문서에 "가능성 있음"으로 적어뒀던 부분을 정정함.)
-- **해결**: data.go.kr `지식재산처_등록원부 실시간 정보 조회 서비스`(`15124946`)의
+- **등록번호 경로(등록 건·지정상품 보강)**: data.go.kr `지식재산처_등록원부 실시간 정보 조회 서비스`(`15124946`)의
   `getMarkHistory` 오퍼레이션(`https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc/getMarkHistory`,
   파라미터 `serviceKey`/`type=json`/`rgstNo`)이 `applicant[].applicantAddr`로 출원인 주소를
   제공함을 2026-08-11 실키로 확인했다. 시도+시군구 수준까지만 노출되고 그 이하는 개인정보
   보호를 위해 마스킹된다(실측: `"강원특별자치도 양양군 ..."`) — 정확히 필요한 정밀도라
-  오히려 이상적이다. 단, 조회 키가 `registrationNumber`(등록번호)라 **등록 완료된 상표만**
-  보강 가능하고 출원중/거절/포기 건은 대상이 아니다. 상세는 이슈 #11 코멘트(2026-08-11) 참고.
+  오히려 이상적이다. 조회 키가 `registrationNumber`(등록번호)라 등록 완료 건의 주소·지정상품
+  보강에 사용하고, 출원중/거절/포기 건의 주소는 위 출원번호 경로를 사용한다.
 - 특허 쪽에는 서지상세(`getBibliographyDetailInfoSearch`)가 있지만 상표용 서지상세는 레퍼런스
   리포에 구현되어 있지 않음 — 다만 위 등록원부 API가 사실상 이 역할을 대신한다.
 
-→ 구현: `enrichIpRegistry.js`가 등록번호가 있는 hit만 제한 수만큼 조회하고 `applicantAddr`를
-법정동코드 마스터와 대조해 `applicantRegionMatch`로 정규화한다. 이건 **진짜 출원인 주소**이므로
-농사로 지역브랜드의 `regionalBrand*`와 달리 `localApplicantShare` 본류에 반영한다. 등록번호가
-없는 hit와 호출 상한 밖 hit는 각각 `not_applicable`, `not_collected`로 남긴다.
+→ 구현: `enrichApplicantRegions.js`가 모든 hit의 출원번호를 기준으로 주소를 누적 보강하고,
+`enrichIpRegistry.js`는 등록번호가 있는 hit의 주소·지정상품을 보강한다. 두 주소 모두 법정동코드
+마스터와 대조해 `applicantRegionMatch`로 정규화하고 `localApplicantShare` 본류에 반영한다.
+출원인 이름·고객번호·전체 상세주소는 캐시에 저장하지 않는다. 호출 상한 밖은 `not_collected`로
+남기며, 주소 커버리지가 끝나기 전 지역 지표는 확정하지 않는다.
+
+실측 중 `resultCode=00`인데 출원인 항목이 비어 있는 응답이 빠른 병렬 호출에서 일시적으로
+발생했다. 이를 완료로 캐시하면 안 되므로 빈 항목은 재시도하고, `resultCode=20` 정상 무결과와
+재시도 후에도 빈 2건을 별도 종료 상태로 기록한다. 동시성 2에서 재수집해 초기 지역 검증률
+28.8%를 최종 87.6%로 복구했다.
 
 ## 품목(품목/상품류) 매칭
 

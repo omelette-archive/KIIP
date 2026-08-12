@@ -27,7 +27,22 @@ function statusCategory(value) {
   return "unknown";
 }
 
-function regionCategory(hit) {
+function evidenceRegionCategory(evidence, bucket) {
+  if (!bucket?.sido || !Array.isArray(evidence) || evidence.length === 0) return null;
+  const values = evidence.map((row) => {
+    if (clean(row.regionStatus) !== "matched" || !clean(row.sido)) return "unverified";
+    if (clean(row.sido) !== clean(bucket.sido)) return "outside";
+    if (clean(bucket.sigungu) && clean(row.regionLevel) === "sigungu") {
+      return clean(row.sigungu) === clean(bucket.sigungu) ? "inside" : "outside";
+    }
+    return "inside";
+  });
+  return new Set(values).size === 1 ? values[0] : "unverified";
+}
+
+function regionCategory(hit, bucket) {
+  const evidenceCategory = evidenceRegionCategory(hit.applicantRegionEvidence, bucket);
+  if (evidenceCategory) return evidenceCategory;
   const raw = hit.applicantRegionMatch ?? hit.regionMatch;
   if (raw === true) return "inside";
   if (raw === false) return "outside";
@@ -124,7 +139,21 @@ function selectTrademarkExamples(examples, limit) {
 
 function normalizeInput(parsed) {
   if (Array.isArray(parsed)) return parsed;
-  if (parsed && Array.isArray(parsed.results)) return parsed.results;
+  if (parsed && Array.isArray(parsed.results)) {
+    if (parsed.storageMode === "query_facts" && parsed.queryFacts) {
+      return parsed.results.map((entry) => {
+        const fact = entry.queryKey ? parsed.queryFacts[entry.queryKey] : null;
+        if (!fact) return entry;
+        return {
+          ...fact,
+          ...entry,
+          query: { ...(fact.query || {}), ...(entry.query || {}) },
+          hits: Array.isArray(fact.hits) ? fact.hits : [],
+        };
+      });
+    }
+    return parsed.results;
+  }
   if (parsed && typeof parsed === "object") return [parsed];
   throw new Error("입력 JSON은 03단계 결과 객체, 결과 배열, 또는 { results: [] } 형태여야 합니다.");
 }
@@ -141,12 +170,11 @@ function entryDimensions(entry) {
   const sigungu = clean(entry.sigungu) || clean(input.sigungu) || regionParts.slice(1).join(" ");
   const region =
     queryRegion || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
-  const noticeName =
-    clean(entry.noticeName) ||
-    clean(input.noticeName) ||
-    clean(query.item) ||
-    clean(query.searchString) ||
-    null;
+  // ②에서 실제로 확정한 고시명칭(entry.noticeName/input.noticeName)과, 검토대기라 고시명칭이
+  // 없어 원물명(query.item)으로 검색만 해본 경우를 구분한다 — 후자는 noticeName 칸에
+  // 검색어가 들어가긴 하지만 공식 분류로 확정된 게 아니므로 matchingBasis로 표시해야 한다.
+  const officialNoticeName = clean(entry.noticeName) || clean(input.noticeName) || "";
+  const noticeName = officialNoticeName || clean(query.item) || clean(query.searchString) || null;
   const itemName =
     clean(input.itemName) ||
     clean(entry.itemName) ||
@@ -160,6 +188,7 @@ function entryDimensions(entry) {
     itemName,
     noticeName,
     niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
+    matchingBasis: officialNoticeName ? "notice_name_and_nice_class" : "raw_item_name_unclassified",
   };
 }
 
@@ -297,6 +326,7 @@ function finalizeBucket(bucket, options) {
   };
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
+  let applicantAddressEvidenceCount = 0;
   const recentBrands = [];
   const trademarkExamples = [];
 
@@ -307,7 +337,16 @@ function finalizeBucket(bucket, options) {
 
   for (const hit of bucket.hits.values()) {
     const status = statusCategory(hit.applicationStatus);
-    const applicantRegion = regionCategory(hit);
+    const applicantRegion = regionCategory(hit, bucket);
+    const hasApplicantAddressEvidence =
+      (Array.isArray(hit.applicantRegionEvidence) &&
+        hit.applicantRegionEvidence.some(
+          (row) => clean(row.regionStatus) === "matched" && clean(row.sido)
+        )) ||
+      ["inside", "outside"].includes(
+        clean(hit.applicantRegionMatch ?? hit.regionMatch).toLowerCase()
+      );
+    if (hasApplicantAddressEvidence) applicantAddressEvidenceCount++;
     statusCounts[status]++;
     regionCounts[applicantRegion]++;
     if (applicantRegion === "inside") regionalStatusCounts[status]++;
@@ -362,14 +401,23 @@ function finalizeBucket(bucket, options) {
   const uniqueTrademarkCount = bucket.hits.size;
   const isRegionalBucket = Boolean(clean(bucket.region));
   const regionalUniqueTrademarkCount = isRegionalBucket ? regionCounts.inside : null;
+  // threshold=1(기본)은 기존 all-or-nothing 게이트와 동일하다. 1 미만은 명시적으로 요청한
+  // 알파/미리보기 실행에서만 쓰고, 그 결과에는 항상 completenessThreshold를 남겨 완화된
+  // 기준으로 나왔다는 걸 구분할 수 있게 한다.
+  const regionalCollectionRate =
+    bucket.queryCount > 0
+      ? (bucket.successfulQueryCount - bucket.partialQueryCount) / bucket.queryCount
+      : 0;
   const regionalCollectionComplete =
     isRegionalBucket &&
     bucket.successfulQueryCount > 0 &&
-    bucket.partialQueryCount === 0 &&
     bucket.erroredQueryCount === 0 &&
-    bucket.skippedQueryCount === 0;
+    bucket.skippedQueryCount === 0 &&
+    regionalCollectionRate >= options.regionalCoverageThreshold;
   const regionalAddressVerificationComplete =
-    isRegionalBucket && (uniqueTrademarkCount === 0 || regionVerifiedHitCount === uniqueTrademarkCount);
+    isRegionalBucket &&
+    (uniqueTrademarkCount === 0 ||
+      regionVerifiedHitCount / uniqueTrademarkCount >= options.regionalCoverageThreshold);
   const regionalMetricBlockingReasons = [];
   if (isRegionalBucket && !regionalCollectionComplete) {
     regionalMetricBlockingReasons.push("collection_incomplete");
@@ -427,6 +475,8 @@ function finalizeBucket(bucket, options) {
     regionCounts,
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
+    applicantAddressEvidenceCount,
+    applicantAddressEvidenceRate: safeRate(applicantAddressEvidenceCount, uniqueTrademarkCount),
     localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
     regionalBrandCounts,
     regionalBrandReferenceHitCount: regionalBrandCounts ? regionalBrandReferenceHitCount : null,
@@ -460,6 +510,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const asOfYear = Number(providedOptions.asOfYear ?? new Date().getUTCFullYear());
   const recentYears = Number(providedOptions.recentYears ?? 3);
   const maxRecentBrands = Number(providedOptions.maxRecentBrands ?? 10);
+  const regionalCoverageThreshold = Number(providedOptions.regionalCoverageThreshold ?? 1);
   if (!Number.isInteger(asOfYear) || asOfYear < 1801 || asOfYear > 2200) {
     throw new Error("asOfYear는 1801~2200 범위의 정수여야 합니다.");
   }
@@ -469,7 +520,14 @@ function analyzeEntries(parsed, providedOptions = {}) {
   if (!Number.isInteger(maxRecentBrands) || maxRecentBrands < 1 || maxRecentBrands > 100) {
     throw new Error("maxRecentBrands는 1~100 범위의 정수여야 합니다.");
   }
-  const options = { asOfYear, recentYears, maxRecentBrands };
+  if (
+    !Number.isFinite(regionalCoverageThreshold) ||
+    regionalCoverageThreshold < 0 ||
+    regionalCoverageThreshold > 1
+  ) {
+    throw new Error("regionalCoverageThreshold는 0~1 범위의 숫자여야 합니다.");
+  }
+  const options = { asOfYear, recentYears, maxRecentBrands, regionalCoverageThreshold };
   const inputDocument = parsed && !Array.isArray(parsed) && typeof parsed === "object" ? parsed : null;
   const entries = normalizeInput(parsed);
   const regionItemBuckets = new Map();
@@ -516,9 +574,73 @@ function analyzeEntries(parsed, providedOptions = {}) {
 
   const finalizeAll = (buckets) => sortAggregates([...buckets.values()].map((b) => finalizeBucket(b, options)));
   const summary = finalizeBucket(summaryBucket, options);
+  if (inputDocument?.mode === "batch") {
+    summary.inputRowCount = Number(inputDocument.inputCount) || entries.length;
+    summary.searchableRowCount = Number(inputDocument.searchableRowCount) || 0;
+    summary.completeRowCount = Math.max(
+      0,
+      (Number(inputDocument.successCount) || 0) - (Number(inputDocument.partialCount) || 0)
+    );
+    summary.partialRowCount = Number(inputDocument.partialCount) || 0;
+    summary.erroredRowCount = Number(inputDocument.errorCount) || 0;
+    summary.skippedRowCount = Number(inputDocument.skippedCount) || 0;
+    summary.uniqueQueryCount = Number(inputDocument.uniqueQueryCount) || 0;
+    summary.completeUniqueQueryCount =
+      Number(inputDocument.completeUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.complete) || 0;
+    summary.partialUniqueQueryCount =
+      Number(inputDocument.partialUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.partial) || 0;
+    summary.erroredUniqueQueryCount =
+      Number(inputDocument.erroredUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.error) || 0;
+  }
   const regionItems = finalizeAll(regionItemBuckets);
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
+
+  // regionCategory/evidenceRegionCategory는 "이 hit가 버킷 자신의 지역 안인지"를 판정하므로
+  // 버킷에 고유한 지역(sido)이 있어야 의미가 있다. regionItems는 지역 하나에 묶여 있어 정상
+  // 동작하지만, summary(전체)와 items(품목만으로 묶어 여러 지역을 합친 버킷)는 자기 지역이
+  // 없어 매 hit가 "unverified"로만 계산된다 — 그 결과 이 두 레벨의 지역 검증 지표가 항상
+  // 0/0/전체 unverified로 나오는 버그가 있었다(2026-08-12). regionItems는 이미 올바르게
+  // 계산돼 있으므로, 그 값을 합산해서 덮어쓰는 방식으로 고친다.
+  function sumRegionalMetrics(matchingRegionItems) {
+    const regionCounts = { inside: 0, outside: 0, unverified: 0 };
+    const regionalStatusCounts = { registered: 0, pending: 0, inactive: 0, unknown: 0 };
+    for (const row of matchingRegionItems) {
+      if (!row.regionCounts) continue;
+      regionCounts.inside += row.regionCounts.inside || 0;
+      regionCounts.outside += row.regionCounts.outside || 0;
+      regionCounts.unverified += row.regionCounts.unverified || 0;
+      if (row.regionalStatusCounts) {
+        regionalStatusCounts.registered += row.regionalStatusCounts.registered || 0;
+        regionalStatusCounts.pending += row.regionalStatusCounts.pending || 0;
+        regionalStatusCounts.inactive += row.regionalStatusCounts.inactive || 0;
+        regionalStatusCounts.unknown += row.regionalStatusCounts.unknown || 0;
+      }
+    }
+    const totalHits = regionCounts.inside + regionCounts.outside + regionCounts.unverified;
+    const regionVerifiedHitCount = regionCounts.inside + regionCounts.outside;
+    const regionalUniqueTrademarkCount = regionCounts.inside;
+    return {
+      regionCounts,
+      regionVerifiedHitCount,
+      regionVerificationRate: safeRate(regionVerifiedHitCount, totalHits),
+      regionalStatusCounts,
+      regionalUniqueTrademarkCount,
+      regionalRegistrationRate: safeRate(regionalStatusCounts.registered, regionalUniqueTrademarkCount),
+      localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
+    };
+  }
+  Object.assign(summary, sumRegionalMetrics(regionItems));
+  for (const item of items) {
+    Object.assign(
+      item,
+      sumRegionalMetrics(
+        regionItems.filter(
+          (row) => row.noticeName === item.noticeName && (row.niceClass || "") === (item.niceClass || "")
+        )
+      )
+    );
+  }
   const warnings = [];
   if (validationOnlyExcludedCount > 0) {
     warnings.push(
@@ -531,11 +653,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
     );
   }
   if (summary.erroredQueryCount > 0) {
-    warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
+    warnings.push(`${summary.erroredQueryCount}개 지역×품목 입력행이 검색 오류여서 집계에서 제외되었습니다.`);
   }
   if (summary.partialQueryCount > 0) {
     warnings.push(
-      `${summary.partialQueryCount}개 검색은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.`
+      `${summary.partialQueryCount}개 지역×품목 입력행은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.`
     );
   }
   if (summary.skippedQueryCount > 0) {
@@ -567,7 +689,22 @@ function analyzeEntries(parsed, providedOptions = {}) {
       );
     }
   }
+  if (inputDocument?.applicationApplicantEnrichment?.enabled) {
+    const applicants = inputDocument.applicationApplicantEnrichment;
+    if (applicants.status !== "complete") {
+      warnings.push(
+        `출원번호 기반 출원인 주소 보강이 ${applicants.status} 상태입니다(완료 ${applicants.completeApplicationCount || 0}, ` +
+          `오류 ${applicants.errorApplicationCount || 0}, 미수집 ${applicants.notCollectedApplicationCount || 0}).`
+      );
+    }
+  }
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
+  if (regionalCoverageThreshold < 1) {
+    warnings.push(
+      `regionalCoverageThreshold=${regionalCoverageThreshold}로 완화된 알파 실행입니다 — 수집·주소 검증이 ` +
+        `100% 미만이어도 지역 지표를 노출합니다. 배포용 공식 수치가 아니라 알파 미리보기로만 사용하세요.`
+    );
+  }
 
   return {
     schemaVersion: "1.4",
@@ -575,6 +712,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
     generatedAt: new Date().toISOString(),
     provenance: {
       inputSchemaVersion: inputDocument?.schemaVersion || null,
+      inputStorageMode: inputDocument?.storageMode || "expanded",
       inputCompletedAt: inputDocument?.completedAt || null,
       sources: [
         inputDocument?.trademarkSourceMetadata,
@@ -583,6 +721,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
           : null,
         inputDocument?.ipRegistryEnrichment?.enabled
           ? inputDocument.ipRegistryEnrichment.sourceMetadata
+          : null,
+        inputDocument?.applicationApplicantEnrichment?.enabled
+          ? inputDocument.applicationApplicantEnrichment.sourceMetadata
           : null,
       ].filter(Boolean),
     },
@@ -597,7 +738,13 @@ function analyzeEntries(parsed, providedOptions = {}) {
         "출원인 주소 근거만 지역 건수·등록률·localApplicantShare에 사용하며, 수집 또는 주소 검증이 불완전하면 regionalMetricAvailability=blocked",
       regionalBrandMetric: "농사로 지역브랜드 출원번호 연관성은 별도 regionalBrand* 지표로 집계",
       applicantRegionMetricVersion:
-        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion || null,
+        inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion ||
+        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion ||
+        null,
+      applicantRegionMetricVersions: [
+        inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion,
+        inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion,
+      ].filter(Boolean),
       designatedGoodsPolicy:
         "normalized_exact만 확정 근거, normalized_contains/class_only는 검토 후보; #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않음",
       designatedGoodsMatchVersion:
@@ -610,6 +757,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
       recentYears,
       recentPeriodExcludesCurrentYear: true,
       maxRecentBrands,
+      regionalCoverageThreshold,
     },
     exclusions: {
       validationOnlyExcludedCount,

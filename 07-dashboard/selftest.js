@@ -120,6 +120,15 @@ function fixture() {
       partialQueryCount: 0,
       erroredQueryCount: 0,
       skippedQueryCount: 0,
+      inputRowCount: 2,
+      searchableRowCount: 2,
+      completeRowCount: 2,
+      partialRowCount: 0,
+      erroredRowCount: 0,
+      skippedRowCount: 0,
+      uniqueQueryCount: 2,
+      completeUniqueQueryCount: 2,
+      partialUniqueQueryCount: 0,
       uniqueTrademarkCount: 1,
     },
     regionItems: [andong, boseong],
@@ -217,15 +226,21 @@ const input = fixture();
 const snapshot = buildDashboardSnapshot(input, {
   mode: "sample",
   generatedAt: "2026-08-10T02:00:00Z",
+  queryHitCap: 600,
 });
 const repeated = buildDashboardSnapshot(input, {
   mode: "sample",
   generatedAt: "2026-08-10T03:00:00Z",
+  queryHitCap: 600,
 });
 assert.strictEqual(snapshot.schemaVersion, "dashboard-snapshot-v1");
 assert.strictEqual(snapshot.snapshotId, repeated.snapshotId, "입력 버전·시점이 같으면 snapshotId도 같아야 함");
 assert.strictEqual(snapshot.mode, "sample");
 assert.strictEqual(snapshot.coverage.completeQueryCount, 2);
+assert.strictEqual(snapshot.coverage.unit, "region_item_input_rows");
+assert.strictEqual(snapshot.pipelineStatus.uniqueQueryCounts.total, 2);
+assert.strictEqual(snapshot.pipelineStatus.collectionExperiment.queryHitCap, 600);
+assert.strictEqual(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1);
 assert.strictEqual(snapshot.regions.length, 2);
 assert.strictEqual(snapshot.rankings.length, 1);
 assert.strictEqual(snapshot.briefings.length, 1);

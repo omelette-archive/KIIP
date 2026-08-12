@@ -71,6 +71,11 @@ function count(row, field) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function optionalCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 function dataState(row) {
   const queryCount = count(row, "queryCount");
   const successful = count(row, "successfulQueryCount");
@@ -251,9 +256,14 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
 
   const regionGroups = new Map();
   for (const row of analysis.regionItems) {
-    if (!clean(row.noticeName) || !clean(row.niceClass)) {
+    // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과(matchingBasis=
+    // raw_item_name_unclassified)는 niceClass가 없는 게 정상이다 — 식품 기본류
+    // fallback으로 검색했을 뿐 공식 분류가 아니기 때문. 이 경우만 niceClass 미확정을
+    // 허용하고, noticeName은 여전히 필수(원물명이라도 표시할 이름은 있어야 함).
+    const isUnclassified = clean(row.matchingBasis) === "raw_item_name_unclassified";
+    if (!clean(row.noticeName) || (!isUnclassified && !clean(row.niceClass))) {
       throw new Error(
-        `대시보드 품목은 ② 고시명칭·NICE류 확정 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
+        `대시보드 품목은 ② 고시명칭 확정 또는 원물명 미분류 검색 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
       );
     }
     const regionIdentity = resolveRegion(row, regionIndex);
@@ -295,7 +305,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       itemName: clean(row.itemName) || null,
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
-      matchingBasis: "notice_name_and_nice_class",
+      matchingBasis: clean(row.matchingBasis) || "notice_name_and_nice_class",
       dataState: state,
       sources: rowSourceIds(row),
       trademarkExamples: Array.isArray(row.trademarkExamples)
@@ -502,13 +512,93 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     targetRegionCount: null,
     observedRegionCount: regions.length,
     regionItemCount: analysis.regionItems.length,
-    completeQueryCount: Math.max(
+    completeQueryCount: optionalCount(summary.completeRowCount) ?? Math.max(
       0,
       count(summary, "successfulQueryCount") - count(summary, "partialQueryCount")
     ),
-    partialQueryCount: count(summary, "partialQueryCount"),
-    errorQueryCount: count(summary, "erroredQueryCount"),
-    skippedQueryCount: count(summary, "skippedQueryCount"),
+    partialQueryCount: optionalCount(summary.partialRowCount) ?? count(summary, "partialQueryCount"),
+    errorQueryCount: optionalCount(summary.erroredRowCount) ?? count(summary, "erroredQueryCount"),
+    skippedQueryCount: optionalCount(summary.skippedRowCount) ?? count(summary, "skippedQueryCount"),
+    unit: "region_item_input_rows",
+  };
+
+  const availableRegionItemCount = analysis.regionItems.filter(
+    (row) => row.regionalMetricAvailability === "available"
+  ).length;
+  const regionalAttributionCounts = analysis.regionItems.reduce(
+    (counts, row) => {
+      counts.inside += count(row.regionCounts || {}, "inside");
+      counts.outside += count(row.regionCounts || {}, "outside");
+      counts.unverified += count(row.regionCounts || {}, "unverified");
+      return counts;
+    },
+    { inside: 0, outside: 0, unverified: 0 }
+  );
+  const addressEvidenceCount =
+    optionalCount(summary.applicantAddressEvidenceCount) ?? count(summary, "regionVerifiedHitCount");
+  const nationwideTrademarkCount = count(summary, "uniqueTrademarkCount");
+  const regionalCoverageThreshold = Number(analysis.parameters?.regionalCoverageThreshold ?? 1);
+  const pipelineStatus = {
+    stage: clean(options.stage) || (mode === "full" ? "alpha" : "sample"),
+    inputScope: mode,
+    units: {
+      row: "region_item_input_rows",
+      uniqueQuery: "notice_name_and_nice_class",
+      trademark: "application_number",
+    },
+    rowCounts: {
+      total: optionalCount(summary.inputRowCount) ?? count(summary, "queryCount"),
+      searchable: optionalCount(summary.searchableRowCount) ?? count(summary, "successfulQueryCount"),
+      complete: coverage.completeQueryCount,
+      partial: coverage.partialQueryCount,
+      error: coverage.errorQueryCount,
+      skipped: coverage.skippedQueryCount,
+    },
+    uniqueQueryCounts: {
+      total: optionalCount(options.uniqueQueryCount ?? summary.uniqueQueryCount),
+      complete: optionalCount(options.completeUniqueQueryCount ?? summary.completeUniqueQueryCount),
+      partial: optionalCount(options.partialUniqueQueryCount ?? summary.partialUniqueQueryCount),
+    },
+    nationwideCandidates: {
+      uniqueTrademarkCount: nationwideTrademarkCount,
+      returnedHitCount: count(summary, "returnedHitCount"),
+      duplicateHitCount: count(summary, "duplicateHitCount"),
+    },
+    applicantRegionVerification: {
+      inside: regionalAttributionCounts.inside,
+      outside: regionalAttributionCounts.outside,
+      unverified: Math.max(0, nationwideTrademarkCount - addressEvidenceCount),
+      verifiedCount: addressEvidenceCount,
+      rate:
+        typeof summary.applicantAddressEvidenceRate === "number"
+          ? summary.applicantAddressEvidenceRate
+          : typeof summary.regionVerificationRate === "number"
+            ? summary.regionVerificationRate
+          : null,
+      regionalAttributionCounts,
+      unit: "unique_trademark_address_evidence",
+    },
+    regionalMetricGate: {
+      availableRegionItemCount,
+      blockedRegionItemCount: Math.max(0, analysis.regionItems.length - availableRegionItemCount),
+      coverageThreshold: Number.isFinite(regionalCoverageThreshold)
+        ? regionalCoverageThreshold
+        : 1,
+      policy:
+        regionalCoverageThreshold < 1
+          ? "alpha_coverage_threshold_preview"
+          : "all_or_nothing_per_region_item",
+    },
+    collectionExperiment: {
+      queryHitCap: optionalCount(options.queryHitCap),
+      serializationFailureObservedAtOrAbove: optionalCount(
+        options.serializationFailureObservedAtOrAbove
+      ),
+      outputShape:
+        analysis.provenance?.inputStorageMode === "query_facts"
+          ? "query_facts_with_region_row_references"
+          : "expanded_region_item_hits",
+    },
   };
 
   const identityFor = (row) => {
@@ -546,7 +636,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     aiReviewApplied: false,
   }));
   const alerts = briefings.filter((row) => row.isGapAlert);
-  const snapshotBasis = JSON.stringify({ mode, analysis, gap, strategy });
+  const snapshotBasis = JSON.stringify({ mode, analysis, gap, strategy, pipelineStatus });
   const sources = collectSources(analysis);
   const sourceFetchedAt = sources
     .map((source) => clean(source.sourceFetchedAt))
@@ -573,6 +663,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       geographyVersion: null,
     },
     coverage,
+    pipelineStatus,
     map: {
       defaultMetric: "data_coverage",
       availability: "blocked",

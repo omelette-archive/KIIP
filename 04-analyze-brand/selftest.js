@@ -191,6 +191,57 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
     r.warnings.some((w) => w.includes("부분 수집")),
     "partial 검색이 집계에 포함됐다는 경고 문구가 있어야 함"
   );
+  const batchDocument = {
+    schemaVersion: "1.2",
+    mode: "batch",
+    inputCount: 3,
+    searchableRowCount: 2,
+    successCount: 1,
+    partialCount: 1,
+    errorCount: 1,
+    skippedCount: 1,
+    uniqueQueryCount: 2,
+    uniqueQueryStatusCounts: { complete: 0, partial: 1, error: 1 },
+    results: newFormatInput,
+  };
+  const batchResult = analyzeEntries(batchDocument, { asOfYear: 2026 });
+  assert.strictEqual(batchResult.summary.inputRowCount, 3);
+  assert.strictEqual(batchResult.summary.searchableRowCount, 2);
+  assert.strictEqual(batchResult.summary.uniqueQueryCount, 2);
+  assert.strictEqual(batchResult.summary.partialUniqueQueryCount, 1);
+  assert.strictEqual(batchResult.summary.erroredUniqueQueryCount, 1);
+  const compactDocument = {
+    ...batchDocument,
+    schemaVersion: "1.3",
+    storageMode: "query_facts",
+    queryFacts: {
+      "사과\u001f31": {
+        ...newFormatInput[0],
+        query: { ...newFormatInput[0].query, region: null },
+      },
+    },
+    results: [
+      {
+        inputIndex: 0,
+        queryKey: "사과\u001f31",
+        query: { ...newFormatInput[0].query },
+        input: newFormatInput[0].input,
+        status: "ok",
+        collectionStatus: "partial",
+      },
+    ],
+    inputCount: 1,
+    searchableRowCount: 1,
+    successCount: 1,
+    partialCount: 1,
+    errorCount: 0,
+    skippedCount: 0,
+    uniqueQueryCount: 1,
+  };
+  const compactResult = analyzeEntries(compactDocument, { asOfYear: 2026 });
+  assert.strictEqual(compactResult.regionItems.length, 1);
+  assert.strictEqual(compactResult.regionItems[0].uniqueTrademarkCount, 1);
+  assert.strictEqual(compactResult.summary.partialRowCount, 1);
   ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
 }
 
@@ -336,6 +387,18 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
         goodsMatchVersion: "ip-registry-designated-goods-v0-review",
       },
     },
+    applicationApplicantEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeApplicationCount: 1,
+      errorApplicationCount: 0,
+      notCollectedApplicationCount: 2,
+      sourceMetadata: {
+        sourceId: "kipris_trademark_applicant",
+        contractVersion: "kipris-trademark-applicant-address-v1",
+      },
+      policy: { applicantRegionMatchVersion: "kipris-trademark-applicant-region-v1" },
+    },
     results: [{
       status: "ok",
       query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
@@ -362,7 +425,13 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   assert.strictEqual(row.trademarkExamples[0].goodsMatchMethod, "normalized_exact");
   assert.strictEqual(row.trademarkExamples[0].goodsEvidence[0].designatedProductName, "신선한 사과");
   assert.ok(r.provenance.sources.some((source) => source.sourceId === "ip_registry"));
+  assert.ok(r.provenance.sources.some((source) => source.sourceId === "kipris_trademark_applicant"));
   assert.ok(r.warnings.some((warning) => warning.includes("등록원부 보강이 partial")));
+  assert.ok(r.warnings.some((warning) => warning.includes("출원번호 기반 출원인 주소 보강이 partial")));
+  assert.strictEqual(
+    r.methodology.applicantRegionMetricVersion,
+    "kipris-trademark-applicant-region-v1"
+  );
   assert.ok(r.warnings.some((warning) => warning.includes("#12")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }

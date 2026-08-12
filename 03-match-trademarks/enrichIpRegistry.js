@@ -6,6 +6,7 @@ const path = require("path");
 const { loadEnv } = require("./lib/loadEnv");
 const { createClient } = require("./lib/ipRegistryClient");
 const { enrichDocument, registryNumbers } = require("./lib/ipRegistryEnricher");
+const { loadCache, saveCache } = require("./lib/ipRegistryCache");
 
 loadEnv();
 
@@ -35,6 +36,8 @@ function usage(message) {
       "  --out <path>        출력 경로 (기본: output/ip-registry-enriched.json)",
       "  --limit <n>         등록번호 최대 호출 수 (기본 3, 최대 100)",
       "  --concurrency <n>   동시 호출 수 (기본 1, 최대 5)",
+      "  --cache <path>      등록번호별 영속 캐시 (기본: output/ip-registry-cache.json)",
+      "  --no-cache          영속 캐시를 읽거나 저장하지 않음",
       "  --dry-run           호출 없이 등록번호 대상 건수만 확인",
     ].join("\n")
   );
@@ -49,11 +52,18 @@ function main() {
   const outPath = path.resolve(
     args.out || path.join(__dirname, "output", "ip-registry-enriched.json")
   );
+  const cachePath = args["no-cache"]
+    ? null
+    : path.resolve(args.cache || path.join(__dirname, "output", "ip-registry-cache.json"));
+  const cacheEntries = cachePath ? loadCache(cachePath) : new Map();
   const document = JSON.parse(fs.readFileSync(inputPath, "utf8").replace(/^\uFEFF/, ""));
   const numbers = registryNumbers(document);
   if (args["dry-run"]) {
+    const cached = numbers.filter((number) => cacheEntries.get(number)?.status === "complete").length;
+    const uncached = numbers.length - cached;
     console.error(
-      `[enrichIpRegistry] dry-run uniqueRegistration=${numbers.length}, requested=${Math.min(numbers.length, Number(args.limit))}`
+      `[enrichIpRegistry] dry-run uniqueRegistration=${numbers.length}, cached=${cached}, ` +
+        `uncached=${uncached}, requested=${Math.min(uncached, Number(args.limit))}`
     );
     return Promise.resolve();
   }
@@ -61,13 +71,16 @@ function main() {
   return enrichDocument(document, client, {
     limit: Number(args.limit),
     concurrency: Number(args.concurrency),
+    cacheEntries,
   }).then((output) => {
+    if (cachePath) saveCache(cachePath, cacheEntries);
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n", "utf8");
     const summary = output.ipRegistryEnrichment;
     console.error(
       `[enrichIpRegistry] status=${summary.status}, requested=${summary.requestedRegistrationCount}, ` +
         `complete=${summary.completeRegistrationCount}, error=${summary.errorRegistrationCount}, ` +
+        `cached=${summary.cachedRegistrationCount || 0}, new=${summary.newlyCompleteRegistrationCount || 0}, ` +
         `notCollected=${summary.notCollectedRegistrationCount} -> ${outPath}`
     );
   });

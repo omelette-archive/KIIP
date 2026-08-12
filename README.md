@@ -37,7 +37,7 @@ flowchart LR
 |---|---|---|---|---|
 | ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | GI·농사로 실키 검증, 일자별 수집·SQLite 멱등 누적 구현 |
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
-| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 검색 + 지역브랜드 조인 + 등록원부 주소·지정상품 3건 보강 실검증 |
+| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 검색 + 출원번호 주소 23,912건 전체 알파 수집 + 등록원부 지정상품 보강 |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 출원인 주소·지역브랜드·지정상품 근거를 분리 집계, 미보강은 별도 상태 유지 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟡 진행중 | 결정론적 점수 계산 완료, **대표성·가중치 기준은 예시값**(#29) |
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |

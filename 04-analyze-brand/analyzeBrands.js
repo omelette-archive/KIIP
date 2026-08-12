@@ -31,6 +31,7 @@ function usage(message) {
       "  --asOfYear <year>         분석 기준 연도 (기본: 현재 UTC 연도)",
       "  --recentYears <n>         최근/직전 비교 기간 길이 (기본: 3년)",
       "  --maxRecentBrands <n>     집계별 최근 브랜드 예시 최대 개수 (기본: 10)",
+      "  --regionalCoverageThreshold <0-1> 지역 지표 노출 최소 수집·주소검증률 (기본: 1, 알파 미리보기용)",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -54,6 +55,7 @@ function main() {
     asOfYear: args.asOfYear,
     recentYears: args.recentYears,
     maxRecentBrands: args.maxRecentBrands,
+    regionalCoverageThreshold: args.regionalCoverageThreshold,
   });
   analysis.provenance.inputFile = inputPath;
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
