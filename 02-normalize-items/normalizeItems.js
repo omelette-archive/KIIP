@@ -74,9 +74,30 @@ function readInputCsv(inputPath) {
   }
   return lines.slice(1).map((line) => {
     const fields = parseCsvLine(line);
+    let sido = fields[idx.sido] || "";
+    let sigungu = fields[idx.sigungu] || "";
+
+    // 일부 재실행 산출물에서 지역 두 컬럼이 한 칸 밀려
+    // `sido="", sigungu="경기도 > 남양주시"` 형태로 들어온다.
+    // 원천 계약은 sido/sigungu를 별도 컬럼으로 보장하므로 여기서 복원해
+    // 후속 지역 집계가 해당 행을 유실하지 않도록 한다.
+    if (!sido && sigungu.includes(">")) {
+      const parts = sigungu.split(">").map((value) => value.trim()).filter(Boolean);
+      if (parts.length >= 2) {
+        [sido, sigungu] = [parts[0], parts[parts.length - 1]];
+      }
+    } else if (!sido && sigungu) {
+      // 시도 단위 원천행은 sigungu가 비어 있어야 하지만, 같은 밀림으로
+      // 시도명이 sigungu에 들어온 경우에는 시도 단위로 복원한다.
+      const provincePattern = /^(서울특별시|부산광역시|대구광역시|인천광역시|광주광역시|대전광역시|울산광역시|세종특별자치시|경기도|강원(?:도|특별자치도)|충청북도|충청남도|전라북도|전북특별자치도|전라남도|전남광주통합특별시|경상북도|경상남도|제주특별자치도)$/;
+      if (provincePattern.test(sigungu)) {
+        sido = sigungu;
+        sigungu = "";
+      }
+    }
     return {
-      sido: fields[idx.sido] || "",
-      sigungu: fields[idx.sigungu] || "",
+      sido,
+      sigungu,
       rawItemName: fields[idx.rawItemName] || "",
       source: idx.source === -1 ? "" : fields[idx.source] || "",
       sourceId: idx.sourceId === -1 ? "" : fields[idx.sourceId] || "",
