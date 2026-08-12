@@ -595,6 +595,52 @@ function analyzeEntries(parsed, providedOptions = {}) {
   const regionItems = finalizeAll(regionItemBuckets);
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
+
+  // regionCategory/evidenceRegionCategory는 "이 hit가 버킷 자신의 지역 안인지"를 판정하므로
+  // 버킷에 고유한 지역(sido)이 있어야 의미가 있다. regionItems는 지역 하나에 묶여 있어 정상
+  // 동작하지만, summary(전체)와 items(품목만으로 묶어 여러 지역을 합친 버킷)는 자기 지역이
+  // 없어 매 hit가 "unverified"로만 계산된다 — 그 결과 이 두 레벨의 지역 검증 지표가 항상
+  // 0/0/전체 unverified로 나오는 버그가 있었다(2026-08-12). regionItems는 이미 올바르게
+  // 계산돼 있으므로, 그 값을 합산해서 덮어쓰는 방식으로 고친다.
+  function sumRegionalMetrics(matchingRegionItems) {
+    const regionCounts = { inside: 0, outside: 0, unverified: 0 };
+    const regionalStatusCounts = { registered: 0, pending: 0, inactive: 0, unknown: 0 };
+    for (const row of matchingRegionItems) {
+      if (!row.regionCounts) continue;
+      regionCounts.inside += row.regionCounts.inside || 0;
+      regionCounts.outside += row.regionCounts.outside || 0;
+      regionCounts.unverified += row.regionCounts.unverified || 0;
+      if (row.regionalStatusCounts) {
+        regionalStatusCounts.registered += row.regionalStatusCounts.registered || 0;
+        regionalStatusCounts.pending += row.regionalStatusCounts.pending || 0;
+        regionalStatusCounts.inactive += row.regionalStatusCounts.inactive || 0;
+        regionalStatusCounts.unknown += row.regionalStatusCounts.unknown || 0;
+      }
+    }
+    const totalHits = regionCounts.inside + regionCounts.outside + regionCounts.unverified;
+    const regionVerifiedHitCount = regionCounts.inside + regionCounts.outside;
+    const regionalUniqueTrademarkCount = regionCounts.inside;
+    return {
+      regionCounts,
+      regionVerifiedHitCount,
+      regionVerificationRate: safeRate(regionVerifiedHitCount, totalHits),
+      regionalStatusCounts,
+      regionalUniqueTrademarkCount,
+      regionalRegistrationRate: safeRate(regionalStatusCounts.registered, regionalUniqueTrademarkCount),
+      localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
+    };
+  }
+  Object.assign(summary, sumRegionalMetrics(regionItems));
+  for (const item of items) {
+    Object.assign(
+      item,
+      sumRegionalMetrics(
+        regionItems.filter(
+          (row) => row.noticeName === item.noticeName && (row.niceClass || "") === (item.niceClass || "")
+        )
+      )
+    );
+  }
   const warnings = [];
   if (validationOnlyExcludedCount > 0) {
     warnings.push(
