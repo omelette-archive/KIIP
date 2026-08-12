@@ -134,6 +134,11 @@ KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은 �
 계속 미확인으로 기록한다.
 부분 캐시 상태에서는 지역 지표를 확정하지 않는다.
 
+지역 귀속 판정은 `applicantRegionMatch`와 출원인 주소 정규화 결과를 우선한다. KIPRIS hit의
+NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unverified`여도 주소가 해당
+지역(`inside`)이면 지역 출원 건수에 포함한다. 다만 지정상품·류 판정은 별도 검토 지표로
+남기며, 출원인 주소 자체가 없거나 행정구역 정규화가 실패한 경우에는 `unverified`로 보류한다.
+
 ## 출처와 버전 필드
 
 - 수집 JSON: `contractVersion`, `sourceMetadata`, `fetchedAt`

@@ -348,6 +348,8 @@ function finalizeBucket(bucket, options) {
       );
     if (hasApplicantAddressEvidence) applicantAddressEvidenceCount++;
     statusCounts[status]++;
+    // 류·지정상품 보강(goodsMatchMethod)은 별도 품목 검토 지표다. KIPRIS hit의
+    // 부가 코드가 비어 있어도 출원인 주소가 해당 지역 inside로 판정되면 지역 귀속은 인정한다.
     regionCounts[applicantRegion]++;
     if (applicantRegion === "inside") regionalStatusCounts[status]++;
     if (regionalBrandCounts) {
