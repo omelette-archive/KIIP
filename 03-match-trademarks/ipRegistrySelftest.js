@@ -112,13 +112,12 @@ async function runIpRegistryTests() {
       ).method,
       "normalized_exact"
     );
-    assert.strictEqual(
-      evaluateGoods(
+    const containsResult = evaluateGoods(
         { item: "미가공사과", classCode: "31" },
         [{ classCode: "31", designatedProductName: "미가공사과(강원도양양군에서생산된사과에한함)" }]
-      ).method,
-      "normalized_contains"
-    );
+      );
+    assert.strictEqual(containsResult.method, "normalized_contains");
+    assert.strictEqual(containsResult.reviewRequired, false);
     assert.strictEqual(
       evaluateGoods(
         { item: "배", classCode: "31" },

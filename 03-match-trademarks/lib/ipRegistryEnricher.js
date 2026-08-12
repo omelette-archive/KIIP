@@ -138,7 +138,9 @@ function evaluateGoods(query, products) {
     reviewRequired = false;
   } else if (contains.length > 0) {
     method = "normalized_contains";
-    confidence = "review_required";
+    confidence = "high_contains";
+    // 지정상품명에 고시상품명칭이 포함되면 특산품 활용 출원으로 인정한다.
+    reviewRequired = false;
   } else if (classMatched.length > 0) {
     method = "class_only";
     confidence = "candidate_only";

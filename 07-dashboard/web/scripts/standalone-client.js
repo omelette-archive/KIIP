@@ -11,7 +11,7 @@ function dashboardClient(snapshot, geometry) {
   const compactDate = (value) => value && /^\d{8}$/.test(value) ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : value || "출원일 미기록";
   const itemName = (item) => item.itemName || item.noticeName || "미지정 품목";
   const noticeBasis = (item) => item.noticeName ? `고시명칭 ${item.noticeName}` : "고시명칭 미확정";
-  const goodsMethod = (method) => ({ normalized_exact: "지정상품 확정", normalized_contains: "명칭 포함 후보", class_only: "NICE류 후보", mismatch: "지정상품 불일치", unverified: "미검증" })[method] || method;
+  const goodsMethod = (method) => ({ normalized_exact: "특산품 활용 확정", normalized_contains: "고시명칭 포함·인정", class_only: "NICE류 검토", mismatch: "지정상품 불일치", unverified: "미검증" })[method] || method;
   const regionKey = (region) => region.regionCode || region.region;
   const fill = (value, max) => value === null ? "#e5e1d7" : `color-mix(in srgb, #1f6d56 ${Math.round(24 + Math.max(.12, Math.min(1, max ? value / max : 0)) * 68)}%, #e7eee9)`;
   const totals = snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 });
@@ -120,7 +120,7 @@ function dashboardClient(snapshot, geometry) {
   function criteria() {
     const rows = [
       ["대표 특산품 판정", "GI 출처 또는 상표 출원 3건 이상", "#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)"],
-      ["품목 매칭", "고시상품명칭 정확 일치", "지식재산처 고시상품명칭 13판(2026) 기준. 부분·복수 일치는 추정하지 않고 사람 검토로 분리"],
+      ["품목 매칭", "고시명칭 일치·포함", "지정상품명이 고시상품명칭과 일치하거나 포함되면 특산품 활용 출원으로 인정하고, NICE류만 일치하면 사람 검토로 분리합니다."],
       ["지역 매칭", "법정동코드 완전일치", "국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만"],
       ["상표 검색", "KIPRIS 단어검색(고시명칭 기준)", "검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음"],
       ["지역 상표 / 등록 상표", "출원인 주소 inside 검증 건만", "전국 KIPRIS 검색 후보는 별도 보존하며 지역 건수·등록률에 포함하지 않음"],

@@ -431,7 +431,7 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
     r.methodology.applicantRegionMetricVersion,
     "kipris-trademark-applicant-region-v1"
   );
-  assert.ok(r.warnings.some((warning) => warning.includes("#12")));
+  assert.ok(r.warnings.some((warning) => warning.includes("class_only")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 

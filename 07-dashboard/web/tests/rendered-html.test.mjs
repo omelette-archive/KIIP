@@ -108,7 +108,7 @@ test("renders matching criteria prominently, on every tab, not just as bottom-of
   assert.match(html, /class="criteria"/);
   assert.match(html, /판정 기준과 매칭 방법/);
   assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
-  assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
+  assert.match(html, /고시명칭 일치·포함/, "품목 매칭 기준이 명시돼야 함");
   assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
   assert.match(html, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
 });

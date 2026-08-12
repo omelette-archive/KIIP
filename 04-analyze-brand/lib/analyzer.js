@@ -428,9 +428,9 @@ function finalizeBucket(bucket, options) {
     : regionalMetricBlockingReasons.length === 0
       ? "available"
       : "blocked";
-  const goodsConfirmedHitCount = goodsMatchCounts.normalized_exact;
-  const goodsReviewRequiredHitCount =
-    goodsMatchCounts.normalized_contains + goodsMatchCounts.class_only;
+  const goodsConfirmedHitCount =
+    goodsMatchCounts.normalized_exact + goodsMatchCounts.normalized_contains;
+  const goodsReviewRequiredHitCount = goodsMatchCounts.class_only;
   const goodsEvaluatedHitCount =
     goodsConfirmedHitCount + goodsReviewRequiredHitCount + goodsMatchCounts.mismatch;
   const applicationYearCounts = {};
@@ -683,7 +683,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
     }
     if (summary.goodsReviewRequiredHitCount > 0) {
       warnings.push(
-        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품 normalized_contains/class_only 검토 후보이며 #12 기준 확정 전 확정 매칭으로 해석하면 안 됩니다.`
+        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품명이 확인되지 않고 NICE류만 일치한 class_only 검토 후보입니다.`
       );
     }
   }
@@ -744,7 +744,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
         inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion,
       ].filter(Boolean),
       designatedGoodsPolicy:
-        "normalized_exact만 확정 근거, normalized_contains/class_only는 검토 후보; #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않음",
+        "normalized_exact 또는 normalized_contains는 특산품 활용 출원으로 인정하고, class_only만 사람 검토 후보로 유지",
       designatedGoodsMatchVersion:
         inputDocument?.ipRegistryEnrichment?.policy?.goodsMatchVersion || null,
       currentYearPolicy: "진행 중인 현재 연도는 최근/직전 기간 비교에서 제외",

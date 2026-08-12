@@ -12,8 +12,9 @@
 - KIPRIS 단어검색에 없는 출원인 주소·지정상품은 등록번호가 있는 hit만 등록원부
   `getMarkHistory`로 별도 보강한다. 주소는 법정동코드로 판정하고, 지정상품은
   `normalized_exact|normalized_contains|class_only|mismatch|unverified` 근거를 남긴다.
-- #12의 세부 기준이 확정되기 전에는 `normalized_contains|class_only`를 후보로만 표시하고 기존
-  상표 합계에서 자동 제외하지 않는다. 등록번호가 없는 출원중·거절 건은 `not_applicable`이다.
+- `normalized_contains`는 지정상품명에 고시상품명칭이 포함된 경우로, 특산품 활용 출원으로
+  인정한다. `class_only`는 NICE류만 확인된 경우이므로 사람 검토 후보로 유지한다. 등록번호가
+  없는 출원중·거절 건은 `not_applicable`이다.
 - 농사로 지역브랜드의 `aplcnoInfo`와 KIPRIS `applicationNumber`는 숫자 외 문자를 제거한 뒤
   완전일치할 때만 연결한다. 이름·유사문자열 조인은 하지 않는다
   (`area-brand-application-region-join-v1`).
