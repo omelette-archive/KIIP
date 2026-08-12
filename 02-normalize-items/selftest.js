@@ -137,6 +137,9 @@ async function run() {
       { item: "생버섯", niceClass: "31", similarGroupCode: "G0202" },
       { item: "소고기", niceClass: "29", similarGroupCode: "G0701" },
       { item: "꿀", niceClass: "30", similarGroupCode: "G0302" },
+      { item: "생밤", niceClass: "31", similarGroupCode: "G0211" },
+      { item: "신선한 키위", niceClass: "31", similarGroupCode: "G0211" },
+      { item: "꽃", niceClass: "31", similarGroupCode: "G0212" },
     ]);
     const expected = new Map([
       ["파프리카", "신선한 고추"],
@@ -149,22 +152,27 @@ async function run() {
       ["느타리버섯", "생버섯"],
       ["새송이버섯", "생버섯"],
       ["팽이버섯", "생버섯"],
+      ["한우", "소고기"],
+      ["벌꿀", "꿀"],
+      ["밤", "생밤"],
+      ["참다래", "신선한 키위"],
+      ["화훼", "꽃"],
     ]);
     for (const [rawItemName, noticeName] of expected) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
       assert.strictEqual(result.status, "ok", rawItemName);
+      assert.strictEqual(result.itemName, rawItemName, `${rawItemName}: itemName은 원물명 그대로 유지해야 함(별칭이 대체하지 않음)`);
       assert.strictEqual(result.noticeName, noticeName, rawItemName);
-      assert.strictEqual(result.niceClass, "31", rawItemName);
       assert.strictEqual(result.matchMethod, "rule_approved_alias", rawItemName);
       assert.strictEqual(result.confidence, "1.0000", rawItemName);
     }
-    for (const rawItemName of ["한우", "벌꿀", "단감", "잡곡"]) {
+    for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대추"]) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
       assert.strictEqual(result.status, "review_required", `${rawItemName}은 미승인 상태여야 함`);
     }
     assert.strictEqual(approvedAliases.approvalIssue, "#51");
-    assert.strictEqual(approvedAliases.approvedAt, "2026-08-11");
-    ok("승인된 10개 표현만 자동 확정하고 미승인 의미 변경 후보는 검토대기에 유지");
+    assert.strictEqual(approvedAliases.approvedAt, "2026-08-12");
+    ok("승인된 15개 표현만 자동 확정하고, itemName은 원물명 그대로 유지하며 noticeName만 연결, 미승인 의미 변경 후보는 검토대기에 유지");
   }
 
   console.log("6) normalizeRow — 규칙 처리 오류를 행별로 보존");
