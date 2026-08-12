@@ -256,9 +256,14 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
 
   const regionGroups = new Map();
   for (const row of analysis.regionItems) {
-    if (!clean(row.noticeName) || !clean(row.niceClass)) {
+    // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과(matchingBasis=
+    // raw_item_name_unclassified)는 niceClass가 없는 게 정상이다 — 식품 기본류
+    // fallback으로 검색했을 뿐 공식 분류가 아니기 때문. 이 경우만 niceClass 미확정을
+    // 허용하고, noticeName은 여전히 필수(원물명이라도 표시할 이름은 있어야 함).
+    const isUnclassified = clean(row.matchingBasis) === "raw_item_name_unclassified";
+    if (!clean(row.noticeName) || (!isUnclassified && !clean(row.niceClass))) {
       throw new Error(
-        `대시보드 품목은 ② 고시명칭·NICE류 확정 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
+        `대시보드 품목은 ② 고시명칭 확정 또는 원물명 미분류 검색 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
       );
     }
     const regionIdentity = resolveRegion(row, regionIndex);
