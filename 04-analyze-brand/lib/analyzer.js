@@ -2,7 +2,7 @@
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
-const ANALYSIS_VERSION = "brand-analysis-v3-ip-registry-evidence";
+const ANALYSIS_VERSION = "brand-analysis-v4-regional-metric-gate";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -275,6 +275,7 @@ function trendOf(recent, previous) {
 
 function finalizeBucket(bucket, options) {
   const statusCounts = { registered: 0, pending: 0, inactive: 0, unknown: 0 };
+  const regionalStatusCounts = { registered: 0, pending: 0, inactive: 0, unknown: 0 };
   const regionCounts = { inside: 0, outside: 0, unverified: 0 };
   const regionalBrandCounts = bucket.sido
     ? { inside: 0, outside: 0, unverified: 0, notReferenced: 0 }
@@ -305,8 +306,11 @@ function finalizeBucket(bucket, options) {
   const previousStart = previousEnd - options.recentYears + 1;
 
   for (const hit of bucket.hits.values()) {
-    statusCounts[statusCategory(hit.applicationStatus)]++;
-    regionCounts[regionCategory(hit)]++;
+    const status = statusCategory(hit.applicationStatus);
+    const applicantRegion = regionCategory(hit);
+    statusCounts[status]++;
+    regionCounts[applicantRegion]++;
+    if (applicantRegion === "inside") regionalStatusCounts[status]++;
     if (regionalBrandCounts) {
       const category = regionalBrandCategory(hit, bucket);
       if (category === null) regionalBrandCounts.notReferenced++;
@@ -356,6 +360,28 @@ function finalizeBucket(bucket, options) {
     ? regionalBrandCounts.inside + regionalBrandCounts.outside
     : 0;
   const uniqueTrademarkCount = bucket.hits.size;
+  const isRegionalBucket = Boolean(clean(bucket.region));
+  const regionalUniqueTrademarkCount = isRegionalBucket ? regionCounts.inside : null;
+  const regionalCollectionComplete =
+    isRegionalBucket &&
+    bucket.successfulQueryCount > 0 &&
+    bucket.partialQueryCount === 0 &&
+    bucket.erroredQueryCount === 0 &&
+    bucket.skippedQueryCount === 0;
+  const regionalAddressVerificationComplete =
+    isRegionalBucket && (uniqueTrademarkCount === 0 || regionVerifiedHitCount === uniqueTrademarkCount);
+  const regionalMetricBlockingReasons = [];
+  if (isRegionalBucket && !regionalCollectionComplete) {
+    regionalMetricBlockingReasons.push("collection_incomplete");
+  }
+  if (isRegionalBucket && !regionalAddressVerificationComplete) {
+    regionalMetricBlockingReasons.push("applicant_address_unverified");
+  }
+  const regionalMetricAvailability = !isRegionalBucket
+    ? null
+    : regionalMetricBlockingReasons.length === 0
+      ? "available"
+      : "blocked";
   const goodsConfirmedHitCount = goodsMatchCounts.normalized_exact;
   const goodsReviewRequiredHitCount =
     goodsMatchCounts.normalized_contains + goodsMatchCounts.class_only;
@@ -376,9 +402,17 @@ function finalizeBucket(bucket, options) {
     sources: [...bucket.sources].sort(),
     sourceProvenance: [...bucket.sourceProvenance.values()],
     uniqueTrademarkCount,
+    nationwideSearchTrademarkCount: uniqueTrademarkCount,
     duplicateHitCount: Math.max(0, bucket.returnedHitCount - uniqueTrademarkCount),
     statusCounts,
     registrationRate: safeRate(statusCounts.registered, uniqueTrademarkCount),
+    regionalUniqueTrademarkCount,
+    regionalStatusCounts: isRegionalBucket ? regionalStatusCounts : null,
+    regionalRegistrationRate: isRegionalBucket
+      ? safeRate(regionalStatusCounts.registered, regionalUniqueTrademarkCount)
+      : null,
+    regionalMetricAvailability,
+    regionalMetricBlockingReasons,
     applicationYearCounts,
     recentPeriod: { startYear: recentStart, endYear: recentEnd, count: recentApplicationCount },
     previousPeriod: { startYear: previousStart, endYear: previousEnd, count: previousApplicationCount },
@@ -510,7 +544,9 @@ function analyzeEntries(parsed, providedOptions = {}) {
     );
   }
   if (summary.regionVerificationRate !== 1 && summary.uniqueTrademarkCount > 0) {
-    warnings.push("출원인 주소 기반 지역 매칭이 끝나지 않은 상표가 있어 지역 내·외 비중은 검증된 건만 기준으로 계산했습니다.");
+    warnings.push(
+      "출원인 주소 기반 지역 매칭이 끝나지 않은 상표가 있어 지역별 상표 건수·등록률·공백 점수를 차단했습니다. uniqueTrademarkCount는 전국 검색 참고값이며 지역 지표에는 사용하지 않습니다."
+    );
   }
   if (regionItems.some((row) => row.regionalBrandReferenceHitCount > 0)) {
     warnings.push(
@@ -534,7 +570,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
 
   return {
-    schemaVersion: "1.3",
+    schemaVersion: "1.4",
     analysisVersion: ANALYSIS_VERSION,
     generatedAt: new Date().toISOString(),
     provenance: {
@@ -554,9 +590,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
       analysisUnit: "지역 × ② 표준 특산품명(표시) × 고시상품명칭·NICE류(집계 키)",
       trademarkTitlePolicy: "상표명은 개별 hit 근거로만 보존하며 품목명·집계 키로 사용하지 않음",
       regionalBrandValidationPolicy: "농사로 areaBrandLst는 출원번호 검증 전용이며 특산품 마스터·집계 입력에서 제외",
-      trademarkCountBasis: "03단계가 저장한 hit를 출원번호 우선 키로 중복 제거",
+      trademarkCountBasis:
+        "uniqueTrademarkCount는 03단계 전국 검색 hit 참고값; 지역 지표는 출원인 주소 inside로 검증된 regionalUniqueTrademarkCount만 사용",
       partialCollectionPolicy: "partial hit도 포함하되 경고와 partialQueryCount를 함께 제공",
-      applicantRegionMetric: "출원인 주소 근거만 localApplicantShare에 사용",
+      applicantRegionMetric:
+        "출원인 주소 근거만 지역 건수·등록률·localApplicantShare에 사용하며, 수집 또는 주소 검증이 불완전하면 regionalMetricAvailability=blocked",
       regionalBrandMetric: "농사로 지역브랜드 출원번호 연관성은 별도 regionalBrand* 지표로 집계",
       applicantRegionMetricVersion:
         inputDocument?.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion || null,

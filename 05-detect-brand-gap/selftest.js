@@ -82,7 +82,7 @@ console.log("5) detectGaps — ④ 출력 -> 랭킹, 비대표 제외, 결정론
     generatedAt: "2026-08-10T00:00:00.000Z",
     regionItems: [
       { region: "경기도 안성시", sido: "경기도", sigungu: "안성시", itemName: "배", noticeName: "신선한 배", niceClass: "31",
-        sources: ["지리적표시"], uniqueTrademarkCount: 0, registrationRate: null, regionVerificationRate: 0 },
+        sources: ["지리적표시"], uniqueTrademarkCount: 0, registrationRate: null, regionVerificationRate: 1 },
       { region: "전라남도 보성군", sido: "전라남도", sigungu: "보성군", itemName: "녹차", noticeName: "녹차", niceClass: "30",
         sources: ["지리적표시"], uniqueTrademarkCount: 3, registrationRate: 0.5, regionVerificationRate: 1 },
       { region: "경상남도 합천군", sido: "경상남도", sigungu: "합천군", itemName: "딸기", noticeName: "신선한 딸기", niceClass: "31",
@@ -94,22 +94,24 @@ console.log("5) detectGaps — ④ 출력 -> 랭킹, 비대표 제외, 결정론
 
   assert.strictEqual(resultA.scoreVersion, GAP_SCORE_VERSION);
   assert.strictEqual(resultA.rows.length, 3, "대표성과 무관하게 모든 지역×품목 행은 보존");
-  assert.strictEqual(resultA.ranking.length, 2, "샘플 출처(비대표)는 랭킹에서 제외됨");
+  assert.strictEqual(resultA.ranking.length, 2, "주소 검증 완료 대표 품목만 랭킹에 포함됨");
   assert.strictEqual(resultA.ranking[0].region, "경기도 안성시", "상표가 전혀 없는 안성배가 가장 공백이 커야 함");
   assert.strictEqual(resultA.ranking[1].region, "전라남도 보성군");
   assert.ok(resultA.ranking[0].gapScore > resultA.ranking[1].gapScore);
 
   const strawberry = resultA.rows.find((row) => row.itemName === "딸기");
-  assert.strictEqual(strawberry.representative, false);
+  assert.strictEqual(strawberry.representative, null, "전국 검색 건수로 대표성을 확정하면 안 됨");
   assert.strictEqual(strawberry.gapScore, null);
-  assert.strictEqual(strawberry.regionMatchVerified, false, "지역매칭 검증여부는 참고용으로만 보존");
+  assert.strictEqual(strawberry.scoreAvailability, "blocked");
+  assert.strictEqual(strawberry.blockingIssue, "#50");
+  assert.strictEqual(strawberry.regionMatchVerified, false);
 
   const { generatedAt: gA, ...restA } = resultA;
   const { generatedAt: gB, ...restB } = resultB;
   assert.deepStrictEqual(restA, restB, "generatedAt을 빼면 동일 입력은 항상 동일 결과여야 함(결정론성)");
 
   assert.ok(resultA.warnings.some((w) => w.includes("예시값")));
-  assert.ok(resultA.warnings.some((w) => w.includes("localApplicantShare")));
+  assert.ok(resultA.warnings.some((w) => w.includes("nationwideSearchTrademarkCount")));
   ok("랭킹은 대표 품목만 공백 점수 내림차순, 비대표는 사유와 함께 보존, 동일 입력은 동일 출력");
 }
 
@@ -119,9 +121,9 @@ console.log("5-1) detectGaps — GI 미등록이어도 상표 3건 이상이면 
     generatedAt: "2026-08-11T00:00:00.000Z",
     regionItems: [
       { region: "경상남도 합천군", sido: "경상남도", sigungu: "합천군", itemName: "딸기", noticeName: "신선한 딸기", niceClass: "31",
-        sources: ["농사로"], uniqueTrademarkCount: 3, registrationRate: 0.2, regionVerificationRate: 0 },
+        sources: ["농사로"], uniqueTrademarkCount: 3, registrationRate: 0.2, regionVerificationRate: 1 },
       { region: "충청북도 제천시", sido: "충청북도", sigungu: "제천시", itemName: "인삼", noticeName: "인삼", niceClass: "5",
-        sources: ["농사로"], uniqueTrademarkCount: 2, registrationRate: 0, regionVerificationRate: 0 },
+        sources: ["농사로"], uniqueTrademarkCount: 2, registrationRate: 0, regionVerificationRate: 1 },
     ],
   };
   const result = detectGaps(analysis);
@@ -133,6 +135,30 @@ console.log("5-1) detectGaps — GI 미등록이어도 상표 3건 이상이면 
   assert.ok(result.methodology.representativeBasis.includes("3건"));
   assert.strictEqual(result.methodology.weightsConfirmed, false, "가중치는 아직 미확정임을 산출물에 명시");
   ok("대표 특산품 판정에서 GI 출처와 상표 3건 이상 OR 조건이 실제 랭킹까지 정확히 반영됨");
+}
+
+console.log("5-2) 전국 검색 hit는 지역 귀속 전 대표성·공백 점수에 사용 금지");
+{
+  const result = detectGaps({
+    regionItems: [{
+      region: "경상북도 영양군",
+      itemName: "사과",
+      noticeName: "신선한 사과",
+      niceClass: "31",
+      sources: ["농사로"],
+      uniqueTrademarkCount: 100,
+      nationwideSearchTrademarkCount: 100,
+      regionalUniqueTrademarkCount: 1,
+      regionalMetricAvailability: "blocked",
+      regionalMetricBlockingReasons: ["applicant_address_unverified"],
+    }],
+  });
+  assert.strictEqual(result.ranking.length, 0);
+  assert.strictEqual(result.rows[0].uniqueTrademarkCount, null);
+  assert.strictEqual(result.rows[0].nationwideSearchTrademarkCount, 100);
+  assert.strictEqual(result.rows[0].gapScore, null);
+  assert.strictEqual(result.rows[0].blockingIssue, "#50");
+  ok("전국 후보 100건이 있어도 지역 inside 검증 전에는 랭킹과 점수를 생성하지 않음");
 }
 
 console.log("6) detectGaps — 입력 계약 위반 시 명확한 오류");

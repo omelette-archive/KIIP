@@ -276,7 +276,19 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     const gapRow = gapRows.get(rowKey(row));
     const briefing = briefingRows.get(rowKey(row));
     const calculatedAt = analysis.generatedAt || generatedAt;
-    const scoreAvailability = typeof gapRow?.gapScore === "number" ? "preview" : "blocked";
+    const regionalMetricAvailable =
+      row.regionalMetricAvailability === "available" ||
+      (!row.regionalMetricAvailability && row.regionVerificationRate === 1);
+    const regionalTrademarkCount = regionalMetricAvailable
+      ? count(row, "regionalUniqueTrademarkCount") || count(row.regionCounts, "inside")
+      : null;
+    const regionalRegisteredCount = regionalMetricAvailable
+      ? count(row.regionalStatusCounts, "registered")
+      : null;
+    const scoreAvailability =
+      typeof gapRow?.gapScore === "number" ? "preview" : "blocked";
+    const scoreBlockingIssue =
+      gapRow?.scoreAvailability === "blocked" || !regionalMetricAvailable ? "#50" : "#29";
     const item = {
       specialtyId: specialty.specialtyId,
       specialtyIdStatus: specialty.specialtyIdStatus,
@@ -298,38 +310,61 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           }))
         : [],
       metrics: {
-        uniqueTrademarkCount: makeMetric(count(row, "uniqueTrademarkCount"), row, {
+        uniqueTrademarkCount: makeMetric(regionalTrademarkCount, row, {
           state,
           sourceIds: baseMetricSourceIds,
+          availability: regionalMetricAvailable ? "available" : "blocked",
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
-          rationale: "④ 저장 hit를 출원번호 우선 키로 중복 제거",
+          rationale: "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계",
+          blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
-        registeredTrademarkCount: makeMetric(count(row.statusCounts, "registered"), row, {
+        nationwideSearchTrademarkCount: makeMetric(
+          count(row, "nationwideSearchTrademarkCount") || count(row, "uniqueTrademarkCount"),
+          row,
+          {
+            state,
+            sourceIds: baseMetricSourceIds,
+            availability: "preview",
+            calculatedAt,
+            methodVersion: analysis.analysisVersion || null,
+            rationale: "KIPRIS 전국 단어검색 후보; 지역 상표 건수로 사용하지 않음",
+            blockingIssue: "#50",
+          }
+        ),
+        registeredTrademarkCount: makeMetric(regionalRegisteredCount, row, {
           state,
-          sourceIds: baseMetricSourceIds,
+          sourceIds: registryMetricSourceIds,
+          availability: regionalMetricAvailable ? "available" : "blocked",
           calculatedAt,
           methodVersion: analysis.analysisVersion || null,
-          rationale: "④ statusCounts.registered",
+          rationale: "지역 inside 검증 출원 중 등록 상태",
+          blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
-        registrationRate: makeMetric(row.registrationRate ?? null, row, {
-          state,
-          sourceIds: baseMetricSourceIds,
-          calculatedAt,
-          methodVersion: analysis.analysisVersion || null,
-          rationale: "registered / uniqueTrademarkCount",
-        }),
-        localApplicantShare: makeMetric(
-          row.regionVerificationRate === 1 ? row.localApplicantShare ?? null : null,
+        registrationRate: makeMetric(
+          regionalMetricAvailable ? row.regionalRegistrationRate ?? null : null,
           row,
           {
             state,
             sourceIds: registryMetricSourceIds,
-            availability: row.regionVerificationRate === 1 ? "available" : "blocked",
+            availability: regionalMetricAvailable ? "available" : "blocked",
+            calculatedAt,
+            methodVersion: analysis.analysisVersion || null,
+            rationale: "지역 inside 등록 출원 / 지역 inside 고유 출원",
+            blockingIssue: regionalMetricAvailable ? null : "#50",
+          }
+        ),
+        localApplicantShare: makeMetric(
+          regionalMetricAvailable ? row.localApplicantShare ?? null : null,
+          row,
+          {
+            state,
+            sourceIds: registryMetricSourceIds,
+            availability: regionalMetricAvailable ? "available" : "blocked",
             calculatedAt,
             methodVersion: analysis.analysisVersion || null,
             rationale: "출원인 주소가 검증된 hit만 사용",
-            blockingIssue: row.regionVerificationRate === 1 ? null : "#11",
+            blockingIssue: regionalMetricAvailable ? null : "#50",
           }
         ),
         regionalBrandInsideShare: makeMetric(row.regionalBrandInsideShare ?? null, row, {
@@ -367,7 +402,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           calculatedAt: gap.generatedAt || generatedAt,
           methodVersion: gap.scoreVersion || null,
           rationale: gapRow?.gapReason || "⑤ 예시 점수 기준",
-          blockingIssue: "#29",
+          blockingIssue: scoreBlockingIssue,
         }),
       },
       briefing: briefing
@@ -402,7 +437,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     }
     region.items.sort(
       (a, b) =>
-        (b.metrics.uniqueTrademarkCount.value || 0) - (a.metrics.uniqueTrademarkCount.value || 0) ||
+        (b.metrics.uniqueTrademarkCount.value ?? -1) -
+          (a.metrics.uniqueTrademarkCount.value ?? -1) ||
         clean(a.noticeName || a.itemName).localeCompare(clean(b.noticeName || b.itemName), "ko")
     );
     return {
@@ -410,21 +446,51 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       dataState: state,
       metrics: aggregate
         ? {
-            uniqueTrademarkCount: makeMetric(count(aggregate, "uniqueTrademarkCount"), aggregate, {
-              state,
-              calculatedAt: analysis.generatedAt || generatedAt,
-              methodVersion: analysis.analysisVersion || null,
-            }),
-            registeredTrademarkCount: makeMetric(count(aggregate.statusCounts, "registered"), aggregate, {
-              state,
-              calculatedAt: analysis.generatedAt || generatedAt,
-              methodVersion: analysis.analysisVersion || null,
-            }),
-            registrationRate: makeMetric(aggregate.registrationRate ?? null, aggregate, {
-              state,
-              calculatedAt: analysis.generatedAt || generatedAt,
-              methodVersion: analysis.analysisVersion || null,
-            }),
+            uniqueTrademarkCount: makeMetric(
+              aggregate.regionalMetricAvailability === "available"
+                ? count(aggregate, "regionalUniqueTrademarkCount")
+                : null,
+              aggregate,
+              {
+                state,
+                availability:
+                  aggregate.regionalMetricAvailability === "available" ? "available" : "blocked",
+                calculatedAt: analysis.generatedAt || generatedAt,
+                methodVersion: analysis.analysisVersion || null,
+                blockingIssue:
+                  aggregate.regionalMetricAvailability === "available" ? null : "#50",
+              }
+            ),
+            registeredTrademarkCount: makeMetric(
+              aggregate.regionalMetricAvailability === "available"
+                ? count(aggregate.regionalStatusCounts, "registered")
+                : null,
+              aggregate,
+              {
+                state,
+                availability:
+                  aggregate.regionalMetricAvailability === "available" ? "available" : "blocked",
+                calculatedAt: analysis.generatedAt || generatedAt,
+                methodVersion: analysis.analysisVersion || null,
+                blockingIssue:
+                  aggregate.regionalMetricAvailability === "available" ? null : "#50",
+              }
+            ),
+            registrationRate: makeMetric(
+              aggregate.regionalMetricAvailability === "available"
+                ? aggregate.regionalRegistrationRate ?? null
+                : null,
+              aggregate,
+              {
+                state,
+                availability:
+                  aggregate.regionalMetricAvailability === "available" ? "available" : "blocked",
+                calculatedAt: analysis.generatedAt || generatedAt,
+                methodVersion: analysis.analysisVersion || null,
+                blockingIssue:
+                  aggregate.regionalMetricAvailability === "available" ? null : "#50",
+              }
+            ),
           }
         : {},
     };

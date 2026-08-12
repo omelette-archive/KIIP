@@ -23,44 +23,78 @@ const ACTIVITY_SATURATION_COUNT = 5;
 const ACTIVITY_WEIGHT = 0.7;
 const REGISTRATION_WEIGHT = 0.3;
 
-const GAP_SCORE_VERSION = "gap-score-v1-representative-gi-or-count3";
+const GAP_SCORE_VERSION = "gap-score-v2-regional-address-gate";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
 }
 
-function isRepresentative(bucket) {
+function regionalMetricAvailable(bucket) {
+  if (bucket.regionalMetricAvailability === "available") return true;
+  if (bucket.regionalMetricAvailability === "blocked") return false;
+  if (typeof bucket.regionVerificationRate === "number") {
+    return bucket.regionVerificationRate === 1;
+  }
+  // 구 fixture와 독립 scorer 호출은 이미 지역 집계값을 전달한 것으로 간주한다.
+  return true;
+}
+
+function regionalTrademarkCount(bucket) {
+  return Number(bucket.regionalUniqueTrademarkCount ?? bucket.uniqueTrademarkCount) || 0;
+}
+
+function regionalRegistrationRate(bucket) {
+  const value = bucket.regionalRegistrationRate ?? bucket.registrationRate;
+  return typeof value === "number" ? value : null;
+}
+
+function hasRepresentativeSource(bucket) {
   const sources = Array.isArray(bucket.sources) ? bucket.sources : [];
-  const hasRepresentativeSource = sources.some((s) => REPRESENTATIVE_SOURCES.includes(s));
+  return sources.some((source) => REPRESENTATIVE_SOURCES.includes(source));
+}
+
+function isRepresentative(bucket) {
+  const sourceRepresentative = hasRepresentativeSource(bucket);
   const hasEnoughTrademarks =
-    (Number(bucket.uniqueTrademarkCount) || 0) >= REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
-  return hasRepresentativeSource || hasEnoughTrademarks;
+    regionalMetricAvailable(bucket) &&
+    regionalTrademarkCount(bucket) >= REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
+  return sourceRepresentative || hasEnoughTrademarks;
 }
 
 function activityScore(bucket) {
-  const count = Number(bucket.uniqueTrademarkCount) || 0;
+  const count = regionalTrademarkCount(bucket);
   return Math.min(1, count / ACTIVITY_SATURATION_COUNT);
 }
 
 // registrationRate가 null인 경우(상표가 아예 없어 분모가 0인 경우 등)는 "등록 성사 실적
 // 없음"으로 간주해 0으로 채운다 — 공백 방향으로 점수가 기운다.
 function registrationScore(bucket) {
-  return typeof bucket.registrationRate === "number" ? bucket.registrationRate : 0;
+  return regionalRegistrationRate(bucket) ?? 0;
 }
 
 /**
- * 지역 내·외 출원 비중(localApplicantShare)은 점수에 쓰지 않는다. ③단계 출원인 주소 매칭이
- * 아직 없어(이슈 #11) 대부분 unverified이기 때문 — 미검증 값을 점수에 섞으면 같은 입력도
- * ③의 검증 진행 상황에 따라 점수가 흔들려 결정론성이 깨진다. 대신 참고용 메타데이터로만
- * 그대로 남긴다.
+ * localApplicantShare 비율 자체는 점수에 쓰지 않지만, 활동량·등록률은 주소가 inside로
+ * 검증된 지역 출원만 사용한다. 검색 수집이나 주소 귀속이 불완전하면 값을 0으로 채우지 않고
+ * 점수 전체를 차단한다(#50).
  */
 function scoreBucket(bucket) {
+  if (!regionalMetricAvailable(bucket)) {
+    return {
+      representative: hasRepresentativeSource(bucket) ? true : null,
+      gapScore: null,
+      gapReason:
+        "전국 검색 hit의 출원인 주소 귀속 또는 검색 수집이 불완전해 지역 상표 건수·공백 점수를 차단함(#50)",
+      scoreAvailability: "blocked",
+      blockingIssue: "#50",
+    };
+  }
   const representative = isRepresentative(bucket);
   if (!representative) {
     return {
       representative: false,
       gapScore: null,
       gapReason: `대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 ${REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD}건 이상)을 충족하지 않음`,
+      scoreAvailability: "not_applicable",
     };
   }
   const activity = activityScore(bucket);
@@ -71,9 +105,10 @@ function scoreBucket(bucket) {
     representative: true,
     gapScore,
     gapReason: null,
+    scoreAvailability: "preview",
     scoreInputs: {
-      uniqueTrademarkCount: bucket.uniqueTrademarkCount,
-      registrationRate: bucket.registrationRate,
+      regionalUniqueTrademarkCount: regionalTrademarkCount(bucket),
+      regionalRegistrationRate: regionalRegistrationRate(bucket),
       activityScore: Number(activity.toFixed(4)),
       registrationScore: Number(registration.toFixed(4)),
     },
@@ -87,6 +122,9 @@ module.exports = {
   ACTIVITY_SATURATION_COUNT,
   ACTIVITY_WEIGHT,
   REGISTRATION_WEIGHT,
+  regionalMetricAvailable,
+  regionalTrademarkCount,
+  regionalRegistrationRate,
   isRepresentative,
   activityScore,
   registrationScore,
