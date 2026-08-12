@@ -71,6 +71,11 @@ function count(row, field) {
   return Number.isFinite(value) && value >= 0 ? value : 0;
 }
 
+function optionalCount(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number >= 0 ? number : null;
+}
+
 function dataState(row) {
   const queryCount = count(row, "queryCount");
   const successful = count(row, "successfulQueryCount");
@@ -509,6 +514,68 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     partialQueryCount: count(summary, "partialQueryCount"),
     errorQueryCount: count(summary, "erroredQueryCount"),
     skippedQueryCount: count(summary, "skippedQueryCount"),
+    unit: "region_item_input_rows",
+  };
+
+  const availableRegionItemCount = analysis.regionItems.filter(
+    (row) => row.regionalMetricAvailability === "available"
+  ).length;
+  const regionCounts = summary.regionCounts || {};
+  const regionalCoverageThreshold = Number(analysis.parameters?.regionalCoverageThreshold ?? 1);
+  const pipelineStatus = {
+    stage: clean(options.stage) || (mode === "full" ? "alpha" : "sample"),
+    inputScope: mode,
+    units: {
+      row: "region_item_input_rows",
+      uniqueQuery: "notice_name_and_nice_class",
+      trademark: "application_number",
+    },
+    rowCounts: {
+      total: count(summary, "queryCount"),
+      searchable: count(summary, "successfulQueryCount"),
+      complete: coverage.completeQueryCount,
+      partial: coverage.partialQueryCount,
+      error: coverage.errorQueryCount,
+      skipped: coverage.skippedQueryCount,
+    },
+    uniqueQueryCounts: {
+      total: optionalCount(options.uniqueQueryCount ?? summary.uniqueQueryCount),
+      complete: optionalCount(options.completeUniqueQueryCount ?? summary.completeUniqueQueryCount),
+      partial: optionalCount(options.partialUniqueQueryCount ?? summary.partialUniqueQueryCount),
+    },
+    nationwideCandidates: {
+      uniqueTrademarkCount: count(summary, "uniqueTrademarkCount"),
+      returnedHitCount: count(summary, "returnedHitCount"),
+      duplicateHitCount: count(summary, "duplicateHitCount"),
+    },
+    applicantRegionVerification: {
+      inside: count(regionCounts, "inside"),
+      outside: count(regionCounts, "outside"),
+      unverified: count(regionCounts, "unverified"),
+      verifiedCount: count(summary, "regionVerifiedHitCount"),
+      rate:
+        typeof summary.regionVerificationRate === "number"
+          ? summary.regionVerificationRate
+          : null,
+    },
+    regionalMetricGate: {
+      availableRegionItemCount,
+      blockedRegionItemCount: Math.max(0, analysis.regionItems.length - availableRegionItemCount),
+      coverageThreshold: Number.isFinite(regionalCoverageThreshold)
+        ? regionalCoverageThreshold
+        : 1,
+      policy:
+        regionalCoverageThreshold < 1
+          ? "alpha_coverage_threshold_preview"
+          : "all_or_nothing_per_region_item",
+    },
+    collectionExperiment: {
+      queryHitCap: optionalCount(options.queryHitCap),
+      serializationFailureObservedAtOrAbove: optionalCount(
+        options.serializationFailureObservedAtOrAbove
+      ),
+      outputShape: "expanded_region_item_hits",
+    },
   };
 
   const identityFor = (row) => {
@@ -546,7 +613,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     aiReviewApplied: false,
   }));
   const alerts = briefings.filter((row) => row.isGapAlert);
-  const snapshotBasis = JSON.stringify({ mode, analysis, gap, strategy });
+  const snapshotBasis = JSON.stringify({ mode, analysis, gap, strategy, pipelineStatus });
   const sources = collectSources(analysis);
   const sourceFetchedAt = sources
     .map((source) => clean(source.sourceFetchedAt))
@@ -573,6 +640,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       geographyVersion: null,
     },
     coverage,
+    pipelineStatus,
     map: {
       defaultMetric: "data_coverage",
       availability: "blocked",

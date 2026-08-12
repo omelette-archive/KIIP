@@ -31,7 +31,10 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
   assert.match(html, /지역 특산품의 상표 공백/);
-  assert.match(html, /샘플 데이터/);
+  assert.match(html, /전체 범위 알파 · 부분 수집/);
+  assert.match(html, /어디까지 됐고, 왜 아직 지도 수치가 막혀 있나/);
+  assert.match(html, /37,563/);
+  assert.match(html, /완료 20 · 부분 106/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
@@ -92,13 +95,17 @@ test("renders matching criteria prominently, on every tab, not just as bottom-of
   assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
   assert.match(html, /고시상품명칭 정확 일치/, "품목 매칭 기준이 명시돼야 함");
   assert.match(html, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
-  assert.match(html, /전체 주소 귀속 완료 전 지표 차단/, "출원인 지역 매칭 차단 기준이 명시돼야 함");
+  assert.match(html, /기본 100% 완료 · 알파는 임계값 명시/, "출원인 지역 매칭 차단 기준이 명시돼야 함");
 });
 
 test("ships a valid dashboard snapshot", async () => {
   const snapshot = await loadSnapshot();
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
-  assert.equal(snapshot.mode, "sample");
+  assert.equal(snapshot.mode, "full");
+  assert.equal(snapshot.pipelineStatus.stage, "alpha");
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 126);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 42);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nongsaro"));
@@ -107,14 +114,11 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.every((item) => item.matchingBasis === "notice_name_and_nice_class"));
   assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
-  assert.ok(
-    items.every((item) => item.metrics.uniqueTrademarkCount.availability === "blocked"),
-    "현재 부분 보강 샘플의 지역 건수는 모두 차단돼야 함"
-  );
-  assert.ok(
-    items.every((item) => item.metrics.uniqueTrademarkCount.value === null),
-    "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨"
-  );
+  const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
+  const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
+  assert.equal(availableItems.length, 42, "60% 알파 임계값을 통과한 지역×품목 수를 유지해야 함");
+  assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
+  assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
     items.every((item) => Number.isFinite(item.metrics.nationwideSearchTrademarkCount.value)),
     "전국 검색 후보 건수는 별도 참고 지표로 보존해야 함"
@@ -126,7 +130,7 @@ test("ships a valid dashboard snapshot", async () => {
       "지정상품 확정 건수가 있으면 사례 목록에서도 그 근거를 확인할 수 있어야 함"
     );
   }
-  assert.ok(snapshot.warnings.some((warning) => warning.includes("전국 모집단")));
+  assert.ok(snapshot.warnings.some((warning) => warning.includes("완전한 모집단")));
 });
 
 test("ships traceable province and municipality geometry", async () => {

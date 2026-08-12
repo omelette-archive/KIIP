@@ -74,6 +74,17 @@ a { color: inherit; text-decoration: none; }
 .metrics strong { display: block; margin: 12px 0 9px; font-family: Georgia, serif; font-size: 34px; font-weight: 500; }
 .metrics small { color: var(--faint); font-size: 11px; line-height: 1.5; }
 
+.pipeline-progress { margin-top: 18px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.pipeline-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
+.pipeline-grid article { min-height: 150px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: #faf8f2; }
+.pipeline-grid span, .pipeline-grid strong { display: block; }
+.pipeline-grid span { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: .04em; }
+.pipeline-grid strong { margin-top: 11px; font-size: 21px; letter-spacing: -.035em; }
+.pipeline-grid p { margin: 10px 0 0; color: var(--muted); font-size: 10.5px; line-height: 1.7; }
+.pipeline-grid .pipeline-bottleneck { grid-column: 1 / -1; min-height: auto; border-color: #e2c59b; background: var(--amber-soft); }
+.pipeline-grid .pipeline-bottleneck span { color: var(--amber); }
+.pipeline-grid .pipeline-bottleneck strong { font-size: 17px; }
+
 .tab-nav { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 30px; padding-bottom: 4px; border-bottom: 1px solid var(--line); }
 .tab-button { padding: 10px 16px; border: 1px solid transparent; border-radius: 10px 10px 0 0; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
 .tab-button:hover { color: var(--ink); }
@@ -242,6 +253,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
   .map-workspace { grid-template-columns: 1fr; }
   .map-stage { min-height: 460px; }
   .criteria-grid { grid-template-columns: repeat(2, 1fr); }
+  .pipeline-grid { grid-template-columns: repeat(2, 1fr); }
 }
 
 @media (max-width: 620px) {
@@ -253,6 +265,9 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
   .metrics { grid-template-columns: 1fr; }
   .metrics article { min-height: 118px; border-right: 0; border-bottom: 1px solid var(--line); }
   .metrics article:last-child { border-bottom: 0; }
+  .pipeline-progress { padding: 22px; }
+  .pipeline-grid { grid-template-columns: 1fr; }
+  .pipeline-grid .pipeline-bottleneck { grid-column: auto; }
   .region-list { grid-template-columns: 1fr; }
   .detail-panel { padding: 22px; }
   .detail-heading h2 { font-size: 28px; }

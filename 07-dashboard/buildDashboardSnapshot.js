@@ -29,6 +29,12 @@ function usage(message) {
       "옵션:",
       "  --out <path>       출력 경로 (기본: 07-dashboard/output/dashboard-snapshot.json)",
       "  --mode <sample|full>  데이터 범위 (기본: sample)",
+      "  --stage <sample|alpha|production>  실행 단계 표시",
+      "  --unique-query-count <n>  고유 고시명칭+NICE 검색 조합 수",
+      "  --complete-unique-query-count <n>  완전 수집된 고유 검색 조합 수",
+      "  --partial-unique-query-count <n>  부분 수집된 고유 검색 조합 수",
+      "  --query-hit-cap <n>  이번 실행의 검색 조합별 저장 상한",
+      "  --serialization-failure-observed-at-or-above <n>  직렬화 실패가 관측된 상한",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -58,7 +64,16 @@ function main() {
       gap: readJson(args.gap, "⑤ gap"),
       strategy: readJson(args.strategy, "⑥ strategy"),
     },
-    { mode: args.mode }
+    {
+      mode: args.mode,
+      stage: args.stage,
+      uniqueQueryCount: args["unique-query-count"],
+      completeUniqueQueryCount: args["complete-unique-query-count"],
+      partialUniqueQueryCount: args["partial-unique-query-count"],
+      queryHitCap: args["query-hit-cap"],
+      serializationFailureObservedAtOrAbove:
+        args["serialization-failure-observed-at-or-above"],
+    }
   );
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(snapshot, null, 2), "utf8");

@@ -1,6 +1,6 @@
 # ⑦ 대시보드 서비스
 
-**상태**: 🟡 `dashboard-snapshot-v1` 샘플 어댑터와 실제 웹 대시보드 구현 ·
+**상태**: 🟡 `dashboard-snapshot-v1` 어댑터와 실제 웹 대시보드 구현 ·
 [`web/`](web/)은 요약(전국 지도·랭킹)/지자체별 조회/품목별 조회/특화작목 비교(준비 상태 표시)
 4개 탭, 판정 기준 상시 노출, 지역·품목 상세, 실제 출원 상표 사례, 출처 표시가 동작하며
 배포 상태는 #42에서 관리
@@ -130,7 +130,30 @@ node 07-dashboard/buildDashboardSnapshot.js `
   --out 07-dashboard/output/dashboard-snapshot.json
 ```
 
-`sample`이 기본값이다. 전국 수집이 실제 완료되기 전에는 `full`로 실행하지 않는다. 현재 기준 지도
+`sample`이 기본값이다. `mode=full`은 전체 입력 범위를 사용했다는 뜻이며 완전 수집을 보장하지
+않는다. 알파 실행은 반드시 `--stage alpha`와 고유 검색 조합·상한 실험 메타데이터를 함께 남겨
+UI가 `전체 범위 알파 · 부분 수집`으로 표시하도록 한다. 예:
+
+```powershell
+node 07-dashboard/buildDashboardSnapshot.js `
+  --analysis 04-analyze-brand/output/alpha-full-20260812-analysis-deep.json `
+  --gap 05-detect-brand-gap/output/alpha-full-20260812-gap-deep.json `
+  --strategy 06-generate-business-strategy/output/alpha-full-20260812-strategy-deep.json `
+  --mode full --stage alpha `
+  --unique-query-count 126 `
+  --complete-unique-query-count 20 `
+  --partial-unique-query-count 106 `
+  --query-hit-cap 600 `
+  --serialization-failure-observed-at-or-above 1200
+```
+
+2026-08-12 알파 스냅샷은 113개 관측 지역·736개 지역×품목, 전국 고유 상표 후보 37,563건,
+주소 검증률 82.79%다. 고유 검색 조합은 126개(완전 20·부분 106)다. 기본 100% 게이트에서는
+0/736개만 공개 가능하지만, 현재 알파 미리보기는 `regionalCoverageThreshold=0.6`을 명시해
+42/736개와 랭킹 24개를 제한적으로 표시한다. 나머지 694개는 계속 차단하며 화면에 임계값과
+비공식 알파 수치임을 함께 표시한다.
+
+현재 기준 지도
 경계가 연결되지 않았으므로 스냅샷의 `map.availability`는 `blocked`로 유지한다. 다만 UI는 출처와
 연도를 표시한 참고 경계 위에 상표 건수·등록률·수집 범위를 그리며, 데이터 없는 지역은 0건이 아닌
 `데이터 없음`으로 표시한다. 브랜드 공백 색상은 점수와 운영 경계가 준비될 때까지 비활성화한다.
