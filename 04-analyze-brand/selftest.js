@@ -191,6 +191,25 @@ console.log("4) 03단계 신 배치 계약(status/keywordTotalCount/skipped.inpu
     r.warnings.some((w) => w.includes("부분 수집")),
     "partial 검색이 집계에 포함됐다는 경고 문구가 있어야 함"
   );
+  const batchDocument = {
+    schemaVersion: "1.2",
+    mode: "batch",
+    inputCount: 3,
+    searchableRowCount: 2,
+    successCount: 1,
+    partialCount: 1,
+    errorCount: 1,
+    skippedCount: 1,
+    uniqueQueryCount: 2,
+    uniqueQueryStatusCounts: { complete: 0, partial: 1, error: 1 },
+    results: newFormatInput,
+  };
+  const batchResult = analyzeEntries(batchDocument, { asOfYear: 2026 });
+  assert.strictEqual(batchResult.summary.inputRowCount, 3);
+  assert.strictEqual(batchResult.summary.searchableRowCount, 2);
+  assert.strictEqual(batchResult.summary.uniqueQueryCount, 2);
+  assert.strictEqual(batchResult.summary.partialUniqueQueryCount, 1);
+  assert.strictEqual(batchResult.summary.erroredUniqueQueryCount, 1);
   ok("skipped 행은 성공 집계·미지정 버킷에서 빠지고, ok 행은 keywordTotalCount로 정확히 집계됨");
 }
 

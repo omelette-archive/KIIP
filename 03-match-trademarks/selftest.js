@@ -57,6 +57,7 @@ const {
   buildSearchOutput,
   searchOne,
   runBatch,
+  loadCheckpoint,
 } = require("./matchTrademarks");
 
 const SAMPLE_OK_XML = `<?xml version="1.0" encoding="UTF-8"?>
@@ -512,6 +513,7 @@ async function run() {
     const interrupted = await runBatch(rows, client, { ...baseOptions, maxRequests: 2 });
     assert.deepStrictEqual(calledPages, [1, 2], "중복된 두 지역 행이 페이지를 각각 호출하면 안 됨");
     assert.strictEqual(interrupted.uniqueQueryCount, 1);
+    assert.deepStrictEqual(interrupted.uniqueQueryStatusCounts, { complete: 0, partial: 1, error: 0 });
     assert.strictEqual(interrupted.results[0].collectionStatus, "partial");
     assert.strictEqual(interrupted.results[0].stopReason, "request_budget");
     assert.strictEqual(interrupted.results[0].hits.length, 4);
@@ -521,6 +523,7 @@ async function run() {
     const resumed = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
     assert.deepStrictEqual(calledPages, [3], "재개 시 다음 미완료 페이지만 호출해야 함");
     assert.strictEqual(resumed.results[0].collectionStatus, "complete");
+    assert.deepStrictEqual(resumed.uniqueQueryStatusCounts, { complete: 1, partial: 0, error: 0 });
     assert.strictEqual(resumed.results[0].hits.length, 5);
 
     calledPages.length = 0;
@@ -529,6 +532,29 @@ async function run() {
     assert.strictEqual(reused.resumedQueryCount, 1);
     assert.ok(reused.results.every((row) => row.reusedFromCheckpoint));
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
+  }
+
+  console.log("9-3) max_pages 부분 체크포인트 — 상한을 늘려 다음 페이지부터 재개");
+  {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-"));
+    const checkpointPath = path.join(dir, "checkpoint.json");
+    fs.writeFileSync(checkpointPath, JSON.stringify({
+      schemaVersion: "1.0",
+      options: { numOfRows: 20, maxPages: 5, maxHitsPerQuery: 600 },
+      queries: {},
+    }));
+    assert.doesNotThrow(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 600,
+    }), "maxPages 증가는 이미 저장한 페이지를 보존하며 안전하게 허용해야 함");
+    assert.throws(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 4, maxHitsPerQuery: 600,
+    }), /보다 현재 값 4가 작습니다/);
+    assert.throws(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 1200,
+    }), /maxHitsPerQuery/,
+    "hit 상한 변경은 마지막 수집 페이지의 잘린 hit를 잃을 수 있어 계속 차단해야 함");
+    fs.rmSync(dir, { recursive: true, force: true });
+    ok("페이지 상한 증가는 허용하고 페이지 크기·hit 상한 변경은 안전을 위해 차단");
   }
 
   console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");

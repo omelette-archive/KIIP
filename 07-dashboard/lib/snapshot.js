@@ -507,13 +507,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     targetRegionCount: null,
     observedRegionCount: regions.length,
     regionItemCount: analysis.regionItems.length,
-    completeQueryCount: Math.max(
+    completeQueryCount: optionalCount(summary.completeRowCount) ?? Math.max(
       0,
       count(summary, "successfulQueryCount") - count(summary, "partialQueryCount")
     ),
-    partialQueryCount: count(summary, "partialQueryCount"),
-    errorQueryCount: count(summary, "erroredQueryCount"),
-    skippedQueryCount: count(summary, "skippedQueryCount"),
+    partialQueryCount: optionalCount(summary.partialRowCount) ?? count(summary, "partialQueryCount"),
+    errorQueryCount: optionalCount(summary.erroredRowCount) ?? count(summary, "erroredQueryCount"),
+    skippedQueryCount: optionalCount(summary.skippedRowCount) ?? count(summary, "skippedQueryCount"),
     unit: "region_item_input_rows",
   };
 
@@ -531,8 +531,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       trademark: "application_number",
     },
     rowCounts: {
-      total: count(summary, "queryCount"),
-      searchable: count(summary, "successfulQueryCount"),
+      total: optionalCount(summary.inputRowCount) ?? count(summary, "queryCount"),
+      searchable: optionalCount(summary.searchableRowCount) ?? count(summary, "successfulQueryCount"),
       complete: coverage.completeQueryCount,
       partial: coverage.partialQueryCount,
       error: coverage.errorQueryCount,

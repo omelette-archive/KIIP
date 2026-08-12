@@ -134,7 +134,7 @@ node 07-dashboard/buildDashboardSnapshot.js `
 ```
 
 `sample`이 기본값이다. `mode=full`은 전체 입력 범위를 사용했다는 뜻이며 완전 수집을 보장하지
-않는다. 알파 실행은 반드시 `--stage alpha`와 고유 검색 조합·상한 실험 메타데이터를 함께 남겨
+않는다. 알파 실행은 반드시 `--stage alpha`와 상한 실험 메타데이터를 함께 남겨
 UI가 `전체 범위 알파 · 부분 수집`으로 표시하도록 한다. 예:
 
 ```powershell
@@ -143,12 +143,13 @@ node 07-dashboard/buildDashboardSnapshot.js `
   --gap 05-detect-brand-gap/output/alpha-full-20260812-gap-deep.json `
   --strategy 06-generate-business-strategy/output/alpha-full-20260812-strategy-deep.json `
   --mode full --stage alpha `
-  --unique-query-count 126 `
-  --complete-unique-query-count 20 `
-  --partial-unique-query-count 106 `
   --query-hit-cap 600 `
   --serialization-failure-observed-at-or-above 1200
 ```
+
+고유 검색 조합의 전체·완료·부분·오류 건수는 ③ 수집 결과에서 ④ 분석 요약을 거쳐 자동으로
+전달된다. `--unique-query-count` 계열 옵션은 이전 산출물에 해당 메타데이터가 없을 때만 쓰는
+호환용 수동 덮어쓰기다.
 
 2026-08-12 알파 스냅샷은 113개 관측 지역·736개 지역×품목, 전국 고유 상표 후보 37,563건,
 주소 검증률 82.79%다. 고유 검색 조합은 126개(완전 20·부분 106)다. 기본 100% 게이트에서는

@@ -120,6 +120,15 @@ function fixture() {
       partialQueryCount: 0,
       erroredQueryCount: 0,
       skippedQueryCount: 0,
+      inputRowCount: 2,
+      searchableRowCount: 2,
+      completeRowCount: 2,
+      partialRowCount: 0,
+      erroredRowCount: 0,
+      skippedRowCount: 0,
+      uniqueQueryCount: 2,
+      completeUniqueQueryCount: 2,
+      partialUniqueQueryCount: 0,
       uniqueTrademarkCount: 1,
     },
     regionItems: [andong, boseong],
@@ -217,17 +226,11 @@ const input = fixture();
 const snapshot = buildDashboardSnapshot(input, {
   mode: "sample",
   generatedAt: "2026-08-10T02:00:00Z",
-  uniqueQueryCount: 2,
-  completeUniqueQueryCount: 2,
-  partialUniqueQueryCount: 0,
   queryHitCap: 600,
 });
 const repeated = buildDashboardSnapshot(input, {
   mode: "sample",
   generatedAt: "2026-08-10T03:00:00Z",
-  uniqueQueryCount: 2,
-  completeUniqueQueryCount: 2,
-  partialUniqueQueryCount: 0,
   queryHitCap: 600,
 });
 assert.strictEqual(snapshot.schemaVersion, "dashboard-snapshot-v1");

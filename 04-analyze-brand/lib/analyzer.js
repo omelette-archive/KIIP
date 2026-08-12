@@ -533,6 +533,24 @@ function analyzeEntries(parsed, providedOptions = {}) {
 
   const finalizeAll = (buckets) => sortAggregates([...buckets.values()].map((b) => finalizeBucket(b, options)));
   const summary = finalizeBucket(summaryBucket, options);
+  if (inputDocument?.mode === "batch") {
+    summary.inputRowCount = Number(inputDocument.inputCount) || entries.length;
+    summary.searchableRowCount = Number(inputDocument.searchableRowCount) || 0;
+    summary.completeRowCount = Math.max(
+      0,
+      (Number(inputDocument.successCount) || 0) - (Number(inputDocument.partialCount) || 0)
+    );
+    summary.partialRowCount = Number(inputDocument.partialCount) || 0;
+    summary.erroredRowCount = Number(inputDocument.errorCount) || 0;
+    summary.skippedRowCount = Number(inputDocument.skippedCount) || 0;
+    summary.uniqueQueryCount = Number(inputDocument.uniqueQueryCount) || 0;
+    summary.completeUniqueQueryCount =
+      Number(inputDocument.completeUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.complete) || 0;
+    summary.partialUniqueQueryCount =
+      Number(inputDocument.partialUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.partial) || 0;
+    summary.erroredUniqueQueryCount =
+      Number(inputDocument.erroredUniqueQueryCount ?? inputDocument.uniqueQueryStatusCounts?.error) || 0;
+  }
   const regionItems = finalizeAll(regionItemBuckets);
   const regions = finalizeAll(regionBuckets);
   const items = finalizeAll(itemBuckets);
@@ -548,11 +566,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
     );
   }
   if (summary.erroredQueryCount > 0) {
-    warnings.push(`${summary.erroredQueryCount}개 검색이 오류여서 집계에서 제외되었습니다.`);
+    warnings.push(`${summary.erroredQueryCount}개 지역×품목 입력행이 검색 오류여서 집계에서 제외되었습니다.`);
   }
   if (summary.partialQueryCount > 0) {
     warnings.push(
-      `${summary.partialQueryCount}개 검색은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.`
+      `${summary.partialQueryCount}개 지역×품목 입력행은 03단계 페이지·hit·요청 상한에 도달한 부분 수집입니다. 저장된 hits는 집계에 포함했지만 완전한 모집단으로 해석하면 안 됩니다.`
     );
   }
   if (summary.skippedQueryCount > 0) {

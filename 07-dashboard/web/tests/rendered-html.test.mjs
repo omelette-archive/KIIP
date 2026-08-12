@@ -30,11 +30,14 @@ test("renders the data-connected Korean dashboard", async () => {
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
-  assert.match(html, /지역 특산품의 상표 흐름/);
+  assert.match(html, /지역 특산품 상표 분석/);
   assert.match(html, /전체 범위 알파 · 부분 수집/);
-  assert.match(html, /지역 특산품의 상표 흐름을/);
-  assert.match(html, /알파 데이터의 현재 준비 상태/);
-  assert.match(html, /실제로 수집된 상표를 살펴보세요/);
+  assert.match(html, /데이터 준비 상태/);
+  assert.match(html, /수집된 상표 예시/);
+  assert.ok(
+    html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
+    "지도는 상표 예시보다 먼저 보여야 함",
+  );
   assert.match(html, /37,563/);
   assert.match(html, /완료 20 · 부분 106/);
   assert.match(html, /전국 지역 브랜드 지도/);

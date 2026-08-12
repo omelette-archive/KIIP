@@ -511,9 +511,15 @@ async function runBatch(rows, client, options) {
     );
     return mapped;
   });
+  const uniqueQueryStatusCounts = { complete: 0, partial: 0, error: 0 };
+  for (const group of collectedGroups) {
+    const status = group.collected?.collectionStatus;
+    if (Object.hasOwn(uniqueQueryStatusCounts, status)) uniqueQueryStatusCounts[status]++;
+  }
   return {
     results,
     uniqueQueryCount: groups.length,
+    uniqueQueryStatusCounts,
     requestCount: budget.used,
     resumedQueryCount,
   };
@@ -559,15 +565,17 @@ function areaBrandValidationMetadata(context, sourceFile, results) {
 function loadCheckpoint(filePath, options) {
   if (!fs.existsSync(filePath)) throw new Error(`재개할 체크포인트가 없습니다: ${filePath}`);
   const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  const expected = {
-    numOfRows: options.numOfRows,
-    maxPages: options.maxPages,
-    maxHitsPerQuery: options.maxHitsPerQuery,
-  };
-  for (const [key, value] of Object.entries(expected)) {
-    if (Number(parsed.options?.[key]) !== Number(value)) {
-      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${value}와 다릅니다.`);
+  for (const key of ["numOfRows", "maxHitsPerQuery"]) {
+    if (Number(parsed.options?.[key]) !== Number(options[key])) {
+      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${options[key]}와 다릅니다.`);
     }
+  }
+  const savedMaxPages = Number(parsed.options?.maxPages);
+  const currentMaxPages = Number(options.maxPages);
+  if (!Number.isInteger(savedMaxPages) || currentMaxPages < savedMaxPages) {
+    throw new Error(
+      `체크포인트 maxPages=${parsed.options?.maxPages}보다 현재 값 ${options.maxPages}가 작습니다.`
+    );
   }
   return parsed;
 }
@@ -730,6 +738,10 @@ async function main() {
       inputCount: rows.length,
       searchableRowCount: searchableRows,
       uniqueQueryCount: batch.uniqueQueryCount,
+      completeUniqueQueryCount: batch.uniqueQueryStatusCounts.complete,
+      partialUniqueQueryCount: batch.uniqueQueryStatusCounts.partial,
+      erroredUniqueQueryCount: batch.uniqueQueryStatusCounts.error,
+      uniqueQueryStatusCounts: batch.uniqueQueryStatusCounts,
       duplicateQueryRowCount: searchableRows - batch.uniqueQueryCount,
       requestCount: batch.requestCount,
       resumedQueryCount: batch.resumedQueryCount,
