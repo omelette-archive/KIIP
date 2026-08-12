@@ -5,6 +5,10 @@ const { isServiceClass } = require("./filters");
 const approvedAliases = require("../data/approved-aliases.json");
 
 const EXCLUDED_SUFFIX_RE = /(나무|묘목|모종|종묘|종자|씨앗)$/;
+// 원본이 "기타(그 외/미분류)"처럼 실제 품목이 아닌 범용 표기인데, 고시상품명칭에 우연히 같은
+// 글자의 다른 품목(예: "기타" = 악기 15류)이 있어 그대로 두면 무관한 품목으로 확정돼버린다.
+// 알파테스트 실행에서 "기타" raw 이름이 15류 악기로 오매칭되는 걸 실측으로 확인해 추가함.
+const EXCLUDED_EXACT_NAMES = new Set(["기타"]);
 const SEGMENT_SEPARATOR_RE = /[,，;；]/;
 
 function canonicalName(value) {
@@ -110,7 +114,7 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
   const candidates = findCandidates(itemName, dictionary, {}, { topK });
   const officialNameIndex = getOfficialNameIndex(dictionary);
 
-  if (EXCLUDED_SUFFIX_RE.test(itemName)) {
+  if (EXCLUDED_SUFFIX_RE.test(itemName) || EXCLUDED_EXACT_NAMES.has(itemName)) {
     return {
       ...base,
       itemName,
