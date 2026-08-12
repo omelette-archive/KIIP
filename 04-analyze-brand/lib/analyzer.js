@@ -27,7 +27,22 @@ function statusCategory(value) {
   return "unknown";
 }
 
-function regionCategory(hit) {
+function evidenceRegionCategory(evidence, bucket) {
+  if (!bucket?.sido || !Array.isArray(evidence) || evidence.length === 0) return null;
+  const values = evidence.map((row) => {
+    if (clean(row.regionStatus) !== "matched" || !clean(row.sido)) return "unverified";
+    if (clean(row.sido) !== clean(bucket.sido)) return "outside";
+    if (clean(bucket.sigungu) && clean(row.regionLevel) === "sigungu") {
+      return clean(row.sigungu) === clean(bucket.sigungu) ? "inside" : "outside";
+    }
+    return "inside";
+  });
+  return new Set(values).size === 1 ? values[0] : "unverified";
+}
+
+function regionCategory(hit, bucket) {
+  const evidenceCategory = evidenceRegionCategory(hit.applicantRegionEvidence, bucket);
+  if (evidenceCategory) return evidenceCategory;
   const raw = hit.applicantRegionMatch ?? hit.regionMatch;
   if (raw === true) return "inside";
   if (raw === false) return "outside";
@@ -124,7 +139,21 @@ function selectTrademarkExamples(examples, limit) {
 
 function normalizeInput(parsed) {
   if (Array.isArray(parsed)) return parsed;
-  if (parsed && Array.isArray(parsed.results)) return parsed.results;
+  if (parsed && Array.isArray(parsed.results)) {
+    if (parsed.storageMode === "query_facts" && parsed.queryFacts) {
+      return parsed.results.map((entry) => {
+        const fact = entry.queryKey ? parsed.queryFacts[entry.queryKey] : null;
+        if (!fact) return entry;
+        return {
+          ...fact,
+          ...entry,
+          query: { ...(fact.query || {}), ...(entry.query || {}) },
+          hits: Array.isArray(fact.hits) ? fact.hits : [],
+        };
+      });
+    }
+    return parsed.results;
+  }
   if (parsed && typeof parsed === "object") return [parsed];
   throw new Error("입력 JSON은 03단계 결과 객체, 결과 배열, 또는 { results: [] } 형태여야 합니다.");
 }
@@ -141,12 +170,11 @@ function entryDimensions(entry) {
   const sigungu = clean(entry.sigungu) || clean(input.sigungu) || regionParts.slice(1).join(" ");
   const region =
     queryRegion || [sido, sigungu].filter(Boolean).join(" ") || "미지정 지역";
-  const noticeName =
-    clean(entry.noticeName) ||
-    clean(input.noticeName) ||
-    clean(query.item) ||
-    clean(query.searchString) ||
-    null;
+  // ②에서 실제로 확정한 고시명칭(entry.noticeName/input.noticeName)과, 검토대기라 고시명칭이
+  // 없어 원물명(query.item)으로 검색만 해본 경우를 구분한다 — 후자는 noticeName 칸에
+  // 검색어가 들어가긴 하지만 공식 분류로 확정된 게 아니므로 matchingBasis로 표시해야 한다.
+  const officialNoticeName = clean(entry.noticeName) || clean(input.noticeName) || "";
+  const noticeName = officialNoticeName || clean(query.item) || clean(query.searchString) || null;
   const itemName =
     clean(input.itemName) ||
     clean(entry.itemName) ||
@@ -160,6 +188,7 @@ function entryDimensions(entry) {
     itemName,
     noticeName,
     niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
+    matchingBasis: officialNoticeName ? "notice_name_and_nice_class" : "raw_item_name_unclassified",
   };
 }
 
@@ -297,6 +326,7 @@ function finalizeBucket(bucket, options) {
   };
   const yearCounts = new Map();
   let invalidApplicationDateCount = 0;
+  let applicantAddressEvidenceCount = 0;
   const recentBrands = [];
   const trademarkExamples = [];
 
@@ -307,7 +337,16 @@ function finalizeBucket(bucket, options) {
 
   for (const hit of bucket.hits.values()) {
     const status = statusCategory(hit.applicationStatus);
-    const applicantRegion = regionCategory(hit);
+    const applicantRegion = regionCategory(hit, bucket);
+    const hasApplicantAddressEvidence =
+      (Array.isArray(hit.applicantRegionEvidence) &&
+        hit.applicantRegionEvidence.some(
+          (row) => clean(row.regionStatus) === "matched" && clean(row.sido)
+        )) ||
+      ["inside", "outside"].includes(
+        clean(hit.applicantRegionMatch ?? hit.regionMatch).toLowerCase()
+      );
+    if (hasApplicantAddressEvidence) applicantAddressEvidenceCount++;
     statusCounts[status]++;
     regionCounts[applicantRegion]++;
     if (applicantRegion === "inside") regionalStatusCounts[status]++;
@@ -436,6 +475,8 @@ function finalizeBucket(bucket, options) {
     regionCounts,
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
+    applicantAddressEvidenceCount,
+    applicantAddressEvidenceRate: safeRate(applicantAddressEvidenceCount, uniqueTrademarkCount),
     localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
     regionalBrandCounts,
     regionalBrandReferenceHitCount: regionalBrandCounts ? regionalBrandReferenceHitCount : null,
@@ -625,6 +666,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
     generatedAt: new Date().toISOString(),
     provenance: {
       inputSchemaVersion: inputDocument?.schemaVersion || null,
+      inputStorageMode: inputDocument?.storageMode || "expanded",
       inputCompletedAt: inputDocument?.completedAt || null,
       sources: [
         inputDocument?.trademarkSourceMetadata,

@@ -300,7 +300,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       itemName: clean(row.itemName) || null,
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
-      matchingBasis: "notice_name_and_nice_class",
+      matchingBasis: clean(row.matchingBasis) || "notice_name_and_nice_class",
       dataState: state,
       sources: rowSourceIds(row),
       trademarkExamples: Array.isArray(row.trademarkExamples)
@@ -520,7 +520,18 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
   const availableRegionItemCount = analysis.regionItems.filter(
     (row) => row.regionalMetricAvailability === "available"
   ).length;
-  const regionCounts = summary.regionCounts || {};
+  const regionalAttributionCounts = analysis.regionItems.reduce(
+    (counts, row) => {
+      counts.inside += count(row.regionCounts || {}, "inside");
+      counts.outside += count(row.regionCounts || {}, "outside");
+      counts.unverified += count(row.regionCounts || {}, "unverified");
+      return counts;
+    },
+    { inside: 0, outside: 0, unverified: 0 }
+  );
+  const addressEvidenceCount =
+    optionalCount(summary.applicantAddressEvidenceCount) ?? count(summary, "regionVerifiedHitCount");
+  const nationwideTrademarkCount = count(summary, "uniqueTrademarkCount");
   const regionalCoverageThreshold = Number(analysis.parameters?.regionalCoverageThreshold ?? 1);
   const pipelineStatus = {
     stage: clean(options.stage) || (mode === "full" ? "alpha" : "sample"),
@@ -544,19 +555,23 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       partial: optionalCount(options.partialUniqueQueryCount ?? summary.partialUniqueQueryCount),
     },
     nationwideCandidates: {
-      uniqueTrademarkCount: count(summary, "uniqueTrademarkCount"),
+      uniqueTrademarkCount: nationwideTrademarkCount,
       returnedHitCount: count(summary, "returnedHitCount"),
       duplicateHitCount: count(summary, "duplicateHitCount"),
     },
     applicantRegionVerification: {
-      inside: count(regionCounts, "inside"),
-      outside: count(regionCounts, "outside"),
-      unverified: count(regionCounts, "unverified"),
-      verifiedCount: count(summary, "regionVerifiedHitCount"),
+      inside: regionalAttributionCounts.inside,
+      outside: regionalAttributionCounts.outside,
+      unverified: Math.max(0, nationwideTrademarkCount - addressEvidenceCount),
+      verifiedCount: addressEvidenceCount,
       rate:
-        typeof summary.regionVerificationRate === "number"
-          ? summary.regionVerificationRate
+        typeof summary.applicantAddressEvidenceRate === "number"
+          ? summary.applicantAddressEvidenceRate
+          : typeof summary.regionVerificationRate === "number"
+            ? summary.regionVerificationRate
           : null,
+      regionalAttributionCounts,
+      unit: "unique_trademark_address_evidence",
     },
     regionalMetricGate: {
       availableRegionItemCount,
@@ -574,7 +589,10 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       serializationFailureObservedAtOrAbove: optionalCount(
         options.serializationFailureObservedAtOrAbove
       ),
-      outputShape: "expanded_region_item_hits",
+      outputShape:
+        analysis.provenance?.inputStorageMode === "query_facts"
+          ? "query_facts_with_region_row_references"
+          : "expanded_region_item_hits",
     },
   };
 
