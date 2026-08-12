@@ -2,6 +2,7 @@
 
 const { findCandidates, stripRegionNames } = require("./candidateSearch");
 const { isServiceClass } = require("./filters");
+const approvedAliases = require("../data/approved-aliases.json");
 
 const EXCLUDED_SUFFIX_RE = /(나무|묘목|모종|종묘|종자|씨앗)$/;
 const SEGMENT_SEPARATOR_RE = /[,，;；]/;
@@ -47,6 +48,17 @@ function uniqueCandidates(candidates) {
 }
 
 const officialNameIndexCache = new WeakMap();
+const approvedAliasIndex = new Map();
+
+for (const rule of approvedAliases.rules) {
+  for (const alias of rule.aliases) {
+    const key = canonicalName(alias);
+    if (approvedAliasIndex.has(key)) {
+      throw new Error(`승인 별칭이 중복되었습니다: ${alias}`);
+    }
+    approvedAliasIndex.set(key, rule);
+  }
+}
 
 function getOfficialNameIndex(dictionary) {
   let cached = officialNameIndexCache.get(dictionary);
@@ -115,6 +127,42 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
     };
   }
 
+  const approvedAlias = approvedAliasIndex.get(canonicalName(itemName));
+  if (approvedAlias) {
+    const matches = uniqueCandidates(
+      (officialNameIndex.get(canonicalName(approvedAlias.noticeName)) || []).filter(
+        (candidate) =>
+          candidate.niceClass === approvedAlias.niceClass &&
+          candidate.similarGroupCode === approvedAlias.similarGroupCode
+      )
+    );
+    if (matches.length !== 1) {
+      return reviewResult(
+        base,
+        itemName,
+        [...matches, ...candidates].slice(0, topK),
+        `승인 별칭의 고시명칭 계약 불일치(${approvedAliases.version})`
+      );
+    }
+    const matched = matches[0];
+    return {
+      ...base,
+      itemName,
+      noticeName: matched.item,
+      niceClass: matched.niceClass,
+      similarGroupCode: matched.similarGroupCode,
+      excluded: false,
+      status: "ok",
+      matchMethod: "rule_approved_alias",
+      confidence: "1.0000",
+      reviewReason: "",
+      reviewCandidates: serializeCandidates(
+        uniqueCandidates([{ ...matched, score: 1.45 }, ...candidates]).slice(0, topK)
+      ),
+      error: "",
+    };
+  }
+
   const preferredNames = [
     { name: itemName, matchMethod: "rule_exact", confidence: "1.0000", score: 1.5 },
     { name: `신선한 ${itemName}`, matchMethod: "rule_fresh", confidence: "0.9500", score: 1.4 },
@@ -163,4 +211,5 @@ module.exports = {
   cleanItemName,
   normalizeByRules,
   serializeCandidates,
+  approvedAliases,
 };

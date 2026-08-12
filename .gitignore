@@ -1,17 +1,22 @@
 .env
 node_modules/
-03-match-trademarks/output/*.json
-03-match-trademarks/output/*.csv
-04-analyze-brand/output/*.json
-05-detect-brand-gap/output/*.json
-06-generate-business-strategy/output/*.json
-07-dashboard/output/*.json
-02-normalize-items/output/*.csv
-02-normalize-items/output/*.json
-01-collect-specialties/output/*.csv
-01-collect-specialties/output/*.sqlite
-01-collect-specialties/output/*.sqlite-shm
-01-collect-specialties/output/*.sqlite-wal
+
+# 각 단계 output/ 아래는 실행 산출물이라 통째로 무시한다(하위 폴더 포함 — 예: output/alpha/*).
+# .gitkeep만 예외로 추적해 빈 폴더 구조를 유지한다.
+01-collect-specialties/output/*
+!01-collect-specialties/output/.gitkeep
+02-normalize-items/output/*
+!02-normalize-items/output/.gitkeep
+03-match-trademarks/output/*
+!03-match-trademarks/output/.gitkeep
+04-analyze-brand/output/*
+!04-analyze-brand/output/.gitkeep
+05-detect-brand-gap/output/*
+!05-detect-brand-gap/output/.gitkeep
+06-generate-business-strategy/output/*
+!06-generate-business-strategy/output/.gitkeep
+07-dashboard/output/*
+!07-dashboard/output/.gitkeep
 
 # buildmap.js/buildmuni.js가 07-dashboard/prototypes/data/skorea_*.json에서 재생성하는
 # 중간 산출물 — vendored 원본만 커밋하고 빌드 결과물은 커밋하지 않는다.

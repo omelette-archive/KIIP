@@ -15,9 +15,9 @@ const { spawnSync } = require("child_process");
 const { parseCsvLine, bigrams } = require("./lib/noticeDictionary");
 const { findCandidates } = require("./lib/candidateSearch");
 const { isServiceClass } = require("./lib/filters");
-const { normalizeRow } = require("./normalizeItems");
+const { NORMALIZATION_VERSION, normalizeRow } = require("./normalizeItems");
 const { applyManualReviews } = require("./applyManualReviews");
-const { cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
+const { approvedAliases, cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -125,6 +125,46 @@ async function run() {
     assert.strictEqual(unresolved.status, "review_required");
     assert.match(unresolved.reviewCandidates, /"item":"탈"/);
     ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김(AI 호출 없음)");
+  }
+
+  console.log("5-1) 사용자 승인 별칭 — 승인 묶음만 공식 고시명칭으로 자동 확정");
+  {
+    const dictionary = makeDictionary([
+      { item: "신선한 고추", niceClass: "31", similarGroupCode: "G0202" },
+      { item: "신선한 토마토", niceClass: "31", similarGroupCode: "G0202" },
+      { item: "신선한 호박", niceClass: "31", similarGroupCode: "G0202" },
+      { item: "신선한 멜론", niceClass: "31", similarGroupCode: "G0211" },
+      { item: "생버섯", niceClass: "31", similarGroupCode: "G0202" },
+      { item: "소고기", niceClass: "29", similarGroupCode: "G0701" },
+      { item: "꿀", niceClass: "30", similarGroupCode: "G0302" },
+    ]);
+    const expected = new Map([
+      ["파프리카", "신선한 고추"],
+      ["풋고추", "신선한 고추"],
+      ["꽈리고추", "신선한 고추"],
+      ["방울토마토", "신선한 토마토"],
+      ["애호박", "신선한 호박"],
+      ["단호박", "신선한 호박"],
+      ["메론", "신선한 멜론"],
+      ["느타리버섯", "생버섯"],
+      ["새송이버섯", "생버섯"],
+      ["팽이버섯", "생버섯"],
+    ]);
+    for (const [rawItemName, noticeName] of expected) {
+      const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
+      assert.strictEqual(result.status, "ok", rawItemName);
+      assert.strictEqual(result.noticeName, noticeName, rawItemName);
+      assert.strictEqual(result.niceClass, "31", rawItemName);
+      assert.strictEqual(result.matchMethod, "rule_approved_alias", rawItemName);
+      assert.strictEqual(result.confidence, "1.0000", rawItemName);
+    }
+    for (const rawItemName of ["한우", "벌꿀", "단감", "잡곡"]) {
+      const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
+      assert.strictEqual(result.status, "review_required", `${rawItemName}은 미승인 상태여야 함`);
+    }
+    assert.strictEqual(approvedAliases.approvalIssue, "#51");
+    assert.strictEqual(approvedAliases.approvedAt, "2026-08-11");
+    ok("승인된 10개 표현만 자동 확정하고 미승인 의미 변경 후보는 검토대기에 유지");
   }
 
   console.log("6) normalizeRow — 규칙 처리 오류를 행별로 보존");
@@ -241,7 +281,7 @@ async function run() {
       assert.match(output, /review_required/);
       assert.match(output, /^﻿?inputIndex,/);
       assert.match(output, /reviewDecision,selectedCandidateIndex,reviewNote,reviewedBy,reviewedAt/);
-      assert.match(output, /specialty-normalization-rules-v1/);
+      assert.ok(output.includes(NORMALIZATION_VERSION));
       assert.match(output, /kipo-notice-goods-13-2026/);
       assert.match(output, /kipo\.go\.kr/);
       assert.match(output, /sourceId,sourceContractVersion,sourceUrl,sourceLastVerifiedAt,sourceFetchedAt/);
