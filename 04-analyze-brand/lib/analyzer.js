@@ -79,6 +79,49 @@ function trademarkKey(hit) {
   ].join("|")}`;
 }
 
+function selectTrademarkExamples(examples, limit) {
+  const max = Math.max(0, Number(limit) || 0);
+  if (max === 0) return [];
+  const recent = [...examples].sort(
+    (a, b) =>
+      clean(b.applicationDate).localeCompare(clean(a.applicationDate)) ||
+      clean(a.title).localeCompare(clean(b.title), "ko")
+  );
+  const evidenceRank = {
+    normalized_exact: 0,
+    normalized_contains: 1,
+    class_only: 2,
+    mismatch: 3,
+  };
+  const evidence = recent
+    .filter(
+      (row) =>
+        evidenceRank[row.goodsMatchMethod] !== undefined ||
+        (Array.isArray(row.goodsEvidence) && row.goodsEvidence.length > 0)
+    )
+    .sort(
+      (a, b) =>
+        (evidenceRank[a.goodsMatchMethod] ?? 9) - (evidenceRank[b.goodsMatchMethod] ?? 9) ||
+        clean(b.applicationDate).localeCompare(clean(a.applicationDate))
+    );
+  const selected = [];
+  const seen = new Set();
+  const add = (row) => {
+    const key = clean(row.applicationNumber) || `${clean(row.title)}\u001f${clean(row.applicationDate)}`;
+    if (!seen.has(key) && selected.length < max) {
+      seen.add(key);
+      selected.push(row);
+    }
+  };
+  for (const row of evidence.slice(0, Math.min(3, max))) add(row);
+  for (const row of recent) add(row);
+  return selected.sort(
+    (a, b) =>
+      clean(b.applicationDate).localeCompare(clean(a.applicationDate)) ||
+      clean(a.title).localeCompare(clean(b.title), "ko")
+  );
+}
+
 function normalizeInput(parsed) {
   if (Array.isArray(parsed)) return parsed;
   if (parsed && Array.isArray(parsed.results)) return parsed.results;
@@ -323,11 +366,6 @@ function finalizeBucket(bucket, options) {
     applicationYearCounts[String(year)] = yearCounts.get(year);
   }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
-  trademarkExamples.sort(
-    (a, b) =>
-      clean(b.applicationDate).localeCompare(clean(a.applicationDate)) ||
-      clean(a.title).localeCompare(clean(b.title), "ko")
-  );
 
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
@@ -351,7 +389,7 @@ function finalizeBucket(bucket, options) {
         : null,
     recentTrend: trendOf(recentApplicationCount, previousApplicationCount),
     recentBrands: recentBrands.slice(0, options.maxRecentBrands),
-    trademarkExamples: trademarkExamples.slice(0, options.maxRecentBrands),
+    trademarkExamples: selectTrademarkExamples(trademarkExamples, options.maxRecentBrands),
     regionCounts,
     regionVerifiedHitCount,
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
@@ -556,6 +594,7 @@ module.exports = {
   normalizeInput,
   regionalBrandCategory,
   regionCategory,
+  selectTrademarkExamples,
   statusCategory,
   trademarkKey,
 };

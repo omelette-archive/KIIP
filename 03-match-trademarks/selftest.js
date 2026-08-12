@@ -29,6 +29,7 @@ const {
 } = require("./lib/ipRegistryClient");
 const {
   createIpRegistryContext,
+  enrichDocument,
   enrichHitsWithIpRegistry,
   ipRegistryValidationMetadata,
 } = require("./lib/ipRegistryEnricher");
@@ -703,6 +704,59 @@ async function run() {
     assert.strictEqual(enriched.length, 6);
     assert.ok(maxInFlight <= 2, `동시 호출은 concurrency(2)를 넘지 않아야 함 (실제 최대: ${maxInFlight})`);
     ok("실키 검증(2026-08-11)에서 무제한 동시 호출이 등록원부 API 429를 유발한 문제를 concurrency 상한으로 방지함");
+  }
+
+  console.log("12-1c) 등록원부 429 이후 후속 호출 회로 차단");
+  {
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    let calls = 0;
+    const fakeClient = {
+      getMarkHistory: async (rgstNo) => {
+        calls++;
+        if (rgstNo === "2") throw new Error("getMarkHistory: API 오류 (429)");
+        return summarizeMarkHistory({ rgstNo, applicant: [], productList: [] });
+      },
+    };
+    const context = createIpRegistryContext({ client: fakeClient, adminList, maxRequests: 10, concurrency: 1 });
+    const enriched = await enrichHitsWithIpRegistry(
+      ["1", "2", "3", "4"].map((registrationNumber) => ({ registrationNumber })),
+      "강원특별자치도 양양군",
+      context
+    );
+    assert.strictEqual(calls, 2, "첫 429 이후 남은 등록번호는 실제 API를 호출하지 않아야 함");
+    assert.strictEqual(enriched[1].ipRegistryStatus, "error", "429를 받은 실제 요청은 오류 근거로 보존");
+    assert.strictEqual(enriched[2].ipRegistryLookup.status, "skipped_rate_limit");
+    assert.strictEqual(enriched[3].ipRegistryLookup.status, "skipped_rate_limit");
+    assert.strictEqual(context.stats.skippedRateLimit, 2);
+    ok("일일/속도 제한이 감지되면 같은 배치에서 실패 요청을 반복하지 않음");
+  }
+
+  console.log("12-1d) 별도 등록원부 보강 CLI도 429 이후 실제 요청 수를 보존");
+  {
+    let calls = 0;
+    const fakeClient = {
+      getMarkHistory: async ({ registrationNumber }) => {
+        calls++;
+        if (registrationNumber === "2") throw new Error("getMarkHistory: API 오류 (429)");
+        return summarizeMarkHistory({ rgstNo: registrationNumber, applicant: [], productList: [] });
+      },
+    };
+    const document = {
+      results: [{
+        query: { region: "강원특별자치도 양양군", item: "신선한 사과", classCode: "31" },
+        hits: ["1", "2", "3", "4"].map((registrationNumber) => ({ registrationNumber })),
+      }],
+    };
+    const output = await enrichDocument(document, fakeClient, { limit: 4, concurrency: 1 });
+    assert.strictEqual(calls, 2);
+    assert.strictEqual(output.ipRegistryEnrichment.selectedRegistrationCount, 4);
+    assert.strictEqual(output.ipRegistryEnrichment.requestedRegistrationCount, 2);
+    assert.strictEqual(output.ipRegistryEnrichment.rateLimitSkippedRegistrationCount, 2);
+    assert.strictEqual(output.ipRegistryEnrichment.notCollectedRegistrationCount, 2);
+    assert.deepStrictEqual(output.results[0].hits.map((hit) => hit.ipRegistryStatus), [
+      "complete", "error", "not_collected", "not_collected",
+    ]);
+    ok("선택 상한과 실제 요청 수를 구분하고 회로 차단된 건을 미수집으로 기록");
   }
 
   console.log("12-2) ipRegistryValidationMetadata — 요약 통계·기준 문서화");

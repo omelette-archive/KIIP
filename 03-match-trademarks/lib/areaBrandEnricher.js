@@ -48,14 +48,15 @@ function normalizeAreaBrandRegion(regionText, adminList = loadAdminCodes()) {
 
   const direct = splitRegion(raw, adminList);
   if (direct.matched) {
+    const level = direct.sigungu ? "sigungu" : "sido";
     return {
       status: "matched",
-      level: "sigungu",
+      level,
       raw,
       sido: direct.sido,
       sigungu: direct.sigungu,
-      normalizedRegion: `${direct.sido} ${direct.sigungu}`,
-      method: "exact_sigungu",
+      normalizedRegion: [direct.sido, direct.sigungu].filter(Boolean).join(" "),
+      method: level === "sigungu" ? "exact_sigungu" : "exact_sido",
     };
   }
   if (direct.ambiguous) {

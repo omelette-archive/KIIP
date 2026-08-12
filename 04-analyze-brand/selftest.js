@@ -6,6 +6,7 @@ const {
   analyzeEntries,
   applicationYear,
   regionCategory,
+  selectTrademarkExamples,
   statusCategory,
   trademarkKey,
 } = require("./lib/analyzer");
@@ -391,6 +392,28 @@ console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무�
   assert.strictEqual(withNoticeFilled.regionItems.length, 0);
   assert.strictEqual(withNoticeFilled.exclusions.validationOnlyExcludedCount, 1);
   ok("validation_only 자료는 출원번호 evidence에만 쓰고 특산품 통계를 오염시키지 않음");
+}
+
+console.log("0) 상표 사례는 최신순을 유지하면서 지정상품 근거를 보존");
+{
+  const recent = Array.from({ length: 12 }, (_, index) => ({
+    title: `최근-${index}`,
+    applicationNumber: `R-${index}`,
+    applicationDate: `2026${String(12 - index).padStart(2, "0")}01`,
+    goodsMatchMethod: "unverified",
+    goodsEvidence: [],
+  }));
+  const exact = {
+    title: "과거 지정상품 확정",
+    applicationNumber: "E-1",
+    applicationDate: "20100101",
+    goodsMatchMethod: "normalized_exact",
+    goodsEvidence: [{ classCode: "31", designatedProductName: "신선한 사과" }],
+  };
+  const selected = selectTrademarkExamples([...recent, exact], 10);
+  assert.strictEqual(selected.length, 10);
+  assert.ok(selected.some((row) => row.applicationNumber === "E-1"));
+  ok("최근 사례가 10건을 넘더라도 지정상품 확정 근거 최소 1건은 사례 목록에 포함");
 }
 
 console.log("\n모든 자체 테스트 통과");

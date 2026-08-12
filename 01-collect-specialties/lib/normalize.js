@@ -41,7 +41,21 @@ function splitRegion(regionText, adminList) {
   const normalized = (regionText || "").trim();
   if (!normalized) return { sido: "", sigungu: "", matched: false };
 
-  const candidates = adminList.filter((admin) => normalized.includes(admin.sigungu));
+  // 농사로에는 부산광역시처럼 시군구 없이 광역 단위로만 작성된 행도 있다. 현재 마스터의
+  // 시도명 또는 통합 전 별칭과 정확히 같은 경우는 잘못된 시군구를 추정하지 않고 시도 단위로
+  // 확정한다.
+  const provinceCandidates = [...new Set(adminList.map((admin) => admin.sido))].filter((sido) =>
+    [sido, ...(LEGACY_SIDO_ALIASES[sido] || [])].includes(normalized)
+  );
+  if (provinceCandidates.length === 1) {
+    return { sido: provinceCandidates[0], sigungu: "", matched: true };
+  }
+
+  const matchingCandidates = adminList.filter((admin) => normalized.includes(admin.sigungu));
+  // "남양주시"에는 "양주시"가 부분 문자열로 들어간다. 가장 긴 행정명칭을 먼저 택하지 않으면
+  // 같은 경기도가 두 후보로 잡혀 정상 행까지 ambiguous가 된다.
+  const longestLength = Math.max(0, ...matchingCandidates.map((admin) => admin.sigungu.length));
+  const candidates = matchingCandidates.filter((admin) => admin.sigungu.length === longestLength);
   if (candidates.length === 0) {
     return { sido: "", sigungu: normalized, matched: false };
   }
@@ -63,7 +77,7 @@ function splitRegion(regionText, adminList) {
     sigungu: normalized,
     matched: false,
     ambiguous: true,
-    candidateSidos: candidates.map((c) => c.sido),
+    candidateSidos: [...new Set(candidates.map((c) => c.sido))],
   };
 }
 

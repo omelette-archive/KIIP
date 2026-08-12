@@ -12,6 +12,12 @@ const {
 const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v1";
 const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v0-review";
 
+function isRateLimitError(error) {
+  return /(?:\b429\b|rate[ _-]?limit|요청\s*(?:횟수|건수).*초과|일일.*초과)/i.test(
+    error instanceof Error ? error.message : String(error || "")
+  );
+}
+
 function clean(value) {
   return value === undefined || value === null
     ? ""
@@ -36,11 +42,11 @@ function normalizeApplicantAddress(address, adminList = loadAdminCodes()) {
   }
   return {
     status: "matched",
-    level: "sigungu",
+    level: split.sigungu ? "sigungu" : "sido",
     sido: split.sido,
     sigungu: split.sigungu,
-    normalizedRegion: `${split.sido} ${split.sigungu}`,
-    method: "admin_sigungu_in_masked_address",
+    normalizedRegion: [split.sido, split.sigungu].filter(Boolean).join(" "),
+    method: split.sigungu ? "admin_sigungu_in_masked_address" : "admin_sido_in_masked_address",
   };
 }
 
@@ -250,12 +256,14 @@ function createIpRegistryContext({
     concurrency,
     budget: createRequestBudget(maxRequests),
     cache: new Map(),
+    rateLimitError: null,
     stats: {
       requested: 0,
       completed: 0,
       notFound: 0,
       cacheHits: 0,
       skippedBudget: 0,
+      skippedRateLimit: 0,
       errors: 0,
     },
   };
@@ -265,6 +273,16 @@ async function lookupMarkHistory(context, registrationNumber) {
   if (context.cache.has(registrationNumber)) {
     context.stats.cacheHits++;
     return context.cache.get(registrationNumber);
+  }
+  if (context.rateLimitError) {
+    context.stats.skippedRateLimit++;
+    const skipped = Promise.resolve({
+      status: "not_collected",
+      reason: "rate_limit",
+      error: context.rateLimitError,
+    });
+    context.cache.set(registrationNumber, skipped);
+    return skipped;
   }
   if (!context.budget.reserve()) {
     context.stats.skippedBudget++;
@@ -285,9 +303,11 @@ async function lookupMarkHistory(context, registrationNumber) {
     })
     .catch((error) => {
       context.stats.errors++;
+      const message = error instanceof Error ? error.message : String(error);
+      if (isRateLimitError(error)) context.rateLimitError = message;
       return {
         status: "error",
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
       };
     });
   context.cache.set(registrationNumber, promise);
@@ -317,7 +337,10 @@ async function enrichHitsWithIpRegistry(hits, queryInput, context) {
         ipRegistryStatus: result.status,
         ipRegistryError: result.error || undefined,
         ipRegistryLookup: {
-          status: result.status === "not_collected" ? "skipped_budget" : result.status,
+          status:
+            result.status === "not_collected"
+              ? result.reason === "rate_limit" ? "skipped_rate_limit" : "skipped_budget"
+              : result.status,
           error: result.error || null,
         },
       };
@@ -389,7 +412,7 @@ function ipRegistryValidationMetadata(context, results) {
   const status =
     context.stats.errors === context.stats.requested && context.stats.requested > 0
       ? "error"
-      : context.stats.errors > 0 || context.stats.skippedBudget > 0
+      : context.stats.errors > 0 || context.stats.skippedBudget > 0 || context.stats.skippedRateLimit > 0
         ? "partial"
         : "complete";
   return {
@@ -409,7 +432,8 @@ function ipRegistryValidationMetadata(context, results) {
     completeRegistrationCount: context.stats.completed,
     notFoundRegistrationCount: context.stats.notFound,
     errorRegistrationCount: context.stats.errors,
-    notCollectedRegistrationCount: context.stats.skippedBudget,
+    notCollectedRegistrationCount: context.stats.skippedBudget + context.stats.skippedRateLimit,
+    rateLimitDetected: Boolean(context.rateLimitError),
     applicantRegionCounts: {
       inside: matchCounts.inside,
       outside: matchCounts.outside,
@@ -436,15 +460,32 @@ async function enrichDocument(document, client, options = {}) {
   const selected = allNumbers.slice(0, limit);
   const selectedSet = new Set(selected);
   const fetchedAt = options.fetchedAt || new Date().toISOString();
+  let rateLimitError = null;
   const fetched = await mapConcurrent(selected, concurrency, async (registrationNumber) => {
+    if (rateLimitError) {
+      return {
+        registrationNumber,
+        status: "rate_limited",
+        error: rateLimitError,
+        requested: false,
+      };
+    }
     try {
       const record = await client.getMarkHistory({ registrationNumber });
-      return { registrationNumber, status: record.found ? "complete" : "not_found", record };
+      return {
+        registrationNumber,
+        status: record.found ? "complete" : "not_found",
+        record,
+        requested: true,
+      };
     } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      if (isRateLimitError(error)) rateLimitError = message;
       return {
         registrationNumber,
         status: "error",
-        error: error instanceof Error ? error.message : String(error),
+        error: message,
+        requested: true,
       };
     }
   });
@@ -479,6 +520,14 @@ async function enrichDocument(document, client, options = {}) {
         return { ...hit, ipRegistryStatus: "not_collected" };
       }
       const fetchedRow = fetchedByNumber.get(number);
+      if (fetchedRow?.status === "rate_limited") {
+        counts.notCollectedHitCount++;
+        return {
+          ...hit,
+          ipRegistryStatus: "not_collected",
+          ipRegistryLookup: { status: "skipped_rate_limit" },
+        };
+      }
       if (!fetchedRow || fetchedRow.status === "error") {
         counts.errorHitCount++;
         return {
@@ -501,7 +550,11 @@ async function enrichDocument(document, client, options = {}) {
   const errorRegistrationCount = fetched.filter((row) => row.status === "error").length;
   const notFoundRegistrationCount = fetched.filter((row) => row.status === "not_found").length;
   const completeRegistrationCount = fetched.filter((row) => row.status === "complete").length;
-  const notCollectedRegistrationCount = Math.max(0, allNumbers.length - selected.length);
+  const requestedRegistrationCount = fetched.filter((row) => row.requested).length;
+  const rateLimitSkippedRegistrationCount = fetched.filter(
+    (row) => row.status === "rate_limited"
+  ).length;
+  const notCollectedRegistrationCount = Math.max(0, allNumbers.length - requestedRegistrationCount);
   const status =
     errorRegistrationCount === selected.length && selected.length > 0
       ? "error"
@@ -524,11 +577,14 @@ async function enrichDocument(document, client, options = {}) {
         applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
       },
       uniqueRegistrationCount: allNumbers.length,
-      requestedRegistrationCount: selected.length,
+      selectedRegistrationCount: selected.length,
+      requestedRegistrationCount,
       completeRegistrationCount,
       notFoundRegistrationCount,
       errorRegistrationCount,
       notCollectedRegistrationCount,
+      rateLimitDetected: Boolean(rateLimitError),
+      rateLimitSkippedRegistrationCount,
       counts,
       applicantRegionCounts,
       goodsMatchCounts,
@@ -548,6 +604,7 @@ module.exports = {
   evaluateGoods,
   normalizeApplicantAddress,
   normalizeGoodsText,
+  isRateLimitError,
   ipRegistryValidationMetadata,
   registryNumbers,
   summarizeIpRegistryMatches,
