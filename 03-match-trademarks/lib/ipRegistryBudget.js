@@ -3,8 +3,8 @@
 const fs = require("fs");
 const path = require("path");
 
-// 제공기관 잔여량은 계정 단위로 매일(KST) 초기화되는 것으로 관측됐다(#52, 2026-08-11 429 실측).
-// 달력일 경계를 KST로 고정해 예산을 관리한다.
+// 제공기관의 실제 계정 상한·초기화 시각은 확정되지 않았다(#52).
+// 이 모듈은 프로젝트의 보수적 운영 기준으로 KST 달력일 단위 예산을 관리한다.
 const KST_OFFSET_MS = 9 * 60 * 60 * 1000;
 const BUDGET_SCHEMA_VERSION = "ip-registry-daily-budget-v1";
 

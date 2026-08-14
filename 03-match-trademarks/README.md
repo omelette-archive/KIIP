@@ -112,8 +112,9 @@ API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 
 
 ### 일별 호출 예산과 429 재개 시점(#52)
 
-제공기관 잔여량은 계정 단위로 KST 자정마다 초기화되는 것으로 관측됐다(2026-08-11 실측, 44건
-성공 후 429). `--daily-budget <n>`을 지정하면 `output/ip-registry-daily-budget.json`(또는
+제공기관의 실제 계정 상한과 초기화 시각은 아직 확정되지 않았다. 프로젝트 운영 기준으로
+KST 달력일 단위의 보수적 예산을 두며, `--daily-budget <n>`을 지정하면
+`output/ip-registry-daily-budget.json`(또는
 `--budget-state` 경로)에 그날(KST) 누적 호출 수를 기록하고, 남은 예산만큼만 `--limit`을 줄여
 호출한다. 429가 감지되면 같은 상태 파일에 `resumeNotBefore`(다음날 KST 00:00)를 남기고, 그
 시점 전에 다시 실행하면 새 API 호출 없이 캐시만 적용한다(`limit=0`으로 자동 전환). 매일 같은
@@ -123,14 +124,17 @@ API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 
 ```bash
 node 03-match-trademarks/enrichIpRegistry.js \
   --input 03-match-trademarks/output/area-brand-validation-result.json \
-  --daily-budget 300 --limit 300 --concurrency 2 \
+  --daily-budget 100 --limit 100 --concurrency 2 \
   --cache 03-match-trademarks/output/ip-registry-cache.json \
   --budget-state 03-match-trademarks/output/ip-registry-daily-budget.json \
   --out 03-match-trademarks/output/ip-registry-enriched.json
 ```
 
-출력 JSON의 `ipRegistryEnrichment.dailyBudget`에 `limit/usedToday/remainingToday/resumeNotBefore`가
-남는다.
+출력 JSON의 `ipRegistryEnrichment.dailyBudget`에
+`limit/usedToday/remainingToday/resumeNotBefore/executionRequestLimit/blockedReason`이 남는다.
+호출 시작 전에 사용량을 상태 파일에 예약하므로 프로세스가 중간 종료돼도 이미 사용한 호출을
+다음 실행에서 다시 배정하지 않는다. `blockedReason`은 `rate_limit_cooldown` 또는
+`daily_budget_exhausted`로 성공·오류·미수집 집계와 함께 운영 리포트에서 확인할 수 있다.
 
 ## 출원번호 기반 출원인 주소 보강
 

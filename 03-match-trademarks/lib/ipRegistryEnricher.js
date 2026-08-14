@@ -516,6 +516,7 @@ async function enrichDocument(document, client, options = {}) {
         requested: false,
       };
     }
+    if (typeof options.onRequest === "function") options.onRequest(registrationNumber);
     try {
       const record = await client.getMarkHistory({ registrationNumber });
       if (record.found) {
@@ -534,7 +535,12 @@ async function enrichDocument(document, client, options = {}) {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (isRateLimitError(error)) rateLimitError = message;
+      if (isRateLimitError(error)) {
+        rateLimitError = message;
+        if (typeof options.onRateLimit === "function") {
+          options.onRateLimit(error, new Date());
+        }
+      }
       return {
         registrationNumber,
         status: "error",

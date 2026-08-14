@@ -150,6 +150,7 @@ async function runIpRegistryTests() {
   console.log("1-4) 등록원부 소량 보강 — 중복 호출 제거와 미수집 상태");
   {
     let calls = 0;
+    let reservedCalls = 0;
     const client = {
       getMarkHistory: async ({ registrationNumber }) => {
         calls++;
@@ -176,7 +177,9 @@ async function runIpRegistryTests() {
       limit: 1,
       concurrency: 1,
       fetchedAt: "2026-08-11T00:00:00Z",
+      onRequest: () => reservedCalls++,
     });
+    assert.strictEqual(reservedCalls, 1, "실제 호출 직전에 예산을 한 번 예약해야 함");
     assert.strictEqual(calls, 1, "같은 등록번호는 한 번만 조회해야 함");
     assert.strictEqual(enriched.ipRegistryEnrichment.status, "partial");
     assert.strictEqual(enriched.ipRegistryEnrichment.uniqueRegistrationCount, 2);
@@ -261,6 +264,44 @@ async function runIpRegistryTests() {
     assert.strictEqual(enriched.ipRegistryEnrichment.requestedRegistrationCount, 0);
     assert.strictEqual(enriched.results[0].hits[0].ipRegistryStatus, "not_collected");
     ok("일별 예산 소진·재개 대기 중에도 새 호출 없이 캐시만 적용 가능");
+  }
+
+  console.log("1-7) 등록원부 429 — 호출 예약과 재개 차단 훅");
+  {
+    let calls = 0;
+    let reservedCalls = 0;
+    let rateLimitSignals = 0;
+    const client = {
+      getMarkHistory: async () => {
+        calls++;
+        throw new Error("getMarkHistory: API 오류 (429)");
+      },
+    };
+    const document = {
+      schemaVersion: "1.1",
+      results: [
+        {
+          status: "ok",
+          query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
+          hits: [
+            { applicationNumber: "1", registrationNumber: "40-1234567-0000" },
+            { applicationNumber: "2", registrationNumber: "40-9999999-0000" },
+          ],
+        },
+      ],
+    };
+    const enriched = await enrichDocument(document, client, {
+      limit: 2,
+      concurrency: 1,
+      onRequest: () => reservedCalls++,
+      onRateLimit: () => rateLimitSignals++,
+    });
+    assert.strictEqual(calls, 1, "첫 429 뒤에는 후속 API 호출을 중단해야 함");
+    assert.strictEqual(reservedCalls, 1, "실제로 시작한 호출만 예산에 예약해야 함");
+    assert.strictEqual(rateLimitSignals, 1, "429 재개 차단 상태를 즉시 한 번 기록해야 함");
+    assert.strictEqual(enriched.ipRegistryEnrichment.requestedRegistrationCount, 1);
+    assert.strictEqual(enriched.ipRegistryEnrichment.rateLimitSkippedRegistrationCount, 1);
+    ok("429 발생 즉시 예산·재개 상태 훅을 기록하고 후속 호출을 차단");
   }
 }
 
