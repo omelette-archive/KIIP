@@ -18,6 +18,7 @@ const { isServiceClass } = require("./lib/filters");
 const { NORMALIZATION_VERSION, normalizeRow } = require("./normalizeItems");
 const { applyManualReviews } = require("./applyManualReviews");
 const { approvedAliases, cleanItemName, normalizeByRules } = require("./lib/ruleNormalizer");
+const { summarizeReviewRows, summaryCsv } = require("./lib/reviewClusters");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -300,6 +301,53 @@ async function run() {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
     ok("규칙 결과와 검토 전용 CSV를 API 키 없이 분리 생성함 — review-required.csv는 사람이 별도로 검토");
+  }
+
+  console.log("9) 검토대기 군집 — 빈도·사유·후보 합의도와 원본 표현 보존");
+  {
+    const sharedCandidate = JSON.stringify([
+      { item: "신선한 감", niceClass: "31", similarGroupCode: "G0211", score: 0.8 },
+    ]);
+    const summary = summarizeReviewRows([
+      {
+        inputIndex: "0", sido: "경상남도", sigungu: "창원시", rawItemName: "단감", itemName: "단감",
+        sourceId: "nongsaro_local_specialty", status: "review_required",
+        normalizationVersion: "rules-v1", dictionaryVersion: "dictionary-v1",
+        reviewReason: "정확히 일치하는 고시명칭이 없음", reviewCandidates: sharedCandidate,
+      },
+      {
+        inputIndex: "1", sido: "전라남도", sigungu: "나주시", rawItemName: "단 감", itemName: "단 감",
+        sourceId: "nongsaro_local_specialty", status: "review_required",
+        normalizationVersion: "rules-v1", dictionaryVersion: "dictionary-v1",
+        reviewReason: "정확히 일치하는 고시명칭이 없음", reviewCandidates: sharedCandidate,
+      },
+      {
+        inputIndex: "2", sido: "충청북도", sigungu: "제천시", rawItemName: "오미자", itemName: "오미자",
+        sourceId: "nongsaro_local_specialty", status: "review_required",
+        normalizationVersion: "rules-v1", dictionaryVersion: "dictionary-v1",
+        reviewReason: "고시명칭 후보가 없음", reviewCandidates: "[]",
+      },
+      {
+        inputIndex: "3", sido: "경상북도", sigungu: "안동시", rawItemName: "사과", itemName: "사과",
+        status: "ok", reviewReason: "", reviewCandidates: "[]",
+      },
+    ], { topCandidates: 3, examples: 2 });
+    assert.strictEqual(summary.inputRowCount, 4);
+    assert.strictEqual(summary.reviewRowCount, 3);
+    assert.strictEqual(summary.uniqueItemClusterCount, 2);
+    assert.deepStrictEqual(summary.normalizationVersions, [{ name: "rules-v1", count: 3 }]);
+    assert.deepStrictEqual(summary.dictionaryVersions, [{ name: "dictionary-v1", count: 3 }]);
+    assert.strictEqual(summary.clusters[0].representativeItemName, "단감");
+    assert.strictEqual(summary.clusters[0].rowCount, 2);
+    assert.strictEqual(summary.clusters[0].regionCount, 2);
+    assert.strictEqual(summary.clusters[0].candidateState, "same_candidate_present_in_all_rows");
+    assert.strictEqual(summary.clusters[0].candidateOptions[0].coverage, 1);
+    assert.strictEqual(summary.clusters[0].reviewDisposition, "human_review_required");
+    assert.strictEqual(summary.clusters[1].candidateState, "no_candidates");
+    const csv = summaryCsv(summary);
+    assert.ok(csv.startsWith("\uFEFFgroupKey,"));
+    assert.match(csv, /human_review_required/);
+    ok("같은 원물명 변형을 결정론적으로 묶고 후보가 같아도 자동 승인하지 않음");
   }
 
   console.log("\n모든 자체 테스트 통과");
