@@ -2,6 +2,8 @@
 
 const crypto = require("crypto");
 const { loadAdminRegionCodes } = require("../../01-collect-specialties/lib/adminCodes");
+const { loadSourceCoverageGaps } = require("../../01-collect-specialties/lib/sourceCoverageGaps");
+const { getSourceDefinition, loadSourceRegistry } = require("../../01-collect-specialties/lib/sourceRegistry");
 
 const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
 const DASHBOARD_CONTRACT_VERSION = "dashboard-data-contract-v0-draft";
@@ -506,6 +508,27 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     };
   });
   regions.sort((a, b) => clean(a.region).localeCompare(clean(b.region), "ko"));
+
+  const presentSido = new Set(regions.map((region) => region.sido).filter(Boolean));
+  const sourceCoverageGaps = options.sourceCoverageGaps || loadSourceCoverageGaps();
+  const sourceRegistry = options.sourceRegistry || (() => {
+    try {
+      return loadSourceRegistry();
+    } catch {
+      return null;
+    }
+  })();
+  for (const gap of sourceCoverageGaps) {
+    if (presentSido.has(gap.sido)) continue; // 실제 데이터가 생기면 자동으로 더 이상 경고하지 않음
+    const sourceLabel = sourceRegistry
+      ? getSourceDefinition(gap.sourceId, sourceRegistry)?.name || gap.sourceId
+      : gap.sourceId;
+    warnings.add(
+      `${gap.sido}은(는) 현재 ${sourceLabel} 소스에서 특산물이 한 건도 수집되지 않아 지역 목록에 나타나지 않습니다` +
+        `(확인 ${gap.verifiedAt}, ${gap.verificationMethod}). 0건으로 확정된 것이 아니라 출처 미확보 상태입니다 — ` +
+        `${gap.note}(${gap.issue}).`
+    );
+  }
 
   const summary = analysis.summary || {};
   const coverage = {
