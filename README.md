@@ -4,6 +4,19 @@
 분석하고 브랜드 공백지역을 발굴해 비즈니스 확장 전략을 제안하는 파이프라인. 전체 기획은
 [`docs/project-plan.md`](docs/project-plan.md) 참고.
 
+## 현재까지의 산출물
+
+> **알파 테스트 결과** — 수집·검증이 진행 중인 지표가 포함되어 있으며, 공식 배포 수치가 아니다.
+
+[**최신 알파 대시보드 열기 →**](https://omelette-archive.github.io/KIIP/latest/)
+
+- [산출물 허브](https://omelette-archive.github.io/KIIP/) — 현재 빌드 정보와 최근 버전
+- [과거 버전 열람](https://omelette-archive.github.io/KIIP/versions/) — 당시 HTML을 그대로 렌더링
+- [피드백 남기기](https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml)
+- [원본 HTML](07-dashboard/dashboard.html) · [변경 이력](https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html) · [운영 방법](docs/current-artifact.md)
+
+`main`의 `07-dashboard/dashboard.html`이 변경되면 최신본과 버전 목록이 GitHub Pages에 자동 반영된다.
+
 ## 파이프라인 (7단계)
 
 ```mermaid

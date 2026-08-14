@@ -1,0 +1,70 @@
+name: Publish current artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "07-dashboard/dashboard.html"
+      - "scripts/buildArtifactSite.js"
+      - ".github/workflows/publish-artifacts.yml"
+  pull_request:
+    paths:
+      - "07-dashboard/dashboard.html"
+      - "scripts/buildArtifactSite.js"
+      - ".github/workflows/publish-artifacts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-current-artifacts
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out full artifact history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Build current artifact hub and version archive
+        run: node scripts/buildArtifactSite.js --output .artifact-site --limit 50
+
+      - name: Configure GitHub Pages
+        if: github.event_name != 'pull_request'
+        uses: actions/configure-pages@v5
+
+      - name: Upload GitHub Pages artifact
+        if: github.event_name != 'pull_request'
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: .artifact-site
+
+  deploy:
+    if: github.event_name != 'pull_request'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      actions: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
