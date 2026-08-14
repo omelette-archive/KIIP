@@ -291,4 +291,38 @@ assert.throws(
 );
 ok("서로 다른 실행/규칙 버전의 ⑤·⑥ 결과를 조용히 혼합하지 않음");
 
+console.log("5) 소스 커버리지 공백 경고 — 출처 미확보 vs 실제 0건 구분(#60)");
+{
+  const gaps = [
+    {
+      sido: "제주특별자치도",
+      sourceId: "nongsaro",
+      verifiedAt: "2026-08-12",
+      verificationMethod: "테스트 고정값",
+      note: "테스트 사유",
+      issue: "#60",
+    },
+  ];
+  const missing = buildDashboardSnapshot(fixture(), {
+    mode: "sample",
+    generatedAt: "2026-08-10T02:00:00Z",
+    sourceCoverageGaps: gaps,
+  });
+  assert.ok(
+    missing.warnings.some((w) => w.includes("제주특별자치도") && w.includes("출처 미확보")),
+    "목록에 있는 시도가 지역 목록에 없으면 출처 미확보 경고가 있어야 함"
+  );
+
+  const present = buildDashboardSnapshot(fixture(), {
+    mode: "sample",
+    generatedAt: "2026-08-10T02:00:00Z",
+    sourceCoverageGaps: [{ ...gaps[0], sido: "경상북도" }],
+  });
+  assert.ok(
+    !present.warnings.some((w) => w.includes("출처 미확보")),
+    "이미 데이터가 있는 시도는 경고하지 않아야 함(데이터가 생기면 자동 해제)"
+  );
+  ok("실측 확인된 공백만 '출처 미확보'로 경고하고, 데이터가 생기면 자동으로 경고가 사라짐");
+}
+
 console.log("\n모든 자체 테스트 통과");
