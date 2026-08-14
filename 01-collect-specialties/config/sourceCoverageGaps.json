@@ -1,0 +1,29 @@
+{
+  "schemaVersion": 1,
+  "gaps": [
+    {
+      "sido": "제주특별자치도",
+      "sourceId": "nongsaro",
+      "verifiedAt": "2026-08-12",
+      "verificationMethod": "농사로 localSpcprd/localSpcprdLst 전국 재실행(1,721건, 9페이지) 및 sAreaNm=제주 라이브 직접 질의(totalCount=0)",
+      "note": "감귤·흑돼지·한라봉 등 전국적으로 유명한 농축산 특산품이 많은 지역이라 0건은 이례적임 — 대체 출처 조사 필요",
+      "issue": "#60"
+    },
+    {
+      "sido": "서울특별시",
+      "sourceId": "nongsaro",
+      "verifiedAt": "2026-08-12",
+      "verificationMethod": "농사로 localSpcprd/localSpcprdLst 전국 재실행(1,721건, 9페이지)",
+      "note": "도시화된 행정구역이라 지역특산물(농산물 중심) 카탈로그에 없는 것이 그럴 법하나 별도 확인은 안 됨",
+      "issue": "#60"
+    },
+    {
+      "sido": "세종특별자치시",
+      "sourceId": "nongsaro",
+      "verifiedAt": "2026-08-12",
+      "verificationMethod": "농사로 localSpcprd/localSpcprdLst 전국 재실행(1,721건, 9페이지)",
+      "note": "도시화된 행정구역이라 지역특산물(농산물 중심) 카탈로그에 없는 것이 그럴 법하나 별도 확인은 안 됨",
+      "issue": "#60"
+    }
+  ]
+}

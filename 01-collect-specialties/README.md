@@ -20,11 +20,22 @@
 GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수다. 전체 무필터 목록은 받을 수
 없으므로 기본 실행은 한국시간 오늘을 조회하고, 누락 복구는 명시한 짧은 날짜 범위만 순회한다.
 
+## 시도별 수집 공백(#60)
+
+농사로 `localSpcprd/localSpcprdLst`를 전국 재실행(1,721건, 9페이지)한 결과 제주특별자치도·
+서울특별시·세종특별자치시는 등록 건수가 0건이었다(`sAreaNm=제주` 라이브 직접 질의로도 재확인).
+이 결과가 파이프라인 후반부(②검토대기·③미검색 등)에서 "0건"으로 잘못 읽히면 실제로는 해당
+지역에 특산물이 없다고 오인할 수 있다 — 특히 제주는 감귤·흑돼지 등 전국적으로 알려진 특산품이
+많아 이례적이다. API 실측으로 확인된 공백만 `config/sourceCoverageGaps.json`에 기록하고, ⑦
+대시보드가 해당 시도가 지역 목록에 없을 때 "출처 미확보"(0건 확정 아님) 경고를 노출한다. 대체
+출처를 찾아 실제 데이터가 들어오면 경고는 자동으로 사라진다.
+
 ## 구조
 
 ```
 01-collect-specialties/
 ├── config/sources.json      공식 URL·인증·포맷·할당량 확인 상태 레지스트리
+├── config/sourceCoverageGaps.json  API 실측으로 확인된 시도별 수집 공백(#60)
 ├── data/                    법정동코드 원본 (기존, data.go.kr 무료 다운로드)
 ├── lib/
 │   ├── loadEnv.js           .env 로더 (02/03에서 포팅)
@@ -33,6 +44,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
 │   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (공식 localSpcprd XML 계약)
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
+│   ├── sourceCoverageGaps.js 시도별 수집 공백 로더/검증기(⑦ 대시보드 경고에 사용)
 │   ├── collectionStore.js   SQLite 실행 이력·원문 레코드·append-only 버전 저장
 │   └── normalize.js         소스별 결과 -> 표준 출력 스키마, 지역명을 adminCodes 마스터와 대조
 ├── collectSpecialties.js    CLI 진입점
