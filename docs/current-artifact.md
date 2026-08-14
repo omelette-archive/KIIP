@@ -26,8 +26,9 @@ Git 커밋에서 과거 HTML을 다시 꺼내 정적 사이트에 함께 싣는�
 Pages 버전 목록은 이를 클릭 가능한 HTML로 보여 주는 읽기 전용 뷰다.
 
 두 저장소 사이는 공개 저장소에만 쓰기 권한이 있는 deploy key로 연결한다. 비공개 원본 저장소의
-Actions secret `ARTIFACT_PUBLISH_KEY`에 개인키를 보관하고, 공개 저장소에는 대응하는 공개키만
-등록한다. 이 키는 `KIIP-artifacts` 외의 저장소에는 접근할 수 없다.
+Actions secret `ARTIFACT_PUBLISH_KEY_B64`에 개인키를 base64로 보관하고, 실행 시에만 Linux
+러너의 임시 SSH 파일로 복원한다. 공개 저장소에는 대응하는 공개키만 등록하며, 이 키는
+`KIIP-artifacts` 외의 저장소에는 접근할 수 없다.
 
 로컬에서 같은 사이트를 만들려면 다음을 실행한다.
 
