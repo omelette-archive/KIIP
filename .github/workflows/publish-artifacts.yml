@@ -45,11 +45,11 @@ jobs:
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         shell: bash
         env:
-          ARTIFACT_PUBLISH_KEY: ${{ secrets.ARTIFACT_PUBLISH_KEY }}
+          ARTIFACT_PUBLISH_KEY_B64: ${{ secrets.ARTIFACT_PUBLISH_KEY_B64 }}
         run: |
-          test -n "$ARTIFACT_PUBLISH_KEY"
+          test -n "$ARTIFACT_PUBLISH_KEY_B64"
           install -m 700 -d "$HOME/.ssh"
-          printf '%s\n' "$ARTIFACT_PUBLISH_KEY" > "$HOME/.ssh/kiip_artifacts"
+          printf '%s' "$ARTIFACT_PUBLISH_KEY_B64" | base64 --decode > "$HOME/.ssh/kiip_artifacts"
           chmod 600 "$HOME/.ssh/kiip_artifacts"
           ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> "$HOME/.ssh/known_hosts"
 
