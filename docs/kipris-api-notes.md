@@ -113,8 +113,17 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
   (2026-08-11) 참고.
 
 `ip-registry-designated-goods-v0-review`는 공백·특수문자를 제거한 뒤 `normalized_exact`,
-`normalized_contains`, `class_only`, `mismatch`, `unverified`를 분리한다. exact만 확정 근거이며
-나머지 포함·류 후보를 통계에서 제외할지는 #12 기준 확정 후 결정한다.
+`normalized_contains`, `class_only`, `mismatch`, `unverified`를 분리한다. 2026-08-12 정책
+결정으로 `normalized_exact`·`normalized_contains`(지정상품명에 고시상품명칭 포함)는 특산품
+활용 출원으로 확정 인정하고, `class_only`(NICE류만 일치)만 계속 사람 검토 후보로 남긴다.
+
+이 지정상품 대조는 **등록번호가 있는 hit에만** 적용된다 — `getMarkHistory`가 등록번호를
+조회 키로 요구하기 때문이다. 출원중·거절 등 등록번호가 아직 없는 hit는 지정상품 판정 자체가
+`unverified`(사실상 `not_applicable`)로 남고, NICE류·주소 매칭에만 의존한다. 출원번호 기준
+지정상품 조회 API는 KIPRISPlus `getWordSearch` 응답에서 확인되지 않았고(지정상품 필드 없음,
+`classificationCode`만 제공), 후보였던 "상표 분류코드 변동 이력" API(`15059142`)도 실엔드포인트를
+확인하지 못해 이 갭은 #12로 계속 열어둔다. 2026-08-14부터 이 미평가 건수(등록번호 없는 hit 수)를
+④ 분석 경고로 노출해 확정 통계처럼 오인되지 않게 한다.
 
 ## resultCode
 
