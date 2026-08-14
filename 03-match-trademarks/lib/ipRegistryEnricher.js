@@ -492,8 +492,8 @@ async function enrichDocument(document, client, options = {}) {
   const concurrency = Number(options.concurrency ?? 1);
   const cacheEntries = options.cacheEntries instanceof Map ? options.cacheEntries : new Map();
   const adminList = options.adminList || loadAdminCodes();
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new Error("limit은 1~100 정수여야 합니다.");
+  if (!Number.isInteger(limit) || limit < 0 || limit > 100) {
+    throw new Error("limit은 0~100 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
@@ -516,6 +516,7 @@ async function enrichDocument(document, client, options = {}) {
         requested: false,
       };
     }
+    if (typeof options.onRequest === "function") options.onRequest(registrationNumber);
     try {
       const record = await client.getMarkHistory({ registrationNumber });
       if (record.found) {
@@ -524,6 +525,7 @@ async function enrichDocument(document, client, options = {}) {
           fetchedAt,
           record: sanitizeRegistryRecordForCache(record, adminList),
         });
+        if (typeof options.onCacheUpdate === "function") options.onCacheUpdate(registrationNumber);
       }
       return {
         registrationNumber,
@@ -533,7 +535,12 @@ async function enrichDocument(document, client, options = {}) {
       };
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      if (isRateLimitError(error)) rateLimitError = message;
+      if (isRateLimitError(error)) {
+        rateLimitError = message;
+        if (typeof options.onRateLimit === "function") {
+          options.onRateLimit(error, new Date());
+        }
+      }
       return {
         registrationNumber,
         status: "error",
