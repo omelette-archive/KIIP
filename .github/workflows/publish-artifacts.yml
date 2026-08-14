@@ -1,0 +1,73 @@
+name: Publish current artifacts
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "07-dashboard/dashboard.html"
+      - "scripts/buildArtifactSite.js"
+      - ".github/workflows/publish-artifacts.yml"
+  pull_request:
+    paths:
+      - "07-dashboard/dashboard.html"
+      - "scripts/buildArtifactSite.js"
+      - ".github/workflows/publish-artifacts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages-current-artifacts
+  cancel-in-progress: false
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out full artifact history
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Build current artifact hub and version archive
+        run: node scripts/buildArtifactSite.js --output .artifact-site --limit 50
+
+      - name: Prepare public artifact repository key
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          ARTIFACT_PUBLISH_KEY: ${{ secrets.ARTIFACT_PUBLISH_KEY }}
+        run: |
+          test -n "$ARTIFACT_PUBLISH_KEY"
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$ARTIFACT_PUBLISH_KEY" > "$HOME/.ssh/kiip_artifacts"
+          chmod 600 "$HOME/.ssh/kiip_artifacts"
+          ssh-keyscan -t rsa,ecdsa,ed25519 github.com >> "$HOME/.ssh/known_hosts"
+
+      - name: Publish generated site only
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        shell: bash
+        env:
+          GIT_SSH_COMMAND: ssh -i ~/.ssh/kiip_artifacts -o IdentitiesOnly=yes
+        run: |
+          git clone --depth 1 git@github.com:omelette-archive/KIIP-artifacts.git .artifact-publish
+          rsync -a --delete --exclude '.git/' .artifact-site/ .artifact-publish/
+          cd .artifact-publish
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "Public artifact site is already current."
+            exit 0
+          fi
+          git commit -m "deploy: KIIP source ${GITHUB_SHA}"
+          git push origin main
