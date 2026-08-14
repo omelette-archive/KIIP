@@ -586,8 +586,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         : 1,
       policy:
         regionalCoverageThreshold < 1
-          ? "alpha_coverage_threshold_preview"
-          : "all_or_nothing_per_region_item",
+          ? "alpha_collection_coverage_preview_address_rate_is_advisory"
+          : "collection_complete_address_rate_is_advisory",
     },
     collectionExperiment: {
       queryHitCap: optionalCount(options.queryHitCap),

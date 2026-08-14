@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>KIIP 알파 데이터 흐름 현황판</title>
+  <style>
+    :root{--ink:#17221e;--muted:#64726c;--line:#dbe3dc;--paper:#f7faf7;--card:#fff;--accent:#13795b;--soft:#e7f4ed;--warn:#9a6516}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Noto Sans KR",sans-serif}main{max-width:1180px;margin:auto;padding:42px 22px 70px}header{display:flex;justify-content:space-between;gap:20px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:25px}h1{margin:5px 0 4px;font-size:clamp(28px,5vw,48px);letter-spacing:-.06em}h2{margin:0 0 14px;font-size:23px;letter-spacing:-.04em}.eyebrow{margin:0;color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.12em}.date{color:var(--muted);font-size:13px}.flow{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:28px 0 36px}.step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px 14px;position:relative;min-height:150px}.step:not(:last-child):after{content:'→';position:absolute;right:-14px;top:53px;color:var(--accent);font-size:24px;z-index:2}.step b{display:block;font-size:24px;margin:9px 0 3px}.step span{color:var(--muted);font-size:13px}.step.done{border-color:#a8d6bd;background:linear-gradient(145deg,#fff,var(--soft))}.step.pending{border-style:dashed}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.stat{padding:15px;border-radius:13px;background:#f1f6f2}.stat b{display:block;font-size:25px}.stat span{color:var(--muted);font-size:13px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:var(--muted)}code{background:#eef2ef;border-radius:5px;padding:2px 5px;font-size:12px}.tag{display:inline-block;background:var(--soft);color:#146143;border-radius:99px;padding:3px 9px;margin:3px;font-size:12px}.warn{color:var(--warn)}footer{color:var(--muted);font-size:13px;margin-top:20px}@media(max-width:850px){.flow{grid-template-columns:repeat(2,1fr)}.step:not(:last-child):after{display:none}.grid{grid-template-columns:1fr}}@media(max-width:500px){.flow,.stats{grid-template-columns:1fr}main{padding:25px 14px}}
+  </style>
+</head>
+<body><main>
+  <header><div><p class="eyebrow">KIIP · DATA LINEAGE</p><h1>알파 데이터 흐름 현황판</h1><div class="date">수집 → 매칭 → 지역 귀속 → 대시보드 · 기준일 2026-08-12</div></div><div class="date">전체 범위 알파 · 부분 수집</div></header>
+  <section class="flow" aria-label="데이터 처리 단계">
+    <div class="step done"><span>01 · 원천 수집</span><b>1,721</b><span>지역×품목 입력 행</span></div>
+    <div class="step done"><span>02 · 표준화</span><b>1,692</b><span>지역×품목 정제 행</span></div>
+    <div class="step done"><span>03 · KIPRIS 검색</span><b>861</b><span>고유 검색 조합</span></div>
+    <div class="step done"><span>04 · 후보 집계</span><b>67,323</b><span>출원번호 고유 후보</span></div>
+    <div class="step done"><span>05 · 주소 귀속</span><b>3,901</b><span>지역 inside</span></div>
+    <div class="step pending"><span>06 · 지정상품 보강</span><b>대기</b><span>contains 확정 집계 예정</span></div>
+  </section>
+  <div class="grid"><div>
+    <section class="card"><h2>현재 수집·매칭 수치</h2><div class="stats"><div class="stat"><b>1,717</b><span>검색 가능 입력 행</span></div><div class="stat"><b>67,323</b><span>전국 고유 상표 후보</span></div><div class="stat"><b>43,384 · 64.44%</b><span>출원인 주소 확인</span></div><div class="stat"><b>671 / 1,692</b><span>수집 완료 지역 지표 공개</span></div></div></section>
+    <section class="card"><h2>단계별 데이터 구조</h2><table><thead><tr><th>단계</th><th>핵심 필드</th><th>판정·용도</th></tr></thead><tbody>
+      <tr><td>특산품</td><td><code>sido</code> <code>sigungu</code> <code>noticeName</code> <code>niceClass</code></td><td>고시상품명칭과 NICE류를 검색 키로 사용</td></tr>
+      <tr><td>KIPRIS hit</td><td><code>applicationNumber</code> <code>title</code> <code>applicationDate</code> <code>applicationStatus</code></td><td>출원번호 기준 중복 제거</td></tr>
+      <tr><td>주소 보강</td><td><code>applicantRegionMatch</code> <code>applicantRegionEvidence</code></td><td>출원인 주소가 지역이면 <b>inside</b></td></tr>
+      <tr><td>지정상품</td><td><code>goodsMatchMethod</code> <code>designatedProductName</code> <code>classCode</code></td><td>exact·contains는 특산품 활용 출원 확정, class_only는 검토</td></tr>
+      <tr><td>대시보드</td><td><code>pipelineStatus</code> <code>regions[].items[].metrics</code></td><td>지도·지역별·품목별 지표로 표시</td></tr>
+    </tbody></table></section>
+  </div><div>
+    <section class="card"><h2>판정 기준</h2><p><span class="tag">주소 우선</span>출원인 주소가 지역과 일치하면 지역 귀속</p><p><span class="tag">고시명칭 포함</span>지정상품에 고시상품명칭이 포함되면 특산품 활용 출원</p><p><span class="tag">사람 검토</span>NICE류만 일치하는 <code>class_only</code></p><p><span class="tag">부분 수집</span>주소 60% 기준은 제거했지만 검색 자체가 부분이면 지역 지표는 보류</p></section>
+    <section class="card"><h2>다음 처리</h2><ol><li>등록원부 API를 캐시·소량 호출로 보강</li><li><code>normalized_contains</code> 실제 건수 산출</li><li>분석·스냅샷 재생성</li><li>서울·제주·세종·울산 등 누락 지역 재검증</li></ol><p class="warn">현재 지정상품 보강 건수: 0건 — 보강 실행 후 갱신 필요</p></section>
+  </div></div>
+  <footer>근거 파일: <a href="../../03-match-trademarks/README.md">③ 상표 매칭</a> · <a href="../../04-analyze-brand/README.md">④ 분석</a> · <a href="../../07-dashboard/README.md">⑦ 대시보드</a> · <a href="../../07-dashboard/web/public/data/dashboard-snapshot.json">현재 스냅샷</a></footer>
+</main></body></html>

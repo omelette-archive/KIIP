@@ -112,7 +112,6 @@ assert.strictEqual(andongApple.regionalRegistrationRate, 1);
 assert.strictEqual(andongApple.regionalMetricAvailability, "blocked");
 assert.deepStrictEqual(andongApple.regionalMetricBlockingReasons, [
   "collection_incomplete",
-  "applicant_address_unverified",
 ]);
 assert.strictEqual(andongApple.invalidApplicationDateCount, 1);
 ok("오류·0건 포함, 출원번호 중복 제거, 상태별 집계");
@@ -432,7 +431,7 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
     r.methodology.applicantRegionMetricVersion,
     "kipris-trademark-applicant-region-v1"
   );
-  assert.ok(r.warnings.some((warning) => warning.includes("#12")));
+  assert.ok(r.warnings.some((warning) => warning.includes("class_only")));
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
@@ -472,7 +471,7 @@ console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무�
   ok("validation_only 자료는 출원번호 evidence에만 쓰고 특산품 통계를 오염시키지 않음");
 }
 
-console.log("5-1) 지역 상표 지표는 완전 수집·주소 귀속 완료 시에만 공개");
+console.log("5-1) 지역 상표 지표는 수집 완료를 기준으로 공개하고 주소 확보율은 참고 지표로 보존");
 {
   const r = analyzeEntries([{
     status: "ok",

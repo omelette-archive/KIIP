@@ -348,6 +348,8 @@ function finalizeBucket(bucket, options) {
       );
     if (hasApplicantAddressEvidence) applicantAddressEvidenceCount++;
     statusCounts[status]++;
+    // 류·지정상품 보강(goodsMatchMethod)은 별도 품목 검토 지표다. KIPRIS hit의
+    // 부가 코드가 비어 있어도 출원인 주소가 해당 지역 inside로 판정되면 지역 귀속은 인정한다.
     regionCounts[applicantRegion]++;
     if (applicantRegion === "inside") regionalStatusCounts[status]++;
     if (regionalBrandCounts) {
@@ -414,25 +416,21 @@ function finalizeBucket(bucket, options) {
     bucket.erroredQueryCount === 0 &&
     bucket.skippedQueryCount === 0 &&
     regionalCollectionRate >= options.regionalCoverageThreshold;
-  const regionalAddressVerificationComplete =
-    isRegionalBucket &&
-    (uniqueTrademarkCount === 0 ||
-      regionVerifiedHitCount / uniqueTrademarkCount >= options.regionalCoverageThreshold);
   const regionalMetricBlockingReasons = [];
   if (isRegionalBucket && !regionalCollectionComplete) {
     regionalMetricBlockingReasons.push("collection_incomplete");
   }
-  if (isRegionalBucket && !regionalAddressVerificationComplete) {
-    regionalMetricBlockingReasons.push("applicant_address_unverified");
-  }
+  // 출원인 주소 확보율은 참고 지표로만 보존한다. 주소가 일부 없더라도
+  // 수집이 완료된 지역·품목은 확보된 값 그대로 표시하며, 지역 귀속 확정값으로
+  // 과해석되지 않도록 대시보드에서 확보율과 주의 문구를 함께 노출한다.
   const regionalMetricAvailability = !isRegionalBucket
     ? null
     : regionalMetricBlockingReasons.length === 0
       ? "available"
       : "blocked";
-  const goodsConfirmedHitCount = goodsMatchCounts.normalized_exact;
-  const goodsReviewRequiredHitCount =
-    goodsMatchCounts.normalized_contains + goodsMatchCounts.class_only;
+  const goodsConfirmedHitCount =
+    goodsMatchCounts.normalized_exact + goodsMatchCounts.normalized_contains;
+  const goodsReviewRequiredHitCount = goodsMatchCounts.class_only;
   const goodsEvaluatedHitCount =
     goodsConfirmedHitCount + goodsReviewRequiredHitCount + goodsMatchCounts.mismatch;
   const applicationYearCounts = {};
@@ -685,7 +683,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
     }
     if (summary.goodsReviewRequiredHitCount > 0) {
       warnings.push(
-        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품 normalized_contains/class_only 검토 후보이며 #12 기준 확정 전 확정 매칭으로 해석하면 안 됩니다.`
+        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품명이 확인되지 않고 NICE류만 일치한 class_only 검토 후보입니다.`
       );
     }
   }
@@ -746,7 +744,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
         inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion,
       ].filter(Boolean),
       designatedGoodsPolicy:
-        "normalized_exact만 확정 근거, normalized_contains/class_only는 검토 후보; #12 기준 확정 전 고유 상표 합계에서 자동 제외하지 않음",
+        "normalized_exact 또는 normalized_contains는 특산품 활용 출원으로 인정하고, class_only만 사람 검토 후보로 유지",
       designatedGoodsMatchVersion:
         inputDocument?.ipRegistryEnrichment?.policy?.goodsMatchVersion || null,
       currentYearPolicy: "진행 중인 현재 연도는 최근/직전 기간 비교에서 제외",

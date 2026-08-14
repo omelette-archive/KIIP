@@ -63,8 +63,9 @@ node 04-analyze-brand/analyzeBrands.js \
 [`docs/data-source-provenance.md`](../docs/data-source-provenance.md)에 기록한다.
 
 지정상품은 `goodsMatchCounts`, `goodsConfirmedHitCount`, `goodsReviewRequiredHitCount`,
-`goodsMismatchHitCount`, `goodsVerificationRate`로 제공한다. #12 기준 확정 전에는 후보를 기존 상표
-합계에서 자동 제외하지 않는다.
+`goodsMismatchHitCount`, `goodsVerificationRate`로 제공한다. `normalized_exact`와
+`normalized_contains`(고시상품명칭 포함)는 특산품 활용 출원으로 확정 집계하고,
+`class_only`만 사람 검토 대상으로 남긴다.
 
 ## 과거 3건 연결 확인 결과
 

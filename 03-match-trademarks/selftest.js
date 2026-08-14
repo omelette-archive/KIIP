@@ -32,6 +32,7 @@ const {
   enrichDocument,
   enrichHitsWithIpRegistry,
   ipRegistryValidationMetadata,
+  registryNumbers,
 } = require("./lib/ipRegistryEnricher");
 const { loadCache: loadIpRegistryCache, saveCache: saveIpRegistryCache } = require("./lib/ipRegistryCache");
 const {
@@ -933,6 +934,53 @@ async function run() {
     });
     assert.strictEqual(ipRegistryValidationMetadata(null).enabled, false);
     ok("활성화 여부·기준·요약 통계를 함께 보존해 감사 가능함");
+  }
+
+  console.log("12-2b) registryNumbers/enrichDocument — storageMode=query_facts 저장 방식 호환");
+  {
+    // ③ 기본 저장 방식(query_facts)에서는 hit가 results[i].hits가 아니라
+    // queryFacts[queryKey].hits에 한 번만 있다. 여기를 안 읽으면 등록번호를 하나도 못 찾아
+    // 등록원부 보강이 조용히 아무 일도 안 한다(2026-08-12 실데이터에서 발견 — 지정상품
+    // 매칭 기준을 완화해도 실제로는 전혀 반영되지 않던 원인).
+    const factDocument = {
+      schemaVersion: "1.3",
+      storageMode: "query_facts",
+      results: [
+        { status: "ok", queryKey: "신선한 사과31", query: { region: "강원특별자치도 양양군" } },
+        { status: "ok", queryKey: "신선한 사과31", query: { region: "경상남도 합천군" } },
+      ],
+      queryFacts: {
+        "신선한 사과31": {
+          query: { item: "신선한 사과", classCode: "31" },
+          hits: [{ registrationNumber: "1", title: "사과example" }],
+        },
+      },
+    };
+    const numbers = registryNumbers(factDocument);
+    assert.deepStrictEqual(numbers, ["1"], "queryFacts의 hits에서 등록번호를 찾아야 함");
+
+    const adminList = [{ code: "4280000000", sido: "강원특별자치도", sigungu: "양양군" }];
+    const fakeClient = {
+      getMarkHistory: async () =>
+        summarizeMarkHistory({
+          rgstNo: "1",
+          applicant: [{ applicantAddr: "강원특별자치도 양양군 ..." }],
+          productList: [{ productClsCd: "31", desProduct: "신선한사과" }],
+        }),
+    };
+    const enriched = await enrichDocument(factDocument, fakeClient, { limit: 10, adminList });
+    assert.strictEqual(
+      enriched.queryFacts["신선한 사과31"].hits[0].ipRegistryStatus,
+      "complete",
+      "queryFacts 원본 hit가 보강돼야 함(results 대신)"
+    );
+    assert.strictEqual(enriched.ipRegistryEnrichment.counts.completeHitCount, 1);
+    assert.strictEqual(
+      enriched.results[0].hits,
+      undefined,
+      "results는 압축 저장 구조를 유지해 hits를 복제하지 않아야 함"
+    );
+    ok("query_facts 저장 방식에서도 등록번호를 찾아 queryFacts의 hits를 한 번만 보강함");
   }
 
   console.log("12-3) 출원번호 기반 상표 출원인 주소 — 응답 파싱·영속 누적");
