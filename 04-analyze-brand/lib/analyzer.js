@@ -489,6 +489,7 @@ function finalizeBucket(bucket, options) {
     goodsConfirmedHitCount,
     goodsReviewRequiredHitCount,
     goodsMismatchHitCount: goodsMatchCounts.mismatch,
+    goodsUnverifiedHitCount: goodsMatchCounts.unverified,
     goodsVerificationRate: safeRate(goodsEvaluatedHitCount, uniqueTrademarkCount),
     ipRegistryStatusCounts,
     invalidApplicationDateCount,
@@ -696,6 +697,14 @@ function analyzeEntries(parsed, providedOptions = {}) {
     if (summary.goodsReviewRequiredHitCount > 0) {
       warnings.push(
         `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품명이 확인되지 않고 NICE류만 일치한 class_only 검토 후보입니다.`
+      );
+    }
+    const notApplicableCount = registry.counts?.noRegistrationHitCount ?? summary.ipRegistryStatusCounts?.not_applicable ?? 0;
+    if (notApplicableCount > 0) {
+      warnings.push(
+        `${notApplicableCount}개 상표는 등록번호가 없는 출원중·거절 등 건이라 등록원부 지정상품 조회 대상이 아닙니다(#12). ` +
+          "이 건들은 지정상품 근거 없이 NICE류·주소 매칭에만 의존하며, 현재 KIPRIS 응답에는 " +
+          "출원번호 기준 지정상품 조회 수단이 확인되지 않았습니다."
       );
     }
   }

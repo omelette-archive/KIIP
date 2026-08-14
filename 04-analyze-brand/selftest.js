@@ -471,6 +471,34 @@ console.log("7-1) 등록원부 일별 예산 소진·429 재개 시점을 경고
   ok("일별 예산 소진 사유와 재개 가능 시점을 경고 메시지로 노출");
 }
 
+console.log("7-2) 등록번호 없는 출원(미등록·심사중)은 지정상품 미평가로 별도 경고(#12)");
+{
+  const r = analyzeEntries({
+    schemaVersion: "1.1",
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeRegistrationCount: 1,
+      errorRegistrationCount: 0,
+      notCollectedRegistrationCount: 0,
+      counts: { noRegistrationHitCount: 42 },
+      sourceMetadata: { sourceId: "ip_registry", contractVersion: "ip-registry-mark-history-v1" },
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+    },
+    results: [],
+  }, { asOfYear: 2026 });
+  assert.ok(
+    r.warnings.some(
+      (warning) => warning.includes("42개 상표") && warning.includes("등록원부 지정상품 조회 대상이 아닙니다")
+    ),
+    "등록번호 없는 출원 건수를 지정상품 미평가 경고로 명시해야 함"
+  );
+  ok("등록번호 없는 출원(미등록·심사중)이 지정상품 근거 없이 매칭됐다는 사실을 명시적으로 경고");
+}
+
 console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무와 무관하게 집계 제외");
 {
   const brandOnlyEntry = {
