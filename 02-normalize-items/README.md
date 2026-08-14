@@ -60,6 +60,23 @@ node 02-normalize-items/normalizeItems.js --input path/to/raw.csv \
   --review-out 02-normalize-items/output/review-required.csv
 ```
 
+### 검토대기 군집 보고서
+
+검토대기 행이 많을 때 후보 점수 1위를 자동 승인하지 않는다. 대신 같은 원물명 표현을 묶고
+빈도·사유·지역 수·후보 출현 비율을 재현 가능한 보고서로 만든다.
+
+```bash
+node 02-normalize-items/summarizeReviews.js \
+  --input 02-normalize-items/output/review-required.csv \
+  --out 02-normalize-items/output/review-summary.json \
+  --csv-out 02-normalize-items/output/review-summary.csv
+```
+
+모든 군집은 `reviewDisposition=human_review_required`로 남는다. 같은 후보가 모든 행에 나타나도
+그 사실은 `candidateState=same_candidate_present_in_all_rows`와 `coverage`로만 기록하며 자동
+확정하지 않는다. 승인된 반복 패턴만 `data/approved-aliases.json`에 출처 버전·승인자와 함께
+추가한다.
+
 입력 CSV 필수 컬럼은 `sido, sigungu, rawItemName`이다. ① 출력의 `source`, `sourceId`,
 `sourceContractVersion`, `sourceUrl`, `sourceLastVerifiedAt`, `collectedAt`도 읽어 다음 단계까지
 그대로 전달한다.
