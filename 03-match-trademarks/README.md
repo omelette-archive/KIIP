@@ -107,7 +107,30 @@ node 03-match-trademarks/enrichIpRegistry.js \
 기본 영속 캐시는 `output/ip-registry-cache.json`이다. 성공한 등록번호의 응답은 다음 실행에서
 API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 `--limit`만큼 추가 조회한다. 캐시에는
 키·출원인 이름·전체 상세주소를 저장하지 않고 주소에서 정규화한 시도·시군구와 지정상품만
-보존한다. 캐시를 사용하지 않을 때만 `--no-cache`를 명시한다.
+보존한다. 캐시를 사용하지 않을 때만 `--no-cache`를 명시한다. `--checkpoint-every`(기본 50)
+성공 건마다 캐시를 저장해 대량 실행 중 중단돼도 그때까지 성공분은 남는다.
+
+### 일별 호출 예산과 429 재개 시점(#52)
+
+제공기관 잔여량은 계정 단위로 KST 자정마다 초기화되는 것으로 관측됐다(2026-08-11 실측, 44건
+성공 후 429). `--daily-budget <n>`을 지정하면 `output/ip-registry-daily-budget.json`(또는
+`--budget-state` 경로)에 그날(KST) 누적 호출 수를 기록하고, 남은 예산만큼만 `--limit`을 줄여
+호출한다. 429가 감지되면 같은 상태 파일에 `resumeNotBefore`(다음날 KST 00:00)를 남기고, 그
+시점 전에 다시 실행하면 새 API 호출 없이 캐시만 적용한다(`limit=0`으로 자동 전환). 매일 같은
+명령을 반복 실행하면(예: Windows 작업 스케줄러로 1일 1회) 날짜가 바뀔 때마다 예산이 초기화되며
+캐시에 없는 등록번호부터 이어서 수집된다 — 별도의 시작 위치 지정은 필요 없다.
+
+```bash
+node 03-match-trademarks/enrichIpRegistry.js \
+  --input 03-match-trademarks/output/area-brand-validation-result.json \
+  --daily-budget 300 --limit 300 --concurrency 2 \
+  --cache 03-match-trademarks/output/ip-registry-cache.json \
+  --budget-state 03-match-trademarks/output/ip-registry-daily-budget.json \
+  --out 03-match-trademarks/output/ip-registry-enriched.json
+```
+
+출력 JSON의 `ipRegistryEnrichment.dailyBudget`에 `limit/usedToday/remainingToday/resumeNotBefore`가
+남는다.
 
 ## 출원번호 기반 출원인 주소 보강
 
@@ -173,6 +196,7 @@ NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unv
 ├── lib/kiprisClient.js              KIPRIS 호출·계약 메타데이터
 ├── lib/ipRegistryClient.js          등록원부 JSON 호출·응답 계약
 ├── lib/ipRegistryEnricher.js        주소 판정·지정상품 근거 분류
+├── lib/ipRegistryBudget.js          KST 기준 일별 호출 예산·429 재개 시점 기록
 ├── lib/trademarkApplicantClient.js  출원 속보 출원인 주소 응답 계약
 ├── lib/trademarkApplicantEnricher.js 출원번호 조회·지역 판정
 ├── lib/trademarkApplicantCache.js   상세주소 비저장 영속 캐시

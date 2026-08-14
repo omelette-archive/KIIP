@@ -492,8 +492,8 @@ async function enrichDocument(document, client, options = {}) {
   const concurrency = Number(options.concurrency ?? 1);
   const cacheEntries = options.cacheEntries instanceof Map ? options.cacheEntries : new Map();
   const adminList = options.adminList || loadAdminCodes();
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    throw new Error("limit은 1~100 정수여야 합니다.");
+  if (!Number.isInteger(limit) || limit < 0 || limit > 100) {
+    throw new Error("limit은 0~100 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
@@ -524,6 +524,7 @@ async function enrichDocument(document, client, options = {}) {
           fetchedAt,
           record: sanitizeRegistryRecordForCache(record, adminList),
         });
+        if (typeof options.onCacheUpdate === "function") options.onCacheUpdate(registrationNumber);
       }
       return {
         registrationNumber,
