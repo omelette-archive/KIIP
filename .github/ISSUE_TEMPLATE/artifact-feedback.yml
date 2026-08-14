@@ -12,7 +12,7 @@ body:
     attributes:
       label: 검토한 페이지
       description: 최신본 또는 과거 버전의 전체 URL을 붙여 주세요.
-      placeholder: https://omelette-archive.github.io/KIIP/latest/
+      placeholder: https://omelette-archive.github.io/KIIP-artifacts/latest/
     validations:
       required: true
   - type: input

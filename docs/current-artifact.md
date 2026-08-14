@@ -2,9 +2,10 @@
 
 ## 공유 주소
 
-- 산출물 허브: <https://omelette-archive.github.io/KIIP/>
-- 최신 알파 대시보드: <https://omelette-archive.github.io/KIIP/latest/>
-- 렌더링 가능한 버전 내역: <https://omelette-archive.github.io/KIIP/versions/>
+- 산출물 허브: <https://omelette-archive.github.io/KIIP-artifacts/>
+- 최신 알파 대시보드: <https://omelette-archive.github.io/KIIP-artifacts/latest/>
+- 렌더링 가능한 버전 내역: <https://omelette-archive.github.io/KIIP-artifacts/versions/>
+- 공개 게시 저장소: <https://github.com/omelette-archive/KIIP-artifacts>
 - Git 원본 이력: <https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html>
 - 피드백: <https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml>
 
@@ -15,12 +16,18 @@
 
 1. `07-dashboard/dashboard.html`을 생성·수정한다.
 2. 변경사항을 PR로 올리면 산출물 사이트 생성 검증을 실행한다.
-3. PR이 `main`에 병합되면 `.github/workflows/publish-artifacts.yml`이 최신본을 Pages에 게시한다.
+3. PR이 `main`에 병합되면 `.github/workflows/publish-artifacts.yml`이 공개 전용 저장소
+   `omelette-archive/KIIP-artifacts`에 정적 사이트만 동기화한다.
 4. 게시 사이트의 `/latest/`는 새 HTML로 교체되고, `/versions/<commit>/`에는 과거 Git 버전이 유지된다.
 
-Pages 사이트는 커밋을 별도 저장소에 복제하는 방식이 아니다. 배포 시 `dashboard.html`을 변경한
-최근 Git 커밋에서 과거 HTML을 다시 꺼내 정적 사이트에 함께 싣는다. Git 이력이 원본 기록이며,
+원본 `KIIP` 저장소는 비공개로 유지한다. 공개 전용 저장소에는 생성된 정적 사이트만 들어가며,
+원본 파이프라인 코드·수집 파일·비밀값은 게시하지 않는다. 배포 시 `dashboard.html`을 변경한 최근
+Git 커밋에서 과거 HTML을 다시 꺼내 정적 사이트에 함께 싣는다. 원본 Git 이력이 기준 기록이며,
 Pages 버전 목록은 이를 클릭 가능한 HTML로 보여 주는 읽기 전용 뷰다.
+
+두 저장소 사이는 공개 저장소에만 쓰기 권한이 있는 deploy key로 연결한다. 비공개 원본 저장소의
+Actions secret `ARTIFACT_PUBLISH_KEY`에 개인키를 보관하고, 공개 저장소에는 대응하는 공개키만
+등록한다. 이 키는 `KIIP-artifacts` 외의 저장소에는 접근할 수 없다.
 
 로컬에서 같은 사이트를 만들려면 다음을 실행한다.
 
