@@ -435,6 +435,42 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
+console.log("7-1) 등록원부 일별 예산 소진·429 재개 시점을 경고로 노출(#52)");
+{
+  const r = analyzeEntries({
+    schemaVersion: "1.1",
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeRegistrationCount: 44,
+      errorRegistrationCount: 0,
+      notCollectedRegistrationCount: 11564,
+      rateLimitSkippedRegistrationCount: 56,
+      sourceMetadata: { sourceId: "ip_registry", contractVersion: "ip-registry-mark-history-v1" },
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+      dailyBudget: {
+        limit: 300,
+        usedToday: 300,
+        remainingToday: 0,
+        resumeNotBefore: "2026-08-12T15:00:00.000Z",
+        blockedReason: "daily_budget_exhausted",
+      },
+    },
+    results: [],
+  }, { asOfYear: 2026 });
+  assert.ok(r.warnings.some((warning) => warning.includes("429로 건너뜀 56")));
+  assert.ok(
+    r.warnings.some(
+      (warning) =>
+        warning.includes("일일 호출 예산을 모두 사용") && warning.includes("2026-08-12T15:00:00.000Z")
+    )
+  );
+  ok("일별 예산 소진 사유와 재개 가능 시점을 경고 메시지로 노출");
+}
+
 console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무와 무관하게 집계 제외");
 {
   const brandOnlyEntry = {
