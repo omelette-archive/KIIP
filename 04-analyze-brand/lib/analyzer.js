@@ -676,9 +676,21 @@ function analyzeEntries(parsed, providedOptions = {}) {
   if (inputDocument?.ipRegistryEnrichment?.enabled) {
     const registry = inputDocument.ipRegistryEnrichment;
     if (registry.status !== "complete") {
+      const rateLimitSkipped = registry.rateLimitSkippedRegistrationCount || 0;
       warnings.push(
         `등록원부 보강이 ${registry.status} 상태입니다(완료 ${registry.completeRegistrationCount || 0}, ` +
-          `오류 ${registry.errorRegistrationCount || 0}, 미수집 ${registry.notCollectedRegistrationCount || 0}).`
+          `오류 ${registry.errorRegistrationCount || 0}, 미수집 ${registry.notCollectedRegistrationCount || 0}` +
+          `${rateLimitSkipped > 0 ? `, 429로 건너뜀 ${rateLimitSkipped}` : ""}).`
+      );
+    }
+    if (registry.dailyBudget?.resumeNotBefore) {
+      const reason =
+        registry.dailyBudget.blockedReason === "daily_budget_exhausted"
+          ? "일일 호출 예산을 모두 사용"
+          : "직전 실행에서 429 발생";
+      warnings.push(
+        `등록원부 보강은 ${reason}으로 새 호출을 중단했습니다(오늘 사용 ${registry.dailyBudget.usedToday}건). ` +
+          `${registry.dailyBudget.resumeNotBefore} 이후 재실행하면 이어서 수집합니다.`
       );
     }
     if (summary.goodsReviewRequiredHitCount > 0) {
