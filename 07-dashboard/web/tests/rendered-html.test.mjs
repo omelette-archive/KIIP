@@ -32,7 +32,8 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
   assert.match(html, /지역 특산품 상표 분석/);
-  assert.match(html, /전체 범위 알파 · 부분 수집/);
+  assert.match(html, /알파 테스트 · 부분 수집/);
+  assert.doesNotMatch(html, /전체 범위 알파|전국 알파|알파 대시보드|ALPHA DATA PREVIEW|ALPHA PIPELINE CHECK/);
   assert.match(html, /데이터 준비 상태/);
   assert.match(html, /수집된 상표 예시/);
   assert.ok(

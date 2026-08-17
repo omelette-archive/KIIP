@@ -720,8 +720,8 @@ function analyzeEntries(parsed, providedOptions = {}) {
   warnings.push("건수는 03단계가 저장한 hits 기준입니다. KIPRIS 전체 검색 건수(totalCount)와 같지 않을 수 있습니다.");
   if (regionalCoverageThreshold < 1) {
     warnings.push(
-      `regionalCoverageThreshold=${regionalCoverageThreshold}로 완화된 알파 실행입니다 — 수집·주소 검증이 ` +
-        `100% 미만이어도 지역 지표를 노출합니다. 배포용 공식 수치가 아니라 알파 미리보기로만 사용하세요.`
+      `regionalCoverageThreshold=${regionalCoverageThreshold}의 검토용 표시 기준을 적용했습니다 — 수집·주소 검증이 ` +
+        `100% 미만이어도 지역 지표를 노출합니다. 공식 통계가 아니므로 데이터 검토 목적으로만 사용하세요.`
     );
   }
 

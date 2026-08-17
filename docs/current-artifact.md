@@ -3,7 +3,7 @@
 ## 공유 주소
 
 - 산출물 허브: <https://omelette-archive.github.io/KIIP-artifacts/>
-- 최신 알파 대시보드: <https://omelette-archive.github.io/KIIP-artifacts/latest/>
+- 최신 대시보드: <https://omelette-archive.github.io/KIIP-artifacts/latest/>
 - 렌더링 가능한 버전 내역: <https://omelette-archive.github.io/KIIP-artifacts/versions/>
 - 공개 게시 저장소: <https://github.com/omelette-archive/KIIP-artifacts>
 - Git 원본 이력: <https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html>
@@ -43,10 +43,10 @@ node scripts/buildArtifactSite.js --output .artifact-site --limit 50
 - 버전 ID는 `dashboard.html`을 변경한 Git 커밋의 앞 12자리다.
 - 최신 페이지의 내용 자체는 원본 HTML과 바이트 단위로 동일하게 유지한다.
 - 화면·수치·문구에 대한 의견은 산출물 피드백 이슈 양식에 페이지 주소와 버전 ID를 함께 남긴다.
-- 의미 있는 알파 마일스톤은 필요할 때 GitHub Release와 태그를 추가해 별도 명칭을 부여할 수 있다.
+- 의미 있는 공개 마일스톤은 필요할 때 GitHub Release와 태그를 추가해 별도 명칭을 부여할 수 있다.
 
-## 알파 해석 주의
+## 데이터 해석 주의
 
-현재 HTML은 배포 전 검토 산출물이다. 스냅샷 내부의 `pipelineStatus`, `warnings`, 지표별
+현재 HTML은 알파 테스트 기반의 공개 검토 산출물이다. 스냅샷 내부의 `pipelineStatus`, `warnings`, 지표별
 `availability`와 `blockingIssue`가 해석 기준이다. 수집이 부분 완료된 값과 지역 귀속이 검증되지
 않은 값은 공식 통계로 인용하지 않는다.
