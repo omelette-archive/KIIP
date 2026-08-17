@@ -4,16 +4,17 @@
 분석하고 브랜드 공백지역을 발굴해 비즈니스 확장 전략을 제안하는 파이프라인. 전체 기획은
 [`docs/project-plan.md`](docs/project-plan.md) 참고.
 
-## 현재까지의 산출물
+## 현재 산출물
 
-> **알파 테스트 결과** — 수집·검증이 진행 중인 지표가 포함되어 있으며, 공식 배포 수치가 아니다.
+| 공개 결과 | 용도 | 바로가기 |
+|---|---|---|
+| 지역 특산품 상표 분석 | 현재 연결된 데이터와 지역별 지표 확인 | [대시보드 보기](https://omelette-archive.github.io/KIIP-artifacts/latest/) |
+| 변경 이력 | 과거 공개 화면을 버전별로 재현·비교 | [버전 비교](https://omelette-archive.github.io/KIIP-artifacts/versions/) |
+| 검토 의견 | 페이지와 버전을 지정해 피드백 기록 | [의견 남기기](https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml) |
 
-[**최신 알파 대시보드 열기 →**](https://omelette-archive.github.io/KIIP-artifacts/latest/)
+> **알파 테스트 기반 검토용** — 수집·검증이 진행 중인 지표가 포함되어 있으며 공식 통계가 아니다.
 
-- [산출물 허브](https://omelette-archive.github.io/KIIP-artifacts/) — 현재 빌드 정보와 최근 버전
-- [과거 버전 열람](https://omelette-archive.github.io/KIIP-artifacts/versions/) — 당시 HTML을 그대로 렌더링
-- [피드백 남기기](https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml)
-- [원본 HTML](07-dashboard/dashboard.html) · [변경 이력](https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html) · [운영 방법](docs/current-artifact.md)
+[공개 산출물 홈](https://omelette-archive.github.io/KIIP-artifacts/) · [원본 HTML](07-dashboard/dashboard.html) · [Git 변경 이력](https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html) · [게시 운영 방법](docs/current-artifact.md)
 
 `main`의 `07-dashboard/dashboard.html`이 변경되면 공개 산출물 저장소
 [`KIIP-artifacts`](https://github.com/omelette-archive/KIIP-artifacts)의 최신본과 버전 목록에 자동 반영된다.
@@ -51,7 +52,7 @@ flowchart LR
 |---|---|---|---|---|
 | ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | GI·농사로 실키 검증, 일자별 수집·SQLite 멱등 누적 구현 |
 | ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
-| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 검색 + 출원번호 주소 23,912건 전체 알파 수집 + 등록원부 지정상품 보강 |
+| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 검색 + 출원번호 주소 23,912건 전체 범위 수집 + 등록원부 지정상품 보강 |
 | ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 출원인 주소·지역브랜드·지정상품 근거를 분리 집계, 미보강은 별도 상태 유지 |
 | ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟡 진행중 | 결정론적 점수 계산 완료, **대표성·가중치 기준은 예시값**(#29) |
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |

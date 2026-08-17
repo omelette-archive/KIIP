@@ -1,5 +1,5 @@
 name: 산출물 피드백
-description: 알파 대시보드의 화면, 수치, 문구, 사용 흐름에 대한 의견을 남깁니다.
+description: 공개 대시보드의 화면, 수치, 문구, 사용 흐름에 대한 의견을 남깁니다.
 title: "[산출물 피드백] "
 body:
   - type: markdown

@@ -135,7 +135,7 @@ node 07-dashboard/buildDashboardSnapshot.js `
 
 `sample`이 기본값이다. `mode=full`은 전체 입력 범위를 사용했다는 뜻이며 완전 수집을 보장하지
 않는다. 알파 실행은 반드시 `--stage alpha`와 상한 실험 메타데이터를 함께 남겨
-UI가 `전체 범위 알파 · 부분 수집`으로 표시하도록 한다. 예:
+UI가 `알파 테스트 · 부분 수집`으로 상태를 표시하도록 한다. 예:
 
 ```powershell
 node 07-dashboard/buildDashboardSnapshot.js `
