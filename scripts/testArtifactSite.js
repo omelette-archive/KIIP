@@ -27,7 +27,13 @@ try {
   }
   const landing = fs.readFileSync(path.join(output, "index.html"), "utf8");
   const versionIndex = fs.readFileSync(path.join(output, "versions", "index.html"), "utf8");
-  assert.match(landing, /최신 알파 대시보드 열기/);
+  assert.match(landing, /지역 특산품<br>상표 분석 결과/);
+  assert.match(landing, /대시보드 보기/);
+  assert.match(landing, /현재 데이터 범위/);
+  assert.match(landing, /최근 변경/);
+  const currentResult = landing.slice(0, landing.indexOf("RECENT UPDATES"));
+  assert.strictEqual((currentResult.match(/알파 테스트 · 검토용/g) || []).length, 1, "알파 상태 배지는 한 번만 표시한다");
+  assert.doesNotMatch(currentResult, /알파 대시보드|전국 알파|전체 범위 알파/);
   for (const [html, base] of [
     [landing, output],
     [versionIndex, path.join(output, "versions")],
