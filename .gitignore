@@ -1,6 +1,7 @@
 .env
 node_modules/
 .artifact-site/
+.kiip-operations/
 
 # 각 단계 output/ 아래는 실행 산출물이라 통째로 무시한다(하위 폴더 포함 — 예: output/alpha/*).
 # .gitkeep만 예외로 추적해 빈 폴더 구조를 유지한다.
