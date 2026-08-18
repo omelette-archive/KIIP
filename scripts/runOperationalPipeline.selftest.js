@@ -9,6 +9,7 @@ const { spawnSync } = require("child_process");
 const {
   buildPlan,
   executePlan,
+  parseArgs,
   publicPlan,
   validateRunId,
 } = require("./runOperationalPipeline");
@@ -92,6 +93,38 @@ try {
 
   console.log("4) run-id 경로 이탈 입력을 거부한다");
   assert.throws(() => validateRunId("../escape"), /run-id/);
+
+  console.log("5) 값 플래그에 값이 없으면 다음 플래그를 값으로 삼키지 않고 오류를 던진다");
+  assert.throws(
+    () => parseArgs(["--state-dir", "--dry-run", "--run-id", "x"]),
+    /--state-dir 값이 필요합니다/,
+    "--state-dir 값이 없으면 --dry-run이 값으로 삼켜지지 않고 즉시 실패해야 함"
+  );
+  assert.throws(
+    () => parseArgs(["--max-requests"]),
+    /--max-requests 값이 필요합니다/,
+    "마지막 토큰이 값 플래그면 값 누락으로 실패해야 함"
+  );
+  const parsed = parseArgs(["--dry-run", "--run-id", "x"]);
+  assert.strictEqual(parsed.dryRun, true, "정상 입력에서는 --dry-run이 여전히 인식돼야 함");
+
+  console.log("6) 같은 run-id로 두 번 실행하면 두 번째는 원자적으로 실패한다(경쟁 없이)");
+  const raceRunsDir = path.join(tempDir, "race-runs");
+  const raceStateDir = path.join(tempDir, "race-state");
+  const racePlan = buildPlan({
+    runId: "race-test",
+    runsDir: raceRunsDir,
+    stateDir: raceStateDir,
+    maxRequests: 1,
+    maxPages: 1,
+    maxHitsPerQuery: 1,
+  });
+  executePlan(racePlan, { runStage: () => ({ status: 0, stdout: "", stderr: "" }) });
+  assert.throws(
+    () => executePlan(racePlan, { runStage: () => ({ status: 0, stdout: "", stderr: "" }) }),
+    /같은 run-id 실행 디렉터리가 이미 있습니다/,
+    "같은 runDir을 두 번째로 만들려고 하면 EEXIST 기반으로 즉시 거부해야 함"
+  );
 
   console.log("운영 실행기 자체 테스트 통과");
 } finally {

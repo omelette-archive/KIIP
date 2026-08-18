@@ -33,7 +33,10 @@ function parseArgs(argv) {
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--help" || arg === "-h") options.help = true;
     else if (valueFlags.has(arg)) {
-      if (index + 1 >= argv.length) throw new Error(`${arg} 값이 필요합니다.`);
+      const next = argv[index + 1];
+      if (next === undefined || next.startsWith("--")) {
+        throw new Error(`${arg} 값이 필요합니다.`);
+      }
       options[valueFlags.get(arg)] = argv[++index];
     } else {
       throw new Error(`지원하지 않는 옵션입니다: ${arg}`);
@@ -257,10 +260,19 @@ function runStageCommand(stage) {
 }
 
 function executePlan(plan, options = {}) {
-  if (fs.existsSync(plan.runDir)) {
-    throw new Error(`같은 run-id 실행 디렉터리가 이미 있습니다: ${plan.runDir}`);
+  // runsDir 자체는 여러 실행이 공유하므로 재귀 생성이 안전하지만(이미 있어도 조용히
+  // 통과), runDir은 같은 run-id로 동시 실행되는 두 프로세스가 있으면 안 되므로
+  // existsSync 후 mkdirSync 순서 대신 mkdirSync(recursive:false)의 원자적
+  // EEXIST 실패를 그대로 이용한다 — 두 검사 사이의 경쟁을 없앤다.
+  fs.mkdirSync(path.dirname(plan.runDir), { recursive: true });
+  try {
+    fs.mkdirSync(plan.runDir, { recursive: false });
+  } catch (error) {
+    if (error.code === "EEXIST") {
+      throw new Error(`같은 run-id 실행 디렉터리가 이미 있습니다: ${plan.runDir}`);
+    }
+    throw error;
   }
-  fs.mkdirSync(plan.runDir, { recursive: true });
   fs.mkdirSync(plan.stateDir, { recursive: true });
   const manifest = {
     schemaVersion: "operational-pipeline-run-v1",
