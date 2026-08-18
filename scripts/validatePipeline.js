@@ -286,6 +286,7 @@ function validateContracts(tempDir) {
 
 function main() {
   validateSyntax();
+  runNode("운영 실행기 자체 테스트", ["scripts/runOperationalPipeline.selftest.js"]);
   runNode("GitHub Pages 산출물 허브 생성", ["scripts/testArtifactSite.js"]);
   for (const phase of ["01", "02", "03", "04", "05", "06", "07"]) {
     const directory = fs

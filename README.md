@@ -94,6 +94,7 @@ node scripts/validatePipeline.js
 - [`docs/open-api-validation-runbook.md`](docs/open-api-validation-runbook.md) — 키 위치·신청 경로·실호출 명령·결과·worktree 인수인계
 - [`docs/applicant-region-recovery-runbook.md`](docs/applicant-region-recovery-runbook.md) — 출원번호·등록번호 두 주소 보강 경로와 재분석·복구 절차
 - [`docs/api-key-management.md`](docs/api-key-management.md) — 로컬 키 보관 위치와 worktree 복사 방법
+- [`docs/operational-pipeline-runner.md`](docs/operational-pipeline-runner.md) — ①~⑦ 운영 실행기, 영구 상태 경로, dry-run·실패 중단·게시 안전장치
 - [`docs/open-api-onboarding-checklist.md`](docs/open-api-onboarding-checklist.md) — 신규 Open API 소스 연동 시 반복되는 시행착오를 줄이는 체크리스트 (KIPRIS/GI/농사로 실사례 기준)
 - [`docs/decisions/0001-deterministic-normalization-manual-review.md`](docs/decisions/0001-deterministic-normalization-manual-review.md) — ②단계 외부 AI 제거와 수동 검토 결정
 
