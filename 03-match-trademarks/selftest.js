@@ -224,7 +224,7 @@ async function run() {
       context
     );
     assert.strictEqual(enriched[0].regionalBrandMatch, "inside");
-    assert.strictEqual(enriched[0].regionalBrandMatchVersion, "area-brand-application-region-join-v1");
+    assert.strictEqual(enriched[0].regionalBrandMatchVersion, "area-brand-application-region-join-v2-aliases");
     assert.strictEqual(enriched[0].regionalBrandEvidence[0].normalizedRegion, "경상북도 구미시");
     assert.strictEqual(
       enriched[0].applicantRegionMatch,

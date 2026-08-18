@@ -54,7 +54,8 @@ node 04-analyze-brand/analyzeBrands.js \
 지역 관련 지표는 다음처럼 엄격히 분리한다.
 
 - `localApplicantShare`: 출원인 주소가 검증된 hit만 `inside / (inside + outside)`로 계산한다.
-  등록번호가 있는 hit는 등록원부 주소로 보강하며 나머지는 `unverified`로 유지한다.
+  모든 hit는 출원번호 기반 주소를 먼저 보강하고, 등록번호가 있는 hit는 완료된 등록원부 근거로
+  주소를 보조 보강한다. 두 경로 모두 주소 근거가 없거나 판정할 수 없으면 `unverified`로 유지한다.
 - `regionalBrandCounts`: 농사로 출원번호 근거를 `inside|outside|unverified|notReferenced`로 집계한다.
 - `regionalBrandReferenceHitCount`, `regionalBrandVerifiedHitCount`,
   `regionalBrandReferenceRate`, `regionalBrandInsideShare`: 지역브랜드 연관성만 나타낸다.

@@ -1,7 +1,7 @@
 "use strict";
 
 const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes");
-const { splitRegion } = require("../../01-collect-specialties/lib/normalize");
+const { resolveRegion } = require("../../01-collect-specialties/lib/normalize");
 const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
 const { normalizeClassCode } = require("./filters");
 const {
@@ -9,7 +9,7 @@ const {
   normalizeRegistrationNumber,
 } = require("./ipRegistryClient");
 
-const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v1";
+const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v2-aliases";
 const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v0-review";
 
 function isRateLimitError(error) {
@@ -31,22 +31,27 @@ function normalizeGoodsText(value) {
 function normalizeApplicantAddress(address, adminList = loadAdminCodes()) {
   const raw = clean(address);
   if (!raw) return { status: "unmatched", level: null, reason: "empty_address" };
-  const split = splitRegion(raw, adminList);
-  if (!split.matched) {
+  const resolved = resolveRegion(raw, adminList);
+  if (!resolved.matched) {
     return {
-      status: split.ambiguous ? "ambiguous" : "unmatched",
+      status: resolved.ambiguous ? "ambiguous" : "unmatched",
       level: null,
-      reason: split.ambiguous ? "ambiguous_sigungu" : "address_not_in_admin_master",
-      candidateSidos: split.candidateSidos || [],
+      reason: resolved.reason || "address_not_in_admin_master",
+      candidateSidos: resolved.candidateSidos || [],
     };
   }
   return {
     status: "matched",
-    level: split.sigungu ? "sigungu" : "sido",
-    sido: split.sido,
-    sigungu: split.sigungu,
-    normalizedRegion: [split.sido, split.sigungu].filter(Boolean).join(" "),
-    method: split.sigungu ? "admin_sigungu_in_masked_address" : "admin_sido_in_masked_address",
+    level: resolved.sigungu ? "sigungu" : "sido",
+    sido: resolved.sido,
+    sigungu: resolved.sigungu,
+    normalizedRegion: [resolved.sido, resolved.sigungu].filter(Boolean).join(" "),
+    method:
+      resolved.matchMethod === "exact_sigungu"
+        ? "admin_sigungu_in_masked_address"
+        : resolved.matchMethod === "exact_sido"
+          ? "admin_sido_in_masked_address"
+          : `admin_${resolved.matchMethod}_in_address`,
   };
 }
 
@@ -79,6 +84,8 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
       sigungu: region.sigungu || null,
       nationality: applicant.nationality || null,
       representative: applicant.representative || null,
+      normalizationMethod: applicant.regionNormalizationMethod || region.method || null,
+      normalizationReason: applicant.regionNormalizationReason || region.reason || null,
       match: result.match,
       confidence: result.confidence,
     };
@@ -205,9 +212,12 @@ function sanitizeRegistryRecordForCache(record, adminList = loadAdminCodes()) {
         address: region.normalizedRegion || null,
         nationality: applicant.nationality || null,
         representative: applicant.representative || null,
+        regionNormalizationMethod: region.method || null,
+        regionNormalizationReason: region.reason || null,
+        hasSourceAddress: Boolean(clean(applicant.address)),
       };
     })
-    .filter((applicant) => applicant.address || applicant.nationality);
+    .filter((applicant) => applicant.address || applicant.nationality || applicant.hasSourceAddress);
   return {
     found: Boolean(record?.found),
     resultCode: record?.resultCode || null,

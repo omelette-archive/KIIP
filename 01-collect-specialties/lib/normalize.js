@@ -15,6 +15,8 @@
  * 남긴다.
  */
 
+const { SIDO_ALIASES, SIGUNGU_SUCCESSORS } = require("./regionAliases");
+
 const SIDO_SUFFIX_RE = /(특별자치시|특별자치도|광역시|특별시|도)$/;
 
 function sidoCoreName(sido) {
@@ -25,12 +27,155 @@ function sidoCoreName(sido) {
 // 통합 전 표기를 계속 쓸 수 있어, 동명 시군구 좁히기에서 신구 명칭을 함께 인정한다.
 // 실제 마스터(법정동코드_전국)에 "전남광주통합특별시"만 있고 "전라남도"/"광주광역시"는
 // 더 이상 없는 것을 확인하고 추가함 — 새 통합 사례가 생기면 여기만 추가하면 된다.
-const LEGACY_SIDO_ALIASES = {
-  전남광주통합특별시: ["전라남도", "전남", "광주광역시", "광주"],
-};
-
 function sidoMatchTokens(sido) {
-  return [sidoCoreName(sido), ...(LEGACY_SIDO_ALIASES[sido] || [])].filter(Boolean);
+  return [...new Set([sido, sidoCoreName(sido), ...(SIDO_ALIASES[sido] || [])])].filter(Boolean);
+}
+
+function cleanRegionText(value) {
+  return String(value || "").normalize("NFKC").trim().replace(/\s+/g, " ");
+}
+
+function compactRegionText(value) {
+  return cleanRegionText(value).replace(/[\s,;:>/\\|()〔〕\[\]·・-]+/g, "");
+}
+
+function uniqueAdminRows(adminList) {
+  const seen = new Set();
+  return (adminList || []).filter((row) => {
+    if (!row?.sido || !row?.sigungu) return false;
+    const key = `${row.sido}\u001f${row.sigungu}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function narrowBySido(candidates, compactInput) {
+  const narrowed = candidates.filter((row) =>
+    sidoMatchTokens(row.sido).some((token) => compactInput.includes(compactRegionText(token)))
+  );
+  return narrowed.length > 0 ? narrowed : candidates;
+}
+
+function resultFromCandidates(candidates, normalized, matchMethod) {
+  if (candidates.length === 1) {
+    return {
+      sido: candidates[0].sido,
+      sigungu: candidates[0].sigungu,
+      matched: true,
+      matchMethod,
+    };
+  }
+  return {
+    sido: "",
+    sigungu: normalized,
+    matched: false,
+    ambiguous: true,
+    candidateSidos: [...new Set(candidates.map((row) => row.sido))],
+    reason: "ambiguous_region_alias",
+  };
+}
+
+/**
+ * 공식 법정동 마스터에 기대어 신·구 명칭과 축약 표기를 해석한다.
+ * 자동 확정은 후보가 하나일 때만 하며, 동명 시군구는 ambiguous로 보류한다.
+ */
+function resolveRegion(regionText, adminList) {
+  const normalized = cleanRegionText(regionText);
+  if (!normalized) return { sido: "", sigungu: "", matched: false, reason: "empty_region" };
+  const compact = compactRegionText(normalized);
+  const adminRows = uniqueAdminRows(adminList);
+  const sidos = [...new Set(adminRows.map((row) => row.sido))];
+
+  // 시군구 없이 시도만 온 경우: 정식명·축약·개칭 전 명칭을 모두 인정한다.
+  const provinceCandidates = sidos.filter((sido) =>
+    sidoMatchTokens(sido).some((token) => compact === compactRegionText(token))
+  );
+  if (provinceCandidates.length === 1) {
+    const sido = provinceCandidates[0];
+    return {
+      sido,
+      sigungu: "",
+      matched: true,
+      matchMethod: compact === compactRegionText(sido) ? "exact_sido" : "sido_alias",
+    };
+  }
+  if (provinceCandidates.length > 1) {
+    return {
+      sido: "",
+      sigungu: normalized,
+      matched: false,
+      ambiguous: true,
+      candidateSidos: provinceCandidates,
+      reason: "ambiguous_sido_alias",
+    };
+  }
+
+  // 복합 시군구(예: "수원시영통구")도 입력의 공백·구분자를 제거해 대조한다.
+  const exactCandidates = adminRows.filter((row) =>
+    compact.includes(compactRegionText(row.sigungu))
+  );
+  const longestExact = Math.max(0, ...exactCandidates.map((row) => compactRegionText(row.sigungu).length));
+  const exactLongestCandidates = exactCandidates.filter(
+    (row) => compactRegionText(row.sigungu).length === longestExact
+  );
+  if (exactLongestCandidates.length > 0) {
+    return resultFromCandidates(
+      narrowBySido(exactLongestCandidates, compact),
+      normalized,
+      "exact_sigungu"
+    );
+  }
+
+  // 통합·개칭 전 시군구명은 명시적 승계표에 있는 경우만 현재 지역으로 연결한다.
+  const successorCandidates = [];
+  for (const mapping of SIGUNGU_SUCCESSORS) {
+    if (!mapping.aliases.some((alias) => compact.includes(compactRegionText(alias)))) continue;
+    successorCandidates.push(
+      ...adminRows.filter(
+        (row) => row.sido === mapping.targetSido && row.sigungu === mapping.targetSigungu
+      )
+    );
+  }
+  if (successorCandidates.length > 0) {
+    return resultFromCandidates(
+      narrowBySido(successorCandidates, compact),
+      normalized,
+      "sigungu_successor_alias"
+    );
+  }
+
+  // '안동' 같은 접미사 생략은 전체 지역명(또는 시도+지역명)과 일치할 때만
+  // 허용한다. 상세주소 일부에 같은 글자가 있다는 이유로 오매칭하지 않는다.
+  const stemCandidates = adminRows.filter((row) => {
+    const stem = compactRegionText(row.sigungu).replace(/[시군구]$/, "");
+    if (!stem) return false;
+    if (compact === stem) return true;
+    return sidoMatchTokens(row.sido).some(
+      (token) => compact === `${compactRegionText(token)}${stem}`
+    );
+  });
+  const longestStem = Math.max(
+    0,
+    ...stemCandidates.map((row) => compactRegionText(row.sigungu).replace(/[시군구]$/, "").length)
+  );
+  const stemLongestCandidates = stemCandidates.filter(
+    (row) => compactRegionText(row.sigungu).replace(/[시군구]$/, "").length === longestStem
+  );
+  if (stemLongestCandidates.length > 0) {
+    return resultFromCandidates(
+      narrowBySido(stemLongestCandidates, compact),
+      normalized,
+      "sigungu_suffix_restored"
+    );
+  }
+
+  return {
+    sido: "",
+    sigungu: normalized,
+    matched: false,
+    reason: "region_not_in_admin_master",
+  };
 }
 
 /**
@@ -38,47 +183,20 @@ function sidoMatchTokens(sido) {
  * @param {{sido:string, sigungu:string}[]} adminList
  */
 function splitRegion(regionText, adminList) {
-  const normalized = (regionText || "").trim();
-  if (!normalized) return { sido: "", sigungu: "", matched: false };
-
-  // 농사로에는 부산광역시처럼 시군구 없이 광역 단위로만 작성된 행도 있다. 현재 마스터의
-  // 시도명 또는 통합 전 별칭과 정확히 같은 경우는 잘못된 시군구를 추정하지 않고 시도 단위로
-  // 확정한다.
-  const provinceCandidates = [...new Set(adminList.map((admin) => admin.sido))].filter((sido) =>
-    [sido, ...(LEGACY_SIDO_ALIASES[sido] || [])].includes(normalized)
-  );
-  if (provinceCandidates.length === 1) {
-    return { sido: provinceCandidates[0], sigungu: "", matched: true };
+  const resolved = resolveRegion(regionText, adminList);
+  if (resolved.matched) {
+    return { sido: resolved.sido, sigungu: resolved.sigungu, matched: true };
   }
-
-  const matchingCandidates = adminList.filter((admin) => normalized.includes(admin.sigungu));
-  // "남양주시"에는 "양주시"가 부분 문자열로 들어간다. 가장 긴 행정명칭을 먼저 택하지 않으면
-  // 같은 경기도가 두 후보로 잡혀 정상 행까지 ambiguous가 된다.
-  const longestLength = Math.max(0, ...matchingCandidates.map((admin) => admin.sigungu.length));
-  const candidates = matchingCandidates.filter((admin) => admin.sigungu.length === longestLength);
-  if (candidates.length === 0) {
-    return { sido: "", sigungu: normalized, matched: false };
+  if (resolved.ambiguous) {
+    return {
+      sido: "",
+      sigungu: cleanRegionText(regionText),
+      matched: false,
+      ambiguous: true,
+      candidateSidos: resolved.candidateSidos || [],
+    };
   }
-  if (candidates.length === 1) {
-    return { sido: candidates[0].sido, sigungu: candidates[0].sigungu, matched: true };
-  }
-
-  // 동명 시군구 — 지역 문자열에 시도명(핵심어, 통합 전 옛 이름 포함)이 같이 있으면 그걸로 좁힌다.
-  const narrowed = candidates.filter((admin) =>
-    sidoMatchTokens(admin.sido).some((token) => normalized.includes(token))
-  );
-  if (narrowed.length === 1) {
-    return { sido: narrowed[0].sido, sigungu: narrowed[0].sigungu, matched: true };
-  }
-
-  // 그래도 못 좁히면 틀린 시도를 단정짓지 않는다.
-  return {
-    sido: "",
-    sigungu: normalized,
-    matched: false,
-    ambiguous: true,
-    candidateSidos: [...new Set(candidates.map((c) => c.sido))],
-  };
+  return { sido: "", sigungu: cleanRegionText(regionText), matched: false };
 }
 
 function toRows(entries, { adminList, source, itemNameOf, regionOf, now = new Date().toISOString() }) {
@@ -116,4 +234,11 @@ function fromNongsaro(specialties, adminList) {
   });
 }
 
-module.exports = { splitRegion, fromGiRegistrations, fromNongsaro };
+module.exports = {
+  cleanRegionText,
+  compactRegionText,
+  resolveRegion,
+  splitRegion,
+  fromGiRegistrations,
+  fromNongsaro,
+};

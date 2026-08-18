@@ -11,7 +11,7 @@ const {
   normalizeApplicationNumber,
 } = require("./trademarkApplicantClient");
 
-const MATCH_VERSION = "kipris-trademark-applicant-region-v1";
+const MATCH_VERSION = "kipris-trademark-applicant-region-v2-aliases";
 
 function applicationNumbers(document) {
   const seen = new Set();
@@ -35,9 +35,15 @@ function sanitizeApplicants(applicants, adminList) {
   return (applicants || [])
     .map((applicant) => {
       const region = normalizeApplicantAddress(applicant.address, adminList);
-      return { address: region.normalizedRegion || null, nationality: applicant.nationality || null };
+      return {
+        address: region.normalizedRegion || null,
+        nationality: applicant.nationality || null,
+        regionNormalizationMethod: region.method || null,
+        regionNormalizationReason: region.reason || null,
+        hasSourceAddress: Boolean(String(applicant.address || "").trim()),
+      };
     })
-    .filter((applicant) => applicant.address || applicant.nationality);
+    .filter((applicant) => applicant.address || applicant.nationality || applicant.hasSourceAddress);
 }
 
 async function enrichApplicantRegions(document, client, options = {}) {

@@ -48,6 +48,7 @@ function usage(message) {
       "  --checkpoint-every <n> 성공 n건마다 캐시 저장 (기본 50)",
       "  --daily-budget <n>  하루(KST) 누적 호출 상한. 지정 시 --limit과 겹치는 만큼만 호출",
       "  --budget-state <path> 일별 호출량·재개 시점 기록 (기본: output/ip-registry-daily-budget.json)",
+      "  --cache-only        신규 API 호출 없이 현재 캐시만 결과에 적용",
       "  --dry-run           호출 없이 등록번호 대상 건수만 확인",
     ].join("\n")
   );
@@ -90,7 +91,8 @@ function main() {
   const now = new Date();
   const budgetState = loadBudgetState(budgetStatePath, now);
   const blocked = isResumeBlocked(budgetState, now);
-  const effectiveLimit = blocked
+  const cacheOnly = Boolean(args["cache-only"]);
+  const effectiveLimit = cacheOnly || blocked
     ? 0
     : Math.min(limit, remainingBudget(budgetState, dailyBudget));
   if (args["dry-run"]) {
@@ -103,7 +105,9 @@ function main() {
     );
     return Promise.resolve();
   }
-  if (blocked) {
+  if (cacheOnly) {
+    console.error("[enrichIpRegistry] cache-only - 신규 API 호출 없이 캐시만 적용합니다.");
+  } else if (blocked) {
     console.error(
       `[enrichIpRegistry] \uC774\uC804 429 \uC774\uD6C4 \uC7AC\uAC1C \uB300\uAE30 \uC911 - resumeNotBefore=${budgetState.resumeNotBefore}. ` +
         "\uC0C8 \uD638\uCD9C \uC5C6\uC774 \uCE90\uC2DC\uB9CC \uC801\uC6A9\uD569\uB2C8\uB2E4."
@@ -148,17 +152,20 @@ function main() {
       nextBudgetState = recordRateLimit(nextBudgetState, new Date());
     }
     saveBudgetState(budgetStatePath, nextBudgetState);
+    const blockedReason = cacheOnly
+      ? "cache_only"
+      : blocked
+        ? "rate_limit_cooldown"
+        : dailyBudget !== undefined && effectiveLimit === 0
+          ? "daily_budget_exhausted"
+          : null;
     summary.dailyBudget = {
       limit: dailyBudget ?? null,
       usedToday: nextBudgetState.callsUsed,
       remainingToday: remainingBudget(nextBudgetState, dailyBudget),
       resumeNotBefore: nextBudgetState.resumeNotBefore,
       executionRequestLimit: effectiveLimit,
-      blockedReason: blocked
-        ? "rate_limit_cooldown"
-        : dailyBudget !== undefined && effectiveLimit === 0
-          ? "daily_budget_exhausted"
-          : null,
+      blockedReason,
     };
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n", "utf8");

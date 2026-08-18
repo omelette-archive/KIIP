@@ -9,18 +9,19 @@
 - KIPRIS 결과는 ②의 `niceClass`로 필터링한다. 류가 없으면 잠정 식품류
   `29·30·31·32·33·40·43`을 사용하며 결과의 `query.classCodeFallbackApplied`에 표시한다.
   이 목록은 업무 확정 기준이 아닌 노이즈 완화용 v1 규칙이다.
-- KIPRIS 단어검색에 없는 출원인 주소·지정상품은 등록번호가 있는 hit만 등록원부
-  `getMarkHistory`로 별도 보강한다. 주소는 법정동코드로 판정하고, 지정상품은
+- KIPRIS 단어검색에 없는 출원인 주소는 출원번호 기반 `trademarkApplicantInfo`로 기본 보강하고,
+  등록번호가 있는 hit는 등록원부 `getMarkHistory`로 주소·지정상품을 보조 보강한다. 주소는 법정동코드로 판정하고, 지정상품은
   `normalized_exact|normalized_contains|class_only|mismatch|unverified` 근거를 남긴다.
 - `normalized_contains`는 지정상품명에 고시상품명칭이 포함된 경우로, 특산품 활용 출원으로
   인정한다. `class_only`는 NICE류만 확인된 경우이므로 사람 검토 후보로 유지한다. 등록번호가
   없는 출원중·거절 건은 `not_applicable`이다.
 - 농사로 지역브랜드의 `aplcnoInfo`와 KIPRIS `applicationNumber`는 숫자 외 문자를 제거한 뒤
   완전일치할 때만 연결한다. 이름·유사문자열 조인은 하지 않는다
-  (`area-brand-application-region-join-v1`).
-- `signguNm`은 법정동코드 마스터에 완전일치시키고 후보가 하나일 때만 `시/군/구` 접미사를
-  복원한다. `고성`처럼 복수 후보이면 `unverified`로 둔다
-  (`area-brand-region-normalization-v1`).
+  (`area-brand-application-region-join-v2-aliases`).
+- 지역명은 법정동코드 마스터를 최종 기준으로 하고, `서울시→서울특별시`,
+  `강원도→강원특별자치도` 같은 축약·개칭명과 명시적으로 등록된 통합 전 시군구명을
+  공통 정규화한다. `시/군/구` 접미사 복원도 후보가 하나일 때만 하며,
+  `고성`처럼 복수 후보이면 `unverified`로 둔다.
 - 지역브랜드의 지역은 브랜드 연관 지역이지 출원인 주소가 아니다. ④단계에서 두 지표를 분리한다.
 
 출처·공식 URL·계약 버전·확인일은
@@ -109,6 +110,8 @@ API를 다시 호출하지 않고 재사용하며, 미수집 등록번호부터 
 키·출원인 이름·전체 상세주소를 저장하지 않고 주소에서 정규화한 시도·시군구와 지정상품만
 보존한다. 캐시를 사용하지 않을 때만 `--no-cache`를 명시한다. `--checkpoint-every`(기본 50)
 성공 건마다 캐시를 저장해 대량 실행 중 중단돼도 그때까지 성공분은 남는다.
+`--cache-only`를 명시하면 신규 등록원부 API 호출 없이 현재 캐시만 새 ③ 결과에
+재적용한다. 주소 정규화·분석 규칙 변경 후 재현 검증에 사용한다.
 
 ### 일별 호출 예산과 429 재개 시점(#52)
 
@@ -133,7 +136,7 @@ node 03-match-trademarks/enrichIpRegistry.js \
 출력 JSON의 `ipRegistryEnrichment.dailyBudget`에
 `limit/usedToday/remainingToday/resumeNotBefore/executionRequestLimit/blockedReason`이 남는다.
 호출 시작 전에 사용량을 상태 파일에 예약하므로 프로세스가 중간 종료돼도 이미 사용한 호출을
-다음 실행에서 다시 배정하지 않는다. `blockedReason`은 `rate_limit_cooldown` 또는
+다음 실행에서 다시 배정하지 않는다. `blockedReason`은 `cache_only`, `rate_limit_cooldown` 또는
 `daily_budget_exhausted`로 성공·오류·미수집 집계와 함께 운영 리포트에서 확인할 수 있다.
 
 ## 출원번호 기반 출원인 주소 보강
@@ -162,6 +165,10 @@ KIPRISPlus 상표 출원 속보의 `trademarkApplicantInfo` 오퍼레이션은 �
 계속 미확인으로 기록한다.
 부분 캐시 상태에서는 지역 지표를 확정하지 않는다.
 
+두 주소 보강 경로의 권장 실행 순서, 캐시 기반 무호출 재분석, 중단·429·규칙 변경
+복구 방법은 [`출원인 주소 지역 매칭·재분석·복구 런북`](../docs/applicant-region-recovery-runbook.md)을
+기준으로 한다.
+
 지역 귀속 판정은 `applicantRegionMatch`와 출원인 주소 정규화 결과를 우선한다. KIPRIS hit의
 NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unverified`여도 주소가 해당
 지역(`inside`)이면 지역 출원 건수에 포함한다. 다만 지정상품·류 판정은 별도 검토 지표로
@@ -184,7 +191,8 @@ NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unv
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
 출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을 보존한다.
-출원인 전체 주소·키 값·인증 URL은 저장하지 않는다.
+출원인 지역 근거에는 정규화 방법·실패 사유를 남기되, 전체 주소·키 값·인증 URL은
+저장하지 않는다.
 
 ## 구조와 테스트
 
