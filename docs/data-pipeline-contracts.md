@@ -75,8 +75,8 @@ URL 경로에 들어가고 JSON 본문은 `Grid_20141225000000000157_1` 객체�
 농사로 `areaBrand/areaBrandLst`는 특산품 수집 원본이 아니라 KIPRIS 결과의 지역·품목 검증자료다.
 따라서 ① CSV/SQLite에 섞지 않고 `03-match-trademarks/fetchAreaBrands.js`로 별도 JSON을 만든다.
 ③의 `--area-brands` 옵션은 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`의 숫자형 키가
-완전히 같을 때만 hit에 근거를 연결한다. 지역은 법정동코드 마스터 완전일치 또는 후보가 하나인
-접미사 복원만 허용하며 모호하면 `unverified`다. ④는 이를 `regionalBrand*`로 집계하고 출원인
+완전히 같을 때만 hit에 근거를 연결한다. 지역은 법정동코드 마스터와 승인된 축약·개칭·통합 전
+지명만 정규화하고, 접미사 복원은 후보가 하나일 때만 허용하며 모호하면 `unverified`다. ④는 이를 `regionalBrand*`로 집계하고 출원인
 주소 기반 `localApplicantShare`와 섞지 않는다. 규칙 버전과 근거는
 [`data-source-provenance.md`](data-source-provenance.md)를 따른다.
 

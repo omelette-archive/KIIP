@@ -40,9 +40,9 @@
 | `specialty-normalization-rules-v1` | 정제명→`신선한`→`미가공` 순서의 고시명칭 정확 일치만 자동 확정 | 의미 추정에 의한 오분류를 막기 위해 부분·복수 일치는 사람 검토로 분리. 사전은 `kipo-notice-goods-13-2026` |
 | `specialty-normalization-rules-v2-approved-aliases` | v1 규칙 + `approved-aliases.json`의 사용자 승인 표현만 자동 확정 | 승인 2026-08-11, #51. 대상 고시명칭·NICE류·유사군코드가 `kipo-notice-goods-13-2026`과 일치하지 않으면 차단 |
 | `area-brand-region-normalization-v1` | 법정동코드의 시도·시군구 완전일치, 고유한 경우에만 시/군/구 접미사 복원 | `구미`→`구미시`처럼 후보가 하나일 때만 복원. `고성`처럼 복수 시도 후보면 `unverified` |
-| `area-brand-application-region-join-v1` | 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`에서 숫자 외 문자를 제거한 뒤 완전일치 | 하이픈 표시 차이만 제거하며 이름·유사 문자열 조인은 하지 않음 |
-| `ip-registry-applicant-region-v1` | 등록원부 `applicantAddr`에 포함된 시도·시군구를 법정동코드로 완전 대조 | 복수·미매칭 주소는 추정하지 않고 `unverified`; 등록번호 없는 hit는 `not_applicable` |
-| `kipris-trademark-applicant-region-v1` | 출원 속보 `applicantAddress`를 법정동코드 시도·시군구와 완전 대조 | 등록번호가 없는 출원도 출원번호로 조회. 복수·미매칭은 `unverified`; 캐시에는 전체 주소가 아닌 정규화 지역만 저장 |
+| `area-brand-application-region-join-v2-aliases` | 농사로 `aplcnoInfo`와 KIPRIS `applicationNumber`에서 숫자 외 문자를 제거한 뒤 완전일치하고, 지역은 공통 행정구역 정규화를 적용 | 하이픈 표시 차이만 제거하며 이름·유사 문자열 조인은 하지 않음. 법정동코드 마스터와 승인된 축약·개칭·통합 전 지명만 사용하고 모호하면 `unverified` |
+| `ip-registry-applicant-region-v2-aliases` | 등록원부 `applicantAddr`를 법정동코드 마스터와 승인된 행정구역 별칭으로 정규화 | 복수·미매칭 주소는 추정하지 않고 `unverified`; 등록번호 없는 hit는 `not_applicable`; 전체 주소는 저장하지 않음 |
+| `kipris-trademark-applicant-region-v2-aliases` | 출원 속보 `applicantAddress`를 법정동코드 마스터와 승인된 행정구역 별칭으로 정규화 | 등록번호가 없는 출원도 출원번호로 조회. 복수·미매칭은 `unverified`; 캐시에는 전체 주소가 아닌 정규화 지역만 저장 |
 | `ip-registry-designated-goods-v0-review` | 지정상품과 검색 품목을 문자 정규화 후 exact/contains/class-only/mismatch로 분리 | exact만 확정 근거. contains/class-only는 #12 확정 전 검토 후보이며 합계에서 자동 제외하지 않음 |
 | `brand-analysis-v2-regional-brand-separated` | 출원인 주소와 지역브랜드 연관성을 별도 집계 | `localApplicantShare`에는 출원인 주소만 사용. 농사로 근거는 `regionalBrand*` 지표로만 제공 |
 | `gap-score-v1-representative-gi-or-count3` | 대표 특산품: GI 출처 또는 상표 출원 3건 이상(OR). 활동량 0.7·등록률 0.3 | 대표 특산품 판정은 #29에서 확정(2026-08-11). 활동량 포화 건수·가중치는 아직 파이프라인 검증용 예시이며 #29 잔여 범위에서 확정 예정 |

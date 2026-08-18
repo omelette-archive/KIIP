@@ -6,6 +6,7 @@ const fs = require("fs");
 const os = require("os");
 const path = require("path");
 const { createClient, parseMarkHistoryResponse } = require("./lib/ipRegistryClient");
+const { parseArgs: parseIpRegistryArgs } = require("./enrichIpRegistry");
 const {
   enrichDocument,
   evaluateApplicantRegions,
@@ -55,6 +56,14 @@ const RESPONSE = {
 };
 
 async function runIpRegistryTests() {
+  console.log("1-1) 등록원부 CLI — 무호출 캐시 재적용 옵션");
+  {
+    const args = parseIpRegistryArgs(["--input", "sample.json", "--cache-only"]);
+    assert.strictEqual(args.input, "sample.json");
+    assert.strictEqual(args["cache-only"], true);
+    ok("--cache-only를 값 없는 boolean 옵션으로 파싱");
+  }
+
   console.log("1-2) 등록원부 API — 응답 계약과 인증 파라미터");
   {
     const parsed = parseMarkHistoryResponse(RESPONSE);

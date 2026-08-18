@@ -91,6 +91,8 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 마스터와 대조해 `applicantRegionMatch`로 정규화하고 `localApplicantShare` 본류에 반영한다.
 출원인 이름·고객번호·전체 상세주소는 캐시에 저장하지 않는다. 호출 상한 밖은 `not_collected`로
 남기며, 주소 커버리지가 끝나기 전 지역 지표는 확정하지 않는다.
+두 경로의 실행 순서, 캐시만 사용한 재분석, 중단·429 복구와 원문 미보존에 따른 한계는
+[`applicant-region-recovery-runbook.md`](applicant-region-recovery-runbook.md)에 정리한다.
 
 실측 중 `resultCode=00`인데 출원인 항목이 비어 있는 응답이 빠른 병렬 호출에서 일시적으로
 발생했다. 이를 완료로 캐시하면 안 되므로 빈 항목은 재시도하고, `resultCode=20` 정상 무결과와
