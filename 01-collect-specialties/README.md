@@ -46,6 +46,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
 │   ├── sourceCoverageGaps.js 시도별 수집 공백 로더/검증기(⑦ 대시보드 경고에 사용)
 │   ├── collectionStore.js   SQLite 실행 이력·원문 레코드·append-only 버전 저장
+│   ├── regionAliases.js     시도 축약·개칭명과 시군구 승계 별칭 관리
 │   └── normalize.js         소스별 결과 -> 표준 출력 스키마, 지역명을 adminCodes 마스터와 대조
 ├── collectSpecialties.js    CLI 진입점
 ├── selftest.js              fetch 모킹 기반 자체 테스트 (API 키 없이 실행 가능)

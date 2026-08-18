@@ -2,7 +2,7 @@
 
 const fs = require("fs");
 const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes");
-const { splitRegion } = require("../../01-collect-specialties/lib/normalize");
+const { resolveRegion } = require("../../01-collect-specialties/lib/normalize");
 const {
   AREA_BRAND_CONTRACT_VERSION,
   AREA_BRAND_SOURCE_METADATA,
@@ -10,113 +10,44 @@ const {
   normalizeApplicationNumber,
 } = require("./areaBrandClient");
 
-const SIDO_SUFFIX_RE = /(특별자치시|특별자치도|광역시|특별시|도)$/;
-const SIDO_SHORT_NAMES = {
-  서울: "서울특별시",
-  부산: "부산광역시",
-  대구: "대구광역시",
-  인천: "인천광역시",
-  광주: "광주광역시",
-  대전: "대전광역시",
-  울산: "울산광역시",
-  세종: "세종특별자치시",
-  경기: "경기도",
-  강원: "강원특별자치도",
-  충북: "충청북도",
-  충남: "충청남도",
-  전북: "전북특별자치도",
-  전남: "전라남도",
-  경북: "경상북도",
-  경남: "경상남도",
-  제주: "제주특별자치도",
-};
-const LEGACY_SIDO_ALIASES = {
-  전남광주통합특별시: ["전라남도", "전남", "광주광역시", "광주"],
-};
+const AREA_BRAND_REGION_MATCH_VERSION = "area-brand-application-region-join-v2-aliases";
 
 function clean(value) {
   return String(value || "").normalize("NFC").trim().replace(/\s+/g, " ");
-}
-
-function uniqueAdminSidos(adminList) {
-  return [...new Set(adminList.map((row) => row.sido).filter(Boolean))];
 }
 
 function normalizeAreaBrandRegion(regionText, adminList = loadAdminCodes()) {
   const raw = clean(regionText);
   if (!raw) return { status: "unmatched", level: null, raw, reason: "empty_region" };
 
-  const direct = splitRegion(raw, adminList);
-  if (direct.matched) {
-    const level = direct.sigungu ? "sigungu" : "sido";
+  const resolved = resolveRegion(raw, adminList);
+  if (resolved.matched) {
+    const level = resolved.sigungu ? "sigungu" : "sido";
     return {
       status: "matched",
       level,
       raw,
-      sido: direct.sido,
-      sigungu: direct.sigungu,
-      normalizedRegion: [direct.sido, direct.sigungu].filter(Boolean).join(" "),
-      method: level === "sigungu" ? "exact_sigungu" : "exact_sido",
+      sido: resolved.sido,
+      sigungu: resolved.sigungu,
+      normalizedRegion: [resolved.sido, resolved.sigungu].filter(Boolean).join(" "),
+      method: resolved.matchMethod,
     };
   }
-  if (direct.ambiguous) {
+  if (resolved.ambiguous) {
     return {
       status: "ambiguous",
       level: null,
       raw,
-      reason: "ambiguous_sigungu",
-      candidateSidos: direct.candidateSidos || [],
+      reason: resolved.reason || "ambiguous_region_alias",
+      candidateSidos: resolved.candidateSidos || [],
     };
   }
-
-  const sidos = uniqueAdminSidos(adminList);
-  const expandedShortName = SIDO_SHORT_NAMES[raw];
-  const sidoCandidates = sidos.filter((sido) =>
-    raw === sido ||
-    raw === sido.replace(SIDO_SUFFIX_RE, "") ||
-    expandedShortName === sido ||
-    (LEGACY_SIDO_ALIASES[sido] || []).includes(raw)
-  );
-  if (sidoCandidates.length === 1) {
-    return {
-      status: "matched",
-      level: "sido",
-      raw,
-      sido: sidoCandidates[0],
-      sigungu: "",
-      normalizedRegion: sidoCandidates[0],
-      method: "exact_sido",
-    };
-  }
-
-  const compact = raw.replace(/\s/g, "");
-  const stemCandidates = adminList.filter((admin) => {
-    const sigungu = clean(admin.sigungu).replace(/\s/g, "");
-    const stem = sigungu.replace(/[시군구]$/, "");
-    return compact === stem;
-  });
-  if (stemCandidates.length === 1) {
-    const match = stemCandidates[0];
-    return {
-      status: "matched",
-      level: "sigungu",
-      raw,
-      sido: match.sido,
-      sigungu: match.sigungu,
-      normalizedRegion: `${match.sido} ${match.sigungu}`,
-      method: "sigungu_suffix_restored",
-    };
-  }
-  if (stemCandidates.length > 1 || sidoCandidates.length > 1) {
-    return {
-      status: "ambiguous",
-      level: null,
-      raw,
-      reason: "ambiguous_region_alias",
-      candidateSidos: [...new Set([...stemCandidates.map((row) => row.sido), ...sidoCandidates])],
-    };
-  }
-  return { status: "unmatched", level: null, raw, reason: "region_not_in_admin_master" };
+  return {
+    status: "unmatched",
+    level: null,
+    raw,
+    reason: resolved.reason || "region_not_in_admin_master",
+  };
 }
 
 function classifyRegionalBrandMatch(queryRegion, referenceRegion) {
@@ -169,7 +100,7 @@ function createAreaBrandContext(brands, adminList = loadAdminCodes(), metadata =
     metadata: {
       ...AREA_BRAND_SOURCE_METADATA,
       ...metadata,
-      joinMethodVersion: "area-brand-application-region-join-v1",
+      joinMethodVersion: AREA_BRAND_REGION_MATCH_VERSION,
       adminRegionMaster: "국토교통부 전국 법정동 코드 2026-07-03",
       adminRegionMasterUrl: "https://www.data.go.kr/data/15063424/fileData.do",
     },
@@ -214,7 +145,7 @@ function enrichHitsWithAreaBrands(hits, queryRegionText, context) {
       ...hit,
       regionalBrandMatch: consistent ? matchValues[0] : "unverified",
       regionalBrandMatchSource: "nongsaro_area_brand_application_number",
-      regionalBrandMatchVersion: "area-brand-application-region-join-v1",
+      regionalBrandMatchVersion: AREA_BRAND_REGION_MATCH_VERSION,
       regionalBrandMatchConfidence: consistent
         ? confidenceValues[0]
         : "multiple_conflicting_references",

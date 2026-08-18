@@ -161,6 +161,42 @@ async function run() {
     ok("가장 긴 시군구명을 우선하고 시군구 없는 광역 원본은 시도 단위로 보존");
   }
 
+  console.log("3-5) normalize.splitRegion — 축약·개칭·공백 표기 통합");
+  {
+    const aliasAdminList = [
+      { code: "A1", sido: "서울특별시", sigungu: "중구" },
+      { code: "A2", sido: "부산광역시", sigungu: "중구" },
+      { code: "B1", sido: "강원특별자치도", sigungu: "고성군" },
+      { code: "B2", sido: "경상남도", sigungu: "고성군" },
+      { code: "C1", sido: "경상북도", sigungu: "안동시" },
+      { code: "D1", sido: "경기도", sigungu: "수원시" },
+      { code: "D2", sido: "경기도", sigungu: "수원시영통구" },
+      { code: "E1", sido: "경상남도", sigungu: "창원시" },
+    ];
+    assert.deepStrictEqual(splitRegion("서울시", aliasAdminList), {
+      sido: "서울특별시", sigungu: "", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("서울시 중구", aliasAdminList), {
+      sido: "서울특별시", sigungu: "중구", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("강원도 고성군", aliasAdminList), {
+      sido: "강원특별자치도", sigungu: "고성군", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("경북 안동", aliasAdminList), {
+      sido: "경상북도", sigungu: "안동시", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("경기도 수원시 영통구", aliasAdminList), {
+      sido: "경기도", sigungu: "수원시영통구", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("경남 진해시", aliasAdminList), {
+      sido: "경상남도", sigungu: "창원시", matched: true,
+    });
+    const ambiguousStem = splitRegion("고성", aliasAdminList);
+    assert.strictEqual(ambiguousStem.matched, false);
+    assert.strictEqual(ambiguousStem.ambiguous, true);
+    ok("시도 축약·개칭명·시군구 접미사·통합 전 명칭을 보정하되 동명 지역은 보류");
+  }
+
   console.log("4) normalize.fromGiRegistrations / fromNongsaro");
   {
     const gi = fromGiRegistrations(

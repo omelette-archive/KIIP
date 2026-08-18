@@ -17,10 +17,11 @@
   없는 출원중·거절 건은 `not_applicable`이다.
 - 농사로 지역브랜드의 `aplcnoInfo`와 KIPRIS `applicationNumber`는 숫자 외 문자를 제거한 뒤
   완전일치할 때만 연결한다. 이름·유사문자열 조인은 하지 않는다
-  (`area-brand-application-region-join-v1`).
-- `signguNm`은 법정동코드 마스터에 완전일치시키고 후보가 하나일 때만 `시/군/구` 접미사를
-  복원한다. `고성`처럼 복수 후보이면 `unverified`로 둔다
-  (`area-brand-region-normalization-v1`).
+  (`area-brand-application-region-join-v2-aliases`).
+- 지역명은 법정동코드 마스터를 최종 기준으로 하고, `서울시→서울특별시`,
+  `강원도→강원특별자치도` 같은 축약·개칭명과 명시적으로 등록된 통합 전 시군구명을
+  공통 정규화한다. `시/군/구` 접미사 복원도 후보가 하나일 때만 하며,
+  `고성`처럼 복수 후보이면 `unverified`로 둔다.
 - 지역브랜드의 지역은 브랜드 연관 지역이지 출원인 주소가 아니다. ④단계에서 두 지표를 분리한다.
 
 출처·공식 URL·계약 버전·확인일은
@@ -184,7 +185,8 @@ NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unv
 
 `regionalBrandEvidence`에는 농사로 콘텐츠 번호, 원본·정규화 지역, 브랜드명, 주요품목명,
 출원번호를 보존한다. `designatedGoodsEvidence`에는 등록번호, NICE류·지정상품 목록을 보존한다.
-출원인 전체 주소·키 값·인증 URL은 저장하지 않는다.
+출원인 지역 근거에는 정규화 방법·실패 사유를 남기되, 전체 주소·키 값·인증 URL은
+저장하지 않는다.
 
 ## 구조와 테스트
 

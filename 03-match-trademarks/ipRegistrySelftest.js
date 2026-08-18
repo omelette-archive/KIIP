@@ -117,6 +117,44 @@ async function runIpRegistryTests() {
     assert.strictEqual(inside.confidence, "exact_registry_address_sigungu");
     assert.strictEqual(outside.match, "outside");
     assert.strictEqual(outside.confidence, "exact_registry_address_sido");
+
+    const aliasAdminList = [
+      { code: "1114000000", sido: "서울특별시", sigungu: "중구" },
+      { code: "2611000000", sido: "부산광역시", sigungu: "중구" },
+      { code: "4812000000", sido: "경상남도", sigungu: "창원시" },
+    ];
+    assert.deepStrictEqual(
+      normalizeApplicantAddress("서울시 중구 상세주소 비공개", aliasAdminList),
+      {
+        status: "matched",
+        level: "sigungu",
+        sido: "서울특별시",
+        sigungu: "중구",
+        normalizedRegion: "서울특별시 중구",
+        method: "admin_sigungu_in_masked_address",
+      }
+    );
+    assert.deepStrictEqual(
+      normalizeApplicantAddress("경남 진해시 상세주소 비공개", aliasAdminList),
+      {
+        status: "matched",
+        level: "sigungu",
+        sido: "경상남도",
+        sigungu: "창원시",
+        normalizedRegion: "경상남도 창원시",
+        method: "admin_sigungu_successor_alias_in_address",
+      }
+    );
+    const aliasEvidence = evaluateApplicantRegions(
+      "경상남도 창원시",
+      [{ address: "경남 진해시 상세주소 비공개" }],
+      aliasAdminList
+    );
+    assert.strictEqual(aliasEvidence.match, "inside");
+    assert.strictEqual(
+      aliasEvidence.evidence[0].normalizationMethod,
+      "admin_sigungu_successor_alias_in_address"
+    );
     assert.strictEqual(
       evaluateGoods(
         { item: "신선한 사과", classCode: "31" },
