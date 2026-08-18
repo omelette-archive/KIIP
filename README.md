@@ -10,7 +10,7 @@
 |---|---|---|
 | 지역 특산품 상표 분석 | 현재 연결된 데이터와 지역별 지표 확인 | [대시보드 보기](https://omelette-archive.github.io/KIIP-artifacts/latest/) |
 | 변경 이력 | 과거 공개 화면을 버전별로 재현·비교 | [버전 비교](https://omelette-archive.github.io/KIIP-artifacts/versions/) |
-| 검토 의견 | 페이지와 버전을 지정해 피드백 기록 | [의견 남기기](https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml) |
+| 검토 의견 | 최신 공개본에 대한 피드백을 한 이슈의 댓글로 기록 | [의견 남기기](https://github.com/omelette-archive/KIIP/issues/76) |
 
 > **알파 테스트 기반 검토용** — 수집·검증이 진행 중인 지표가 포함되어 있으며 공식 통계가 아니다.
 

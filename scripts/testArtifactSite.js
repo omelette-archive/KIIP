@@ -31,6 +31,10 @@ try {
   assert.match(landing, /대시보드 보기/);
   assert.match(landing, /현재 데이터 범위/);
   assert.match(landing, /최근 변경/);
+  assert.match(landing, /issues\/76/);
+  assert.match(landing, /최신 공개본에 대한 의견을 이슈 댓글로 남깁니다/);
+  assert.doesNotMatch(landing, /issues\/new\?template=artifact-feedback\.yml/);
+  assert.doesNotMatch(landing, /검토한 페이지와 버전을 지정/);
   const currentResult = landing.slice(0, landing.indexOf("RECENT UPDATES"));
   assert.strictEqual((currentResult.match(/알파 테스트 · 검토용/g) || []).length, 1, "알파 상태 배지는 한 번만 표시한다");
   assert.doesNotMatch(currentResult, /알파 대시보드|전국 알파|전체 범위 알파/);

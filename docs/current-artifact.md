@@ -7,7 +7,7 @@
 - 렌더링 가능한 버전 내역: <https://omelette-archive.github.io/KIIP-artifacts/versions/>
 - 공개 게시 저장소: <https://github.com/omelette-archive/KIIP-artifacts>
 - Git 원본 이력: <https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html>
-- 피드백: <https://github.com/omelette-archive/KIIP/issues/new?template=artifact-feedback.yml>
+- 피드백 댓글: <https://github.com/omelette-archive/KIIP/issues/76>
 
 공유 대상은 현재 `07-dashboard/dashboard.html`이다. 이 파일은 스타일·스크립트·스냅샷 데이터를
 포함한 단일 HTML이므로 별도 서버 기능 없이 정적 페이지로 열 수 있다.
@@ -42,7 +42,8 @@ node scripts/buildArtifactSite.js --output .artifact-site --limit 50
 
 - 버전 ID는 `dashboard.html`을 변경한 Git 커밋의 앞 12자리다.
 - 최신 페이지의 내용 자체는 원본 HTML과 바이트 단위로 동일하게 유지한다.
-- 화면·수치·문구에 대한 의견은 산출물 피드백 이슈 양식에 페이지 주소와 버전 ID를 함께 남긴다.
+- 화면·수치·문구에 대한 의견은 고정 피드백 이슈 #76에 댓글로 남긴다. 별도 언급이 없으면
+  댓글 작성 시점의 최신 공개본에 대한 의견으로 보며, 과거 버전에 관한 의견일 때만 버전을 적는다.
 - 의미 있는 공개 마일스톤은 필요할 때 GitHub Release와 태그를 추가해 별도 명칭을 부여할 수 있다.
 
 ## 데이터 해석 주의
