@@ -208,7 +208,9 @@ node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
 
 ## 7. 현재 한계와 후속 구현
 
-- 미확인 캐시만 선별 재조회하는 `refresh-unverified` 옵션·대상 목록 계약이 아직 없다([#73](https://github.com/omelette-archive/KIIP/issues/73)).
+- 경로 A(출원번호)는 미확인 캐시 선별 재조회와 대상 manifest가 구현됐다. 경로 B(등록번호)는
+  재조회 후보 판정에 필요한 최소 상태를 캐시에 보존하도록 스키마를 확장한 뒤 같은 복구 계약을
+  구현해야 한다([#73](https://github.com/omelette-archive/KIIP/issues/73)).
 - 두 경로의 결과가 모두 있을 때 근거 우선순위는 실행 순서로 구현돼 있다. 후속으로
   A·B 근거를 동시 보존하고 명시적 우선순위를 기록하는 계약이 필요하다.
 - 캐시는 로컬·영속 실행 디스크에 보관해야 하며 현재 GitHub 호스티드 러너만으로는
