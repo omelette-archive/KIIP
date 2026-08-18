@@ -58,6 +58,12 @@ flowchart LR
 | ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |
 | ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | 🟡 데이터 계층 | `dashboard-snapshot-v1` 구현, 현재 지도 경계 연결 대기 |
 
+위 표는 진행 상태 요약일 뿐이다. **각 단계가 실제로 어떤 기준으로 데이터를 뽑고 매칭하고
+확정하는지**는 [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md)에 데이터 분석
+관점으로 정리되어 있다 — ②의 판정 근거(verdictSource) 비중 실측치, ③의 지역 귀속·지정상품
+대조 기준, ④의 지표 게이트, ⑤의 대표성·점수 기준, 그리고 아직 업무 기준이 안 정해진 정책
+이슈 목록까지 한 곳에 모았다.
+
 각 폴더의 `README.md`에 해당 단계의 목표·할 일·입출력 스키마가 정리되어 있다.
 
 수집 URL·데이터 구조·정제 기준은 [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md),
@@ -78,6 +84,7 @@ node scripts/validatePipeline.js
 
 ## 문서
 
+- [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md) — **데이터 분석 가이드**: 각 단계가 무엇을 어떤 기준으로 뽑고 매칭·확정하는지, 실측 비중과 미해결 정책 이슈 모음
 - [`docs/project-plan.md`](docs/project-plan.md) — 전체 기획 원문 정리 (프로젝트명·목표·7단계 상세·기대효과)
 - [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
 - [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
