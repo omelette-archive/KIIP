@@ -91,6 +91,7 @@ function reviewResult(base, itemName, candidates, reviewReason) {
     status: "review_required",
     matchMethod: "rule_unresolved",
     confidence: "",
+    verdictSource: "unresolved",
     reviewReason,
     reviewCandidates: serializeCandidates(candidates),
     error: "",
@@ -125,6 +126,7 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
       status: "ok",
       matchMethod: "rule_excluded",
       confidence: "1.0000",
+      verdictSource: "excluded",
       reviewReason: "",
       reviewCandidates: serializeCandidates(candidates),
       error: "",
@@ -159,6 +161,7 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
       status: "ok",
       matchMethod: "rule_approved_alias",
       confidence: "1.0000",
+      verdictSource: "human_approved_alias",
       reviewReason: "",
       reviewCandidates: serializeCandidates(
         uniqueCandidates([{ ...matched, score: 1.45 }, ...candidates]).slice(0, topK)
@@ -167,10 +170,16 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
     };
   }
 
+  // exact는 원물명 자체가 사전과 완전히 같으므로 판단의 여지가 없다(사람 재가 불필요).
+  // fresh/unprocessed는 정해진 접두어 사전(신선한/미가공)만 허용하는 결정론적 규칙으로
+  // "고시명칭을 임의로 확정"하는 게 아니라 코드로 버전 관리되는 화이트리스트다. 임의
+  // 접두어를 추가하지 않고, 새 접두어가 필요하면 실측 검토 후 이 배열에 명시적으로
+  // 추가하고 자체 테스트로 고정한다(ADR 0001의 "반복 검토 사례는 코드/사전 변경과
+  // 테스트를 통해서만 자동화 범위에 포함된다" 원칙).
   const preferredNames = [
-    { name: itemName, matchMethod: "rule_exact", confidence: "1.0000", score: 1.5 },
-    { name: `신선한 ${itemName}`, matchMethod: "rule_fresh", confidence: "0.9500", score: 1.4 },
-    { name: `미가공 ${itemName}`, matchMethod: "rule_unprocessed", confidence: "0.9000", score: 1.3 },
+    { name: itemName, matchMethod: "rule_exact", confidence: "1.0000", score: 1.5, verdictSource: "exact" },
+    { name: `신선한 ${itemName}`, matchMethod: "rule_fresh", confidence: "0.9500", score: 1.4, verdictSource: "algorithm" },
+    { name: `미가공 ${itemName}`, matchMethod: "rule_unprocessed", confidence: "0.9000", score: 1.3, verdictSource: "algorithm" },
   ];
 
   for (const preferred of preferredNames) {
@@ -195,6 +204,7 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
       status: "ok",
       matchMethod: preferred.matchMethod,
       confidence: preferred.confidence,
+      verdictSource: preferred.verdictSource,
       reviewReason: "",
       reviewCandidates: serializeCandidates(
         uniqueCandidates([matched, ...candidates]).slice(0, topK)

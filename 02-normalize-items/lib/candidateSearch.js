@@ -124,7 +124,14 @@ function findCandidates(rawItemName, dictionary, region = {}, options = {}) {
     if (!includeServiceClass && isServiceClass(entry.niceClass)) continue;
     // substring 포함 관계(예: "하회탈" ⊃ "탈")는 bigram이 하나도 안 겹쳐도(1글자
     // 사전 항목 등) 유효한 신호이므로, bigram 점수가 0이어도 먼저 확인해서 살려둔다.
-    const hasSubstringMatch = cleaned.length > 0 && (cleaned.includes(entry.item) || entry.item.includes(cleaned));
+    // 단, 문자열 중간에 우연히 끼어든 경우(예: "단감" ⊂ "옷단감치는 기계")는 실제
+    // 관련성이 없으므로 접두/접미 경계에서 포함될 때만 신호로 인정한다(2026-08-18,
+    // #51 검토 표본검사에서 "단감"이 무관한 "옷단감치는 기계"의 최상위 후보로 잡히는
+    // 오탐을 발견해 수정).
+    const [shorter, longer] =
+      cleaned.length <= entry.item.length ? [cleaned, entry.item] : [entry.item, cleaned];
+    const hasSubstringMatch =
+      shorter.length > 0 && (longer.startsWith(shorter) || longer.endsWith(shorter));
     const jaccardScore = jaccard(queryBigrams, entry.bigrams);
     if (jaccardScore === 0 && !hasSubstringMatch) continue;
     const score = jaccardScore + (hasSubstringMatch ? 0.5 : 0);

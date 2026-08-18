@@ -79,6 +79,21 @@ async function run() {
     ok("지역명 제거로 정확한 후보를 찾고, 35류는 기본 제외/옵션으로 포함 가능");
   }
 
+  console.log("3-1) candidateSearch.findCandidates — 문자열 중간 우연 포함은 강한 신호로 인정하지 않음(#51)");
+  {
+    // "단감"이 "옷단감치는 기계"의 접두/접미가 아니라 문자열 중간에 우연히 끼어든
+    // 사례(2026-08-14 검토대기 표본검사에서 발견). 접두/접미 경계 포함만 +0.5 보너스를
+    // 받아야 하고, 이런 무관 항목이 최상위 후보로 올라오면 안 된다.
+    const dictionary = makeDictionary([
+      { item: "옷단감치는 기계", niceClass: "07", similarGroupCode: "G9901" },
+      { item: "감", niceClass: "31", similarGroupCode: "G0101" },
+    ]);
+    const candidates = findCandidates("단감", dictionary, {}, { topK: 5 });
+    const machine = candidates.find((c) => c.item === "옷단감치는 기계");
+    assert.ok(!machine || machine.score < 0.5, "중간에 끼어든 문자열은 경계 포함 보너스를 받으면 안 됨");
+    ok("접두/접미 경계에서 포함될 때만 강한 신호로 인정해 무관한 문자열 중간 일치를 걸러냄");
+  }
+
   console.log("4) filters.isServiceClass");
   {
     assert.strictEqual(isServiceClass("35"), true);
@@ -107,7 +122,16 @@ async function run() {
     assert.strictEqual(exact.noticeName, "신선한 사과");
     assert.strictEqual(exact.niceClass, "31");
     assert.strictEqual(exact.matchMethod, "rule_fresh");
+    assert.strictEqual(exact.verdictSource, "algorithm", "신선한/미가공 접두어 자동 매칭은 사람 승인이 아니라 알고리즘 판정으로 표시돼야 함(#51)");
     assert.strictEqual(exact.source, "농사로");
+
+    const literalMatch = normalizeByRules(
+      { ...region, rawItemName: "탈" },
+      dictionary,
+      { topK: 5 }
+    );
+    assert.strictEqual(literalMatch.matchMethod, "rule_exact");
+    assert.strictEqual(literalMatch.verdictSource, "exact", "원물명이 사전과 완전히 같으면 판단의 여지가 없는 exact여야 함");
 
     const excluded = normalizeByRules(
       { ...region, rawItemName: "안동사과나무" },
@@ -117,6 +141,7 @@ async function run() {
     assert.strictEqual(excluded.status, "ok");
     assert.strictEqual(excluded.excluded, true);
     assert.strictEqual(excluded.matchMethod, "rule_excluded");
+    assert.strictEqual(excluded.verdictSource, "excluded");
 
     const unresolved = normalizeByRules(
       { ...region, rawItemName: "안동하회탈" },
@@ -124,6 +149,7 @@ async function run() {
       { topK: 5 }
     );
     assert.strictEqual(unresolved.status, "review_required");
+    assert.strictEqual(unresolved.verdictSource, "unresolved");
     assert.match(unresolved.reviewCandidates, /"item":"탈"/);
     ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김(AI 호출 없음)");
   }
@@ -166,6 +192,7 @@ async function run() {
       assert.strictEqual(result.noticeName, noticeName, rawItemName);
       assert.strictEqual(result.matchMethod, "rule_approved_alias", rawItemName);
       assert.strictEqual(result.confidence, "1.0000", rawItemName);
+      assert.strictEqual(result.verdictSource, "human_approved_alias", rawItemName);
     }
     for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대추"]) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);

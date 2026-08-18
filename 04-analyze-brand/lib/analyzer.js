@@ -181,6 +181,12 @@ function entryDimensions(entry) {
     noticeName ||
     clean(input.rawItemName) ||
     "미지정 품목";
+  // ②단계가 남긴 품목 확정 근거(verdictSource: exact/human_approved_alias/algorithm/unresolved)를
+  // 그대로 전달한다. algorithm은 사람이 개별 승인하지 않은 결정론적 규칙 자동 확정이므로,
+  // 대시보드가 "AI 판정" 배지로 구분해 노출한다(#51 자동화+감사 트레일).
+  const itemVerdictSource = clean(entry.verdictSource) || clean(input.verdictSource) || null;
+  const itemMatchMethod = clean(entry.matchMethod) || clean(input.matchMethod) || null;
+  const itemMatchConfidence = clean(entry.confidence) || clean(input.confidence) || null;
   return {
     sido,
     sigungu,
@@ -189,6 +195,9 @@ function entryDimensions(entry) {
     noticeName,
     niceClass: clean(entry.niceClass) || clean(query.classCode) || clean(input.niceClass) || null,
     matchingBasis: officialNoticeName ? "notice_name_and_nice_class" : "raw_item_name_unclassified",
+    itemVerdictSource,
+    itemMatchMethod,
+    itemMatchConfidence: itemMatchConfidence ? Number(itemMatchConfidence) : null,
   };
 }
 

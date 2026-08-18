@@ -45,8 +45,12 @@
 │   ├── candidateSearch.js  문자 bigram Jaccard 기반 후보 검색 (지역명 제거, 35류 기본 제외,
 │   │                       bigram 역색인 캐싱으로 대량 처리 시 57k건 전체 스캔 회피)
 │   ├── ruleNormalizer.js   보수적 규칙 매칭과 검토 대상 분리
+│   ├── reviewClusters.js   검토대기 행을 원물명 군집으로 묶는 보고서 생성기
+│   ├── decisionReport.js   전체 판정 출처(verdictSource)별 집계와 algorithm 판정 사후 감사 목록
 │   └── filters.js          isServiceClass()
 ├── normalizeItems.js       CLI 진입점 (API 키 불필요)
+├── summarizeReviews.js     검토대기 군집 보고서 CLI
+├── reportNormalizationDecisions.js  판정 출처별 집계·algorithm 판정 감사 리포트 CLI
 ├── applyManualReviews.js   사람이 기록한 결정 반영 및 감사 이력 검증
 ├── selftest.js             자체 테스트 (외부 API 없이 실행)
 └── output/                 --out 결과 저장 위치 (git-ignored)
@@ -97,6 +101,37 @@ node 02-normalize-items/summarizeReviews.js \
 
 공식 출처와 규칙의 채택 근거는
 [`docs/data-source-provenance.md`](../docs/data-source-provenance.md)에 중앙 관리한다.
+
+### 판정 출처(verdictSource)와 자동 확정 감사 리포트(#51)
+
+모든 출력 행은 `matchMethod`와 함께 `verdictSource`를 남긴다.
+
+| verdictSource | 의미 | 사람 승인 필요 |
+|---|---|---|
+| `exact` | 원물명이 고시명칭과 완전히 동일 | 아니오(판단의 여지 없음) |
+| `human_approved_alias` | 사람이 승인한 별칭 사전(`data/approved-aliases.json`) 매칭 | 이미 받음(사전 등록 시) |
+| `algorithm` | 결정론적 접두어 화이트리스트(신선한/미가공) 자동 매칭 | 아니오 — 즉시 다음 단계로 노출, 사후 표본검사 대상 |
+| `excluded` | 나무/묘목/씨앗 등 규칙으로 분석 제외 | 아니오 |
+| `unresolved` | 검토대기 | 예 |
+| `error` | 정규화 처리 실패 | - |
+
+`algorithm`은 매 건 사람이 개별 승인하지 않고 코드로 버전 관리되는 화이트리스트가 자동
+확정한다(ADR 0001과 상충하지 않음 — 금지 대상은 비결정론적 외부 LLM 호출이며, 이 화이트리스트는
+결정론적 규칙이다). 대신 자동화가 기본값이라는 사실을 감춰서는 안 되므로, ⑦ 대시보드가 이
+항목에 "AI 판정" 배지를 표시하고, 아래 리포트로 사후 표본검사 근거를 남긴다.
+
+```bash
+node 02-normalize-items/reportNormalizationDecisions.js \
+  --input 02-normalize-items/output/normalized.csv \
+  --out 02-normalize-items/output/normalization-decisions.json \
+  --md-out 02-normalize-items/output/normalization-decisions.md \
+  --csv-out 02-normalize-items/output/normalization-decisions-algorithm.csv
+```
+
+Markdown 리포트는 판정 출처별 건수와, `algorithm` 판정 원물명→고시명칭 조합(빈도순)을 표로
+보여준다. 사람이 이 목록에서 문제를 발견하면 `lib/ruleNormalizer.js`의 접두어 화이트리스트나
+관련 규칙을 수정하고 `selftest.js`에 회귀 테스트를 추가한 뒤 재실행한다 — 코드/사전 변경만이
+자동화 범위를 넓히는 유일한 경로다(ADR 0001).
 
 ### 중간산출물 수동 검토
 
