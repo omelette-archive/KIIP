@@ -22,6 +22,9 @@ function bucket(overrides = {}) {
     itemName: "사과",
     noticeName: "신선한 사과",
     niceClass: "31",
+    itemVerdictSource: "algorithm",
+    itemMatchMethod: "rule_fresh",
+    itemMatchConfidence: 0.95,
     queryCount: 1,
     successfulQueryCount: 1,
     partialQueryCount: 0,
@@ -258,6 +261,11 @@ assert.match(andong.regionCode, /^\d+$/);
 assert.strictEqual(andong.regionCodeStatus, "resolved");
 assert.strictEqual(snapshot.briefings[0].regionCode, andong.regionCode);
 assert.strictEqual(andong.items[0].metrics.uniqueTrademarkCount.value, 1);
+assert.deepStrictEqual(andong.items[0].itemVerdict, {
+  source: "algorithm",
+  method: "rule_fresh",
+  confidence: 0.95,
+});
 assert.strictEqual(andong.items[0].metrics.uniqueTrademarkCount.availability, "available");
 assert.strictEqual(andong.items[0].metrics.nationwideSearchTrademarkCount.value, 1);
 assert.strictEqual(andong.items[0].metrics.localApplicantShare.availability, "available");

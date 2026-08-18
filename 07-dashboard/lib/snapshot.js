@@ -308,6 +308,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
       matchingBasis: clean(row.matchingBasis) || "notice_name_and_nice_class",
+      itemVerdict: {
+        source: clean(row.itemVerdictSource) || "unresolved",
+        method: clean(row.itemMatchMethod) || null,
+        confidence: typeof row.itemMatchConfidence === "number" ? row.itemMatchConfidence : null,
+      },
       dataState: state,
       sources: rowSourceIds(row),
       trademarkExamples: Array.isArray(row.trademarkExamples)

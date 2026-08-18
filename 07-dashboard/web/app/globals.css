@@ -13,6 +13,8 @@
   --amber: #a96117;
   --amber-soft: #faead4;
   --red: #a34035;
+  --violet: #5b4b9e;
+  --violet-soft: #e8e4f5;
   --shadow: 0 18px 55px rgba(38, 50, 44, 0.08);
 }
 
@@ -231,6 +233,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .example-list article p { grid-column: 1 / -1; margin: 3px 0 0; color: var(--muted); font-size: 9px; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 8px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
+.verdict-chip { padding: 5px 9px; border-radius: 999px; background: var(--violet-soft); color: var(--violet); font-size: 8px; font-weight: 800; white-space: nowrap; }
 
 .screen-section { padding-top: 54px; }
 .screen-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; }

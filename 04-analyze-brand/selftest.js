@@ -555,6 +555,32 @@ console.log("5-1) 지역 상표 지표는 수집 완료를 기준으로 공개�
   ok("전국 검색 후보 2건과 지역 inside 확정 1건을 분리하고 완전 검증 여부를 명시");
 }
 
+console.log("9) ②단계 품목 판정 근거(verdictSource)를 지역×품목 행까지 전파(#51)");
+{
+  const r = analyzeEntries([
+    {
+      status: "ok",
+      query: { region: "경상북도 안동시", item: "신선한 배", classCode: "31" },
+      input: {
+        sido: "경상북도",
+        sigungu: "안동시",
+        itemName: "배",
+        noticeName: "신선한 배",
+        niceClass: "31",
+        matchMethod: "rule_fresh",
+        confidence: "0.9500",
+        verdictSource: "algorithm",
+      },
+      hits: [],
+    },
+  ], { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.strictEqual(row.itemVerdictSource, "algorithm");
+  assert.strictEqual(row.itemMatchMethod, "rule_fresh");
+  assert.strictEqual(row.itemMatchConfidence, 0.95);
+  ok("사람이 개별 승인하지 않은 algorithm 판정을 지역×품목 행 단위까지 보존해 대시보드가 구분 표시 가능");
+}
+
 console.log("0) 상표 사례는 최신순을 유지하면서 지정상품 근거를 보존");
 {
   const recent = Array.from({ length: 12 }, (_, index) => ({
