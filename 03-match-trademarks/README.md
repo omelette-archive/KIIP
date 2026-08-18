@@ -203,6 +203,7 @@ NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unv
 ├── buildAreaBrandValidationInput.js 별도 검증자료의 validation_only 감사 CSV 생성
 ├── enrichIpRegistry.js              등록번호 기반 주소·지정상품 소량 보강
 ├── enrichApplicantRegions.js        출원번호 기반 주소 지역 누적 보강
+├── refreshUnverifiedApplicantRegions.js  미확인(unmatched/ambiguous) 건만 선별 재조회(#73)
 ├── lib/areaBrandClient.js           농사로 XML·페이지·계약 메타데이터
 ├── lib/areaBrandEnricher.js         행정구역 정규화·출원번호 완전일치 조인
 ├── lib/kiprisClient.js              KIPRIS 호출·계약 메타데이터
@@ -212,6 +213,7 @@ NICE류·지정상품 등 부가 코드가 누락되거나 `goodsMatchMethod=unv
 ├── lib/trademarkApplicantClient.js  출원 속보 출원인 주소 응답 계약
 ├── lib/trademarkApplicantEnricher.js 출원번호 조회·지역 판정
 ├── lib/trademarkApplicantCache.js   상세주소 비저장 영속 캐시
+├── lib/applicantRegionRefresh.js    미확인 캐시 항목 분류·재조회 후보 manifest(#73)
 └── output/                           로컬 산출물(git-ignored)
 ```
 
