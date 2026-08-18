@@ -13,7 +13,8 @@ const { execFileSync } = require("child_process");
 const ROOT = path.resolve(__dirname, "..");
 const DASHBOARD_PATH = "07-dashboard/dashboard.html";
 const REPOSITORY_URL = "https://github.com/omelette-archive/KIIP";
-const FEEDBACK_URL = `${REPOSITORY_URL}/issues/new?template=artifact-feedback.yml`;
+const FEEDBACK_ISSUE_NUMBER = 76;
+const FEEDBACK_URL = `${REPOSITORY_URL}/issues/${FEEDBACK_ISSUE_NUMBER}`;
 
 function escapeHtml(value) {
   return String(value)
@@ -237,7 +238,7 @@ function buildLanding(metadata, versions, headSha) {
       <section class="section" aria-labelledby="guide-title"><div class="section-heading"><div><span class="eyebrow">QUICK ACCESS</span><h2 id="guide-title">확인하고 기록하기</h2></div></div><div class="guide-grid">
         <a href="./latest/"><strong>현재 결과 확인 →</strong><span>지역·품목별 상표 현황과 데이터 준비 상태를 봅니다.</span></a>
         <a href="./versions/"><strong>변경 이력 비교 →</strong><span>과거 시점의 HTML을 열어 결과 변화를 확인합니다.</span></a>
-        <a href="${FEEDBACK_URL}"><strong>피드백 남기기 →</strong><span>검토한 페이지와 버전을 지정해 의견을 기록합니다.</span></a>
+        <a href="${FEEDBACK_URL}"><strong>피드백 남기기 →</strong><span>최신 공개본에 대한 의견을 이슈 댓글로 남깁니다.</span></a>
       </div></section>
       <section class="section card" aria-labelledby="history-title"><div class="section-heading"><div><span class="eyebrow">RECENT UPDATES</span><h2 id="history-title">최근 변경</h2></div><a href="./versions/">전체 이력 보기 →</a></div><div class="table-wrap"><table><thead><tr><th>버전</th><th>날짜</th><th>변경 내용</th><th>Git</th></tr></thead><tbody>${recentRows || '<tr><td colspan="4">기록된 버전이 없습니다.</td></tr>'}</tbody></table></div></section>
       <footer>원본 파일 <a href="${REPOSITORY_URL}/blob/main/${DASHBOARD_PATH}">${DASHBOARD_PATH}</a> · 주소 확보율 ${percent(metadata.addressVerificationRate)} · 자동 게시</footer>`,
