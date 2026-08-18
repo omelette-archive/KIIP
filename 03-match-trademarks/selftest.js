@@ -49,6 +49,7 @@ const {
 const { filterByClassCode, FOOD_RELATED_CLASSES } = require("./lib/filters");
 const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
+const { runApplicantRegionRefreshTests } = require("./applicantRegionRefreshSelftest");
 const {
   parseCsvLine,
   readNormalizedCsv,
@@ -138,6 +139,7 @@ function ok(label) {
 
 async function run() {
   await runIpRegistryTests();
+  await runApplicantRegionRefreshTests();
 
   console.log("1) xmlLite.parseTrademarkResponse");
   {

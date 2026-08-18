@@ -130,6 +130,32 @@ node 05-detect-brand-gap/detectBrandGap.js `
 
 ⑥·⑦도 같은 `replay` 접두사로 새 경로에 생성한 뒤 기존 산출물과 비교한다.
 
+### 4.4 미확인 건 선별 재조회(#73)
+
+시도·시군구 별칭 규칙만 바뀌었고 새 검색은 없을 때, 기준 캐시 전체를 다시
+호출하지 않고 `unmatched`·`ambiguous`만 골라 재조회한다.
+
+```powershell
+# 1) 후보 규모부터 확인(호출 없음)
+node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
+  --cache 03-match-trademarks/output/trademark-applicant-region-cache.json `
+  --dry-run `
+  --manifest-out 03-match-trademarks/output/refresh-manifest.json
+
+# 2) 실제 재조회 — 기준 캐시는 그대로 두고 별도 캐시에만 기록
+node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
+  --cache 03-match-trademarks/output/trademark-applicant-region-cache.json `
+  --refresh-cache 03-match-trademarks/output/applicant-region-refresh-cache.json `
+  --limit 500 --concurrency 2 --checkpoint-every 100 `
+  --daily-budget 1000 --budget-state 03-match-trademarks/output/applicant-region-refresh-daily-budget.json `
+  --merged-out 03-match-trademarks/output/trademark-applicant-region-cache.merged.json `
+  --report-out 03-match-trademarks/output/refresh-report.json
+```
+
+`refresh-report.json`의 `recoveredCount`가 실제로 `unmatched`/`ambiguous`에서
+`matched`로 바뀐 건수다. `--merged-out` 결과를 검증한 뒤에만 사람이 기준 캐시
+파일을 교체한다 — 이 CLI가 기준 캐시를 자동으로 덮어쓰지 않는다.
+
 ## 5. 상황별 재분석·복구
 
 | 상황 | API 재호출 | 조치 |
@@ -150,10 +176,16 @@ node 05-detect-brand-gap/detectBrandGap.js `
 적용하려면 **미확인 출원번호 선별 → 제한된 재조회 → 정규화 결과만 새 캐시에
 저장**하는 작업이 필요하다.
 
-현재 CLI는 완료 캐시 키를 선별적으로 재조회하는 옵션을 제공하지 않는다.
-기준 캐시를 직접 삭제·편집하지 말고, 별도 실행 캐시와 선별 목록을 사용하는
-안전한 `refresh-unverified` 기능을 [#73](https://github.com/omelette-archive/KIIP/issues/73)에서
-후속 구현한다.
+**구현됨**([#73](https://github.com/omelette-archive/KIIP/issues/73)):
+`node 03-match-trademarks/refreshUnverifiedApplicantRegions.js --cache <기준 캐시>`.
+`--dry-run`으로 재조회 후보 manifest만 먼저 생성해 규모를 확인하고,
+실제 재조회는 `--refresh-cache <별도 경로>`에만 쓴다 — 기준 캐시는 절대 직접
+수정하지 않는다. 검증 후 `--merged-out <경로>`로 "개선된 건만" 반영한 새 캐시를
+만들어, 사람이 확인한 뒤 기준 캐시를 교체한다. 현재는 경로 A(출원번호 기반,
+`trademark-applicant-region-cache.json`)만 지원한다 — 경로 B(등록번호 기반,
+`ip-registry-cache.json`)는 캐시 저장 단계에서 주소·국적이 둘 다 없는 출원인을
+걸러내 재조회 후보 판정에 필요한 최소 정보가 없으므로, 캐시 스키마 확장이
+먼저 필요하다(범위 밖).
 
 ## 6. 재분석 전·후 검증표
 
