@@ -48,9 +48,14 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
   assert.match(html, /지역 특산품 상표 분석/);
-  assert.match(html, /알파 테스트 · 부분 수집/);
+  // 2026-08-19 피드백: "알파테스트라는 말을 제외시키고... 최종본처럼" — 상단 배지·요약 탭
+  // 곳곳에 반복 노출하던 "알파 테스트" 문구를 걷어내고 footer 한 곳에만 작게 남긴다.
+  // 같은 이유로 요약 탭의 "데이터 준비 상태"(pipeline-progress) 섹션도 제거했다 —
+  // 같은 내용이 데이터 개요 탭에 이미 있고, "다음 개선" 같은 내부 로드맵 문구가 있었다.
+  assert.doesNotMatch(html, /class="sample-badge">알파 테스트/, "알파 테스트 문구가 상단 배지에 노출되면 안 됨(2026-08-19 결정)");
+  assert.match(html, /알파 테스트 · 데이터 검토 중/, "알파 테스트 표기는 footer 한 곳에만 남겨야 함");
   assert.doesNotMatch(html, /전체 범위 알파|전국 알파|알파 대시보드|ALPHA DATA PREVIEW|ALPHA PIPELINE CHECK/);
-  assert.match(html, /데이터 준비 상태/);
+  assert.doesNotMatch(html, /class="pipeline-progress"/, "요약 탭에서 데이터 준비 상태 섹션은 제거됨(데이터 개요 탭과 중복)");
   assert.match(html, /수집된 상표 예시/);
   assert.ok(
     html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
