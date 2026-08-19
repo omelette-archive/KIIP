@@ -284,7 +284,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /그중 등록/);
   assert.match(html, /지역별 집계 대기/);
   assert.match(html, /class="item-card-grid"/);
-  assert.match(html, /지역 미확정 전국 검색 후보/);
+  assert.match(html, /지역 확인 전 전국 검색 후보/);
+  assert.match(html, /ITEM_ROW_LIMIT = 100/);
+  assert.match(html, /상표 출원 건수 상위/);
+  assert.match(html, /class="item-regions-detail"/);
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
   assert.match(html, /출원 확인 특산품 수 ÷ 판정 완료 특산품 수/);
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
