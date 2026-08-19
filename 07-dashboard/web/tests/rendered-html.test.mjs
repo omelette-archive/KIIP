@@ -40,6 +40,13 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
     "지도는 상표 예시보다 먼저 보여야 함",
   );
+  const mapStart = html.indexOf('<svg class="korea-map"');
+  const mapEnd = html.indexOf("</svg>", mapStart);
+  const mapHtml = html.slice(mapStart, mapEnd);
+  assert.ok(
+    mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-label map-label-province"'),
+    "전국 지도 라벨은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
+  );
   assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
   assert.match(
     html,
@@ -192,6 +199,9 @@ test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(html, /\.map-label \{ fill: #24372e; font-size: 9\.5px;/, "standalone map labels should keep the slightly larger desktop size");
   assert.match(html, /\.map-label \{ font-size: 7\.5px; \}/, "standalone map labels should keep the slightly larger mobile size");
+  assert.match(html, /\.map-label-province \{ font-size: 11px; \}/, "province labels should be larger than municipality labels");
+  assert.match(html, /\.map-label-province \{ font-size: 9px; \}/, "province labels should retain a larger mobile size");
+  assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
