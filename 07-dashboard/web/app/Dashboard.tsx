@@ -164,6 +164,14 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const scopeLabel = isAlpha ? "알파 테스트 · 부분 수집" : snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터";
   const gateTotal = pipeline ? pipeline.regionalMetricGate.availableRegionItemCount + pipeline.regionalMetricGate.blockedRegionItemCount : snapshot.coverage.regionItemCount;
   const uniqueSpecialtyCount = useMemo(() => new Set(snapshot.regions.flatMap((region) => region.items.map((item) => itemName(item)))).size, [snapshot.regions]);
+  const filingStats = useMemo(() => {
+    let total = 0;
+    let filed = 0;
+    snapshot.regions.forEach((region) => region.items.forEach((item) => {
+      if (item.dataState === "complete_nonzero" || item.dataState === "complete_zero") { total += 1; if (item.dataState === "complete_nonzero") filed += 1; }
+    }));
+    return { total, filed, rate: total ? filed / total : null };
+  }, [snapshot.regions]);
   const trademarkShowcase = useMemo(() => {
     const rows: { region: Region; item: Item; example: TrademarkExample }[] = [];
     const applications = new Set<string>();
