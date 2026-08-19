@@ -59,6 +59,13 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
   assert.match(html, /2013 KOSTAT/);
+  assert.match(html, /상표 등록률/);
+  assert.match(html, /확인 특산품 수/);
+  assert.match(html, /상표 활용 여지/);
+  assert.match(html, /지역 주소 일치 출원 중 등록 상태인 건의 비율입니다/);
+  assert.match(html, /현재 데이터에서 확인된 지역×특산품 항목 수입니다/);
+  assert.match(html, /대표 특산품에 비해 지역 상표 활동이 적을수록 높게 표시됩니다/);
+  assert.doesNotMatch(html, />수집 범위<|>브랜드 공백</);
   assert.match(
     visibleTextHtml,
     /[가-힣]+(?:시|군|구|광역시|특별시|특별자치시) \/ [가-힣A-Za-z0-9]/,
@@ -83,6 +90,32 @@ test("keeps trademark-like raw labels out of the map specialty summary", async (
   assert.doesNotMatch(insight, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as map specialties");
   assert.doesNotMatch(ranking, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as ranked specialties");
   assert.match(html, /class="showcase"/, "trademark names should remain in their separate example section");
+});
+
+test("keeps item totals, registration denominator, and pending states explicit", async () => {
+  const snapshot = await loadSnapshot();
+  const officialRows = snapshot.regions.flatMap((region) =>
+    region.items
+      .filter((item) => item.matchingBasis === "notice_name_and_nice_class" && item.niceClass)
+      .map((item) => ({ region: region.region, item })),
+  );
+  const driedPersimmon = officialRows.filter(({ item }) => item.itemName === "감말랭이");
+  assert.equal(driedPersimmon.length, 3);
+  assert.equal(
+    driedPersimmon.reduce((sum, { item }) => sum + item.metrics.uniqueTrademarkCount.value, 0),
+    66,
+    "감말랭이 66건은 세 지역의 주소 일치 출원 합계여야 함",
+  );
+  assert.equal(
+    driedPersimmon.reduce((sum, { item }) => sum + item.metrics.registeredTrademarkCount.value, 0),
+    42,
+    "감말랭이 등록 42건은 같은 66건 중 등록 상태 합계여야 함",
+  );
+  const blueberries = officialRows.filter(({ item }) => item.itemName === "블루베리");
+  assert.ok(blueberries.length > 0, "블루베리는 고시명칭·NICE류가 확인된 품목이어야 함");
+  assert.ok(blueberries.every(({ item }) => item.dataState === "partial"));
+  assert.ok(blueberries.every(({ item }) => item.metrics.uniqueTrademarkCount.availability === "blocked"));
+  assert.ok(blueberries.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 329));
 });
 
 test("renders tab navigation and a data-connected ranking table", async () => {
@@ -207,6 +240,18 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
+  assert.match(html, /상표 등록률/);
+  assert.match(html, /확인 특산품 수/);
+  assert.match(html, /상표 활용 여지/);
+  assert.doesNotMatch(html, />수집 범위<|>브랜드 공백</);
+  assert.match(html, /지역 주소 일치 출원/);
+  assert.match(html, /그중 등록/);
+  assert.match(html, /등록 비율 = 그중 등록 ÷ 지역 주소 일치 출원/);
+  assert.match(html, /지역별 집계 대기/);
+  assert.match(html, /특산품명이 미확정이거나 상표가 0건이라는 뜻이 아닙니다/);
+  assert.match(html, /출원인 주소-대상 지역 일치/);
+  assert.match(html, /두 번째 값은 상표의 유효성 비율이 아닙니다/);
+  assert.doesNotMatch(html, /지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
