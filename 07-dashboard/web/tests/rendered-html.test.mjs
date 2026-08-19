@@ -63,6 +63,21 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
+test("keeps trademark-like raw labels out of the map specialty summary", async () => {
+  const response = await render();
+  const html = await response.text();
+  const insightStart = html.indexOf('class="map-insight"');
+  const insightEnd = html.indexOf("</aside>", insightStart);
+  const insight = html.slice(insightStart, insightEnd);
+  const rankingStart = html.indexOf('class="ranking"');
+  const rankingEnd = html.indexOf("</section>", rankingStart);
+  const ranking = html.slice(rankingStart, rankingEnd);
+  assert.match(insight, /감말랭이/, "the map summary should show a confirmed specialty label");
+  assert.doesNotMatch(insight, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as map specialties");
+  assert.doesNotMatch(ranking, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as ranked specialties");
+  assert.match(html, /class="showcase"/, "trademark names should remain in their separate example section");
+});
+
 test("renders tab navigation and a data-connected ranking table", async () => {
   const response = await render();
   const html = await response.text();
@@ -175,6 +190,8 @@ test("ships traceable province and municipality geometry", async () => {
 
 test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(html, /\.map-label \{ fill: #24372e; font-size: 9\.5px;/, "standalone map labels should keep the slightly larger desktop size");
+  assert.match(html, /\.map-label \{ font-size: 7\.5px; \}/, "standalone map labels should keep the slightly larger mobile size");
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
