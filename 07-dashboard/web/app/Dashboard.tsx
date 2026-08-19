@@ -51,6 +51,15 @@ function officialItemLabel(item: Item): string | null {
   const prefix = DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
   return prefix ? name.slice(prefix.length) : name;
 }
+// 지자체 상세의 "특산품 탭"은 고시명칭이 확정된 공식 특산품만 골라 보여준다.
+// matchingBasis=raw_item_name_unclassified인 검토대기 원물명·상호(예: "꿀다림
+// 데일리허니", "왕곡한과")는 삭제하지 않고 데이터에는 남기되, 탭 목록·기본 선택에서는
+// 절대 노출하지 않는다(2026-08-19 데이터 감사). 지역에 공식 특산품이 하나도 없는
+// 경우(11/124개 지역)에도 원물을 대신 보여주지 않고, 호출부에서 "확인된 특산품 없음"
+// 빈 상태로 분기한다.
+function officialRegionItems(region: Region): Item[] {
+  return region.items.filter((item) => officialItemLabel(item));
+}
 function specialtyCoverage(regions: Region[]): SpecialtyCoverage {
   let total = 0;
   let decided = 0;
@@ -127,7 +136,8 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const mapMax = Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : mapMetric === "registration" ? (stat.trademarks ? stat.registered / stat.trademarks : 0) : mapMetric === "coverage" ? stat.officialItems : stat.decidedItems ? stat.appliedItems / stat.decidedItems : 0));
   const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => `${itemName(item)} ${item.noticeName || ""}`.toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
   const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode) || filteredRegions[0] || snapshot.regions[0];
-  const selectedItem = selectedRegion?.items.find((item) => item.specialtyId === selectedItemId) || selectedRegion?.items[0];
+  const selectedRegionOfficialItems = selectedRegion ? officialRegionItems(selectedRegion) : [];
+  const selectedItem = selectedRegionOfficialItems.find((item) => item.specialtyId === selectedItemId) || selectedRegionOfficialItems[0];
   const itemRows = useMemo(() => {
     const rows = new Map<string, { name: string; trademarks: number; trademarksDisplay: number; hasProvisional: boolean; registered: number; available: number; availableRegions: string[]; regions: string[]; states: string[] }>();
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
@@ -158,7 +168,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const ITEM_ROW_LIMIT = 100;
   const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
 
-  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(region.items[0]?.specialtyId || ""); }
+  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
   function regionMapValue(region: Region | undefined) { if (!region) return null; const available = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((mapMetric === "trademarks" || mapMetric === "registration") && available.length === 0) return null; if (mapMetric === "trademarks") return trademarks; if (mapMetric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (mapMetric === "coverage") return coverage.total; return coverage.rate; }
   function mapValue(name: string) { const stat = provinceStats.get(name); if (!stat) return null; if (mapMetric === "trademarks") return stat.verified ? stat.trademarks : null; if (mapMetric === "registration") return stat.verified && stat.trademarks ? stat.registered / stat.trademarks : null; if (mapMetric === "coverage") return stat.officialItems; return stat.decidedItems ? stat.appliedItems / stat.decidedItems : null; }
@@ -284,15 +294,24 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   </main>;
 }
 
-function RegionDetail({ region, item, onItem }: { region: Region; item: Item; onItem: (id: string) => void }) {
+function RegionDetail({ region, item, onItem }: { region: Region; item: Item | undefined; onItem: (id: string) => void }) {
+  const official = officialRegionItems(region);
+  const heading = <div className="detail-heading"><div><p className="eyebrow">REGION DETAIL</p><h2>{region.region}</h2><p>법정동코드 {region.regionCode || "미확정"}</p></div><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></div>;
+  if (!item) {
+    return <div className="detail-panel">
+      {heading}
+      <div className="item-tabs" role="tablist" aria-label={`${region.region} 특산품`} />
+      <p className="empty">고시명칭·NICE류가 확인된 특산품이 없습니다 · 검토대기 원물명·상호 {region.items.length}개</p>
+    </div>;
+  }
   const examples = item.trademarkExamples || [];
   const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
   const localCount = item.metrics.uniqueTrademarkCount.value || 0;
   const registeredCount = item.metrics.registeredTrademarkCount.value || 0;
   const pendingReason = regionalMetricPendingReason(item);
   return <div className="detail-panel">
-    <div className="detail-heading"><div><p className="eyebrow">REGION DETAIL</p><h2>{region.region}</h2><p>법정동코드 {region.regionCode || "미확정"}</p></div><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></div>
-    <div className="item-tabs" role="tablist" aria-label={`${region.region} 특산품`}>{region.items.map((row) => <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")}>{itemName(row)}</button>)}</div>
+    {heading}
+    <div className="item-tabs" role="tablist" aria-label={`${region.region} 특산품`}>{official.map((row) => <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")}>{itemName(row)}</button>)}</div>
     <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span>{item.itemVerdict?.source === "algorithm" && <span className="verdict-chip" title={verdictTitle(item.itemVerdict)}>AI 판정</span>}</div>
     <div className="metric-reading-note"><strong>아래 수치의 기준</strong><p>전국 검색 결과 전체가 아니라, 출원인 주소가 <b>{region.region}</b>으로 확인된 출원을 지역 수치로 셉니다. 등록 비율은 그중 등록 상태 건수 ÷ 지역 주소 일치 출원 건수입니다.</p></div>
     <div className="detail-grid">
