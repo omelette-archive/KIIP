@@ -108,14 +108,16 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
       region.items.forEach((item) => {
         const official = Boolean(officialItemLabel(item));
         if (official) current.officialItems += 1;
-        if (item.metrics.uniqueTrademarkCount.availability === "available") {
+        // 지역 단위 상표 집계(trademarks/verified/registered)는 고시명칭이 확정된
+        // 공식 특산품만 포함한다. matchingBasis=raw_item_name_unclassified인 검토대기
+        // 원물명·상호(예: "꿀다림 데일리허니", "왕곡한과")는 uniqueTrademarkCount가
+        // available이어도 지역 상표 건수 합계에 섞이면 안 된다(2026-08-19 데이터 감사).
+        if (official && item.metrics.uniqueTrademarkCount.availability === "available") {
           current.verified += 1;
           current.trademarks += item.metrics.uniqueTrademarkCount.value || 0;
           current.registered += item.metrics.registeredTrademarkCount.value || 0;
-          if (official) {
-            current.decidedItems += 1;
-            if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) current.appliedItems += 1;
-          }
+          current.decidedItems += 1;
+          if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) current.appliedItems += 1;
         }
       });
       stats.set(name, current);
@@ -157,8 +159,8 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
 
   function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(region.items[0]?.specialtyId || ""); }
-  function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
-  function regionMapValue(region: Region | undefined) { if (!region) return null; const available = region.items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((mapMetric === "trademarks" || mapMetric === "registration") && available.length === 0) return null; if (mapMetric === "trademarks") return trademarks; if (mapMetric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (mapMetric === "coverage") return coverage.total; return coverage.rate; }
+  function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
+  function regionMapValue(region: Region | undefined) { if (!region) return null; const available = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((mapMetric === "trademarks" || mapMetric === "registration") && available.length === 0) return null; if (mapMetric === "trademarks") return trademarks; if (mapMetric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (mapMetric === "coverage") return coverage.total; return coverage.rate; }
   function mapValue(name: string) { const stat = provinceStats.get(name); if (!stat) return null; if (mapMetric === "trademarks") return stat.verified ? stat.trademarks : null; if (mapMetric === "registration") return stat.verified && stat.trademarks ? stat.registered / stat.trademarks : null; if (mapMetric === "coverage") return stat.officialItems; return stat.decidedItems ? stat.appliedItems / stat.decidedItems : null; }
   function mapMetricValueLabel(value: number | null) { if (value === null) return "데이터 없음"; if (mapMetric === "registration" || mapMetric === "applicationCoverage") return percent(value); return `${number(value)}${mapMetric === "trademarks" ? "건" : "개 품목"}`; }
   function mapValueLabel(name: string) { return mapMetricValueLabel(mapValue(name)); }
