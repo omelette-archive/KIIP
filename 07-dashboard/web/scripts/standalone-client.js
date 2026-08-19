@@ -140,6 +140,29 @@ function dashboardClient(snapshot, geometry) {
     const previewRate = pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal);
     return `<section class="screen-section data-overview"><div class="screen-heading"><div><p class="eyebrow">DATA JOURNEY</p><h1>특산물과 상표가<br>데이터가 되기까지</h1></div><p>수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다.</p></div><div class="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>${number(pipeline.rowCounts.total)}</strong><small>지역×특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>${number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역×품목</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>${number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>${number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 고유 후보</small></article><i>→</i><article class="flow-highlight"><span>05 · 지역 지표</span><strong>${number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>검증 기준 통과 항목</small></article></div><div class="data-summary-grid"><article class="data-summary-card"><p class="eyebrow">SPECIALTY DATA</p><h2>특산물 데이터</h2><div class="data-stat"><strong>${number(uniqueSpecialtyCount)}개</strong><span>고유 특산품명</span></div><div class="data-stat"><strong>${number(snapshot.coverage.regionItemCount)}개</strong><span>지역×품목 조합</span></div><div class="data-stat"><strong>${number(snapshot.coverage.observedRegionCount)}개</strong><span>관측 지역</span></div><p class="data-card-note">같은 특산물도 지역이 다르면 별도 관측 단위로 관리합니다.</p></article><article class="data-summary-card"><p class="eyebrow">TRADEMARK MATCH</p><h2>상표 매칭 결과</h2><div class="match-bars"><div><span>주소 확보 완료 <b>${number(pipeline.applicantRegionVerification.verifiedCount)}</b></span><em><i style="width:${addressRate}%"></i></em><small>${percent(pipeline.applicantRegionVerification.rate)}</small></div><div><span>지역 내 출원 관계 <b>${number(pipeline.applicantRegionVerification.inside)}</b></span><em><i style="width:${Math.max(2, Math.round(insideRate * 100))}%"></i></em><small>주소 판정 관계 중 ${percent(insideRate)}</small></div><div><span>지역 지표 미리보기 <b>${number(pipeline.regionalMetricGate.availableRegionItemCount)}</b></span><em><i style="width:${Math.max(2, Math.round(previewRate * 100))}%"></i></em><small>전체 조합 중 ${percent(previewRate)}</small></div></div></article></div><div class="data-reading-note"><strong>숫자를 읽는 법</strong><p><b>${number(pipeline.rowCounts.total)}행</b>은 수집 입력량, <b>${number(uniqueSpecialtyCount)}개</b>는 고유 특산품명, <b>${number(pipeline.uniqueQueryCounts.total)}개</b>는 실제 API 검색 조합입니다. <b>${number(pipeline.nationwideCandidates.uniqueTrademarkCount)}건</b>은 전국 상표 후보이며, 지역 지표에는 출원인 주소와 수집률 기준을 통과한 값만 사용합니다.</p></div></section>`;
   }
+
+  function bindSearchInput(selector, stateKey) {
+    const input = document.querySelector(selector);
+    if (!input) return;
+    let composing = false;
+    const commit = (value) => {
+      state[stateKey] = value;
+      render();
+      const nextInput = document.querySelector(selector);
+      if (nextInput) {
+        nextInput.focus();
+        nextInput.setSelectionRange(value.length, value.length);
+      }
+    };
+    input.oncompositionstart = () => { composing = true; };
+    input.oncompositionend = (event) => { composing = false; commit(event.currentTarget.value); };
+    input.oninput = (event) => {
+      const value = event.currentTarget.value;
+      state[stateKey] = value;
+      if (composing || event.isComposing) return;
+      commit(value);
+    };
+  }
   function compareScreen() {
     return `<section class="screen-section"><div class="screen-heading"><div><p class="eyebrow">SPECIALIZED CROP MATCH</p><h1>특화작목 비교</h1></div><p>정책 지정 작목과 실제 상표 활동의 일치 여부를 비교하는 화면입니다.</p></div><div class="compare-banner"><span>현재 상태</span><strong>정책 지정 특화작목 원본 미수집 · 비교 대기</strong><p>농사로 지역특산물과 정책 지정 특화작목은 같은 데이터가 아니므로 임의로 대체하지 않습니다.</p></div><div class="compare-grid">${[...provinceStats.entries()].map(([province, row]) => { const names = snapshot.regions.filter((region) => (region.sido || region.region) === province).flatMap((region) => region.items.map(itemName)); return `<article><div class="compare-head"><h2>${esc(province)}</h2><span>비교 대기</span></div><dl><dt>현재 공식 특산품 후보</dt><dd>${esc(names.join(", ") || "없음")}</dd><dt>정책 지정 특화작목</dt><dd class="missing">미수집</dd><dt>지역 상표 활동</dt><dd>${row.verified ? `${number(row.trademarks)}건` : "검증 중"}</dd><dt>일치 여부</dt><dd class="missing">판정 불가</dd></dl></article>`; }).join("")}</div><div class="compare-sources"><article><span>추가 수집 1</span><strong>농촌진흥청 지역특화작목 지정 목록</strong><p>계획 기간·지역·작목·근거 버전을 구조화해야 합니다.</p></article><article><span>추가 수집 2</span><strong>한국지식재산연구원 로컬브랜드 근거</strong><p>2024년 보고서의 지역·품목 대응표와 페이지 근거가 필요합니다.</p></article><article><span>자동화 원칙</span><strong>정책 목록 확보 후 결정론적 비교</strong><p>명칭 후보만 사람 검토하고 나머지 집계·일치 판정은 자동화합니다.</p></article></div></section>`;
   }
@@ -168,8 +191,8 @@ function dashboardClient(snapshot, geometry) {
     document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
     document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
-    const regionSearch = document.querySelector("#region-search"); if (regionSearch) regionSearch.oninput = () => { state.query = regionSearch.value; render(); document.querySelector("#region-search")?.focus(); };
-    const itemSearch = document.querySelector("#item-search"); if (itemSearch) itemSearch.oninput = () => { state.itemQuery = itemSearch.value; render(); document.querySelector("#item-search")?.focus(); };
+    bindSearchInput("#region-search", "query");
+    bindSearchInput("#item-search", "itemQuery");
   }
   function render() {
     nav();

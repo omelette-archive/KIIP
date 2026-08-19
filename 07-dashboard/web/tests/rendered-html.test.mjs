@@ -192,6 +192,8 @@ test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(html, /\.map-label \{ fill: #24372e; font-size: 9\.5px;/, "standalone map labels should keep the slightly larger desktop size");
   assert.match(html, /\.map-label \{ font-size: 7\.5px; \}/, "standalone map labels should keep the slightly larger mobile size");
+  assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
+  assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
