@@ -25,15 +25,24 @@ function percent(value: number | null | undefined) { return typeof value === "nu
 function date(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록"; }
 function compactDate(value: string | null | undefined) { return value && /^\d{8}$/.test(value) ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : value || "출원일 미기록"; }
 function itemName(item: Item) { return item.itemName || item.noticeName || "미지정 품목"; }
-function noticeBasis(item: Item) { return item.noticeName ? `고시명칭 ${item.noticeName}` : "고시명칭 미확정"; }
+// item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
+// 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
+// notice_name_and_nice_class일 때만 실제로 지식재산처 고시상품명칭 사전과 대조해 확정된
+// 값이므로, "고시명칭"이라는 라벨은 이 조건을 거친 값에만 붙여야 한다 — 아니면 원물명이나
+// (검토대기 상태에서 상표 검색에 쓰인) 임의 검색어를 마치 공식 분류인 것처럼 보여주게 된다.
+function officialNoticeName(item: Item): string | null {
+  return item.matchingBasis === "notice_name_and_nice_class" ? item.noticeName : null;
+}
+function noticeBasis(item: Item) { const name = officialNoticeName(item); return name ? `고시명칭 ${name}` : "고시명칭 미확정"; }
 // 신선한/미가공 접두어는 품목 자체가 아니라 매칭 규칙이 붙인 수식어라, 품목별 조회처럼
 // 여러 지역을 하나의 품목으로 묶어 보여줄 때는 "신선한 사과"가 아니라 "사과"로
 // 표시한다(02-normalize-items/lib/ruleNormalizer.js의 접두어 화이트리스트와 동일 어휘).
 const DISPLAY_PREFIXES = ["신선한 ", "미가공 "];
 function officialItemLabel(item: Item): string | null {
-  if (item.matchingBasis !== "notice_name_and_nice_class" || !item.noticeName) return null;
-  const prefix = DISPLAY_PREFIXES.find((candidate) => item.noticeName!.startsWith(candidate));
-  return prefix ? item.noticeName!.slice(prefix.length) : item.noticeName;
+  const name = officialNoticeName(item);
+  if (!name) return null;
+  const prefix = DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
+  return prefix ? name.slice(prefix.length) : name;
 }
 function goodsMethod(method: string) { return ({ normalized_exact: "특산품 활용 확정", normalized_contains: "고시명칭 포함·인정", class_only: "NICE류 검토", mismatch: "지정상품 불일치", unverified: "미검증" } as Record<string, string>)[method] || method; }
 function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`; }
@@ -92,7 +101,10 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   function openMunicipality(name: string) { setSelectedMunicipality(name); const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === name); if (match) chooseRegion(match); }
 
   const visibleRegions = selectedProvince ? snapshot.regions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality)) : snapshot.regions;
-  const visibleItems = visibleRegions.flatMap((region) => region.items.map((item) => ({ region, item }))).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
+  // 지도 옆 미리보기는 상표명(예: 등록 브랜드 "임금님표쌀")이나 아직 고시명칭이 확정 안 된
+  // 원문 표기가 아니라, 확정된 특산물 고시명칭만 보여준다. 원문 표기·상표 사례는 지역 상세와
+  // "수집된 상표 예시"에서 별도로 확인한다.
+  const visibleItems = visibleRegions.flatMap((region) => region.items.map((item) => ({ region, item }))).filter(({ item }) => officialItemLabel(item)).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
   const rankingRows = snapshot.regions
     .flatMap((region) => region.items.map((item) => ({ region, item })))
     .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
@@ -124,22 +136,21 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><span className="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>특산품 × 상표 근거 대시보드</small></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
-    <section className="criteria" aria-label="판정 기준과 매칭 방법">
-      <div className="section-heading">
-        <div><p className="eyebrow">HOW THIS IS BUILT</p><h2>판정 기준과 매칭 방법</h2></div>
-        <span>현재 출처 {sourceLine}</span>
-      </div>
-      <div className="criteria-grid">
-        <article><span>대표 특산품 판정</span><strong>GI 출처 또는 상표 출원 3건 이상</strong><small>#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)</small></article>
-        <article><span>품목 매칭</span><strong>고시명칭 일치·포함</strong><small>지정상품명이 고시상품명칭과 일치하거나 포함되면 특산품 활용 출원으로 인정하고, NICE류만 일치하면 사람 검토로 분리합니다.</small></article>
-        <article><span>지역 매칭</span><strong>법정동코드 완전일치</strong><small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small></article>
-        <article><span>상표 검색</span><strong>KIPRIS 단어검색(고시명칭 기준)</strong><small>검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음</small></article>
-        <article><span>지역 상표 / 등록 상표</span><strong>출원인 주소가 해당 지역으로 확인된 건만</strong><small>전국 KIPRIS 검색 후보는 별도 보존하며 지역 건수·등록률에 포함하지 않음</small></article>
-        <article><span>출원인 지역 매칭</span><strong>주소 확보율은 참고 지표</strong><small>주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 부분 수집은 별도 상태로 구분합니다.</small></article>
-      </div>
-    </section>
-
     {tab === "summary" && <>
+      <section className="criteria" aria-label="판정 기준과 매칭 방법">
+        <div className="section-heading">
+          <div><p className="eyebrow">HOW THIS IS BUILT</p><h2>판정 기준과 매칭 방법</h2></div>
+          <span>현재 출처 {sourceLine}</span>
+        </div>
+        <div className="criteria-grid">
+          <article><span>대표 특산품 판정</span><strong>GI 출처 또는 상표 출원 3건 이상</strong><small>#29 확정(2026-08-11) — GI 미등록이어도 출원 활동이 활발하면 대표로 인정(OR 조건)</small></article>
+          <article><span>품목 매칭</span><strong>고시명칭 일치·포함</strong><small>지정상품명이 고시상품명칭과 일치하거나 포함되면 특산품 활용 출원으로 인정하고, NICE류만 일치하면 사람 검토로 분리합니다.</small></article>
+          <article><span>지역 매칭</span><strong>법정동코드 완전일치</strong><small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small></article>
+          <article><span>상표 검색</span><strong>KIPRIS 단어검색(고시명칭 기준)</strong><small>검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음</small></article>
+          <article><span>지역 상표 / 등록 상표</span><strong>출원인 주소가 해당 지역으로 확인된 건만</strong><small>전국 KIPRIS 검색 후보는 별도 보존하며 지역 건수·등록률에 포함하지 않음</small></article>
+          <article><span>출원인 지역 매칭</span><strong>주소 확보율은 참고 지표</strong><small>주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 부분 수집은 별도 상태로 구분합니다.</small></article>
+        </div>
+      </section>
       <section className="hero"><div><p className="eyebrow">LOCAL BRAND OBSERVATORY</p><h1>지역 특산품 상표 분석</h1><p className="hero-copy">지역별 특산품과 관련 상표 현황을 한눈에 확인합니다.</p></div><div className="hero-note"><span>DATA COVERAGE</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}개 지역×품목</strong><p>{isAlpha && pipeline ? `주소 확보율 ${percent(pipeline.applicantRegionVerification.rate)} · 확보된 값 기준으로 표시합니다.` : "현재 확인 가능한 데이터 범위입니다."}</p></div></section>
       <section className="metrics" aria-label="핵심 지표"><article><span>전국 검색 고유 상표 후보</span><strong>{pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "검증 중"}</strong><small>출원번호 중복 제거 · 지역 상표 건수 아님</small></article><article><span>출원인 주소 확보율</span><strong>{pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역 지표 표시 가능</span><strong>{pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>수집 완료 항목은 주소 확보율과 무관하게 표시</small></article><article><span>고유 검색 조합</span><strong>{pipeline ? number(pipeline.uniqueQueryCounts.total) : snapshot.coverage.partialQueryCount > 0 ? "부분" : "완료"}</strong><small>{pipeline ? `완료 ${number(pipeline.uniqueQueryCounts.complete)} · 부분 ${number(pipeline.uniqueQueryCounts.partial)}` : `입력행 완료 ${snapshot.coverage.completeQueryCount} · 부분 ${snapshot.coverage.partialQueryCount}`}</small></article></section>
       <section className="map-workspace">
@@ -148,9 +159,9 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
           <div className="map-stage"><svg className="korea-map" viewBox={municipalityGeometry?.viewBox || geometry.viewBox} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? municipalityGeometry.items.map((shape) => { const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === shape.name); const statValue = regionTrademarkValue(match); const active = selectedMunicipality === shape.name; return <g key={shape.name}><path d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(statValue, Math.max(1, ...municipalityGeometry.items.map((item) => regionTrademarkValue(snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === item.name)) || 0))) }} tabIndex={0} role="button" aria-label={`${shape.name} ${statValue === null ? "지역 귀속 검증 중" : `상표 ${statValue}건`}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{shape.name} · {statValue === null ? "지역 귀속 검증 중" : `상표 ${statValue}건`}</title></path><text x={shape.labelX} y={shape.labelY} className="map-label">{shape.name}</text></g>; }) : geometry.provinces.map((shape) => <g key={shape.name}><path d={shape.d} className={selectedProvince === shape.name ? "map-shape selected" : "map-shape"} style={{ fill: fill(mapValue(shape.name), mapMax) }} tabIndex={0} role="button" aria-label={`${shape.name} ${mapValueLabel(shape.name)}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{shape.name} · {mapValueLabel(shape.name)}</title></path><text x={shape.labelX} y={shape.labelY} className="map-label">{shape.name}</text></g>)}</svg></div>
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div><p className="map-warning">{geometry.boundaryReference.warning} 지도를 클릭하면 해당 지역의 특산품 목록과 상표 사례를 확인할 수 있습니다.</p>
         </div>
-        <aside className="map-insight"><p className="eyebrow">SELECTED AREA</p><h2>{selectedMunicipality || selectedProvince || "전국"}</h2><p className="insight-summary">{selectedProvince ? `${visibleRegions.length}개 수집 지역, ${visibleItems.length}개 특산품` : `${snapshot.coverage.observedRegionCount}개 관측 지역 · 검증 완료 항목만 수치 반영`}</p><div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {itemName(item)}</strong><small>{noticeBasis(item)} · NICE {item.niceClass || "미확정"}류</small></span><b>{item.metrics.uniqueTrademarkCount.availability === "available" ? `출원 ${number(item.metrics.uniqueTrademarkCount.value)}건` : "지역 귀속 검증 중"}</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역의 수집 데이터가 없습니다.</p>}</div><div className="insight-note"><strong>집계 원칙</strong><p>대표 특산품은 표준명으로 표시합니다. 상표 수치는 확보된 출원인 주소 기준이며, 미확보 건은 원자료와 함께 참고값으로 남깁니다.</p></div></aside>
+        <aside className="map-insight"><p className="eyebrow">SELECTED AREA</p><h2>{selectedMunicipality || selectedProvince || "전국"}</h2><p className="insight-summary">{selectedProvince ? `${visibleRegions.length}개 수집 지역, ${visibleItems.length}개 특산품` : `${snapshot.coverage.observedRegionCount}개 관측 지역 · 검증 완료 항목만 수치 반영`}</p><div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {officialItemLabel(item)}</strong><small>NICE {item.niceClass}류</small></span><b>{item.metrics.uniqueTrademarkCount.availability === "available" ? `출원 ${number(item.metrics.uniqueTrademarkCount.value)}건` : "지역 귀속 검증 중"}</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역은 아직 고시명칭이 확정된 품목이 없습니다.</p>}</div><div className="insight-note"><strong>집계 원칙</strong><p>고시명칭이 확정된 특산물만 표시합니다. 등록 브랜드·상표명은 지역 상세와 "수집된 상표 예시"에서 개별 사례로 확인할 수 있습니다.</p></div></aside>
       </section>
-      <section className="ranking" aria-label="등록상표 랭킹"><div className="section-heading"><div><p className="eyebrow">TRADEMARK RANKING</p><h2>지역×대표 특산품 등록상표 랭킹</h2></div><div className="ranking-toggle" role="group" aria-label="랭킹 표시 건수">{([10, 50] as const).map((limit) => <button type="button" key={limit} className={rankingLimit === limit ? "active" : ""} onClick={() => setRankingLimit(limit)}>TOP {limit}</button>)}</div></div><p className="ranking-note">대표 특산품명으로 표시하고 고시명칭·NICE류를 집계 근거로 병기합니다. 수집 및 지역 귀속 검증 기준을 통과한 항목만 순위에 포함합니다.</p><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>등록상표</th></tr></thead><tbody>{rankingRows.slice(0, rankingLimit).map(({ region, item }, index) => <tr key={`${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{itemName(item)}</td><td>{item.noticeName || "미확정"} · {item.niceClass || "—"}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></section>
+      <section className="ranking" aria-label="등록상표 랭킹"><div className="section-heading"><div><p className="eyebrow">TRADEMARK RANKING</p><h2>지역×대표 특산품 등록상표 랭킹</h2></div><div className="ranking-toggle" role="group" aria-label="랭킹 표시 건수">{([10, 50] as const).map((limit) => <button type="button" key={limit} className={rankingLimit === limit ? "active" : ""} onClick={() => setRankingLimit(limit)}>TOP {limit}</button>)}</div></div><p className="ranking-note">대표 특산품명으로 표시하고 고시명칭·NICE류를 집계 근거로 병기합니다. 수집 및 지역 귀속 검증 기준을 통과한 항목만 순위에 포함합니다.</p><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>등록상표</th></tr></thead><tbody>{rankingRows.slice(0, rankingLimit).map(({ region, item }, index) => <tr key={`${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{itemName(item)}</td><td>{officialNoticeName(item) || "미확정"} · {item.niceClass || "—"}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></section>
       {trademarkShowcase.length > 0 && <section className="showcase" aria-label="수집된 상표 사례"><div className="section-heading"><div><p className="eyebrow">TRADEMARK EXAMPLES</p><h2>수집된 상표 예시</h2></div><span>최근 출원 · 품목별 1건</span></div><p className="showcase-intro">고시명칭으로 검색된 전국 후보이며, 해당 지역 출원으로 확정된 목록은 아닙니다.</p><div className="showcase-grid">{trademarkShowcase.map(({ region, item, example }) => <button type="button" key={example.applicationNumber || example.title} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span className="showcase-item">{itemName(item)} 검색 사례</span><strong>{example.title}</strong><small>{compactDate(example.applicationDate)} · {example.applicationStatus || "상태 미기록"}</small><span className="showcase-number">{example.applicationNumber || "출원번호 미기록"} →</span></button>)}</div></section>}
       {pipeline && <section className="pipeline-progress" aria-label="데이터 준비 상태"><div className="section-heading"><div><p className="eyebrow">DATA READINESS</p><h2>데이터 준비 상태</h2></div><span>수집·검증 단위별 현황</span></div><div className="pipeline-grid"><article><span>지역×품목 입력행</span><strong>{number(pipeline.rowCounts.total)}행</strong><p>검색 가능 {number(pipeline.rowCounts.searchable)} · 건너뜀 {number(pipeline.rowCounts.skipped)}<br />완전 {number(pipeline.rowCounts.complete)} · 부분 {number(pipeline.rowCounts.partial)}</p></article><article><span>출원인 주소 확보</span><strong>{percent(pipeline.applicantRegionVerification.rate)}</strong><p>확보 {number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 {number(pipeline.applicantRegionVerification.unverified)}<br />고유 상표 후보 기준</p></article><article><span>지역 지표 표시 상태</span><strong>{number(pipeline.regionalMetricGate.blockedRegionItemCount)}개 확인 필요</strong><p>{(pipeline.regionalMetricGate.coverageThreshold ?? 1) < 1 ? `검토용 표시 기준 ${percent(pipeline.regionalMetricGate.coverageThreshold)}를 적용했습니다. ` : "지역×품목별 수집과 주소 귀속이 모두 완료돼야 공개합니다. "}일부 결과를 0건으로 간주하지 않습니다.</p></article><article className="pipeline-bottleneck"><span>다음 개선</span><strong>검색 조건 정밀화와 주소 보강 확대</strong><p>중복 검색 단위 분리와 부분 수집 재개는 반영했습니다. 남은 광범위 검색어를 좁히고 새 상표 후보의 주소를 증분 보강합니다.</p></article></div></section>}
     </>}

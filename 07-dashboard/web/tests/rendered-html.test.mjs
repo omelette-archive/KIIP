@@ -57,7 +57,7 @@ test("renders the data-connected Korean dashboard", async () => {
     /[가-힣]+(?:시|군|구|광역시|특별시|특별자치시) \/ [가-힣A-Za-z0-9]/,
     "지도 옆 표기는 '지역 / 특산품' 형식이어야 함"
   );
-  assert.match(html, /판정 기준과 매칭 방법/, "매칭 기준은 하단 note가 아니라 상시 노출 섹션에 있어야 함");
+  assert.match(html, /판정 기준과 매칭 방법/, "매칭 기준은 하단 note가 아니라 눈에 띄는 섹션에 있어야 함(요약 탭 기본 노출)");
   assert.match(html, /고시명칭 \+ NICE류/);
   assert.match(html, /출처와 데이터 상태/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
@@ -101,11 +101,12 @@ test("renders tab navigation and a data-connected ranking table", async () => {
   assert.doesNotMatch(firstRow, /데일리|일선정품|상큼愛/, "랭킹 표에 고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
 });
 
-test("renders matching criteria prominently, on every tab, not just as bottom-of-page small print", async () => {
+test("renders matching criteria prominently once, on the summary tab, not repeated on every tab", async () => {
   const response = await render();
   const html = await response.text();
-  // 판정 기준은 하단 <details>가 아니라 항상 보이는 섹션이어야 한다(2026-08-11 피드백:
-  // "작은글씨는 아니면 위에 잘 넣을수있으면 넣고"). tab 조건문 밖에 있어야 모든 탭에서 보인다.
+  // 판정 기준은 하단 <details>가 아니라 눈에 띄는 섹션이어야 한다(2026-08-11 피드백: "작은글씨는
+  // 아니면 위에 잘 넣을수있으면 넣고"). 다만 2026-08-19 피드백으로 모든 탭에 반복 노출하던 것을
+  // 정리해 요약 탭에만 한 번 보이도록 옮겼다 — SSR 초기 상태가 요약 탭이라 여기서 확인된다.
   assert.match(html, /class="criteria"/);
   assert.match(html, /판정 기준과 매칭 방법/);
   assert.match(html, /GI 출처 또는 상표 출원 3건 이상/, "#29 대표 특산품 기준이 명시돼야 함");
