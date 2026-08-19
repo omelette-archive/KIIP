@@ -79,6 +79,14 @@ Open API 계정/호출 제한은 [`docs/open-api-limits.md`](docs/open-api-limit
 node scripts/validatePipeline.js
 ```
 
+추가 수집 결과를 대시보드에 반영하기 전에는 스냅샷의 확인 특산품과 검토대기 데이터가 섞이지 않는지도 감사한다.
+
+```powershell
+node scripts/auditDashboardSnapshot.js
+```
+
+판정 기준과 반영 체크리스트는 [대시보드 데이터 품질 감사](docs/dashboard-data-quality-audit.md)에 정리되어 있다.
+
 동일한 검증은 모든 push와 pull request에서 GitHub Actions로 자동 실행된다. 실제 API 호출은
 포함하지 않아 키나 호출량을 사용하지 않는다.
 
