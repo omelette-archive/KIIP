@@ -181,7 +181,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, 1fr);
+  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, 1fr);
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
@@ -208,11 +208,16 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .map-metric-description span { min-width: 0; }
 .map-stage { display: grid; place-items: center; min-height: 530px; margin-top: 10px; overflow: hidden; }
 .korea-map { width: min(100%, 620px); max-height: 610px; overflow: visible; }
+.map-with-callouts { width: min(100%, 760px); max-height: 650px; }
 .map-shape { stroke: #fffdf8; stroke-width: 1.4; cursor: pointer; transition: filter .15s ease, opacity .15s ease, stroke-width .15s ease; }
 .map-shape:hover, .map-shape:focus-visible { filter: brightness(.9) saturate(1.1); stroke: var(--green-dark); stroke-width: 2.8; outline: none; }
 .map-shape.selected { stroke: var(--amber); stroke-width: 3.5; }
 .map-label { fill: #24372e; font-size: 9.5px; font-weight: 800; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 2px; stroke-linejoin: round; }
 .map-label-province { font-size: 11px; }
+.map-callout { pointer-events: none; }
+.map-callout polyline { fill: none; stroke: #64766d; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.map-callout text { dominant-baseline: middle; fill: #24372e; font-size: 17px; font-weight: 800; paint-order: stroke; stroke: rgba(255,255,255,.94); stroke-width: 3px; stroke-linejoin: round; }
+.map-callout-value { fill: var(--green); }
 .map-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
 .map-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .map-legend strong { margin-left: auto; color: var(--green); }
@@ -228,6 +233,39 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .mini-list strong, .mini-list small { display: block; }.mini-list strong { font-size: 12px; }.mini-list small { margin-top: 3px; color: var(--muted); font-size: 9px; }.mini-list b { color: var(--green); font-size: 12px; white-space: nowrap; }
 .insight-note { margin-top: 18px; padding: 16px; border-radius: 12px; background: var(--green-dark); color: white; }
 .insight-note strong { font-size: 10px; }.insight-note p { margin: 7px 0 0; color: #d3e3dc; font-size: 10px; line-height: 1.65; }
+
+.coverage-screen { padding-top: 44px; }
+.coverage-kpis { display: grid; grid-template-columns: 1.15fr repeat(3, 1fr); margin-top: 24px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.coverage-kpis article { min-height: 138px; padding: 24px; border-right: 1px solid var(--line); }
+.coverage-kpis article:last-child { border-right: 0; }
+.coverage-kpis span, .coverage-kpis small { display: block; color: var(--muted); }
+.coverage-kpis span { font-size: 10px; font-weight: 800; }
+.coverage-kpis strong { display: block; margin-top: 10px; font-size: 30px; letter-spacing: -.04em; }
+.coverage-kpis small { margin-top: 8px; font-size: 10px; line-height: 1.55; }
+.coverage-rate-kpi { background: var(--green-dark); color: white; }
+.coverage-rate-kpi span, .coverage-rate-kpi small { color: #d3e3dc; }
+.coverage-map-card, .coverage-directory { margin-top: 20px; padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.coverage-map-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
+.coverage-map-stage { min-height: 620px; }
+.coverage-map { width: min(100%, 900px); max-height: 720px; }
+.coverage-legend { display: grid; grid-template-columns: auto minmax(180px, 1fr) repeat(4, auto) minmax(150px, auto); align-items: center; gap: 9px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
+.coverage-legend i { height: 11px; border-radius: 999px; background: linear-gradient(90deg, #d9e6df 0%, #a9cdbb 25%, #73ad91 50%, #438b70 75%, #1f6d56 100%); }
+.coverage-legend b { justify-self: end; color: var(--faint); font-weight: 700; }
+.coverage-directory .section-heading { margin-bottom: 16px; }
+.coverage-region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.coverage-region-card { padding: 18px; border: 1px solid var(--line); border-radius: 14px; background: #faf8f2; }
+.coverage-region-card.selected { border-color: var(--green); background: var(--green-soft); }
+.coverage-region-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
+.coverage-region-head strong, .coverage-region-head small { display: block; }
+.coverage-region-head strong { font-size: 17px; }
+.coverage-region-head small { margin-top: 4px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.coverage-region-head b { color: var(--green); font-size: 24px; }
+.coverage-region-head button { padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--green); font-size: 9px; font-weight: 800; cursor: pointer; }
+.coverage-specialty-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; padding-top: 13px; border-top: 1px solid var(--line); }
+.coverage-specialty-list > span, .coverage-specialty-list button { padding: 7px 9px; border: 1px solid #d8dfda; border-radius: 9px; background: var(--surface); color: #425a4f; font-size: 11px; }
+.coverage-specialty-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; cursor: pointer; }
+.coverage-specialty-list button:hover { border-color: #8db9a5; background: var(--green-soft); }
+.coverage-specialty-list button small { color: var(--muted); font-size: 9px; white-space: nowrap; }
 .matching-rule { margin: 18px 0 0; border-left: 4px solid var(--green); }
 .matching-rule strong { font-size: 13px; }.matching-rule p { font-size: 11px; line-height: 1.65; }
 .trademark-examples { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
@@ -309,6 +347,10 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
   .source-grid { grid-template-columns: repeat(2, 1fr); }
   .map-workspace { grid-template-columns: 1fr; }
   .map-stage { min-height: 460px; }
+  .coverage-kpis { grid-template-columns: repeat(2, 1fr); }
+  .coverage-kpis article:nth-child(2) { border-right: 0; }
+  .coverage-kpis article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
+  .coverage-region-grid { grid-template-columns: 1fr; }
   .criteria-grid { grid-template-columns: repeat(2, 1fr); }
   .pipeline-grid { grid-template-columns: repeat(2, 1fr); }
   .showcase-grid { grid-template-columns: repeat(2, 1fr); }
@@ -353,6 +395,22 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
   .map-stage { min-height: 390px; }
   .map-label { font-size: 7.5px; }
   .map-label-province { font-size: 9px; }
+  .map-callout text { font-size: 30px; stroke-width: 5px; }
+  .coverage-screen { padding-top: 30px; }
+  .coverage-kpis { grid-template-columns: 1fr; }
+  .coverage-kpis article { min-height: 116px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .coverage-kpis article:nth-child(2) { border-right: 0; }
+  .coverage-kpis article:last-child { border-bottom: 0; }
+  .coverage-map-card, .coverage-directory { padding: 18px; }
+  .coverage-map-actions { justify-content: flex-start; }
+  .coverage-map-stage { min-height: 420px; }
+  .coverage-legend { grid-template-columns: auto 1fr auto; }
+  .coverage-legend span:nth-of-type(2), .coverage-legend span:nth-of-type(3), .coverage-legend span:nth-of-type(4) { display: none; }
+  .coverage-legend b { grid-column: 1 / -1; justify-self: start; }
+  .coverage-directory .section-heading { align-items: flex-start; flex-direction: column; }
+  .coverage-region-head { grid-template-columns: 1fr auto; }
+  .coverage-region-head button { grid-column: 1 / -1; justify-self: start; }
+  .coverage-specialty-list { display: grid; grid-template-columns: 1fr; }
   .item-screen-toolbar, .item-card-head, .compare-section-head { align-items: flex-start; flex-direction: column; }
   .item-screen-toolbar label { width: 100%; }
   .item-card-metrics { grid-template-columns: 1fr; }
@@ -373,7 +431,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 <script>/* eslint-disable @typescript-eslint/no-unused-vars -- embedded and invoked by dashboard.html */
 function dashboardClient(snapshot, geometry) {
   const labels = { complete_nonzero: "수집 완료", complete_zero: "결과 0건", partial: "부분 수집", error: "오류", skipped: "건너뜀", not_collected: "미수집", complete: "완료" };
-  const tabs = { summary: "요약", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교", data: "데이터 개요" };
+  const tabs = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교", data: "데이터 개요" };
   const mapLabels = { trademarks: "상표 건수", registration: "상표 등록률", coverage: "확인 특산품 수", applicationCoverage: "특산품 출원율" };
   const mapDescriptions = {
     trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
@@ -443,6 +501,20 @@ function dashboardClient(snapshot, geometry) {
   const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
   const fill = (value, max) => value === null ? "#e5e1d7" : `color-mix(in srgb, #1f6d56 ${Math.round(24 + Math.max(.12, Math.min(1, max ? value / max : 0)) * 68)}%, #e7eee9)`;
+  const compactRegionName = (name) => name === "전남광주통합특별시" ? "전남·광주" : name.replace(/특별자치도$|특별자치시$|광역시$|특별시$|도$/, "");
+  const parseViewBox = (viewBox) => { const [x, y, width, height] = viewBox.split(/\s+/).map(Number); return { x, y, width, height }; };
+  const calloutViewBox = (viewBox) => { const { x, y, width, height } = parseViewBox(viewBox); const gutter = Math.max(125, width * .2); return `${x - gutter} ${y} ${width + gutter * 2} ${height}`; };
+  const calloutLabels = (shapes, viewBox, valueFor, labelFor, includeName = () => true) => {
+    const { x, y, width, height } = parseViewBox(viewBox); const center = x + width / 2; const result = [];
+    const rows = shapes.map((shape) => ({ shape, rawValue: valueFor(shape.name) })).filter(({ shape }) => includeName(shape.name));
+    ["left", "right"].forEach((side) => {
+      const sideRows = rows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
+      if (!sideRows.length) return;
+      const top = y + Math.max(18, height * .035), bottom = y + height - Math.max(18, height * .035), step = sideRows.length === 1 ? 0 : (bottom - top) / (sideRows.length - 1);
+      sideRows.forEach(({ shape, rawValue }, index) => { const labelY = sideRows.length === 1 ? Math.max(top, Math.min(bottom, shape.labelY)) : top + step * index; const isLeft = side === "left"; result.push({ name: shape.name, x: isLeft ? x - 13 : x + width + 13, y: labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: isLeft ? x - 4 : x + width + 4, anchor: isLeft ? "end" : "start", value: labelFor(rawValue) }); });
+    });
+    return result;
+  };
   const totals = snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 });
   const sourceLine = snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean).join(" · ");
   const pipeline = snapshot.pipelineStatus;
@@ -482,26 +554,26 @@ function dashboardClient(snapshot, geometry) {
     });
     provinceStats.set(name, row);
   });
-  function provinceValue(name) {
+  function provinceValue(name, metric = state.mapMetric) {
     const row = provinceStats.get(name); if (!row) return null;
-    if (state.mapMetric === "trademarks") return row.verified ? row.trademarks : null;
-    if (state.mapMetric === "registration") return row.verified && row.trademarks ? row.registered / row.trademarks : null;
-    if (state.mapMetric === "coverage") return row.officialItems;
+    if (metric === "trademarks") return row.verified ? row.trademarks : null;
+    if (metric === "registration") return row.verified && row.trademarks ? row.registered / row.trademarks : null;
+    if (metric === "coverage") return row.officialItems;
     return row.decidedItems ? row.appliedItems / row.decidedItems : null;
   }
-  function regionValue(region) {
+  function regionValue(region, metric = state.mapMetric) {
     if (!region) return null;
     const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available");
     const trademarks = verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0);
     const registered = verified.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0);
-    if (["trademarks", "registration"].includes(state.mapMetric) && verified.length === 0) return null;
-    if (state.mapMetric === "trademarks") return trademarks;
-    if (state.mapMetric === "registration") return trademarks ? registered / trademarks : 0;
+    if (["trademarks", "registration"].includes(metric) && verified.length === 0) return null;
+    if (metric === "trademarks") return trademarks;
+    if (metric === "registration") return trademarks ? registered / trademarks : 0;
     const coverage = specialtyCoverage([region]);
-    if (state.mapMetric === "coverage") return coverage.total;
+    if (metric === "coverage") return coverage.total;
     return coverage.rate;
   }
-  function mapValueLabel(value) { if (value === null) return "데이터 없음"; if (["registration", "applicationCoverage"].includes(state.mapMetric)) return percent(value); return `${number(value)}${state.mapMetric === "trademarks" ? "건" : "개 품목"}`; }
+  function mapValueLabel(value, metric = state.mapMetric) { if (value === null) return "데이터 없음"; if (["registration", "applicationCoverage"].includes(metric)) return percent(value); return `${number(value)}${metric === "trademarks" ? "건" : "개 품목"}`; }
   function regionalMetricPendingReason(item) {
     if (item.dataState === "partial") return "상표 검색이 일부만 수집되어 지역별 집계를 아직 확정하지 않았습니다.";
     if (item.dataState === "error") return "상표 검색 오류로 지역별 집계를 아직 확정하지 않았습니다.";
@@ -525,17 +597,36 @@ function dashboardClient(snapshot, geometry) {
     // "수집된 상표 예시"에서 별도로 확인한다.
     const visibleItems = visibleRegions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; })).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
     const municipal = state.province ? geometry.municipalities[state.province] : null;
-    const nationalMax = Math.max(1, ...geometry.provinces.map((shape) => provinceValue(shape.name) || 0));
-    const municipalMax = municipal ? Math.max(1, ...municipal.items.map((shape) => regionValue(snapshot.regions.find((region) => region.sido === state.province && region.sigungu === shape.name)) || 0)) : 1;
+    const percentageMetric = ["registration", "applicationCoverage"].includes(state.mapMetric);
+    const nationalMax = percentageMetric ? 1 : Math.max(1, ...geometry.provinces.map((shape) => provinceValue(shape.name) || 0));
+    const municipalMax = percentageMetric ? 1 : municipal ? Math.max(1, ...municipal.items.map((shape) => regionValue(snapshot.regions.find((region) => region.sido === state.province && region.sigungu === shape.name)) || 0)) : 1;
     const rankingRows = snapshot.regions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; })).filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available").sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
     const shapePaths = municipal ? municipal.items.map((shape) => { const region = snapshot.regions.find((row) => row.sido === state.province && row.sigungu === shape.name); const value = regionValue(region); return `<path d="${shape.d}" class="map-shape ${state.municipality === shape.name ? "selected" : ""}" style="fill:${fill(value, municipalMax)}" tabindex="0" role="button" data-municipality="${esc(shape.name)}" aria-label="${esc(shape.name)} ${mapValueLabel(value)}"><title>${esc(shape.name)} · ${mapValueLabel(value)}</title></path>`; }).join("") : geometry.provinces.map((shape) => { const value = provinceValue(shape.name); return `<path d="${shape.d}" class="map-shape" style="fill:${fill(value, nationalMax)}" tabindex="0" role="button" data-province="${esc(shape.name)}" aria-label="${esc(shape.name)} ${mapValueLabel(value)}"><title>${esc(shape.name)} · ${mapValueLabel(value)}</title></path>`; }).join("");
-    const shapeLabels = municipal ? municipal.items.map((shape) => `<text x="${shape.labelX}" y="${shape.labelY}" class="map-label map-label-municipality">${esc(shape.name)}</text>`).join("") : geometry.provinces.map((shape) => `<text x="${shape.labelX}" y="${shape.labelY}" class="map-label map-label-province">${esc(shape.name)}</text>`).join("");
+    const activeViewBox = municipal?.viewBox || geometry.viewBox;
+    const activeShapes = municipal?.items || geometry.provinces;
+    const shapeLabels = calloutLabels(activeShapes, activeViewBox, (name) => municipal ? regionValue(snapshot.regions.find((region) => region.sido === state.province && region.sigungu === name)) : provinceValue(name), (value) => mapValueLabel(value), (name) => !municipal || snapshot.regions.some((region) => region.sido === state.province && region.sigungu === name)).map((label) => `<g class="map-callout"><polyline points="${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}"></polyline><text x="${label.x}" y="${label.y}" text-anchor="${label.anchor}"><tspan>${esc(compactRegionName(label.name))}</tspan><tspan class="map-callout-value"> ${esc(label.value)}</tspan></text></g>`).join("");
     return `<section class="hero"><div><p class="eyebrow">LOCAL BRAND OBSERVATORY</p><h1>지역 특산품 상표 분석</h1><p class="hero-copy">지역별 특산품과 관련 상표 현황을 한눈에 확인합니다.</p></div><div class="hero-note"><span>DATA COVERAGE</span><strong>${snapshot.coverage.observedRegionCount}개 지역 · ${snapshot.coverage.regionItemCount}개 지역×품목</strong><p>현재 확인 가능한 데이터 범위입니다.</p></div></section>
     <section class="metrics"><article><span>특산품 출원율</span><strong>${percent(nationalSpecialtyCoverage.rate)}</strong><small>확인 특산품 전체 ${number(nationalSpecialtyCoverage.total)}개 · 판정 완료 ${number(nationalSpecialtyCoverage.decided)}개 중 ${number(nationalSpecialtyCoverage.applied)}개 출원 확인 · 집계 대기 ${number(nationalSpecialtyCoverage.pending)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>${pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거 · 지역별 출원 수와는 다른 전국 검색 결과</small></article><article><span>출원인 주소 확보율</span><strong>${pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>${pipeline ? `고유 후보 중 확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>${pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>검색 수집이 완료된 지역×특산품 항목 수</small></article></section>
-    <section class="map-workspace"><div class="map-card"><div class="map-heading"><div><p class="eyebrow">REGIONAL TRADEMARK MAP</p><h2>${state.province ? `${esc(state.province)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip">참고 경계 · 2013 KOSTAT</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map" viewBox="${municipal?.viewBox || geometry.viewBox}" role="img" aria-label="${state.province ? `${esc(state.province)} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span><span><i class="legend-swatch low"></i>낮음</span><span><i class="legend-swatch high"></i>높음</span><strong>${mapLabels[state.mapMetric]} 기준</strong></div><p class="map-warning">${esc(geometry.boundaryReference.warning)} 집계 대기 특산품은 출원율 분모에서 제외합니다.</p></div>
+    <section class="map-workspace"><div class="map-card"><div class="map-heading"><div><p class="eyebrow">REGIONAL TRADEMARK MAP</p><h2>${state.province ? `${esc(state.province)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip">참고 경계 · 2013 KOSTAT</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map map-with-callouts" viewBox="${calloutViewBox(activeViewBox)}" role="img" aria-label="${state.province ? `${esc(state.province)} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span><span><i class="legend-swatch low"></i>낮음</span><span><i class="legend-swatch high"></i>높음</span><strong>${mapLabels[state.mapMetric]} 기준</strong></div><p class="map-warning">${esc(geometry.boundaryReference.warning)} 집계 대기 특산품은 출원율 분모에서 제외합니다.</p></div>
     <aside class="map-insight"><p class="eyebrow">SELECTED AREA</p><h2>${esc(state.municipality || state.province || "전국")}</h2><p class="insight-summary">확인 특산품 ${number(visibleSpecialtyCoverage.total)}개 · 출원 확인 ${number(visibleSpecialtyCoverage.applied)} / 판정 완료 ${number(visibleSpecialtyCoverage.decided)} · 출원율 ${percent(visibleSpecialtyCoverage.rate)}${visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</p><div class="mini-list">${visibleItems.slice(0, 5).map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span><strong>${esc(region.sigungu || region.region)} / ${esc(label)}</strong><small>${esc(noticeBasis(item))} · NICE ${esc(item.niceClass)}류</small></span><b>${item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "지역별 집계 대기"}</b></button>`).join("") || '<p class="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>'}</div><div class="insight-note"><strong>출원율 계산</strong><p>출원 확인 특산품 수 ÷ 지역별 집계 판정 완료 특산품 수입니다. 전체 특산품 수와 집계 대기 수를 함께 표시하며, 대기 품목을 출원 없음으로 계산하지 않습니다.</p></div></aside></section>
     <section class="ranking" aria-label="지역 주소 일치 출원 중 등록 랭킹"><div class="section-heading"><div><p class="eyebrow">TRADEMARK RANKING</p><h2>지역×대표 특산품 · 등록 상태 출원 랭킹</h2></div><div class="ranking-toggle">${[10, 50].map((limit) => `<button type="button" data-ranking-limit="${limit}" class="${state.rankingLimit === limit ? "active" : ""}">TOP ${limit}</button>`).join("")}</div></div><p class="ranking-note">출원인 주소가 해당 지역과 일치한 출원 가운데 등록 상태인 건수로 순위를 정합니다. 고시명칭·NICE류가 확인된 특산품명만 표시하고, 개별 상표명은 아래 상표 예시와 상세 화면에서 확인합니다.</p><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>그중 등록</th></tr></thead><tbody>${rankingRows.slice(0, state.rankingLimit).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(region.region)}</td><td>${esc(label)}</td><td>${esc(item.noticeName)} · ${esc(item.niceClass)}류</td><td>${number(item.metrics.registeredTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></section>
     ${trademarkShowcase.length ? `<section class="showcase" aria-label="수집된 상표 사례"><div class="section-heading"><div><p class="eyebrow">TRADEMARK EXAMPLES</p><h2>수집된 상표 예시</h2></div><span>최근 출원 · 품목별 1건</span></div><p class="showcase-intro">고시명칭으로 검색된 전국 후보이며, 해당 지역 출원으로 확정된 목록은 아닙니다.</p><div class="showcase-grid">${trademarkShowcase.map(({ region, item, example }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span class="showcase-item">${esc(itemName(item))} 검색 사례</span><strong>${esc(example.title)}</strong><small>${esc(compactDate(example.applicationDate))} · ${esc(example.applicationStatus || "상태 미기록")}</small><span class="showcase-number">${esc(example.applicationNumber || "출원번호 미기록")} →</span></button>`).join("")}</div></section>` : ""}`;
+  }
+
+  function applicationsScreen() {
+    const municipal = state.province ? geometry.municipalities[state.province] : null;
+    const activeViewBox = municipal?.viewBox || geometry.viewBox;
+    const activeShapes = municipal?.items || geometry.provinces;
+    const areaRegions = state.province ? snapshot.regions.filter((region) => region.sido === state.province && (!state.municipality || region.sigungu === state.municipality)) : snapshot.regions;
+    const area = specialtyCoverage(areaRegions);
+    const areaName = state.municipality || state.province || "전국";
+    const mapLabelsHtml = calloutLabels(activeShapes, activeViewBox, (name) => municipal ? regionValue(snapshot.regions.find((region) => region.sido === state.province && region.sigungu === name), "applicationCoverage") : provinceValue(name, "applicationCoverage"), (value) => mapValueLabel(value, "applicationCoverage"), (name) => !municipal || snapshot.regions.some((region) => region.sido === state.province && region.sigungu === name)).map((label) => `<g class="map-callout"><polyline points="${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}"></polyline><text x="${label.x}" y="${label.y}" text-anchor="${label.anchor}"><tspan>${esc(compactRegionName(label.name))}</tspan><tspan class="map-callout-value"> ${esc(label.value)}</tspan></text></g>`).join("");
+    const shapePaths = municipal ? municipal.items.map((shape) => { const region = snapshot.regions.find((row) => row.sido === state.province && row.sigungu === shape.name); const value = regionValue(region, "applicationCoverage"); return `<path d="${shape.d}" class="map-shape ${state.municipality === shape.name ? "selected" : ""}" style="fill:${fill(value, 1)}" tabindex="0" role="button" data-municipality="${esc(shape.name)}" aria-label="${esc(shape.name)} 특산품 출원율 ${mapValueLabel(value, "applicationCoverage")}"><title>${esc(shape.name)} · 특산품 출원율 ${mapValueLabel(value, "applicationCoverage")}</title></path>`; }).join("") : geometry.provinces.map((shape) => { const value = provinceValue(shape.name, "applicationCoverage"); return `<path d="${shape.d}" class="map-shape" style="fill:${fill(value, 1)}" tabindex="0" role="button" data-province="${esc(shape.name)}" aria-label="${esc(shape.name)} 특산품 출원율 ${mapValueLabel(value, "applicationCoverage")}"><title>${esc(shape.name)} · 특산품 출원율 ${mapValueLabel(value, "applicationCoverage")}</title></path>`; }).join("");
+    const breakdown = (state.province ? areaRegions.map((region) => ({ key: regionKey(region), label: region.sigungu || region.region, regions: [region], region })) : [...provinceStats.keys()].map((province) => ({ key: province, label: province, regions: snapshot.regions.filter((region) => region.sido === province), region: null }))).map((row) => ({ ...row, coverage: specialtyCoverage(row.regions), items: row.regions.flatMap((region) => officialRegionItems(region).map((item) => ({ region, item, label: officialItemLabel(item) || itemName(item) }))) })).sort((a, b) => a.label.localeCompare(b.label, "ko-KR"));
+    return `<section class="screen-section coverage-screen"><div class="screen-heading"><div><p class="eyebrow">REGIONAL APPLICATION COVERAGE</p><h1>지역별 특산품 출원율</h1></div><p>지도 색과 숫자로 시도별 출원율을 비교하고, 시도를 누르면 시군구까지 내려갑니다.</p></div>
+      <section class="coverage-kpis" aria-label="${esc(areaName)} 특산품 출원 현황"><article><span>선택 지역</span><strong>${esc(areaName)}</strong><small>${state.municipality ? `${esc(state.province)} 내 시군구` : state.province ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</small></article><article><span>확인 특산품</span><strong>${number(area.total)}개</strong><small>현재 고시명칭·NICE류가 확인된 항목</small></article><article><span>출원 확인 특산품</span><strong>${number(area.applied)}개</strong><small>판정 완료 ${number(area.decided)}개 중 1건 이상 출원 확인</small></article><article class="coverage-rate-kpi"><span>특산품 출원율</span><strong>${percent(area.rate)}</strong><small>${number(area.applied)} ÷ ${number(area.decided)}${area.pending ? ` · 집계 대기 ${number(area.pending)}개` : " · 전체 판정 완료"}</small></article></section>
+      <section class="coverage-map-card"><div class="map-heading"><div><p class="eyebrow">APPLICATION RATE MAP</p><h2>${state.province ? `${esc(state.province)} 시군구 출원율` : "전국 시도별 출원율"}</h2></div><div class="coverage-map-actions"><span class="reference-chip">색이 진할수록 출원율이 높음</span>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div></div><p class="map-metric-description"><strong>특산품 출원율</strong><span>출원 확인 특산품 수 ÷ 판정 완료 특산품 수 · 집계 대기는 분모에서 제외합니다.</span></p><div class="map-stage coverage-map-stage"><svg class="korea-map map-with-callouts coverage-map" viewBox="${calloutViewBox(activeViewBox)}" role="img" aria-label="${state.province ? `${esc(state.province)} 시군구별 특산품 출원율 지도` : "대한민국 시도별 특산품 출원율 지도"}">${shapePaths}${mapLabelsHtml}</svg></div><div class="coverage-legend"><span>0%</span><i></i><span>25%</span><span>50%</span><span>75%</span><span>100%</span><b>회색은 데이터 없음</b></div><p class="map-warning">${state.province ? "라벨은 현재 특산품 데이터가 있는 시군구만 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "각 시도의 숫자는 시군구별 특산품 항목을 합산한 출원율입니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p></section>
+      <section class="coverage-directory"><div class="section-heading"><div><p class="eyebrow">SPECIALTY DIRECTORY</p><h2>${esc(areaName)} 특산품 목록</h2></div><span>확인 ${number(area.total)}개 · 출원 확인 ${number(area.applied)}개 · 출원율 ${percent(area.rate)}</span></div><div class="coverage-region-grid">${breakdown.map((row) => `<article class="coverage-region-card ${state.municipality && row.label === state.municipality ? "selected" : ""}"><div class="coverage-region-head"><div><strong>${esc(row.label)}</strong><small>특산품 ${number(row.coverage.total)}개 · 출원 확인 ${number(row.coverage.applied)} / 판정 완료 ${number(row.coverage.decided)}${row.coverage.pending ? ` · 대기 ${number(row.coverage.pending)}` : ""}</small></div><b>${percent(row.coverage.rate)}</b>${!state.province ? `<button type="button" data-province="${esc(row.label)}">지도에서 보기</button>` : ""}</div><div class="coverage-specialty-list">${row.items.map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span>${esc(state.province ? label : `${region.sigungu || region.region} / ${label}`)}</span><small>${item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "집계 대기"}</small></button>`).join("")}</div></article>`).join("")}</div></section></section>`;
   }
 
   function regionDetail(region, item) {
@@ -647,7 +738,14 @@ function dashboardClient(snapshot, geometry) {
   }
   function render() {
     nav();
-    document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
+    document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
+    if (state.tab === "regions") {
+      document.querySelectorAll(".detail-grid article").forEach((article) => {
+        if (article.querySelector("span")?.textContent?.trim() === "그중 등록 상태") article.remove();
+      });
+      const metricNote = document.querySelector(".detail-panel .metric-reading-note p");
+      if (metricNote) metricNote.textContent = "전국 검색 결과 전체가 아니라, 출원인 주소가 해당 지역으로 확인된 출원을 지역 수치로 셉니다.";
+    }
     bind();
   }
 
