@@ -37,8 +37,13 @@ function itemName(item: Item) { return item.itemName || item.noticeName || "미�
 // notice_name_and_nice_class일 때만 실제로 지식재산처 고시상품명칭 사전과 대조해 확정된
 // 값이므로, "고시명칭"이라는 라벨은 이 조건을 거친 값에만 붙여야 한다 — 아니면 원물명이나
 // (검토대기 상태에서 상표 검색에 쓰인) 임의 검색어를 마치 공식 분류인 것처럼 보여주게 된다.
+// 2026-08-20: raw_item_goods_matched(원물명 + 등록원부 지정상품 정규화 일치 + 출원인
+// 주소 지역 일치로 AI가 검토·확정한 항목)는 고시명칭 사전 매칭과 판정 근거는 다르지만,
+// 화면에서는 구분 없이 동일한 "확인 특산품"으로 취급한다(사용자 결정). 판단 근거는
+// matchingBasis 값과 metrics.*.rationale에만 남기고 UI 텍스트로는 노출하지 않는다.
+const OFFICIAL_MATCHING_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
 function officialNoticeName(item: Item): string | null {
-  return item.matchingBasis === "notice_name_and_nice_class" ? item.noticeName : null;
+  return item.matchingBasis && OFFICIAL_MATCHING_BASES.has(item.matchingBasis) ? item.noticeName : null;
 }
 function noticeBasis(item: Item) { const name = officialNoticeName(item); return name ? `고시명칭 ${name}` : "고시명칭 미확정"; }
 // 신선한/미가공 접두어는 품목 자체가 아니라 매칭 규칙이 붙인 수식어라, 품목별 조회처럼
