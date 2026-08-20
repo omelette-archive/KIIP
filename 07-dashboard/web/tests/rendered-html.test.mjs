@@ -62,16 +62,19 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
     "지도는 상표 예시보다 먼저 보여야 함",
   );
-  const mapStart = html.indexOf('<svg class="korea-map"');
+  const mapStart = html.indexOf('<svg class="korea-map map-with-callouts"');
   const mapEnd = html.indexOf("</svg>", mapStart);
   const mapHtml = html.slice(mapStart, mapEnd);
   assert.ok(
-    mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-label map-label-province"'),
-    "전국 지도 라벨은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
+    mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-callout"'),
+    "전국 지도 연결선 라벨은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
   );
+  assert.match(mapHtml, /<polyline[^>]+points=/, "겹치는 지도 텍스트는 경계 밖 연결선 라벨로 표시해야 함");
+  assert.match(mapHtml, /map-callout-value/, "지도 라벨에서 지역명과 현재 지표 값을 함께 보여야 함");
   assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
+  assert.match(html, /지역별 출원율/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
@@ -158,11 +161,27 @@ test("keeps item totals, registration denominator, and pending states explicit",
   assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 213));
 });
 
+test("identifies unfiled specialties (confirmed items with zero regional trademark applications)", async () => {
+  // 2026-08-20: "미출원 특산품" 탭 데이터 로직 — 검색·주소 판정까지 끝났는데
+  // (availability=available) 지역 일치 출원이 0건인 항목만 대상으로 하고, 아직
+  // 판정 안 끝난(partial/blocked) 항목은 절대 "미출원"으로 잘못 표시하면 안 된다.
+  const snapshot = await loadSnapshot();
+  const items = snapshot.regions.flatMap((region) => region.items);
+  const zeroApplication = (item) => item.metrics.uniqueTrademarkCount.availability === "available" && (item.metrics.uniqueTrademarkCount.value || 0) === 0;
+  const confirmedUnfiled = items.filter((item) => (item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched") && zeroApplication(item));
+  const rawUnfiled = items.filter((item) => item.matchingBasis === "raw_item_name_unclassified" && zeroApplication(item));
+  assert.equal(confirmedUnfiled.length, 125, "확인 특산품 중 출원 0건 행 수");
+  assert.equal(rawUnfiled.length, 480, "검토대기 원물 중 출원 0건 행 수");
+  assert.ok(confirmedUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
+  assert.ok(rawUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
+});
+
 test("renders tab navigation and a data-connected ranking table", async () => {
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지자체별/품목별/특화작목/데이터 개요 5개 탭이 있어야 함");
+  assert.match(html, /class="primary-tabs"/, "요약/지역별 출원율/지자체별/품목별/특화작목/데이터 개요 6개 탭이 있어야 함");
+  assert.match(html, /지역별 출원율/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /class="ranking-table"/, "레퍼런스의 등록상표 랭킹 TOP 10/50에 대응하는 테이블");
@@ -336,11 +355,16 @@ test("ships traceable province and municipality geometry", async () => {
 
 test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
-  assert.match(html, /\.map-label \{ fill: #24372e; font-size: 9\.5px;/, "standalone map labels should keep the slightly larger desktop size");
-  assert.match(html, /\.map-label \{ font-size: 7\.5px; \}/, "standalone map labels should keep the slightly larger mobile size");
-  assert.match(html, /\.map-label-province \{ font-size: 11px; \}/, "province labels should be larger than municipality labels");
-  assert.match(html, /\.map-label-province \{ font-size: 9px; \}/, "province labels should retain a larger mobile size");
+  assert.match(html, /\.map-callout polyline \{ fill: none;/, "standalone map should include leader lines for collision-free labels");
+  assert.match(html, /\.map-callout text \{[^}]*font-size: 17px;/, "standalone map callout values should remain readable on desktop");
+  assert.match(html, /\.map-callout text \{ font-size: 30px;/, "standalone map callout values should remain readable after mobile SVG scaling");
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
+  assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
+  assert.match(html, /전국 시도별 출원율/);
+  assert.match(html, /출원 확인 특산품/);
+  assert.match(html, /시도를 선택하면 시군구 지도로 전환됩니다/);
+  assert.match(html, /region\.sigungu \|\| region\.region} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
+  assert.doesNotMatch(html, /const uniqueItems/, "도 단위 목록에서 중복 품목을 숨겨 총 특산품 수와 목록 수가 달라지면 안 됨");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
@@ -361,7 +385,15 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
   assert.match(html, /출원 확인 특산품 수 ÷ 판정 완료 특산품 수/);
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
+  assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
   assert.match(html, /전국 지역 브랜드 지도/);
+  // 2026-08-20: "미출원 특산품" 탭 — 실제 특산품인데 그 지역 주소 상표 출원이 0건인
+  // 항목을 확인 특산품/검토대기 원물 두 그룹으로 나눠 보여준다(사용자 요청).
+  assert.match(html, /미출원 특산품/);
+  assert.match(html, /function gapsScreen\(\)/);
+  assert.match(html, /고시명칭·지정상품까지 확인됐지만 출원 없음/);
+  assert.match(html, /고시명칭 미확정 원물명 검색 결과 출원 없음/);
+  assert.match(html, /id="gap-search"/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /class="compare-readiness"/);
   assert.match(html, /비교 기준 원본 확보 전 · 준비 현황만 확인 가능/);
