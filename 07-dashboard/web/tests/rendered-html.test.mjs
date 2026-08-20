@@ -14,7 +14,8 @@ function specialtyCoverage(snapshot) {
   let applied = 0;
   for (const region of snapshot.regions) {
     for (const item of region.items) {
-      if (item.matchingBasis !== "notice_name_and_nice_class" || !item.noticeName) continue;
+      const isConfirmed = item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched";
+      if (!isConfirmed || !item.noticeName) continue;
       total += 1;
       if (item.metrics.uniqueTrademarkCount.availability !== "available") continue;
       decided += 1;
@@ -113,18 +114,19 @@ test("shows specialty application coverage with a complete, auditable denominato
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   const snapshot = await loadSnapshot();
   const coverage = specialtyCoverage(snapshot);
-  // 2026-08-20 재수집 2라운드까지 반영(① 사과 등 183개를 150페이지로, ② 포도·오리
-  // 등 49개를 쿼리당 3,000건 상한의 "제한적 완료"로 재수집)으로 판정 완료 특산품이
-  // 28개 -> 744개까지 늘었다. 숫자는 실제 데이터 변화를 반영한 것이며, 분모(803)와
-  // 대기(59)가 여전히 함께 표시되는지가 중요하다.
-  assert.equal(coverage.total, 803);
-  assert.equal(coverage.decided, 744);
-  assert.equal(coverage.applied, 619);
+  // 2026-08-20 원물+지정상품 매칭 병합 반영: 재수집 2라운드(판정 완료 744개)에 더해,
+  // 고시상품명칭 사전에 없는 원물명 212개를 등록원부 지정상품 정규화 일치(exact/contains)
+  // + 출원인 주소 지역 일치 근거로 AI가 검토해 "확인 특산품"에 병합했다(사용자 결정).
+  // 분모(1,015 = 803 + 212)와 대기(59)가 여전히 함께 표시되는지가 중요하다.
+  assert.equal(coverage.total, 1015);
+  assert.equal(coverage.decided, 956);
+  assert.equal(coverage.applied, 831);
   assert.equal(coverage.pending, 59);
-  assert.equal(Math.round(coverage.rate * 100), 83);
-  assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${coverage.total}개 · 판정 완료 ${coverage.decided}개 중 ${coverage.applied}개 출원 확인 · 집계 대기 ${coverage.pending}개`));
+  assert.equal(Math.round(coverage.rate * 100), 87);
+  const localeNumber = (n) => n.toLocaleString("ko-KR");
+  assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${localeNumber(coverage.total)}개 · 판정 완료 ${localeNumber(coverage.decided)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 집계 대기 ${localeNumber(coverage.pending)}개`));
   assert.match(html, /출원 확인 특산품 수 ÷ 지역별 집계 판정 완료 특산품 수/);
-  assert.doesNotMatch(html, /출원 확인 619 \/ 전체 803/, "pending specialties must not be counted as no-application rows");
+  assert.doesNotMatch(html, /출원 확인 831 \/ 전체 1,015/, "pending specialties must not be counted as no-application rows");
 });
 
 test("keeps item totals, registration denominator, and pending states explicit", async () => {
@@ -221,7 +223,9 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 861);
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1615);
+  // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
+  // 1,615 -> 1,617이 됐다.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1617);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -232,21 +236,24 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.every((item) => item.itemName && item.noticeName));
   // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과는 matchingBasis=
   // raw_item_name_unclassified이고 niceClass가 없는 게 정상이다(2026-08-12) — 공식
-  // 분류 행만 niceClass가 있어야 한다.
+  // 분류 행만 niceClass가 있어야 한다. 2026-08-20: raw_item_goods_matched(원물명 +
+  // 등록원부 지정상품 정규화 일치 + 출원인 주소 지역 일치로 AI가 검토·확정한 항목)도
+  // 고시명칭 사전 매칭이 아니므로 niceClass는 없는 게 정상이다.
   assert.ok(
     items.every((item) =>
       item.matchingBasis === "notice_name_and_nice_class"
         ? Boolean(item.niceClass)
-        : item.matchingBasis === "raw_item_name_unclassified"
+        : item.matchingBasis === "raw_item_name_unclassified" || item.matchingBasis === "raw_item_goods_matched"
     )
   );
   assert.ok(items.some((item) => item.matchingBasis === "notice_name_and_nice_class"));
   assert.ok(items.some((item) => item.matchingBasis === "raw_item_name_unclassified"));
+  assert.ok(items.some((item) => item.matchingBasis === "raw_item_goods_matched"));
   assert.ok(items.every((item) => !["데일리", "일선정품", "상큼愛"].includes(item.itemName)));
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 1615, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.length, 1617, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
