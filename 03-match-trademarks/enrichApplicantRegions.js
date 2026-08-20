@@ -10,6 +10,47 @@ const { loadCache, saveCache } = require("./lib/trademarkApplicantCache");
 
 loadEnv();
 
+// 2026-08-20: 병합 입력이 커지면(수백MB) JSON.stringify(output) 자체가 V8 문자열 길이
+// 한도를 넘어 "Invalid string length"로 실패한다(compact로 바꿔도 마찬가지). queryFacts·
+// results처럼 큰 컬렉션만 항목 단위로 나눠 스트리밍 쓰기하면, 각 JSON.stringify 호출은
+// 항목 하나(수 KB~수백KB) 크기로 끝나 한도를 넘지 않는다. 값은 완전히 동일하다.
+function writeJsonStreaming(outPath, obj) {
+  const stream = fs.createWriteStream(outPath, { encoding: "utf8" });
+  const write = (chunk) => stream.write(chunk);
+  write("{");
+  let firstTopKey = true;
+  for (const [key, value] of Object.entries(obj)) {
+    if (!firstTopKey) write(",");
+    firstTopKey = false;
+    write(`${JSON.stringify(key)}:`);
+    if (key === "queryFacts" && value && typeof value === "object") {
+      write("{");
+      let first = true;
+      for (const [qKey, fact] of Object.entries(value)) {
+        if (!first) write(",");
+        first = false;
+        write(`${JSON.stringify(qKey)}:${JSON.stringify(fact)}`);
+      }
+      write("}");
+    } else if (key === "results" && Array.isArray(value)) {
+      write("[");
+      let first = true;
+      for (const row of value) {
+        if (!first) write(",");
+        first = false;
+        write(JSON.stringify(row));
+      }
+      write("]");
+    } else {
+      write(JSON.stringify(value));
+    }
+  }
+  write("}\n");
+  return new Promise((resolve, reject) => {
+    stream.end((err) => (err ? reject(err) : resolve()));
+  });
+}
+
 function parseArgs(argv) {
   const args = { limit: 10, concurrency: 1, "checkpoint-every": 100 };
   for (let i = 0; i < argv.length; i++) {
@@ -85,7 +126,11 @@ async function main() {
   });
   saveCache(cachePath, entries);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n", "utf8");
+  // 2026-08-20: pretty-print(들여쓰기 2칸)는 대용량(수백MB) 병합 입력에서 문자열 길이가
+  // V8 한도를 넘어 "Invalid string length"로 실패한다. 캐시는 이미 저장됐으므로 진행
+  // 손실은 없지만, --out 자체가 안 나오면 후속 단계 입력이 안 만들어진다. compact
+  // JSON으로 바꿔 크기를 줄인다(값은 동일, 가독성만 포기).
+  await writeJsonStreaming(outPath, output);
   const s = output.applicationApplicantEnrichment;
   console.error(
     `[enrichApplicantRegions] requested=${s.requestedApplicationCount}, cached=${s.cachedApplicationCount}, ` +
