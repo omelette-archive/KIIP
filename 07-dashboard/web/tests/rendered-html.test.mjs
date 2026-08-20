@@ -161,6 +161,21 @@ test("keeps item totals, registration denominator, and pending states explicit",
   assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 213));
 });
 
+test("identifies unfiled specialties (confirmed items with zero regional trademark applications)", async () => {
+  // 2026-08-20: "미출원 특산품" 탭 데이터 로직 — 검색·주소 판정까지 끝났는데
+  // (availability=available) 지역 일치 출원이 0건인 항목만 대상으로 하고, 아직
+  // 판정 안 끝난(partial/blocked) 항목은 절대 "미출원"으로 잘못 표시하면 안 된다.
+  const snapshot = await loadSnapshot();
+  const items = snapshot.regions.flatMap((region) => region.items);
+  const zeroApplication = (item) => item.metrics.uniqueTrademarkCount.availability === "available" && (item.metrics.uniqueTrademarkCount.value || 0) === 0;
+  const confirmedUnfiled = items.filter((item) => (item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched") && zeroApplication(item));
+  const rawUnfiled = items.filter((item) => item.matchingBasis === "raw_item_name_unclassified" && zeroApplication(item));
+  assert.equal(confirmedUnfiled.length, 125, "확인 특산품 중 출원 0건 행 수");
+  assert.equal(rawUnfiled.length, 480, "검토대기 원물 중 출원 0건 행 수");
+  assert.ok(confirmedUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
+  assert.ok(rawUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
+});
+
 test("renders tab navigation and a data-connected ranking table", async () => {
   const response = await render();
   const html = await response.text();
@@ -372,6 +387,13 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
   assert.match(html, /전국 지역 브랜드 지도/);
+  // 2026-08-20: "미출원 특산품" 탭 — 실제 특산품인데 그 지역 주소 상표 출원이 0건인
+  // 항목을 확인 특산품/검토대기 원물 두 그룹으로 나눠 보여준다(사용자 요청).
+  assert.match(html, /미출원 특산품/);
+  assert.match(html, /function gapsScreen\(\)/);
+  assert.match(html, /고시명칭·지정상품까지 확인됐지만 출원 없음/);
+  assert.match(html, /고시명칭 미확정 원물명 검색 결과 출원 없음/);
+  assert.match(html, /id="gap-search"/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /class="compare-readiness"/);
   assert.match(html, /비교 기준 원본 확보 전 · 준비 현황만 확인 가능/);

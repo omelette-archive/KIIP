@@ -13,13 +13,13 @@ type Snapshot = { schemaVersion: string; snapshotId: string; mode: "sample" | "f
 type ProvinceShape = { name: string; d: string; labelX: number; labelY: number };
 type MunicipalityShape = { name: string; d: string; labelX: number; labelY: number };
 type MapGeometry = { schemaVersion: string; viewBox: string; boundaryReference: { sourceName: string; sourceUrl: string; sourceBasis: string; status: string; warning: string }; provinces: ProvinceShape[]; municipalities: Record<string, { viewBox: string; items: MunicipalityShape[] }> };
-type Tab = "summary" | "applications" | "regions" | "items" | "compare" | "data";
+type Tab = "summary" | "applications" | "regions" | "items" | "gaps" | "compare" | "data";
 type MapMetric = "trademarks" | "registration" | "coverage" | "applicationCoverage";
 type SpecialtyCoverage = { total: number; decided: number; applied: number; pending: number; rate: number | null };
 type MapLabel = { name: string; x: number; y: number; targetX: number; targetY: number; edgeX: number; anchor: "start" | "end"; value: string };
 
 const STATE_LABELS: Record<string, string> = { complete_nonzero: "수집 완료", complete_zero: "결과 0건", partial: "부분 수집", error: "오류", skipped: "건너뜀", not_collected: "미수집", complete: "완료" };
-const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교", data: "데이터 개요" };
+const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", gaps: "미출원 특산품", compare: "특화작목 비교", data: "데이터 개요" };
 const MAP_LABELS: Record<MapMetric, string> = { trademarks: "상표 건수", registration: "상표 등록률", coverage: "확인 특산품 수", applicationCoverage: "특산품 출원율" };
 const MAP_DESCRIPTIONS: Record<MapMetric, string> = {
   trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
@@ -149,6 +149,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const [tab, setTab] = useState<Tab>("summary");
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
+  const [gapQuery, setGapQuery] = useState("");
   const [selectedRegionCode, setSelectedRegionCode] = useState(regionKey(snapshot.regions[0]));
   const [selectedItemId, setSelectedItemId] = useState("");
   const [mapMetric, setMapMetric] = useState<MapMetric>("trademarks");
@@ -216,6 +217,34 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   // 순으로 상위 100개만 우선 보여준다(2026-08-19 결정).
   const ITEM_ROW_LIMIT = 100;
   const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
+  // 2026-08-20: "미출원 특산품" — 실제로 존재하는 특산품인데 그 지역 주소로 낸 상표
+  // 출원이 KIPRIS에 한 건도 없는 경우다. 검색·주소 판정까지 끝난(availability=
+  // available) 것 중 값이 0인 것만 대상으로 한다 — 아직 판정 안 끝난(partial/blocked)
+  // 항목을 "미출원"으로 잘못 보여주면 안 된다. 확정 특산품(고시명칭·지정상품 매칭)과
+  // 아직 미분류인 원물명은 신뢰도가 다르므로 별도 그룹으로 나눈다.
+  const unfiledRows = useMemo(() => {
+    const confirmed = new Map<string, { name: string; regions: string[] }>();
+    const raw = new Map<string, { name: string; regions: string[] }>();
+    snapshot.regions.forEach((region) => region.items.forEach((item) => {
+      if (item.metrics.uniqueTrademarkCount.availability !== "available") return;
+      if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) return;
+      const officialLabel = officialItemLabel(item);
+      const bucket = officialLabel ? confirmed : item.matchingBasis === "raw_item_name_unclassified" ? raw : null;
+      if (!bucket) return;
+      const name = officialLabel || itemName(item);
+      const row = bucket.get(name) || { name, regions: [] };
+      if (!row.regions.includes(region.region)) row.regions.push(region.region);
+      bucket.set(name, row);
+    }));
+    const sortRows = (map: Map<string, { name: string; regions: string[] }>) =>
+      [...map.values()].sort((a, b) => b.regions.length - a.regions.length || a.name.localeCompare(b.name, "ko-KR"));
+    return { confirmed: sortRows(confirmed), raw: sortRows(raw) };
+  }, [snapshot.regions]);
+  const gapKeyword = gapQuery.trim().toLocaleLowerCase("ko-KR");
+  const matchesGapKeyword = (row: { name: string; regions: string[] }) =>
+    !gapKeyword || row.name.toLocaleLowerCase("ko-KR").includes(gapKeyword) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(gapKeyword));
+  const visibleUnfiledConfirmed = unfiledRows.confirmed.filter(matchesGapKeyword);
+  const visibleUnfiledRaw = unfiledRows.raw.filter(matchesGapKeyword);
 
   function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
@@ -359,6 +388,26 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
         </article>; })}{itemRows.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div>
         <details className="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details>
       </div>
+    </section>}
+
+    {tab === "gaps" && <section className="screen-section">
+      <div className="screen-heading"><div><p className="eyebrow">BRAND PROTECTION GAP</p><h1>미출원 특산품</h1></div><p>실제로 존재하는 특산품인데, 그 지역 주소로 낸 상표 출원이 KIPRIS에 한 건도 없는 경우입니다.</p></div>
+      <div className="compare-banner"><span>읽는 법</span><strong>검색·주소 판정까지 끝난 것만 표시합니다</strong><p>상표 출원이 없다는 것이지 특산품 자체가 없다는 뜻이 아닙니다 — 생산·판매는 되지만 아직 상표 등록을 안 했을 수 있습니다. 아직 검색·주소 확인이 안 끝난 항목은(집계 대기) 여기 포함하지 않습니다.</p></div>
+      <label className="search-field"><span className="sr-only">품목 또는 지역 검색</span><input value={gapQuery} onChange={(event) => setGapQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
+      <section className="compare-region-section">
+        <div className="compare-section-head"><div><span>확인 특산품 기준</span><h2>고시명칭·지정상품까지 확인됐지만 출원 없음</h2></div><p>신뢰도가 가장 높은 목록입니다 — 특산품 분류까지 끝난 항목입니다.</p></div>
+        <div className="item-card-grid">{visibleUnfiledConfirmed.map((row) => <article className="item-card" key={row.name}>
+          <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 출원 0건</small></div><span className="item-status pending">미출원</span></div>
+          <details className="item-regions-detail"><summary>해당 지역 {row.regions.length}개 보기</summary><div className="region-chips">{row.regions.map((region) => <span key={region}>{region}</span>)}</div></details>
+        </article>)}{visibleUnfiledConfirmed.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div>
+      </section>
+      <section className="compare-region-section">
+        <div className="compare-section-head"><div><span>검토대기 원물 기준</span><h2>고시명칭 미확정 원물명 검색 결과 출원 없음</h2></div><p>아직 공식 분류 전인 원물명이라 확인 특산품보다 신뢰도가 낮습니다 — 참고용입니다.</p></div>
+        <details className="method-note"><summary>{visibleUnfiledRaw.length}개 보기</summary><div className="item-card-grid">{visibleUnfiledRaw.map((row) => <article className="item-card" key={row.name}>
+          <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 출원 0건</small></div><span className="item-status pending">미출원(검토대기)</span></div>
+          <details className="item-regions-detail"><summary>해당 지역 {row.regions.length}개 보기</summary><div className="region-chips">{row.regions.map((region) => <span key={region}>{region}</span>)}</div></details>
+        </article>)}{visibleUnfiledRaw.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div></details>
+      </section>
     </section>}
 
     {tab === "compare" && <section className="screen-section">
