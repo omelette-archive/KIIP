@@ -113,17 +113,18 @@ test("shows specialty application coverage with a complete, auditable denominato
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   const snapshot = await loadSnapshot();
   const coverage = specialtyCoverage(snapshot);
-  // 2026-08-20 재수집(사과 등 246개 partial 쿼리 중 183개를 페이지 상한 완화로
-  // 완결)으로 판정 완료 특산품이 28개 -> 638개로 크게 늘었다. 숫자는 실제 데이터
-  // 변화를 반영한 것이며, 분모(803)와 대기(165)가 여전히 함께 표시되는지가 중요하다.
+  // 2026-08-20 재수집 2라운드까지 반영(① 사과 등 183개를 150페이지로, ② 포도·오리
+  // 등 49개를 쿼리당 3,000건 상한의 "제한적 완료"로 재수집)으로 판정 완료 특산품이
+  // 28개 -> 744개까지 늘었다. 숫자는 실제 데이터 변화를 반영한 것이며, 분모(803)와
+  // 대기(59)가 여전히 함께 표시되는지가 중요하다.
   assert.equal(coverage.total, 803);
-  assert.equal(coverage.decided, 638);
-  assert.equal(coverage.applied, 533);
-  assert.equal(coverage.pending, 165);
-  assert.equal(Math.round(coverage.rate * 100), 84);
+  assert.equal(coverage.decided, 744);
+  assert.equal(coverage.applied, 619);
+  assert.equal(coverage.pending, 59);
+  assert.equal(Math.round(coverage.rate * 100), 83);
   assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${coverage.total}개 · 판정 완료 ${coverage.decided}개 중 ${coverage.applied}개 출원 확인 · 집계 대기 ${coverage.pending}개`));
   assert.match(html, /출원 확인 특산품 수 ÷ 지역별 집계 판정 완료 특산품 수/);
-  assert.doesNotMatch(html, /출원 확인 533 \/ 전체 803/, "pending specialties must not be counted as no-application rows");
+  assert.doesNotMatch(html, /출원 확인 619 \/ 전체 803/, "pending specialties must not be counted as no-application rows");
 });
 
 test("keeps item totals, registration denominator, and pending states explicit", async () => {
@@ -218,11 +219,11 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
   assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 861);
-  // 2026-08-20: 246개 partial 쿼리 중 183개(사과 등)를 페이지 상한을 높여 재수집하면서
-  // 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1463);
+  // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
+  // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1615);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 61045);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -245,7 +246,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 1463, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.length, 1615, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
