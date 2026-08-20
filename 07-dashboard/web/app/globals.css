@@ -181,11 +181,11 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, 1fr);
+  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(4, auto); grid-auto-flow: column;
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
-.primary-tabs button { padding: 15px 12px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
+.primary-tabs button { min-height: 48px; padding: 12px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13px; cursor: pointer; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); color: var(--green-dark); font-weight: 800; }
 
@@ -387,7 +387,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
   .source-grid { grid-template-columns: 1fr; }
   .criteria-grid { grid-template-columns: 1fr; }
   footer { flex-direction: column; }
-  .primary-tabs { grid-template-columns: repeat(2, 1fr); position: static; }
+  .primary-tabs { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; grid-auto-flow: row; position: static; }
   .primary-tabs button { padding: 12px 8px; font-size: 11px; }
   .map-card, .map-insight, .item-screen { padding: 18px; }
   .map-heading, .screen-heading { align-items: flex-start; flex-direction: column; }
