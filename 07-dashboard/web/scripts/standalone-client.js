@@ -73,15 +73,17 @@ function dashboardClient(snapshot, geometry) {
   const fill = (value, max) => value === null ? "#e5e1d7" : `color-mix(in srgb, #1f6d56 ${Math.round(24 + Math.max(.12, Math.min(1, max ? value / max : 0)) * 68)}%, #e7eee9)`;
   const compactRegionName = (name) => name === "전남광주통합특별시" ? "전남·광주" : name.replace(/특별자치도$|특별자치시$|광역시$|특별시$|도$/, "");
   const parseViewBox = (viewBox) => { const [x, y, width, height] = viewBox.split(/\s+/).map(Number); return { x, y, width, height }; };
-  const calloutViewBox = (viewBox) => { const { x, y, width, height } = parseViewBox(viewBox); const gutter = Math.max(125, width * .2); return `${x - gutter} ${y} ${width + gutter * 2} ${height}`; };
-  const calloutLabels = (shapes, viewBox, valueFor, labelFor, includeName = () => true) => {
+  const calloutViewBox = (viewBox, withGutter) => { const { x, y, width, height } = parseViewBox(viewBox); const gutter = (withGutter ?? width < 700) ? Math.max(125, width * .2) : 0; return `${x - gutter} ${y} ${width + gutter * 2} ${height}`; };
+  const calloutLabels = (shapes, viewBox, valueFor, labelFor, includeName = () => true, inlineByDefault = shapes.length === 17) => {
     const { x, y, width, height } = parseViewBox(viewBox); const center = x + width / 2; const result = [];
     const rows = shapes.map((shape) => ({ shape, rawValue: valueFor(shape.name) })).filter(({ shape }) => includeName(shape.name));
+    const connectorRows = inlineByDefault ? rows.filter(({ shape }, index) => rows.some(({ shape: other }, otherIndex) => otherIndex !== index && Math.abs(shape.labelX - other.labelX) < 52 && Math.abs(shape.labelY - other.labelY) < 24)) : rows;
+    if (inlineByDefault) rows.filter(({ shape }) => !connectorRows.some(({ shape: other }) => other === shape)).forEach(({ shape, rawValue }) => result.push({ name: shape.name, x: shape.labelX, y: shape.labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: shape.labelX, anchor: "middle", value: labelFor(rawValue), connector: false }));
     ["left", "right"].forEach((side) => {
-      const sideRows = rows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
+      const sideRows = connectorRows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
       if (!sideRows.length) return;
       const top = y + Math.max(18, height * .035), bottom = y + height - Math.max(18, height * .035), step = sideRows.length === 1 ? 0 : (bottom - top) / (sideRows.length - 1);
-      sideRows.forEach(({ shape, rawValue }, index) => { const labelY = sideRows.length === 1 ? Math.max(top, Math.min(bottom, shape.labelY)) : top + step * index; const isLeft = side === "left"; result.push({ name: shape.name, x: isLeft ? x - 13 : x + width + 13, y: labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: isLeft ? x - 4 : x + width + 4, anchor: isLeft ? "end" : "start", value: labelFor(rawValue) }); });
+      sideRows.forEach(({ shape, rawValue }, index) => { const labelY = sideRows.length === 1 ? Math.max(top, Math.min(bottom, shape.labelY)) : top + step * index; const isLeft = side === "left"; result.push({ name: shape.name, x: isLeft ? x - 13 : x + width + 13, y: labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: isLeft ? x - 4 : x + width + 4, anchor: isLeft ? "end" : "start", value: labelFor(rawValue), connector: true }); });
     });
     return result;
   };

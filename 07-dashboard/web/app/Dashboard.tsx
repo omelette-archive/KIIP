@@ -16,7 +16,7 @@ type MapGeometry = { schemaVersion: string; viewBox: string; boundaryReference: 
 type Tab = "summary" | "applications" | "regions" | "items" | "gaps" | "compare" | "data";
 type MapMetric = "trademarks" | "registration" | "coverage" | "applicationCoverage";
 type SpecialtyCoverage = { total: number; decided: number; applied: number; pending: number; rate: number | null };
-type MapLabel = { name: string; x: number; y: number; targetX: number; targetY: number; edgeX: number; anchor: "start" | "end"; value: string };
+type MapLabel = { name: string; x: number; y: number; targetX: number; targetY: number; edgeX: number; anchor: "start" | "end"; value: string; connector: boolean };
 
 const STATE_LABELS: Record<string, string> = { complete_nonzero: "수집 완료", complete_zero: "결과 0건", partial: "부분 수집", error: "오류", skipped: "건너뜀", not_collected: "미수집", complete: "완료" };
 const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", gaps: "미출원 특산품", compare: "특화작목 비교", data: "데이터 개요" };
@@ -87,20 +87,22 @@ function parseViewBox(viewBox: string) {
   const [x, y, width, height] = viewBox.split(/\s+/).map(Number);
   return { x, y, width, height };
 }
-function calloutViewBox(viewBox: string) {
+function calloutViewBox(viewBox: string, withGutter?: boolean) {
   const { x, y, width, height } = parseViewBox(viewBox);
-  const gutter = Math.max(125, width * 0.2);
+  const gutter = (withGutter ?? width < 700) ? Math.max(125, width * 0.2) : 0;
   return `${x - gutter} ${y} ${width + gutter * 2} ${height}`;
 }
-function calloutLabels(shapes: (ProvinceShape | MunicipalityShape)[], viewBox: string, valueFor: (name: string) => number | null, labelFor: (value: number | null) => string, includeName: (name: string) => boolean = () => true): MapLabel[] {
+function calloutLabels(shapes: (ProvinceShape | MunicipalityShape)[], viewBox: string, valueFor: (name: string) => number | null, labelFor: (value: number | null) => string, includeName: (name: string) => boolean = () => true, inlineByDefault = shapes.length === 17): MapLabel[] {
   const { x, y, width, height } = parseViewBox(viewBox);
   const center = x + width / 2;
   const rows = shapes
     .map((shape) => ({ shape, rawValue: valueFor(shape.name) }))
     .filter(({ shape }) => includeName(shape.name));
   const result: MapLabel[] = [];
+  const connectorRows = inlineByDefault ? rows.filter(({ shape }, index) => rows.some(({ shape: other }, otherIndex) => otherIndex !== index && Math.abs(shape.labelX - other.labelX) < 52 && Math.abs(shape.labelY - other.labelY) < 24)) : rows;
+  if (inlineByDefault) rows.filter(({ shape }) => !connectorRows.some(({ shape: other }) => other === shape)).forEach(({ shape, rawValue }) => result.push({ name: shape.name, x: shape.labelX, y: shape.labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: shape.labelX, anchor: "middle", value: labelFor(rawValue), connector: false }));
   (["left", "right"] as const).forEach((side) => {
-    const sideRows = rows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
+    const sideRows = connectorRows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
     if (!sideRows.length) return;
     const top = y + Math.max(18, height * 0.035);
     const bottom = y + height - Math.max(18, height * 0.035);
@@ -117,6 +119,7 @@ function calloutLabels(shapes: (ProvinceShape | MunicipalityShape)[], viewBox: s
         edgeX: isLeft ? x - 4 : x + width + 4,
         anchor: isLeft ? "end" : "start",
         value: labelFor(rawValue),
+        connector: true,
       });
     });
   });
@@ -282,6 +285,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     (name) => municipalityGeometry ? regionMapValue(snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === name)) : mapValue(name),
     (value) => mapMetricValueLabel(value),
     (name) => !municipalityGeometry || snapshot.regions.some((region) => region.sido === selectedProvince && region.sigungu === name),
+    !municipalityGeometry,
   );
   const coverageAreaRegions = selectedProvince
     ? snapshot.regions.filter((region) => region.sido === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality))
@@ -294,6 +298,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     (name) => municipalityGeometry ? regionMapValue(snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === name), "applicationCoverage") : mapValue(name, "applicationCoverage"),
     (value) => mapMetricValueLabel(value, "applicationCoverage"),
     (name) => !municipalityGeometry || snapshot.regions.some((region) => region.sido === selectedProvince && region.sigungu === name),
+    !municipalityGeometry,
   );
   const coverageBreakdown = (selectedProvince
     ? coverageAreaRegions.map((region) => ({ key: regionKey(region), label: region.sigungu || region.region, regions: [region], region }))
@@ -336,11 +341,11 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
         <div className="map-card"><div className="map-heading"><div><p className="eyebrow">REGIONAL TRADEMARK MAP</p><h2>{selectedProvince ? `${selectedProvince} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip">참고 경계 · 2013 KOSTAT</span></div>
           <div className="map-toolbar"><div className="map-metrics">{(Object.keys(MAP_LABELS) as MapMetric[]).map((key) => <button type="button" key={key} className={mapMetric === key ? "active" : ""} onClick={() => setMapMetric(key)} title={MAP_DESCRIPTIONS[key]} aria-label={`${MAP_LABELS[key]}: ${MAP_DESCRIPTIONS[key]}`}>{MAP_LABELS[key]}</button>)}</div>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div>
           <p className="map-metric-description"><strong>{MAP_LABELS[mapMetric]}</strong><span>{MAP_DESCRIPTIONS[mapMetric]}</span></p>
-          <div className="map-stage"><svg className="korea-map map-with-callouts" viewBox={calloutViewBox(activeMapViewBox)} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? <>
+          <div className="map-stage"><svg className="korea-map map-with-callouts" viewBox={calloutViewBox(activeMapViewBox, activeMapLabels.some((label) => label.connector))} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? <>
              {municipalityGeometry.items.map((shape) => { const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === shape.name); const statValue = regionMapValue(match); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(statValue, municipalityMapMax) }} tabIndex={0} role="button" aria-label={`${shape.name} ${mapMetricValueLabel(statValue)}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{shape.name} · {mapMetricValueLabel(statValue)}</title></path>; })}
           </> : <>
              {geometry.provinces.map((shape) => <path key={`${shape.name}-shape`} d={shape.d} className={selectedProvince === shape.name ? "map-shape selected" : "map-shape"} style={{ fill: fill(mapValue(shape.name), mapMax) }} tabIndex={0} role="button" aria-label={`${shape.name} ${mapValueLabel(shape.name)}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{shape.name} · {mapValueLabel(shape.name)}</title></path>)}
-          </>}{activeMapLabels.map((label) => <g className="map-callout" key={`${label.name}-label`}><polyline points={`${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}`} /><text x={label.x} y={label.y} textAnchor={label.anchor}><tspan>{compactRegionName(label.name)}</tspan><tspan className="map-callout-value"> {label.value}</tspan></text></g>)}</svg></div>
+          </>}{activeMapLabels.map((label) => <g className={`map-callout${label.connector ? " with-connector" : ""}`} key={`${label.name}-label`}>{label.connector && <polyline points={`${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}`} />}<text x={label.x} y={label.y} textAnchor={label.anchor}><tspan>{compactRegionName(label.name)}</tspan><tspan className="map-callout-value"> {label.value}</tspan></text></g>)}</svg></div>
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div><p className="map-warning">{geometry.boundaryReference.warning} 지도를 클릭하면 해당 지역의 특산품 목록과 상표 사례를 확인할 수 있습니다. 집계 대기 특산품은 출원율 분모에서 제외합니다.</p>
         </div>
         <aside className="map-insight"><p className="eyebrow">SELECTED AREA</p><h2>{selectedMunicipality || selectedProvince || "전국"}</h2><p className="insight-summary">확인 특산품 {number(visibleSpecialtyCoverage.total)}개 · 출원 확인 {number(visibleSpecialtyCoverage.applied)} / 판정 완료 {number(visibleSpecialtyCoverage.decided)} · 출원율 {percent(visibleSpecialtyCoverage.rate)}{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</p><div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)} · NICE {item.niceClass}류</small></span><b>{item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "지역별 집계 대기"}</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>}</div><div className="insight-note"><strong>출원율 계산</strong><p>출원 확인 특산품 수 ÷ 지역별 집계 판정 완료 특산품 수입니다. 전체 특산품 수와 집계 대기 수를 함께 표시하며, 대기 품목을 출원 없음으로 계산하지 않습니다.</p></div></aside>
@@ -360,11 +365,11 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
       <section className="coverage-map-card">
         <div className="map-heading"><div><p className="eyebrow">APPLICATION RATE MAP</p><h2>{selectedProvince ? `${selectedProvince} 시군구 출원율` : "전국 시도별 출원율"}</h2></div><div className="coverage-map-actions"><span className="reference-chip">색이 진할수록 출원율이 높음</span>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div></div>
         <p className="map-metric-description"><strong>특산품 출원율</strong><span>출원 확인 특산품 수 ÷ 판정 완료 특산품 수 · 집계 대기는 분모에서 제외합니다.</span></p>
-        <div className="map-stage coverage-map-stage"><svg className="korea-map map-with-callouts coverage-map" viewBox={calloutViewBox(activeMapViewBox)} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구별 특산품 출원율 지도` : "대한민국 시도별 특산품 출원율 지도"}>{municipalityGeometry ? <>
+        <div className="map-stage coverage-map-stage"><svg className="korea-map map-with-callouts coverage-map" viewBox={calloutViewBox(activeMapViewBox, coverageMapLabels.some((label) => label.connector))} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구별 특산품 출원율 지도` : "대한민국 시도별 특산품 출원율 지도"}>{municipalityGeometry ? <>
           {municipalityGeometry.items.map((shape) => { const match = snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === shape.name); const value = regionMapValue(match, "applicationCoverage"); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-coverage-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(value, 1) }} tabIndex={0} role="button" aria-label={`${shape.name} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{shape.name} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
         </> : <>
           {geometry.provinces.map((shape) => { const value = mapValue(shape.name, "applicationCoverage"); return <path key={`${shape.name}-coverage-shape`} d={shape.d} className="map-shape" style={{ fill: fill(value, 1) }} tabIndex={0} role="button" aria-label={`${shape.name} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{shape.name} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
-        </>}{coverageMapLabels.map((label) => <g className="map-callout" key={`${label.name}-coverage-label`}><polyline points={`${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}`} /><text x={label.x} y={label.y} textAnchor={label.anchor}><tspan>{compactRegionName(label.name)}</tspan><tspan className="map-callout-value"> {label.value}</tspan></text></g>)}</svg></div>
+        </>}{coverageMapLabels.map((label) => <g className={`map-callout${label.connector ? " with-connector" : ""}`} key={`${label.name}-coverage-label`}>{label.connector && <polyline points={`${label.targetX},${label.targetY} ${label.edgeX},${label.y} ${label.x},${label.y}`} />}<text x={label.x} y={label.y} textAnchor={label.anchor}><tspan>{compactRegionName(label.name)}</tspan><tspan className="map-callout-value"> {label.value}</tspan></text></g>)}</svg></div>
         <div className="coverage-legend" aria-label="출원율 색상 범례"><span>0%</span><i /><span>25%</span><span>50%</span><span>75%</span><span>100%</span><b>회색은 데이터 없음</b></div>
         <p className="map-warning">{selectedProvince ? "라벨은 현재 특산품 데이터가 있는 시군구만 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "각 시도의 숫자는 시군구별 특산품 항목을 합산한 출원율입니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p>
       </section>
