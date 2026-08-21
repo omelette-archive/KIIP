@@ -48,18 +48,30 @@ function createRegionIndex(adminCodes = loadAdminRegionCodes()) {
   return grouped;
 }
 
+// 2026-08-21: 농사로 areaNm이 "경기도 > 남양주시"처럼 시도>시군구를 한 필드에
+// 합쳐 주는 경우가 있다(대부분의 다른 지역은 시군구만 옴, 예: "대전광역시"). 이
+// 원본 값을 그대로 sigungu로 쓰면 법정동코드 완전일치 매칭이 항상 실패한다(">"가
+// 낀 문자열은 마스터에 없으니까) — ">" 구분자를 분리해서 진짜 시군구만 남긴다.
+function splitCompoundRegionText(value) {
+  const raw = clean(value);
+  if (!raw.includes(">")) return { prefix: "", tail: raw };
+  const parts = raw.split(">").map((part) => clean(part)).filter(Boolean);
+  return { prefix: parts.slice(0, -1).join(" "), tail: parts[parts.length - 1] || "" };
+}
+
 function resolveRegion(row, regionIndex) {
   const regionParts = clean(row.region).split(" ").filter(Boolean);
-  const sido = clean(row.sido) || regionParts[0] || "";
-  const sigungu = clean(row.sigungu) || regionParts.slice(1).join(" ");
-  const candidates = regionIndex.get(`${sido}\u001f${sigungu}`);
+  const splitSigungu = splitCompoundRegionText(row.sigungu);
+  const sido = clean(row.sido) || splitSigungu.prefix || regionParts[0] || "";
+  const sigungu = splitSigungu.tail || regionParts.slice(1).join(" ");
+  const candidates = regionIndex.get(`${sido}${sigungu}`);
   if (!sido || !candidates || candidates.size === 0) {
-    return { regionCode: null, regionCodeStatus: "unresolved" };
+    return { regionCode: null, regionCodeStatus: "unresolved", sido, sigungu };
   }
   if (candidates.size > 1) {
-    return { regionCode: null, regionCodeStatus: "ambiguous" };
+    return { regionCode: null, regionCodeStatus: "ambiguous", sido, sigungu };
   }
-  return { regionCode: [...candidates.keys()][0], regionCodeStatus: "resolved" };
+  return { regionCode: [...candidates.keys()][0], regionCodeStatus: "resolved", sido, sigungu };
 }
 
 function rowKey(row) {
@@ -436,9 +448,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     if (!regionGroups.has(groupKey)) {
       regionGroups.set(groupKey, {
         ...regionIdentity,
-        sido: clean(row.sido) || null,
-        sigungu: clean(row.sigungu) || null,
-        region: clean(row.region) || groupKey,
+        sido: regionIdentity.sido || clean(row.sido) || null,
+        sigungu: regionIdentity.sigungu || clean(row.sigungu) || null,
+        region: clean(row.region).includes(">")
+          ? [regionIdentity.sido, regionIdentity.sigungu].filter(Boolean).join(" ")
+          : clean(row.region) || groupKey,
         items: [],
       });
     }
