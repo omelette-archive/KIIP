@@ -64,7 +64,9 @@ test("renders the data-connected Korean dashboard", async () => {
     mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-label'),
     "전국 지도 지명은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
   );
-  assert.equal((mapHtml.match(/<polyline[^>]+points=/g) || []).length, 2, "전국 지도 연결선은 겹치는 서울·세종 두 곳에만 사용해야 함");
+  // 2026-08-21: 서울·세종을 화살표로 빼는 대신 경기도 라벨만 살짝 옮겨 겹침을
+  // 피한다(사용자 요청) — 전국 지도에는 더 이상 연결선(화살표)이 없어야 한다.
+  assert.equal((mapHtml.match(/<polyline[^>]+points=/g) || []).length, 0, "전국 지도에는 화살표(연결선)를 쓰지 않고 경기도 라벨만 옮겨 겹침을 피해야 함");
   assert.match(mapHtml, /서울특별시/);
   assert.match(mapHtml, /세종특별자치시/);
   assert.match(mapHtml, /제주특별자치도/);
@@ -375,9 +377,12 @@ test("ships traceable province and municipality geometry", async () => {
 
 test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
-  assert.match(html, /\.map-region-label-callout polyline \{ fill: none;/, "standalone map should include restrained leader lines for the two crowded labels");
+  // 2026-08-21: 전국 지도 화살표(연결선)를 없애고 경기도 라벨만 옮기는 방식으로
+  // 바꿨다(사용자 요청) — 화살표용 CSS/폴리라인이 더 이상 없어야 한다.
+  assert.doesNotMatch(html, /map-region-label-callout|<polyline/, "standalone map should no longer draw leader-line arrows");
   assert.match(html, /const mapLabelMarkup = \(shapes, municipality\)/, "standalone map should render every geometry label regardless of data availability");
-  assert.match(html, /서울특별시: \{ x: -52, y: -28 \}, 세종특별자치시: \{ x: -60, y: -31 \}/, "standalone map should limit national callouts to Seoul and Sejong");
+  // 2026-08-21: 서울·세종 화살표 대신 경기도 라벨만 옮기는 방식으로 변경(사용자 요청).
+  assert.match(html, /경기도: \{ x: 20, y: 38 \}/, "standalone map should nudge only Gyeonggi's label instead of using leader-line arrows");
   assert.doesNotMatch(html, /const calloutLabels/, "legacy all-label callout layout must not remain in the standalone client");
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
