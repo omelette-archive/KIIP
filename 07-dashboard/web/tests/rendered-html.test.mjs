@@ -14,16 +14,14 @@ function specialtyCoverage(snapshot) {
   let applied = 0;
   for (const region of snapshot.regions) {
     for (const item of region.items) {
-      const isConfirmed = item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched";
-      if (!isConfirmed || !item.noticeName) continue;
       total += 1;
       if (item.metrics.uniqueTrademarkCount.availability !== "available") continue;
       decided += 1;
       if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) applied += 1;
     }
   }
-  // 2026-08-20 계산 방식 변경(사용자 결정): 분모를 판정 완료가 아니라 확인 특산품
-  // 전체로 바꿨다 — Dashboard.tsx/standalone-client.js의 specialtyCoverage()와 동일.
+  // 2026-08-21 사용자 재확인: 분모는 확인 완료 특산품이 아니라 수집된 지역×특산품
+  // 전체다 — Dashboard.tsx/standalone-client.js의 specialtyCoverage()와 동일.
   return { total, decided, applied, pending: total - decided, rate: total ? applied / total : null };
 }
 
@@ -96,10 +94,9 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, />출원율<\/button>/);
   assert.match(html, />등록률<\/button>/);
   assert.match(html, /지역 주소 일치 출원 중 등록 상태인 건의 비율입니다/);
-  assert.match(html, /고시명칭·NICE류가 확인된 지역×특산품 수입니다/);
-  // 2026-08-20: 집계 대기 품목은 이제 분모에서 빠지는 게 아니라 출원 미확인으로
-  // 계산돼 분모에 포함된다(사용자 결정으로 계산 방식 변경).
-  assert.match(html, /아직 지역별 집계가 안 끝난 품목은 출원 미확인으로 계산되므로/);
+  assert.match(html, /현재 스냅샷에 수집된 지역×특산품 수입니다/);
+  // 집계 대기 품목도 전체 1,692개 분모에 포함하며, 확인이 진행되면 값이 올라간다.
+  assert.match(html, /아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로/);
   assert.doesNotMatch(html, />수집 범위<|>브랜드 공백|상표 활용 여지|출원인 주소-대상 지역 일치/);
   assert.match(
     visibleTextHtml,
@@ -125,27 +122,25 @@ test("keeps trademark-like raw labels out of the map specialty summary", async (
   assert.match(html, /class="showcase"/, "trademark names should remain in their separate example section");
 });
 
-test("shows specialty application coverage with a complete, auditable denominator", async () => {
+test("uses every collected region-item specialty as the application-rate denominator", async () => {
   const response = await render();
   const html = await response.text();
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   const snapshot = await loadSnapshot();
   const coverage = specialtyCoverage(snapshot);
-  // 2026-08-20 원물+지정상품 매칭 병합 반영: 재수집 2라운드(판정 완료 744개)에 더해,
-  // 고시상품명칭 사전에 없는 원물명 212개를 등록원부 지정상품 정규화 일치(exact/contains)
-  // + 출원인 주소 지역 일치 근거로 AI가 검토해 "확인 특산품"에 병합했다(사용자 결정).
-  // 분모(1,015 = 803 + 212)와 대기(59)가 여전히 함께 표시되는지가 중요하다.
-  // 같은 날 계산 방식도 바뀌었다: 출원율 분모를 "판정 완료"가 아니라 "확인 특산품
-  // 전체"로 바꿔 831 ÷ 1,015 = 82%(판정 완료 기준이던 87%가 아님).
-  assert.equal(coverage.total, 1015);
-  assert.equal(coverage.decided, 956);
-  assert.equal(coverage.applied, 831);
-  assert.equal(coverage.pending, 59);
-  assert.equal(Math.round(coverage.rate * 100), 82);
+  // 스냅샷의 regionItemCount 1,692개 전부를 분모로 사용한다. 고시명칭 확인 완료분만
+  // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,012개이며,
+  // 지역별 집계가 덜 끝난 75개도 분모에 남아 초기 출원율을 보수적으로 낮춘다.
+  assert.equal(coverage.total, snapshot.coverage.regionItemCount);
+  assert.equal(coverage.total, 1692);
+  assert.equal(coverage.decided, 1617);
+  assert.equal(coverage.applied, 1012);
+  assert.equal(coverage.pending, 75);
+  assert.equal(Math.round(coverage.rate * 100), 60);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${localeNumber(coverage.total)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 판정 완료 ${localeNumber(coverage.decided)}개 · 집계 대기 ${localeNumber(coverage.pending)}개`));
-  assert.match(html, /출원 확인 특산품 수 ÷ 이 지역의 확인 특산품 전체 수/);
-  assert.doesNotMatch(html, /출원 확인 831 \/ 전체 1,015/, "pending specialties must not be counted as no-application rows");
+  assert.match(visibleTextHtml, new RegExp(`수집 특산품 전체 ${localeNumber(coverage.total)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 지역별 집계 완료 ${localeNumber(coverage.decided)}개 · 집계 대기 ${localeNumber(coverage.pending)}개`));
+  assert.match(html, /지역 주소 일치 출원이 확인된 특산품 수 ÷ 이 지역에서 수집된 전체 특산품 수/);
+  assert.doesNotMatch(html, /확인 특산품 전체 1,015개|831 ÷ 1,015|출원율 82%/);
 });
 
 test("keeps item totals, registration denominator, and pending states explicit", async () => {
@@ -405,9 +400,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /상표 출원 건수 상위/);
   assert.match(html, /class="item-regions-detail"/);
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
-  // 2026-08-20 계산 방식 변경(사용자 결정): 분모를 판정 완료가 아니라 확인 특산품
-  // 전체로 바꿨다 — 아직 집계 안 끝난 대기 품목도 출원 미확인으로 계산해 분모에 포함한다.
-  assert.match(html, /출원 확인 특산품 수 ÷ 확인 특산품 전체 수/);
+  // 2026-08-21 사용자 재확인: 분모는 확인 완료분이 아니라 수집된 지역×특산품 전체다.
+  assert.match(html, /지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수/);
+  assert.doesNotMatch(html, /if \(!officialItemLabel\(item\)\) return;\s*total \+= 1/);
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
   assert.match(html, /전국 지역 브랜드 지도/);
