@@ -422,7 +422,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /class="compare-readiness"/);
   assert.match(html, /비교 기준 원본 확보 전 · 준비 현황만 확인 가능/);
   assert.match(html, /지역별 특산품 출원 현황/);
-  assert.match(html, /판정 완료분 출원율/);
+  assert.match(html, /전체 특산품 출원율/);
+  assert.doesNotMatch(html, /판정 완료분 출원율/);
+  assert.match(html, /출원 확인 \$\{coverage\.applied\}\/\$\{coverage\.total\}/);
+  assert.doesNotMatch(html, /\$\{coverage\.applied\}\/\$\{coverage\.decided\}/);
   assert.match(html, /원본 대기/);
   assert.doesNotMatch(html, /class="compare-grid"/);
   assert.match(html, /데이터 개요/);
