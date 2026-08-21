@@ -311,13 +311,16 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.warnings.some((warning) => warning.includes("완전한 모집단")));
 });
 
-test("shows every region-item in the detail tabs, marking name-unmatched entries instead of hiding them", async () => {
+test("shows every region-item in the detail tabs without a name-match badge", async () => {
   // 2026-08-19 데이터 감사 이후 한동안 raw_item_name_unclassified(고시명칭 미확정) 항목을
   // 특산품 탭·기본 선택에서 통째로 숨겼으나, 사용자 재지적(2026-08-21): 고시명칭 매칭은
-  // 여러 판정 기준 중 하나일 뿐이고 원물명 그대로라고 특산품이 아닌 것은 아니다. 이제
-  // 탭은 region.items 전체를 보여주되, 명칭 매칭이 안 된 항목만 "명칭 확인중" 표시를
-  // 덧붙인다. 기본 선택(selectedItem)은 공식 특산품을 우선하되, state.itemId가 미분류
-  // 원물을 가리키면 그 원물 상세를 그대로 보여줘야 한다(임의로 다른 항목으로 바뀌면 안 됨).
+  // 여러 판정 기준 중 하나일 뿐이고 원물명 그대로라고 특산품이 아닌 것은 아니다. 한때
+  // "명칭 확인중" 배지를 붙였으나, 이 역시 사용자 재지적(2026-08-21) — 고시명칭 사전에
+  // 없는 건 대개 영구적인 상태라 "확인 중"이라는 말 자체가 오해를 부르고, 억지로
+  // 고시명칭화하는 것도 바람직하지 않다. 이제 탭은 region.items 전체를 아무 표시 없이
+  // 그대로 보여준다. 기본 선택(selectedItem)은 공식 특산품을 우선하되, state.itemId가
+  // 미분류 원물을 가리키면 그 원물 상세를 그대로 보여줘야 한다(임의로 다른 항목으로
+  // 바뀌면 안 됨).
   const snapshot = await loadSnapshot();
   const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
   assert.ok(goseong, "고성군 스냅샷 데이터가 있어야 함");
@@ -341,8 +344,13 @@ test("shows every region-item in the detail tabs, marking name-unmatched entries
   );
   assert.match(
     standaloneHtml,
-    /<div class="item-tabs">\$\{region\.items\.map\(\(row\) => `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}">\$\{esc\(itemName\(row\)\)\}\$\{!officialItemLabel\(row\) \? '<em class="specialty-namecheck">명칭 확인중<\/em>' : ""\}<\/button>`\)/,
-    "특산품 탭은 region.items 전체를 렌더링하고, 명칭 미확정 항목에는 '명칭 확인중' 표시를 덧붙여야 함",
+    /<div class="item-tabs">\$\{region\.items\.map\(\(row\) => `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}">\$\{esc\(itemName\(row\)\)\}<\/button>`\)/,
+    "특산품 탭은 region.items 전체를 아무 표시 없이 렌더링해야 함",
+  );
+  assert.doesNotMatch(
+    standaloneHtml,
+    /specialty-namecheck|명칭 확인중/,
+    "명칭 확인중 배지는 오해를 부르므로 완전히 제거되어야 함",
   );
   assert.match(
     standaloneHtml,

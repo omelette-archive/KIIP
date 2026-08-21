@@ -56,16 +56,13 @@ function officialItemLabel(item: Item): string | null {
   const prefix = DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
   return prefix ? name.slice(prefix.length) : name;
 }
-// 지자체 상세의 개별 품목 선택(지역 상세 드릴다운)은 고시명칭이 확정된 공식 특산품만
-// 골라 보여준다. matchingBasis=raw_item_name_unclassified인 검토대기 원물명·상호(예:
-// "꿀다림 데일리허니", "왕곡한과")는 삭제하지 않고 데이터에는 남기되, 이 선택 목록에서는
-// 노출하지 않는다(2026-08-19 데이터 감사 — 상호명이 섞여 있어 "이 지역의 대표 품목"으로
-// 단정해 보여주면 안 됨). 지역에 공식 특산품이 하나도 없는 경우(11/124개 지역)에도
-// 원물을 대신 보여주지 않고, 호출부에서 "확인된 특산품 없음" 빈 상태로 분기한다.
-// 다만 "지역별 출원" 탭의 특산품 목록(coverage-specialty-list)은 이 필터를 쓰지 않는다
-// — 고시명칭 매칭 여부는 판정 기준의 하나일 뿐, 원물명 그대로라고 특산품이 아닌 것은
-// 아니므로(사용자 지적, 2026-08-21) region.items 전체를 보여주되 명칭 매칭이 안 된
-// 항목만 "명칭 확인중" 표시를 덧붙인다.
+// 2026-08-19 데이터 감사 직후 한동안 matchingBasis=raw_item_name_unclassified인
+// 검토대기 원물명·상호(예: "꿀다림 데일리허니", "왕곡한과")를 지역별 출원 탭·지자체 상세
+// 품목 탭 모두에서 숨겼으나, 사용자 재지적(2026-08-21): 고시명칭 매칭 여부는 판정 기준의
+// 하나일 뿐이고 원물명 그대로라고 특산품이 아닌 것은 아니며, 사전에 없다고 억지로
+// 고시명칭화할 것도 아니다. 이제 두 목록 모두 region.items 전체를 그대로 보여준다(별도
+// 표시 없이 동일하게). officialRegionItems는 기본 선택 우선순위(공식 특산품을 먼저
+// 보여주되, 없으면 원물로 대체)에만 쓴다.
 function officialRegionItems(region: Region): Item[] {
   return region.items.filter((item) => officialItemLabel(item));
 }
@@ -364,7 +361,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
       <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
       </section>
       <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
-        <div className="coverage-region-grid">{coverageBreakdown.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); const nameReview = !officialItemLabel(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}{nameReview && <em className="specialty-namecheck">명칭 확인중</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>)}</div>
+        <div className="coverage-region-grid">{coverageBreakdown.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>)}</div>
       </section>
     </section>}
 
@@ -446,7 +443,7 @@ function RegionDetail({ region, item, onItem }: { region: Region; item: Item | u
   const pendingReason = regionalMetricPendingReason(item);
   return <div className="detail-panel">
     {heading}
-    <div className="item-tabs" role="tablist" aria-label={`${region.region} 특산품`}>{region.items.map((row) => <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")}>{itemName(row)}{!officialItemLabel(row) && <em className="specialty-namecheck">명칭 확인중</em>}</button>)}</div>
+    <div className="item-tabs" role="tablist" aria-label={`${region.region} 특산품`}>{region.items.map((row) => <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")}>{itemName(row)}</button>)}</div>
     <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span>{item.itemVerdict?.source === "algorithm" && <span className="verdict-chip" title={verdictTitle(item.itemVerdict)}>AI 판정</span>}</div>
     <div className="metric-reading-note"><strong>아래 수치의 기준</strong><p>전국 검색 결과 전체가 아니라, 출원인 주소가 <b>{region.region}</b>으로 확인된 출원을 지역 수치로 셉니다.</p></div>
     <div className="detail-grid">
