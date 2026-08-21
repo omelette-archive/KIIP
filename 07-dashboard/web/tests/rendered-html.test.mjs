@@ -172,19 +172,26 @@ test("keeps item totals, registration denominator, and pending states explicit",
   assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 213));
 });
 
-test("identifies unfiled specialties (confirmed items with zero regional trademark applications)", async () => {
-  // 2026-08-20: "미출원 특산품" 탭 데이터 로직 — 검색·주소 판정까지 끝났는데
-  // (availability=available) 지역 일치 출원이 0건인 항목만 대상으로 하고, 아직
-  // 판정 안 끝난(partial/blocked) 항목은 절대 "미출원"으로 잘못 표시하면 안 된다.
+test("publishes only goods-confirmed regional application gaps", async () => {
+  // 2026-08-21 감사: 지역 출원 수 0만으로는 미출원을 단정할 수 없다. 고시명칭 검색
+  // 후보에는 유사 품목·상표명이 섞일 수 있으므로, 지정상품 일치 근거와 지역코드가 모두
+  // 있는 항목만 "지역 출원 미확인" 목록에 포함한다.
   const snapshot = await loadSnapshot();
-  const items = snapshot.regions.flatMap((region) => region.items);
-  const zeroApplication = (item) => item.metrics.uniqueTrademarkCount.availability === "available" && (item.metrics.uniqueTrademarkCount.value || 0) === 0;
-  const confirmedUnfiled = items.filter((item) => (item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched") && zeroApplication(item));
-  const rawUnfiled = items.filter((item) => item.matchingBasis === "raw_item_name_unclassified" && zeroApplication(item));
-  assert.equal(confirmedUnfiled.length, 125, "확인 특산품 중 출원 0건 행 수");
-  assert.equal(rawUnfiled.length, 480, "검토대기 원물 중 출원 0건 행 수");
-  assert.ok(confirmedUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
-  assert.ok(rawUnfiled.every((item) => item.dataState !== "partial"), "판정 대기 항목은 미출원으로 취급하면 안 됨");
+  const candidates = snapshot.regions.flatMap((region) => region.items.map((item) => ({ region, item }))).filter(({ region, item }) =>
+    Boolean(region.regionCode) &&
+    (item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched") &&
+    item.metrics.uniqueTrademarkCount.availability === "available" &&
+    (item.metrics.uniqueTrademarkCount.value || 0) === 0
+  );
+  const hasGoodsEvidence = ({ item }) => item.matchingBasis === "raw_item_goods_matched" ||
+    (item.metrics.confirmedGoodsMatchCount.availability === "available" && (item.metrics.confirmedGoodsMatchCount.value || 0) > 0);
+  const publishable = candidates.filter(hasGoodsEvidence);
+  const excluded = candidates.filter((entry) => !hasGoodsEvidence(entry));
+  const pepperCandidates = candidates.filter(({ item }) => item.noticeName?.includes("고추"));
+  assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
+  assert.equal(excluded.length, 86, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
+  assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
 
 test("renders tab navigation and a data-connected ranking table", async () => {
