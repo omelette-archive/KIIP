@@ -169,10 +169,14 @@ KIPRIS hit에 검증 근거를 붙이는 용도이며, 대표 특산품 목록�
 | `02-normalize-items/output/normalized.csv` | `itemName`, `noticeName`, `niceClass`, 근거 버전을 가진 ③ 입력 |
 | `02-normalize-items/output/review-required.csv` | 정확 일치하지 않은 명칭의 사람 검토 큐 |
 | `03-match-trademarks/output/*.json` | 고시명칭 검색 결과와 상표명 hit 사례 |
+| `04-analyze-brand/data/raw-item-goods-review-v1.json` | 고시명칭 미분류 원물 중 지정상품·지역 근거를 검토 승인한 재현 입력 |
 | `04-analyze-brand/output/*.json` | 지역×고시명칭·NICE류 집계 |
 
-운영 파일명은 실행별로 달라질 수 있지만 필드 계약은 유지한다. 고시명칭이나 NICE류가 비어 있는
-행은 ③ 호출 및 ⑦ 스냅샷 생성에서 차단한다.
+운영 파일명은 실행별로 달라질 수 있지만 필드 계약은 유지한다. 공식 고시명칭 기준 행은
+고시명칭과 NICE류가 모두 필요하다. 다만 승인 manifest가 적용된
+`matchingBasis=raw_item_goods_matched` 행은 원물 표시명과 지정상품 근거를 필수로 하고,
+고시명칭 사전의 NICE류는 비어 있을 수 있다. 그 밖의 근거 없는 행은 ⑦ 확인 특산품 집계에서
+제외한다.
 
 ### 3.2 각 지표 공통 메타데이터
 

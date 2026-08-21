@@ -333,4 +333,44 @@ console.log("5) 소스 커버리지 공백 경고 — 출처 미확보 vs 실제
   ok("실측 확인된 공백만 '출처 미확보'로 경고하고, 데이터가 생기면 자동으로 경고가 사라짐");
 }
 
+console.log("6) 지정상품 검토 승인 원물은 NICE류 없이도 근거 메타데이터를 보존");
+{
+  const rawInput = fixture();
+  const rawRow = rawInput.analysis.regionItems[0];
+  Object.assign(rawRow, {
+    itemName: "칡소",
+    noticeName: "칡소",
+    niceClass: null,
+    matchingBasis: "raw_item_goods_matched",
+    goodsConfirmedHitCount: 0,
+    goodsReviewRequiredHitCount: 1,
+    rawGoodsReview: {
+      methodVersion: "raw-item-goods-match-ai-review-v1",
+      reviewedAt: "2026-08-20T07:05:51.187Z",
+    },
+  });
+  const updateIdentity = (row) => Object.assign(row, {
+    itemName: "칡소",
+    noticeName: "칡소",
+    niceClass: null,
+  });
+  rawInput.gap.rows.filter((row) => row.region === "경상북도 안동시").forEach(updateIdentity);
+  rawInput.gap.ranking.filter((row) => row.region === "경상북도 안동시").forEach(updateIdentity);
+  rawInput.strategy.briefings
+    .filter((row) => row.region === "경상북도 안동시")
+    .forEach(updateIdentity);
+  const rawSnapshot = buildDashboardSnapshot(rawInput, {
+    mode: "sample",
+    generatedAt: "2026-08-21T00:00:00Z",
+  });
+  const rawItem = rawSnapshot.regions.find((region) => region.region === "경상북도 안동시").items[0];
+  assert.strictEqual(rawItem.matchingBasis, "raw_item_goods_matched");
+  assert.strictEqual(rawItem.niceClass, null);
+  assert.strictEqual(rawItem.metrics.uniqueTrademarkCount.methodVersion, "raw-item-goods-match-ai-review-v1");
+  assert.strictEqual(rawItem.metrics.confirmedGoodsMatchCount.availability, "available");
+  assert.strictEqual(rawItem.metrics.goodsReviewCandidateCount.value, 1);
+  assert.strictEqual(rawItem.metrics.goodsReviewCandidateCount.blockingIssue, null);
+  ok("검토 승인 원물의 지역 건수·exact/contains 근거를 일반 주소 집계와 구분해 전달");
+}
+
 console.log("\n모든 자체 테스트 통과");

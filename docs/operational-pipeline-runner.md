@@ -18,7 +18,7 @@ node scripts/runOperationalPipeline.js --dry-run --run-id 20260818-manual
 1. GI·농사로 수집과 누적 SQLite 갱신
 2. 결정론적 품목 정규화
 3. KIPRIS 검색과 영구 체크포인트 재개
-4. 분석
+4. 분석과 승인된 원물명 지정상품 검토 결과 재적용
 5. 브랜드 공백 탐지
 6. 결정론적 전략 초안 생성
 7. `mode=full`, `stage=alpha` 스냅샷 생성
@@ -40,10 +40,15 @@ node scripts/runOperationalPipeline.js \
 - 실행별 산출물·로그: `.kiip-operations/runs/<run-id>/`
 - 누적 SQLite·KIPRIS 체크포인트: `.kiip-operations/state/`
 - 실행 상태: `<run-id>/run-manifest.json`
+- 원물명 지정상품 승인 입력: `04-analyze-brand/data/raw-item-goods-review-v1.json`
 
 동일한 KIPRIS 체크포인트가 있으면 ③단계에 `--resume`을 자동으로 붙인다. 한 단계가 실패하면
 후속 단계는 `pending`으로 남기고 실행하지 않는다. 각 단계 stdout/stderr는 실행 디렉터리의
 `<stage-id>.log`에 저장한다.
+
+운영 실행기는 저장소의 승인 manifest를 ④ `--raw-goods-review`에 기본 전달한다. 다른 승인본을
+시험해야 할 때만 `--raw-goods-review <json>`으로 명시적으로 바꾼다. 따라서 현재 공개본의
+`raw_item_goods_matched` 집계를 대시보드 JSON 수동 패치 없이 재현할 수 있다.
 
 ## 게시 안전장치와 현재 한계
 

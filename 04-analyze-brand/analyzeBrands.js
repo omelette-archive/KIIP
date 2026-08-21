@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { analyzeEntries } = require("./lib/analyzer");
+const { applyRawGoodsReview } = require("./lib/rawGoodsReview");
 
 function parseArgs(argv) {
   const args = { recentYears: 3, maxRecentBrands: 10 };
@@ -31,6 +32,7 @@ function usage(message) {
       "  --asOfYear <year>         분석 기준 연도 (기본: 현재 UTC 연도)",
       "  --recentYears <n>         최근/직전 비교 기간 길이 (기본: 3년)",
       "  --maxRecentBrands <n>     집계별 최근 브랜드 예시 최대 개수 (기본: 10)",
+      "  --raw-goods-review <json> 검토 승인된 원물명 지정상품 결과를 지역 집계에 재적용",
       "  --regionalCoverageThreshold <0-1> 지역 지표 노출 최소 수집률 (주소 확보율은 참고 지표, 기본: 1)",
     ].join("\n")
   );
@@ -58,11 +60,22 @@ function main() {
     regionalCoverageThreshold: args.regionalCoverageThreshold,
   });
   analysis.provenance.inputFile = inputPath;
+  if (args.rawGoodsReview) {
+    const reviewPath = path.resolve(args.rawGoodsReview);
+    let review;
+    try {
+      review = JSON.parse(fs.readFileSync(reviewPath, "utf8").replace(/^\uFEFF/, ""));
+    } catch (error) {
+      throw new Error(`지정상품 검토 파일을 읽을 수 없습니다: ${reviewPath} (${error.message})`);
+    }
+    applyRawGoodsReview(analysis, review, { maxRecentBrands: args.maxRecentBrands });
+    analysis.provenance.rawGoodsReviewFile = reviewPath;
+  }
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(analysis, null, 2), "utf8");
   console.error(
     `[analyzeBrands] query=${analysis.summary.queryCount}, unique=${analysis.summary.uniqueTrademarkCount}, ` +
-      `regionItem=${analysis.regionItems.length} -> ${outPath}`
+      `regionItem=${analysis.regionItems.length}, rawGoodsReview=${analysis.rawGoodsReview?.appliedRowCount || 0} -> ${outPath}`
   );
 }
 

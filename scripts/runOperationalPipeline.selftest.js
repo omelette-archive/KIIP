@@ -41,6 +41,12 @@ try {
   assert.strictEqual(path.dirname(plan.state.specialtiesDb), plan.stateDir);
   assert.strictEqual(path.dirname(plan.state.trademarkCheckpoint), plan.stateDir);
   assert.ok(plan.publication.automatic === false);
+  const analyzeStage = plan.stages.find((stage) => stage.id === "04_analyze");
+  assert.ok(analyzeStage.args.includes("--raw-goods-review"));
+  assert.strictEqual(
+    analyzeStage.args[analyzeStage.args.indexOf("--raw-goods-review") + 1],
+    plan.inputs.rawGoodsReview
+  );
   const serialized = JSON.stringify(publicPlan(plan));
   assert.ok(!serialized.includes("API_KEY"));
   assert.ok(!serialized.includes("--apiKey"));
@@ -107,6 +113,8 @@ try {
   );
   const parsed = parseArgs(["--dry-run", "--run-id", "x"]);
   assert.strictEqual(parsed.dryRun, true, "정상 입력에서는 --dry-run이 여전히 인식돼야 함");
+  const customReview = parseArgs(["--raw-goods-review", "review.json"]);
+  assert.strictEqual(customReview.rawGoodsReview, "review.json");
 
   console.log("6) 같은 run-id로 두 번 실행하면 두 번째는 원자적으로 실패한다(경쟁 없이)");
   const raceRunsDir = path.join(tempDir, "race-runs");

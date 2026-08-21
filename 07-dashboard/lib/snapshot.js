@@ -274,8 +274,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     // raw_item_name_unclassified)는 niceClass가 없는 게 정상이다 — 식품 기본류
     // fallback으로 검색했을 뿐 공식 분류가 아니기 때문. 이 경우만 niceClass 미확정을
     // 허용하고, noticeName은 여전히 필수(원물명이라도 표시할 이름은 있어야 함).
-    const isUnclassified = clean(row.matchingBasis) === "raw_item_name_unclassified";
-    if (!clean(row.noticeName) || (!isUnclassified && !clean(row.niceClass))) {
+    const hasRawItemBasis = new Set([
+      "raw_item_name_unclassified",
+      "raw_item_goods_matched",
+    ]).has(clean(row.matchingBasis));
+    if (!clean(row.noticeName) || (!hasRawItemBasis && !clean(row.niceClass))) {
       throw new Error(
         `대시보드 품목은 ② 고시명칭 확정 또는 원물명 미분류 검색 행만 허용합니다: ${clean(row.region)} / ${clean(row.itemName)}`
       );
@@ -300,6 +303,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     const gapRow = gapRows.get(rowKey(row));
     const briefing = briefingRows.get(rowKey(row));
     const calculatedAt = analysis.generatedAt || generatedAt;
+    const rawGoodsMatched = clean(row.matchingBasis) === "raw_item_goods_matched";
+    const reviewedAt = clean(row.rawGoodsReview?.reviewedAt) || calculatedAt;
+    const regionalMethodVersion = rawGoodsMatched
+      ? clean(row.rawGoodsReview?.methodVersion) || "raw-item-goods-match-ai-review-v1"
+      : analysis.analysisVersion || null;
     const regionalMetricAvailable =
       row.regionalMetricAvailability === "available" ||
       (!row.regionalMetricAvailability && row.regionVerificationRate === 1);
@@ -343,9 +351,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           state,
           sourceIds: baseMetricSourceIds,
           availability: regionalMetricAvailable ? "available" : "blocked",
-          calculatedAt,
-          methodVersion: analysis.analysisVersion || null,
-          rationale: "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계",
+          calculatedAt: reviewedAt,
+          methodVersion: regionalMethodVersion,
+          rationale: rawGoodsMatched
+            ? "검토 승인된 지정상품 exact/contains 및 지역 일치 고유 출원만 집계"
+            : "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계",
           blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
         nationwideSearchTrademarkCount: makeMetric(
@@ -365,9 +375,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           state,
           sourceIds: registryMetricSourceIds,
           availability: regionalMetricAvailable ? "available" : "blocked",
-          calculatedAt,
-          methodVersion: analysis.analysisVersion || null,
-          rationale: "지역 inside 검증 출원 중 등록 상태",
+          calculatedAt: reviewedAt,
+          methodVersion: regionalMethodVersion,
+          rationale: rawGoodsMatched
+            ? "검토 승인된 지정상품·지역 일치 출원 중 등록 상태"
+            : "지역 inside 검증 출원 중 등록 상태",
           blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
         registrationRate: makeMetric(
@@ -377,9 +389,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             state,
             sourceIds: registryMetricSourceIds,
             availability: regionalMetricAvailable ? "available" : "blocked",
-            calculatedAt,
-            methodVersion: analysis.analysisVersion || null,
-            rationale: "지역 inside 등록 출원 / 지역 inside 고유 출원",
+            calculatedAt: reviewedAt,
+            methodVersion: regionalMethodVersion,
+            rationale: rawGoodsMatched
+              ? "등록 출원 / 검토 승인된 지정상품·지역 일치 고유 출원"
+              : "지역 inside 등록 출원 / 지역 inside 고유 출원",
             blockingIssue: regionalMetricAvailable ? null : "#50",
           }
         ),
@@ -408,22 +422,32 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         confirmedGoodsMatchCount: makeMetric(row.goodsConfirmedHitCount ?? 0, row, {
           state,
           sourceIds: registryMetricSourceIds,
-          availability:
-            count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
-          calculatedAt,
-          methodVersion: "ip-registry-designated-goods-v0-review",
-          rationale: "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
-          blockingIssue: "#12",
+          availability: rawGoodsMatched
+            ? "available"
+            : count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
+          calculatedAt: rawGoodsMatched ? reviewedAt : calculatedAt,
+          methodVersion: rawGoodsMatched
+            ? regionalMethodVersion
+            : "ip-registry-designated-goods-v0-review",
+          rationale: rawGoodsMatched
+            ? "지정상품명이 원물명과 정규화 완전일치(normalized_exact)한 출원 수"
+            : "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
+          blockingIssue: rawGoodsMatched ? null : "#12",
         }),
         goodsReviewCandidateCount: makeMetric(row.goodsReviewRequiredHitCount ?? 0, row, {
           state,
           sourceIds: registryMetricSourceIds,
-          availability:
-            count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
-          calculatedAt,
-          methodVersion: "ip-registry-designated-goods-v0-review",
-          rationale: "normalized_contains 또는 class_only 후보",
-          blockingIssue: "#12",
+          availability: rawGoodsMatched
+            ? "available"
+            : count(row.ipRegistryStatusCounts, "complete") > 0 ? "preview" : "blocked",
+          calculatedAt: rawGoodsMatched ? reviewedAt : calculatedAt,
+          methodVersion: rawGoodsMatched
+            ? regionalMethodVersion
+            : "ip-registry-designated-goods-v0-review",
+          rationale: rawGoodsMatched
+            ? "지정상품명에 원물명이 포함(normalized_contains)된 출원 수"
+            : "normalized_contains 또는 class_only 후보",
+          blockingIssue: rawGoodsMatched ? null : "#12",
         }),
         gapScore: makeMetric(gapRow?.gapScore ?? null, row, {
           state,

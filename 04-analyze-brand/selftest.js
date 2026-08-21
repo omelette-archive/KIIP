@@ -10,6 +10,7 @@ const {
   statusCategory,
   trademarkKey,
 } = require("./lib/analyzer");
+const { applyRawGoodsReview } = require("./lib/rawGoodsReview");
 
 function hit(number, title, date, status, regionMatch) {
   return {
@@ -601,6 +602,81 @@ console.log("0) 상표 사례는 최신순을 유지하면서 지정상품 근�
   assert.strictEqual(selected.length, 10);
   assert.ok(selected.some((row) => row.applicationNumber === "E-1"));
   ok("최근 사례가 10건을 넘더라도 지정상품 확정 근거 최소 1건은 사례 목록에 포함");
+}
+
+console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론적으로 재적용");
+{
+  const analysis = analyzeEntries([
+    {
+      status: "ok",
+      collectionStatus: "complete",
+      query: { region: "경기도 남양주시", item: "깻잎", classCode: "" },
+      input: { sido: "경기도", sigungu: "남양주시", itemName: "깻잎" },
+      hits: [],
+    },
+    {
+      status: "ok",
+      collectionStatus: "complete",
+      query: { region: "경기도 > 남양주시", item: "딸기", classCode: "" },
+      input: { sido: "경기도", sigungu: "경기도 > 남양주시", itemName: "딸기" },
+      hits: [],
+    },
+  ], { asOfYear: 2026, maxRecentBrands: 10 });
+  const review = [{
+    sido: "",
+    sigungu: "경기도 > 남양주시",
+    itemName: "깻잎",
+    uniqueTrademarkCount: 2,
+    registeredTrademarkCount: 1,
+    apps: [
+      {
+        title: "남양주 깻잎",
+        applicationNumber: "40-2025-1",
+        applicationDate: "20250101",
+        applicationStatus: "출원",
+        goodsMatchMethod: "normalized_exact",
+        designatedProducts: [{ classCode: "31", designatedProductName: "깻잎" }],
+      },
+      {
+        title: "남양주 채소",
+        applicationNumber: "40-2024-2",
+        applicationDate: "20240101",
+        applicationStatus: "등록",
+        goodsMatchMethod: "normalized_contains",
+        designatedProducts: [{ classCode: "31", designatedProductName: "신선한 깻잎" }],
+      },
+    ],
+  }];
+  applyRawGoodsReview(analysis, review);
+  const row = analysis.regionItems.find((candidate) => candidate.itemName === "깻잎");
+  assert.strictEqual(row.matchingBasis, "raw_item_goods_matched");
+  assert.strictEqual(row.regionalUniqueTrademarkCount, 2);
+  assert.strictEqual(row.regionalStatusCounts.registered, 1);
+  assert.strictEqual(row.regionalRegistrationRate, 0.5);
+  assert.strictEqual(row.goodsConfirmedHitCount, 1, "exact는 자동 일치로 유지");
+  assert.strictEqual(row.goodsReviewRequiredHitCount, 1, "contains는 검토 후보로 유지");
+  assert.strictEqual(row.trademarkExamples[0].goodsEvidence.length, 1);
+  assert.strictEqual(analysis.regions[0].regionalUniqueTrademarkCount, 2);
+  assert.strictEqual(analysis.summary.regionalUniqueTrademarkCount, 2);
+  assert.strictEqual(
+    analysis.regionItems.find((candidate) => candidate.itemName === "딸기").region,
+    "경기도 남양주시",
+    "검토 대상이 아닌 같은 지역 행도 복합 지역명을 정규화"
+  );
+  assert.strictEqual(analysis.rawGoodsReview.appliedRowCount, 1);
+  applyRawGoodsReview(analysis, review);
+  assert.strictEqual(
+    analysis.regionItems.find((candidate) => candidate.itemName === "깻잎").sourceProvenance.filter(
+      (source) => source.sourceId === "raw_item_goods_review"
+    ).length,
+    1,
+    "같은 검토본 재적용은 provenance를 중복시키지 않음"
+  );
+  assert.throws(
+    () => applyRawGoodsReview(analysis, [{ ...review[0], itemName: "없는 품목" }]),
+    /일치하는 ④ 지역×품목이 없습니다/
+  );
+  ok("복합 지역명 보정, 건수·등록률·exact/contains·근거·상위 집계를 함께 재현");
 }
 
 console.log("\n모든 자체 테스트 통과");

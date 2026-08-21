@@ -12,6 +12,12 @@ const { spawnSync } = require("child_process");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OPERATION_ROOT = path.join(ROOT, ".kiip-operations");
+const DEFAULT_RAW_GOODS_REVIEW = path.join(
+  ROOT,
+  "04-analyze-brand",
+  "data",
+  "raw-item-goods-review-v1.json"
+);
 
 function parseArgs(argv) {
   const options = {
@@ -24,6 +30,7 @@ function parseArgs(argv) {
     ["--run-id", "runId"],
     ["--runs-dir", "runsDir"],
     ["--state-dir", "stateDir"],
+    ["--raw-goods-review", "rawGoodsReview"],
     ["--max-requests", "maxRequests"],
     ["--max-pages", "maxPages"],
     ["--max-hits-per-query", "maxHitsPerQuery"],
@@ -63,6 +70,7 @@ function printUsage() {
       "  --run-id <id>                실행 식별자(영문/숫자/._-)",
       "  --runs-dir <path>            실행별 산출물·로그 디렉터리",
       "  --state-dir <path>           SQLite·검색 체크포인트 영구 디렉터리",
+      "  --raw-goods-review <json>    승인된 원물명 지정상품 검토 파일(기본: 저장소 검토본)",
       "  --max-requests <n>           이번 ③ 검색 실행의 요청 상한(기본 100)",
       "  --max-pages <n>              ③ 검색 조합별 페이지 상한(기본 5)",
       "  --max-hits-per-query <n>     ③ 검색 조합별 저장 상한(기본 100)",
@@ -98,6 +106,7 @@ function buildPlan(options = {}) {
   const runId = validateRunId(options.runId || defaultRunId(options.now));
   const runsDir = path.resolve(options.runsDir || path.join(DEFAULT_OPERATION_ROOT, "runs"));
   const stateDir = path.resolve(options.stateDir || path.join(DEFAULT_OPERATION_ROOT, "state"));
+  const rawGoodsReview = path.resolve(options.rawGoodsReview || DEFAULT_RAW_GOODS_REVIEW);
   const runDir = path.join(runsDir, runId);
   const files = {
     collected: path.join(runDir, "01-specialties.csv"),
@@ -157,7 +166,14 @@ function buildPlan(options = {}) {
       "04_analyze",
       "지역×품목 상표 분석",
       "04-analyze-brand/analyzeBrands.js",
-      ["--input", files.trademarks, "--out", files.analysis],
+      [
+        "--input",
+        files.trademarks,
+        "--out",
+        files.analysis,
+        "--raw-goods-review",
+        rawGoodsReview,
+      ],
       [files.analysis]
     ),
     nodeStage(
@@ -218,6 +234,9 @@ function buildPlan(options = {}) {
     stateDir,
     files,
     state,
+    inputs: {
+      rawGoodsReview,
+    },
     stages,
     publication: {
       automatic: false,

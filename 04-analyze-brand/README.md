@@ -21,16 +21,22 @@
 node 04-analyze-brand/analyzeBrands.js \
   --input 03-match-trademarks/output/batch-result.json \
   --out 04-analyze-brand/output/analysis.json \
+  --raw-goods-review 04-analyze-brand/data/raw-item-goods-review-v1.json \
   --asOfYear 2026
 ```
+
+`--raw-goods-review`는 고시명칭 사전에서 분류되지 않았지만 지정상품과 지역 근거를
+별도로 검토·승인한 원물명 행을 ④ 집계에 재적용한다. 기본 운영 실행기는 저장소에
+고정된 승인 manifest를 이 옵션으로 전달하므로, 대시보드 JSON을 수동 수정하지 않고도
+같은 결과를 재생성할 수 있다.
 
 현재 연도는 불완전하므로 시계열 비교에서 제외한다. `--asOfYear 2026 --recentYears 3`은
 2023~2025년과 2020~2022년을 비교한다.
 
 ## 출력 계약
 
-현재 `schemaVersion`은 `1.3`, 분석 규칙은
-`brand-analysis-v3-ip-registry-evidence`다.
+현재 `schemaVersion`은 `1.4`, 분석 규칙은
+`brand-analysis-v4-regional-metric-gate`다.
 
 ```text
 {
@@ -67,6 +73,11 @@ node 04-analyze-brand/analyzeBrands.js \
 `goodsMismatchHitCount`, `goodsVerificationRate`로 제공한다. `normalized_exact`와
 `normalized_contains`(고시상품명칭 포함)는 특산품 활용 출원으로 확정 집계하고,
 `class_only`만 사람 검토 대상으로 남긴다.
+
+원물명 승인 manifest가 적용된 행은 `matchingBasis=raw_item_goods_matched`와
+`rawGoodsReview` 근거를 갖는다. 이 행의 지역 출원 건수는 exact와 contains를 모두
+포함하지만, 대시보드의 근거 세부값은 `exact`와 `contains`를 각각 자동 일치와 포함
+일치로 분리해 표시한다.
 
 ## 과거 3건 연결 확인 결과
 

@@ -71,10 +71,13 @@
   판정 자체의 근본적 한계이며, 고시명칭 매칭 항목도 동일한 한계를 갖는다.
 - 나머지 원물 483개 행(889-406)은 애초에 지역 일치 출원 자체가 없어 이번
   방법으로도 확정 불가 — 검토대기로 유지.
-- 재현 자료: 원본 산출물은 `orca/workspaces/KIIP/main` 워크트리의
-  `03-match-trademarks/output/goods-match-final-results-full.json`(213개 행
-  전체, 지정상품 근거 포함)과 `goods-match-candidates-manifest.json`(1,312건
-  선정 근거)에 있다. 이 저장소에는 git-ignored 산출물이라 커밋하지 않았다.
+- 재현 입력: 승인된 213개 행과 지정상품 근거는
+  [`04-analyze-brand/data/raw-item-goods-review-v1.json`](../04-analyze-brand/data/raw-item-goods-review-v1.json)에
+  저장한다. ④ 분석의 `--raw-goods-review`와 운영 실행기가 이 파일을 직접 사용한다.
+- 원래의 git-ignored `goods-match-final-results-full.json`은 감사 원본으로 보존하되,
+  대시보드 재생성에는 더 이상 그 워크트리 경로가 필요하지 않다. 검토본을 갱신할 때는
+  `04-analyze-brand/importRawGoodsReview.js`로 스키마·건수·지역명을 검증한 뒤 승인
+  manifest를 교체한다.
 
 ## 관련 정책
 
