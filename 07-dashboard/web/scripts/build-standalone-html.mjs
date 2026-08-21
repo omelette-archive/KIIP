@@ -24,8 +24,8 @@ const mapData = JSON.stringify(geometry).replaceAll("<", "\\u003c");
 const css = cssText.replace(/^@import\s+"tailwindcss";\s*/u, "");
 const html = `<!doctype html>
 <html lang="ko"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="description" content="지역 특산품과 상표 근거를 함께 확인하는 KIIP 샘플 대시보드"><title>지역 브랜드 인사이트</title><style>${css}</style></head>
-<body><main class="shell"><header class="topbar" id="top"><button class="brand brand-button" id="brand-home" type="button"><span class="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>특산품 × 상표 근거 대시보드</small></span></button><div class="snapshot-meta"><span class="sample-badge" id="scope-label"></span><span id="generated"></span></div></header><nav class="primary-tabs" id="primary-tabs" aria-label="대시보드 화면"></nav><div id="app"></div><section class="provenance" id="provenance"></section><footer><span id="snapshot-id"></span><span>수치·판정·지도 경계는 출처와 버전을 함께 표시합니다.</span><span>알파 테스트 · 데이터 검토 중</span></footer></main>
+<meta name="description" content="지역 특산품과 상표 현황을 함께 확인하는 KIIP 대시보드"><title>지역 브랜드 인사이트</title><style>${css}</style></head>
+<body><main class="shell"><header class="topbar" id="top"><button class="brand brand-button" id="brand-home" type="button"><span class="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>지역 특산품 상표 현황</small></span></button><div class="snapshot-meta"><span class="sample-badge" id="scope-label"></span><span id="generated"></span></div></header><nav class="primary-tabs" id="primary-tabs" aria-label="대시보드 화면"></nav><div id="app"></div><footer><span>© 한국지식재산연구원 · Korea Institute of Intellectual Property</span><span id="snapshot-id"></span></footer></main>
 <script>${client}\ndashboardClient(${data},${mapData});</script></body></html>`;
 await writeFile(outputUrl, html, "utf8");
 console.log(`standalone dashboard -> ${fileURLToPath(outputUrl)}`);

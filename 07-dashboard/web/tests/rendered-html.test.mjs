@@ -52,11 +52,10 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
   assert.match(html, /지역 특산품 상표 분석/);
   // 2026-08-19 피드백: "알파테스트라는 말을 제외시키고... 최종본처럼" — 상단 배지·요약 탭
-  // 곳곳에 반복 노출하던 "알파 테스트" 문구를 걷어내고 footer 한 곳에만 작게 남긴다.
+  // 곳곳에 반복 노출하던 "알파 테스트" 문구를 모두 걷어낸다.
   // 같은 이유로 요약 탭의 "데이터 준비 상태"(pipeline-progress) 섹션도 제거했다 —
   // 같은 내용이 데이터 개요 탭에 이미 있고, "다음 개선" 같은 내부 로드맵 문구가 있었다.
-  assert.doesNotMatch(html, /class="sample-badge">알파 테스트/, "알파 테스트 문구가 상단 배지에 노출되면 안 됨(2026-08-19 결정)");
-  assert.match(html, /알파 테스트 · 데이터 검토 중/, "알파 테스트 표기는 footer 한 곳에만 남겨야 함");
+  assert.doesNotMatch(html, /알파 테스트/, "알파 테스트 문구가 화면에 노출되면 안 됨(2026-08-19 결정)");
   assert.doesNotMatch(html, /전체 범위 알파|전국 알파|알파 대시보드|ALPHA DATA PREVIEW|ALPHA PIPELINE CHECK/);
   assert.doesNotMatch(html, /class="pipeline-progress"/, "요약 탭에서 데이터 준비 상태 섹션은 제거됨(데이터 개요 탭과 중복)");
   assert.match(html, /수집된 상표 예시/);
@@ -68,11 +67,21 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapEnd = html.indexOf("</svg>", mapStart);
   const mapHtml = html.slice(mapStart, mapEnd);
   assert.ok(
-    mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-callout"'),
-    "전국 지도 연결선 라벨은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
+    mapHtml.lastIndexOf('class="map-shape') < mapHtml.indexOf('class="map-label'),
+    "전국 지도 지명은 모든 지역 도형 뒤의 최상위 SVG 레이어에 있어야 함",
   );
-  assert.match(mapHtml, /<polyline[^>]+points=/, "겹치는 지도 텍스트는 경계 밖 연결선 라벨로 표시해야 함");
-  assert.match(mapHtml, /map-callout-value/, "지도 라벨에서 지역명과 현재 지표 값을 함께 보여야 함");
+  assert.equal((mapHtml.match(/<polyline[^>]+points=/g) || []).length, 2, "전국 지도 연결선은 겹치는 서울·세종 두 곳에만 사용해야 함");
+  assert.match(mapHtml, /서울특별시/);
+  assert.match(mapHtml, /세종특별자치시/);
+  assert.match(mapHtml, /제주특별자치도/);
+  assert.match(mapHtml, /전남·광주 통합권역/);
+  assert.doesNotMatch(mapHtml, /map-callout-value/, "지도 지명에 현재 지표 값을 이어 붙여 가독성을 해치면 안 됨");
+  assert.ok(
+    html.indexOf(">특산품 수</button>") < html.indexOf(">상표 건수</button>") &&
+    html.indexOf(">상표 건수</button>") < html.indexOf(">출원율</button>") &&
+    html.indexOf(">출원율</button>") < html.indexOf(">등록률</button>"),
+    "지도 지표는 특산품 수, 상표 건수, 출원율, 등록률 순서여야 함",
+  );
   assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
@@ -82,9 +91,10 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
   assert.match(html, /2013 KOSTAT/);
-  assert.match(html, /상표 등록률/);
-  assert.match(html, /확인 특산품 수/);
-  assert.match(html, /특산품 출원율/);
+  assert.match(html, />특산품 수<\/button>/);
+  assert.match(html, />상표 건수<\/button>/);
+  assert.match(html, />출원율<\/button>/);
+  assert.match(html, />등록률<\/button>/);
   assert.match(html, /지역 주소 일치 출원 중 등록 상태인 건의 비율입니다/);
   assert.match(html, /고시명칭·NICE류가 확인된 지역×특산품 수입니다/);
   // 2026-08-20: 집계 대기 품목은 이제 분모에서 빠지는 게 아니라 출원 미확인으로
@@ -96,7 +106,7 @@ test("renders the data-connected Korean dashboard", async () => {
     /[가-힣]+(?:시|군|구|광역시|특별시|특별자치시) \/ [가-힣A-Za-z0-9]/,
     "지도 옆 표기는 '지역 / 특산품' 형식이어야 함"
   );
-  assert.match(html, /출처와 데이터 상태/);
+  assert.match(html, /전국 지역 브랜드 지도/);
   assert.doesNotMatch(html, /codex-preview|react-loading-skeleton|Your site is taking shape/i);
 });
 
@@ -234,7 +244,11 @@ test("renders matching criteria once, on the data overview tab, not on the summa
   assert.match(standaloneHtml, /data-overview">\$\{criteriaHtml\(\)\}/, "판정 기준 섹션은 데이터 개요 탭에서만 호출돼야 함");
   assert.doesNotMatch(standaloneHtml, /\$\{criteriaHtml\(\)\}<section class="hero"/, "판정 기준 섹션이 요약 탭(hero) 앞에서 호출되면 안 됨");
   assert.match(standaloneHtml, /판정 기준과 매칭 방법/);
-  assert.match(standaloneHtml, /GI 출처 또는 상표 출원 3건 이상/, "대표 특산품 판정 기준이 명시돼야 함");
+  const standaloneClientSource = standaloneHtml.slice(0, standaloneHtml.indexOf("\ndashboardClient("));
+  // 2026-08-21 디자인 정리: "GI 출처 또는 상표 출원 3건 이상"은 실제로 어떤 집계·표시
+  // 로직에도 쓰이지 않는 죽은 문구였다(gapScore는 타입에만 존재하고 읽히지 않음) —
+  // 사용자 요청으로 검토 후 제거했다. 이 자리를 실제로 쓰이는 매칭 기준으로 대체.
+  assert.doesNotMatch(standaloneClientSource, /GI 출처 또는 상표 출원 3건 이상/, "실제로 쓰이지 않는 대표 특산품 판정 기준 문구는 노출되면 안 됨");
   assert.match(standaloneHtml, /고시명칭 일치·포함/, "품목 매칭 기준이 명시돼야 함");
   assert.match(standaloneHtml, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
   assert.match(standaloneHtml, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
@@ -361,9 +375,10 @@ test("ships traceable province and municipality geometry", async () => {
 
 test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
-  assert.match(html, /\.map-callout polyline \{ fill: none;/, "standalone map should include leader lines for collision-free labels");
-  assert.match(html, /\.map-callout text \{[^}]*font-size: 17px;/, "standalone map callout values should remain readable on desktop");
-  assert.match(html, /\.map-callout text \{ font-size: 30px;/, "standalone map callout values should remain readable after mobile SVG scaling");
+  assert.match(html, /\.map-region-label-callout polyline \{ fill: none;/, "standalone map should include restrained leader lines for the two crowded labels");
+  assert.match(html, /const mapLabelMarkup = \(shapes, municipality\)/, "standalone map should render every geometry label regardless of data availability");
+  assert.match(html, /서울특별시: \{ x: -52, y: -28 \}, 세종특별자치시: \{ x: -60, y: -31 \}/, "standalone map should limit national callouts to Seoul and Sejong");
+  assert.doesNotMatch(html, /const calloutLabels/, "legacy all-label callout layout must not remain in the standalone client");
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
   assert.match(html, /전국 시도별 출원율/);
@@ -376,9 +391,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
-  assert.match(html, /상표 등록률/);
-  assert.match(html, /확인 특산품 수/);
-  assert.match(html, /특산품 출원율/);
+  assert.match(html, /특산품 수/);
+  assert.match(html, /상표 건수/);
+  assert.match(html, /출원율/);
+  assert.match(html, /등록률/);
   assert.doesNotMatch(html, />수집 범위<|>브랜드 공백|상표 활용 여지/);
   assert.match(html, /지역 확인 출원/);
   assert.match(html, /그중 등록/);
