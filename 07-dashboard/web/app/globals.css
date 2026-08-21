@@ -215,7 +215,7 @@ footer { display: flex; justify-content: space-between; gap: 20px; padding: 26px
 .map-label { fill: #24372e; font-size: 9.5px; font-weight: 800; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.88); stroke-width: 2px; stroke-linejoin: round; }
 .map-label-province { font-size: 11px; }
 .map-callout { pointer-events: none; }
-.map-callout polyline { fill: none; stroke: #64766d; stroke-width: 1.2; vector-effect: non-scaling-stroke; }
+.map-callout polyline { display: none; }
 .map-callout text { dominant-baseline: middle; fill: #24372e; font-size: 17px; font-weight: 800; paint-order: stroke; stroke: rgba(255,255,255,.94); stroke-width: 3px; stroke-linejoin: round; }
 .map-callout-value { fill: var(--green); }
 .map-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
