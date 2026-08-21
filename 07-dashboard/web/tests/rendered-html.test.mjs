@@ -56,11 +56,7 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.doesNotMatch(html, /알파 테스트/, "알파 테스트 문구가 화면에 노출되면 안 됨(2026-08-19 결정)");
   assert.doesNotMatch(html, /전체 범위 알파|전국 알파|알파 대시보드|ALPHA DATA PREVIEW|ALPHA PIPELINE CHECK/);
   assert.doesNotMatch(html, /class="pipeline-progress"/, "요약 탭에서 데이터 준비 상태 섹션은 제거됨(데이터 개요 탭과 중복)");
-  assert.match(html, /수집된 상표 예시/);
-  assert.ok(
-    html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
-    "지도는 상표 예시보다 먼저 보여야 함",
-  );
+  assert.doesNotMatch(html, /수집된 상표 예시|class="showcase"/, "표본 상표를 최신 출원처럼 보이게 하는 요약 섹션은 제거해야 함");
   const mapStart = html.indexOf('<svg class="korea-map"');
   const mapEnd = html.indexOf("</svg>", mapStart);
   const mapHtml = html.slice(mapStart, mapEnd);
@@ -119,7 +115,7 @@ test("keeps trademark-like raw labels out of the map specialty summary", async (
   assert.match(insight, /감말랭이/, "the map summary should show a confirmed specialty label");
   assert.doesNotMatch(insight, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as map specialties");
   assert.doesNotMatch(ranking, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as ranked specialties");
-  assert.match(html, /class="showcase"/, "trademark names should remain in their separate example section");
+  assert.doesNotMatch(html, /class="showcase"/, "unverified trademark samples should not be promoted on the summary screen");
 });
 
 test("uses every collected region-item specialty as the application-rate denominator", async () => {
@@ -415,6 +411,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
   assert.match(html, /전국 지역 브랜드 지도/);
+  assert.doesNotMatch(html, /class="showcase"|recent-showcase|최근 1년 상표 출원이 많은/, "표본 상표 또는 중복 표본 집계 랭킹을 공개 요약에 표시하면 안 됨");
   // 2026-08-21: "지역 출원 미확인" 탭 — 품목명·지정상품 일치 근거·지역 주소 판정이 모두
   // 갖춰진 항목만 보여준다(사용자 요청 — 브랜드명·미분류 원물명 오염 방지).
   assert.match(html, /지역 출원 미확인/);

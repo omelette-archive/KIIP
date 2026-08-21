@@ -14,7 +14,6 @@ function dashboardClient(snapshot, geometry) {
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
   const date = (value) => value ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록";
-  const compactDate = (value) => value && /^\d{8}$/.test(value) ? `${value.slice(0, 4)}.${value.slice(4, 6)}.${value.slice(6, 8)}` : value || "출원일 미기록";
   const itemName = (item) => item.itemName || item.noticeName || "미지정 품목";
   // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
   // 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
@@ -106,17 +105,6 @@ function dashboardClient(snapshot, geometry) {
   const gateTotal = pipeline ? pipeline.regionalMetricGate.availableRegionItemCount + pipeline.regionalMetricGate.blockedRegionItemCount : snapshot.coverage.regionItemCount;
   const uniqueSpecialtyCount = new Set(snapshot.regions.flatMap((region) => region.items.map((item) => itemName(item)))).size;
   const nationalSpecialtyCoverage = specialtyCoverage(snapshot.regions);
-  const trademarkShowcase = [];
-  const showcaseApplications = new Set();
-  const showcaseItems = new Set();
-  const showcaseCandidates = snapshot.regions.flatMap((region) => region.items.flatMap((item) => (item.trademarkExamples || []).filter((example) => example.title).map((example) => ({ region, item, example })))).sort((a, b) => (b.example.applicationDate || "").localeCompare(a.example.applicationDate || ""));
-  for (const row of showcaseCandidates) {
-    const applicationKey = row.example.applicationNumber || row.example.title || "";
-    const itemKey = itemName(row.item);
-    if (!applicationKey || showcaseApplications.has(applicationKey) || showcaseItems.has(itemKey)) continue;
-    showcaseApplications.add(applicationKey); showcaseItems.add(itemKey); trademarkShowcase.push(row);
-    if (trademarkShowcase.length === 6) break;
-  }
   const provinceStats = new Map();
   snapshot.regions.forEach((region) => {
     const name = region.sido || region.region;
@@ -179,8 +167,8 @@ function dashboardClient(snapshot, geometry) {
     const visibleRegions = state.province ? snapshot.regions.filter((region) => (region.sido || region.region) === state.province && (!state.municipality || region.sigungu === state.municipality || isUnclassifiedRegion(region))) : snapshot.regions;
     const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
     // 지도 옆 미리보기는 상표명(예: 등록 브랜드 "임금님표쌀")이나 아직 고시명칭이 확정 안 된
-    // 원문 표기가 아니라, 확정된 특산물 고시명칭만 보여준다. 원문 표기·상표 사례는 지역 상세와
-    // "수집된 상표 예시"에서 별도로 확인한다.
+    // 원문 표기가 아니라, 확정된 특산물 고시명칭만 보여준다. 개별 상표명은 지역 상세에서
+    // 검색 근거와 함께 확인한다.
     const visibleItems = visibleRegions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; })).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
     const municipal = state.province ? geometry.municipalities[state.province] : null;
     const percentageMetric = ["registration", "applicationCoverage"].includes(state.mapMetric);
@@ -196,7 +184,7 @@ function dashboardClient(snapshot, geometry) {
     <section class="map-workspace"><div class="map-card"><div class="map-heading"><div><h2>${state.province ? `${esc(displayRegionName(state.province))} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip">참고 경계 · 2013 KOSTAT</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map" viewBox="${activeViewBox}" role="img" aria-label="${state.province ? `${esc(displayRegionName(state.province))} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span><span><i class="legend-swatch low"></i>낮음</span><span><i class="legend-swatch high"></i>높음</span><strong>${mapLabels[state.mapMetric]} 기준</strong></div></div>
     <aside class="map-insight"><h2>${esc(displayRegionName(state.municipality || state.province || "전국"))}</h2><div class="rate-hero">${rateRing(visibleSpecialtyCoverage.rate)}<div class="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 ${number(visibleSpecialtyCoverage.total)}개 중 출원 확인 ${number(visibleSpecialtyCoverage.applied)}개${visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>${state.province && visibleRegions.some(isUnclassifiedRegion) ? `<p class="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 ${esc(displayRegionName(state.province))} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>` : ""}<div class="mini-list">${visibleItems.slice(0, 5).map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span><strong>${esc(region.sigungu || region.region)} / ${esc(label)}</strong><small>${esc(noticeBasis(item))} · NICE ${esc(item.niceClass)}류</small></span><b>${item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "지역별 집계 대기"}</b></button>`).join("") || '<p class="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>'}</div></aside></section>
     <section class="ranking" aria-label="지역 주소 일치 출원 중 등록 랭킹"><div class="section-heading"><div><h2>지역·대표 특산품 등록 상표 랭킹</h2></div><div class="ranking-toggle">${[10, 50].map((limit) => `<button type="button" data-ranking-limit="${limit}" class="${state.rankingLimit === limit ? "active" : ""}">TOP ${limit}</button>`).join("")}</div></div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>그중 등록</th></tr></thead><tbody>${rankingRows.slice(0, state.rankingLimit).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(region.region)}</td><td>${esc(label)}</td><td>${esc(item.noticeName)} · ${esc(item.niceClass)}류</td><td>${number(item.metrics.registeredTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></section>
-    ${trademarkShowcase.length ? `<section class="showcase" aria-label="수집된 상표 사례"><div class="section-heading"><div><h2>수집된 상표 예시</h2></div><span>최근 출원 · 품목별 1건</span></div><p class="showcase-intro">고시명칭으로 검색된 전국 후보이며, 해당 지역 출원으로 확정된 목록은 아닙니다.</p><div class="showcase-grid">${trademarkShowcase.map(({ region, item, example }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span class="showcase-item">${esc(itemName(item))} 검색 사례</span><strong>${esc(example.title)}</strong><small>${esc(compactDate(example.applicationDate))} · ${esc(example.applicationStatus || "상태 미기록")}</small><span class="showcase-number">${esc(example.applicationNumber || "출원번호 미기록")} →</span></button>`).join("")}</div></section>` : ""}`;
+    `;
   }
 
   function applicationsScreen() {
