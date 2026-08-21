@@ -64,7 +64,7 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf('class="map-workspace"') < html.indexOf('class="showcase"'),
     "지도는 상표 예시보다 먼저 보여야 함",
   );
-  const mapStart = html.indexOf('<svg class="korea-map map-with-callouts"');
+  const mapStart = html.indexOf('<svg class="korea-map"');
   const mapEnd = html.indexOf("</svg>", mapStart);
   const mapHtml = html.slice(mapStart, mapEnd);
   assert.ok(

@@ -78,18 +78,8 @@ function dashboardClient(snapshot, geometry) {
   const fill = (value, max) => value === null ? "#e5e1d7" : `color-mix(in srgb, #1f6d56 ${Math.round(24 + Math.max(.12, Math.min(1, max ? value / max : 0)) * 68)}%, #e7eee9)`;
   const compactRegionName = (name) => name === "전남광주통합특별시" ? "전남·광주" : name.replace(/특별자치도$|특별자치시$|광역시$|특별시$|도$/, "");
   const parseViewBox = (viewBox) => { const [x, y, width, height] = viewBox.split(/\s+/).map(Number); return { x, y, width, height }; };
-  const calloutViewBox = (viewBox) => { const { x, y, width, height } = parseViewBox(viewBox); const gutter = Math.max(125, width * .2); return `${x - gutter} ${y} ${width + gutter * 2} ${height}`; };
-  const calloutLabels = (shapes, viewBox, valueFor, labelFor, includeName = () => true) => {
-    const { x, y, width, height } = parseViewBox(viewBox); const center = x + width / 2; const result = [];
-    const rows = shapes.map((shape) => ({ shape, rawValue: valueFor(shape.name) })).filter(({ shape }) => includeName(shape.name));
-    ["left", "right"].forEach((side) => {
-      const sideRows = rows.filter(({ shape }) => side === "left" ? shape.labelX < center : shape.labelX >= center).sort((a, b) => a.shape.labelY - b.shape.labelY);
-      if (!sideRows.length) return;
-      const top = y + Math.max(18, height * .035), bottom = y + height - Math.max(18, height * .035), step = sideRows.length === 1 ? 0 : (bottom - top) / (sideRows.length - 1);
-      sideRows.forEach(({ shape, rawValue }, index) => { const labelY = sideRows.length === 1 ? Math.max(top, Math.min(bottom, shape.labelY)) : top + step * index; const isLeft = side === "left"; result.push({ name: shape.name, x: isLeft ? x - 13 : x + width + 13, y: labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: isLeft ? x - 4 : x + width + 4, anchor: isLeft ? "end" : "start", value: labelFor(rawValue) }); });
-    });
-    return result;
-  };
+  const calloutViewBox = (viewBox) => viewBox;
+  const calloutLabels = (shapes, viewBox, valueFor, labelFor, includeName = () => true) => shapes.filter((shape) => includeName(shape.name)).map((shape) => ({ name: shape.name, x: shape.labelX, y: shape.labelY, targetX: shape.labelX, targetY: shape.labelY, edgeX: shape.labelX, anchor: "middle", value: labelFor(valueFor(shape.name)) }));
   const totals = snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 });
   const sourceLine = snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean).join(" · ");
   const pipeline = snapshot.pipelineStatus;
