@@ -276,27 +276,6 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     }))
     .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
-  // 2026-08-21: "수집된 상표 예시"(표본 카드) 대신, 최근 1년간 상표 출원이 많았던
-  // 특산품 랭킹으로 대체한다(사용자 요청) — 어떤 품목이 요즘 브랜드 활동이 활발한지
-  // 한눈에 보여준다.
-  const recentShowcase = useMemo(() => {
-    const cutoffDate = new Date(snapshot.generatedAt);
-    cutoffDate.setFullYear(cutoffDate.getFullYear() - 1);
-    const cutoff = `${cutoffDate.getFullYear()}${String(cutoffDate.getMonth() + 1).padStart(2, "0")}${String(cutoffDate.getDate()).padStart(2, "0")}`;
-    const counts = new Map<string, { label: string; regions: string[]; count: number; region: Region; item: Item }>();
-    snapshot.regions.forEach((region) => region.items.forEach((item) => {
-      const label = officialItemLabel(item);
-      if (!label) return;
-      (item.trademarkExamples || []).forEach((example) => {
-        if (!example.applicationDate || example.applicationDate < cutoff) return;
-        const row = counts.get(label) || { label, regions: [], count: 0, region, item };
-        row.count += 1;
-        if (!row.regions.includes(region.region)) row.regions.push(region.region);
-        counts.set(label, row);
-      });
-    }));
-    return [...counts.values()].sort((a, b) => b.count - a.count).slice(0, 10);
-  }, [snapshot.regions, snapshot.generatedAt]);
   const municipalityGeometry = selectedProvince ? geometry.municipalities[selectedProvince] : null;
   const municipalityMapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : municipalityGeometry ? Math.max(1, ...municipalityGeometry.items.map((shape) => regionMapValue(snapshot.regions.find((region) => region.sido === selectedProvince && region.sigungu === shape.name)) || 0)) : 1;
   const activeMapViewBox = municipalityGeometry?.viewBox || geometry.viewBox;
