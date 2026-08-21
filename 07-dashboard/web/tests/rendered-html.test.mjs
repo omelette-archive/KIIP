@@ -311,57 +311,48 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.warnings.some((warning) => warning.includes("완전한 모집단")));
 });
 
-test("keeps the region detail item tabs and default item selection scoped to official specialty items", async () => {
-  // 2026-08-19 데이터 감사: 고성군 상세 화면의 "특산품 탭"에 특산물·원물이 아닌
-  // matchingBasis=raw_item_name_unclassified 원물명·상호(예: "꿀다림 데일리허니",
-  // "왕곡한과")가 섞여 나오는 문제가 보고됐다. 탭 목록·기본 선택(chooseRegion/selectedItem)은
-  // officialItemLabel이 확정된 항목만 골라야 하고, 공식 특산품이 하나도 없는 지역은 원물로
-  // 대체 노출하지 않고 빈 상태를 보여줘야 한다.
+test("shows every region-item in the detail tabs, marking name-unmatched entries instead of hiding them", async () => {
+  // 2026-08-19 데이터 감사 이후 한동안 raw_item_name_unclassified(고시명칭 미확정) 항목을
+  // 특산품 탭·기본 선택에서 통째로 숨겼으나, 사용자 재지적(2026-08-21): 고시명칭 매칭은
+  // 여러 판정 기준 중 하나일 뿐이고 원물명 그대로라고 특산품이 아닌 것은 아니다. 이제
+  // 탭은 region.items 전체를 보여주되, 명칭 매칭이 안 된 항목만 "명칭 확인중" 표시를
+  // 덧붙인다. 기본 선택(selectedItem)은 공식 특산품을 우선하되, state.itemId가 미분류
+  // 원물을 가리키면 그 원물 상세를 그대로 보여줘야 한다(임의로 다른 항목으로 바뀌면 안 됨).
   const snapshot = await loadSnapshot();
   const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
   assert.ok(goseong, "고성군 스냅샷 데이터가 있어야 함");
   const officialGoseongItems = goseong.items.filter((item) => item.matchingBasis === "notice_name_and_nice_class" && item.noticeName);
   const rawGoseongItems = goseong.items.filter((item) => item.matchingBasis === "raw_item_name_unclassified");
-  assert.ok(officialGoseongItems.length > 0, "고성군에는 공식 특산품이 있어야 함(빈 상태 분기가 아니라 필터링 분기를 검증하기 위함)");
+  assert.ok(officialGoseongItems.length > 0, "고성군에는 공식 특산품이 있어야 함");
   assert.ok(
     rawGoseongItems.some((item) => item.itemName === "꿀다림 데일리허니") && rawGoseongItems.some((item) => item.itemName === "왕곡한과"),
     "고성군에는 검토대기 원물명·상호가 실제로 섞여 있어야 이 테스트가 의미가 있음",
   );
   const regionsWithoutOfficialItems = snapshot.regions.filter(
-    (region) => !region.items.some((item) => item.matchingBasis === "notice_name_and_nice_class" && item.noticeName),
+    (region) => region.items.length > 0 && !region.items.some((item) => item.matchingBasis === "notice_name_and_nice_class" && item.noticeName),
   );
-  assert.ok(regionsWithoutOfficialItems.length > 0, "공식 특산품이 하나도 없는 지역이 실제로 있어야 빈 상태 분기가 의미가 있음");
+  assert.ok(regionsWithoutOfficialItems.length > 0, "공식 특산품은 없지만 미분류 원물은 있는 지역이 실제로 있어야 fallback 검증이 의미가 있음");
 
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(
     standaloneHtml,
     /const officialRegionItems = \(region\) => region\.items\.filter\(\(item\) => officialItemLabel\(item\)\);/,
-    "officialRegionItems는 공식 특산품만 반환해야 하고, 원물로 대체(fallback)하면 안 됨",
+    "officialRegionItems 자체는 여전히 공식 특산품만 반환해야 함(기본 선택 우선순위에 사용)",
+  );
+  assert.match(
+    standaloneHtml,
+    /<div class="item-tabs">\$\{region\.items\.map\(\(row\) => `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}">\$\{esc\(itemName\(row\)\)\}\$\{!officialItemLabel\(row\) \? '<em class="specialty-namecheck">명칭 확인중<\/em>' : ""\}<\/button>`\)/,
+    "특산품 탭은 region.items 전체를 렌더링하고, 명칭 미확정 항목에는 '명칭 확인중' 표시를 덧붙여야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /function selectedItem\(region\) \{ const official = officialRegionItems\(region\); return region\.items\.find\(\(item\) => item\.specialtyId === state\.itemId\) \|\| official\[0\] \|\| region\.items\[0\]; \}/,
+    "기본 선택은 official을 우선하되, 지정된 itemId가 미분류 원물이어도 그 항목을 그대로 보여줘야 함",
   );
   assert.doesNotMatch(
     standaloneHtml,
-    /officialRegionItems = \(region\) => \{ const official = region\.items\.filter[^}]*return official\.length \? official : region\.items/,
-    "공식 특산품이 없다고 원물 전체를 다시 노출하는 예전 fallback 로직이 되살아나면 안 됨",
-  );
-  assert.match(
-    standaloneHtml,
-    /<div class="item-tabs">\$\{officialRegionItems\(region\)\.map/,
-    "지자체 상세의 특산품 탭은 officialRegionItems로 걸러진 목록만 렌더링해야 함",
-  );
-  assert.doesNotMatch(
-    standaloneHtml,
-    /<div class="item-tabs">\$\{region\.items\.map/,
-    "특산품 탭이 지역의 전체 원본 items(검토대기 원물 포함)를 그대로 렌더링하면 안 됨",
-  );
-  assert.match(
-    standaloneHtml,
-    /function selectedItem\(region\) \{ const official = officialRegionItems\(region\); return official\.find\(\(item\) => item\.specialtyId === state\.itemId\) \|\| official\[0\]; \}/,
-    "기본 선택 항목도 officialRegionItems로 걸러진 목록 안에서만 찾아야 하고, state.itemId가 검토대기 원물 id를 가리켜도 원물 상세로 되돌아가면 안 됨",
-  );
-  assert.match(
-    standaloneHtml,
-    /고시명칭·NICE류가 확인된 특산품이 없습니다 · 검토대기 원물명·상호 \$\{region\.items\.length\}개/,
-    "공식 특산품이 없는 지역은 원물을 대신 보여주지 않고 명시적인 빈 상태를 표시해야 함",
+    /고시명칭·NICE류가 확인된 특산품이 없습니다/,
+    "공식 특산품이 없어도 원물이 있으면 빈 상태 대신 원물 상세를 보여줘야 함",
   );
 });
 
