@@ -438,6 +438,13 @@ function RegionDetail({ region, item, onItem }: { region: Region; item: Item | u
     </div>;
   }
   const examples = item.trademarkExamples || [];
+  // 2026-08-21 감사: 검색어(품목명) 일치만으로 걸러진 전국 상표 후보를 "사례"로 보여주면
+  // 실제로는 무관한 상표(예: "고춧가루 전문 기업 하남댁 명가")까지 섞여 나온다(사용자 지적).
+  // 등록원부 지정상품 근거(goodsEvidence)가 실제로 확인된 사례만 보여준다.
+  // matchingBasis=raw_item_goods_matched(2026-08-20 AI 검토, 커밋 119a1a2)는 이 근거 확보
+  // 과정에서 출원인 주소 지역 일치까지 이미 확인된 것만 골랐으므로 별도 표시를 붙인다.
+  const confirmedExamples = examples.filter((example) => (example.goodsEvidence?.length || 0) > 0);
+  const regionGoodsConfirmed = item.matchingBasis === "raw_item_goods_matched";
   const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
   const localCount = item.metrics.uniqueTrademarkCount.value || 0;
   const pendingReason = regionalMetricPendingReason(item);
@@ -452,6 +459,6 @@ function RegionDetail({ region, item, onItem }: { region: Region; item: Item | u
       <article><span>이 특산품의 출원 판정</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "판정은 완료됐으며 특산품 출원율의 분모에만 포함" : "판정 전이라 출원 미확인으로 계산되어 특산품 출원율의 분모에 포함됩니다"}</small></article>
     </div>
     <div className="review-strip"><div><span>지정상품 자동 일치</span><strong>{number(item.metrics.confirmedGoodsMatchCount.value)}건</strong></div><div><span>지정상품 개별 검토</span><strong>{number(item.metrics.goodsReviewCandidateCount.value)}건</strong></div><p>상표명은 사례로 보존하고, 대표 특산품 집계 키와 분리합니다.</p></div>
-    <section className="trademark-examples"><div className="example-heading"><strong>전국 검색 상표 사례</strong><span>지역 귀속 전 검색 후보 · 최근 출원 + 지정상품 근거 우선 · 최대 {examples.length || 0}건</span></div>{examples.length ? <div className="example-list">{examples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{example.applicationNumber || "출원번호 미기록"} · {example.applicationDate || "출원일 미기록"} · {example.applicationStatus || "상태 미기록"}</small></div><span className={example.goodsReviewRequired ? "goods-chip review" : "goods-chip"}>{goodsMethod(example.goodsMatchMethod)}</span>{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}</article>)}</div> : <p className="empty">현재 스냅샷에는 개별 상표명이 포함되지 않았습니다.</p>}</section>
+    <section className="trademark-examples"><div className="example-heading"><strong>지정상품 근거 확인 사례</strong><span>등록원부 지정상품이 이 품목과 일치·포함 확인된 출원만 표시 · 최대 {confirmedExamples.length || 0}건</span></div>{confirmedExamples.length ? <div className="example-list">{confirmedExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{example.applicationNumber || "출원번호 미기록"} · {example.applicationDate || "출원일 미기록"} · {example.applicationStatus || "상태 미기록"}</small></div><span className={example.goodsReviewRequired ? "goods-chip review" : "goods-chip"}>{goodsMethod(example.goodsMatchMethod)}</span><p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>{regionGoodsConfirmed && <small className="example-region-note">출원인 주소도 이 지역으로 확인됨</small>}</article>)}</div> : <p className="empty">{examples.length ? `지정상품 근거가 확인된 사례가 아직 없습니다 · 품목명 검색으로만 걸러진 전국 후보 ${examples.length}건은 실제 연관성이 확인되지 않아 표시하지 않습니다.` : "현재 스냅샷에는 개별 상표명이 포함되지 않았습니다."}</p>}</section>
   </div>;
 }

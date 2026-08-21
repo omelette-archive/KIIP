@@ -364,6 +364,46 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   );
 });
 
+test("hides goods-unverified trademark examples instead of showing nationwide keyword noise", async () => {
+  // 2026-08-21 사용자 지적: "전국 검색 상표 사례"가 품목명 검색어만 겹치는 무관한 상표
+  // (예: 해&들米 품목에 "고춧가루 전문 기업 하남댁 명가"가 뜸)까지 그대로 보여줘 혼란을
+  // 준다. 지정상품 근거(goodsEvidence)가 실제로 확인된 사례만 보여주고, 하나도 없으면
+  // 전국 후보를 나열하지 않고 명시적으로 "근거 없음"이라고 밝혀야 한다.
+  const snapshot = await loadSnapshot();
+  const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
+  const haeDeulMi = goseong.items.find((item) => item.itemName === "해&들米");
+  assert.ok(haeDeulMi, "해&들米 스냅샷 데이터가 있어야 함");
+  assert.ok(
+    haeDeulMi.trademarkExamples.length > 0 && haeDeulMi.trademarkExamples.every((example) => (example.goodsEvidence || []).length === 0),
+    "해&들米는 상표 사례는 있지만 지정상품 근거는 하나도 없어야 이 테스트가 의미가 있음",
+  );
+  const chikso = goseong.items.find((item) => item.itemName === "칡소");
+  assert.ok(chikso && chikso.matchingBasis === "raw_item_goods_matched" && chikso.trademarkExamples.some((example) => (example.goodsEvidence || []).length > 0),
+    "칡소는 raw_item_goods_matched이고 지정상품 근거가 있어야 이 테스트가 의미가 있음");
+
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(
+    standaloneHtml,
+    /const confirmedExamples = examples\.filter\(\(example\) => \(example\.goodsEvidence\?\.length \|\| 0\) > 0\);/,
+    "상표 사례 목록은 goodsEvidence가 있는 것만 걸러서 렌더링해야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /const regionGoodsConfirmed = item\.matchingBasis === "raw_item_goods_matched";/,
+    "raw_item_goods_matched 항목은 이미 지역 주소 일치까지 확인된 사례라는 것을 표시할 수 있어야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /지정상품 근거가 확인된 사례가 아직 없습니다/,
+    "지정상품 근거가 없는 품목은 전국 후보를 나열하지 않고 명시적으로 안내해야 함",
+  );
+  assert.doesNotMatch(
+    standaloneHtml,
+    /전국 검색 상표 사례/,
+    "예전 헤딩(전국 검색 상표 사례)은 오해를 불렀으므로 남아있으면 안 됨",
+  );
+});
+
 test("ships traceable province and municipality geometry", async () => {
   const raw = await readFile(new URL("../public/data/map-geometry.json", import.meta.url), "utf8");
   const geometry = JSON.parse(raw);
