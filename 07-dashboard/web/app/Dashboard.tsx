@@ -411,7 +411,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
       <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-grid">{snapshot.sources.filter((source) => source.sourceUrl).map((source) => <a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer" key={source.sourceId}><span>{source.sourceLabel || source.sourceId}</span><strong>{source.sourceContractVersion || "버전 미기록"}</strong><small>검증 {source.sourceLastVerifiedAt || date(source.sourceFetchedAt)}</small></a>)}<a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer"><span>지도 경계</span><strong>{geometry.boundaryReference.sourceName}</strong><small>{geometry.boundaryReference.sourceBasis} · 참고용</small></a></div></section>
     </section>}
 
-    <footer><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>Snapshot {snapshot.snapshotId} · 마지막 생성 {date(snapshot.generatedAt)}</span></footer>
+    <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품 상표 출원 현황</span></div><span>Snapshot {snapshot.snapshotId} · 마지막 생성 {date(snapshot.generatedAt)}</span></footer>
   </main>;
 }
 
