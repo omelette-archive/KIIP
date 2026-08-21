@@ -5,6 +5,12 @@ const fs = require("fs");
 const path = require("path");
 
 const CONFIRMED_MATCHING_BASIS = "notice_name_and_nice_class";
+// 2026-08-20 AI 검토(커밋 119a1a2)로 원물명+지정상품 정규화 일치(exact/contains) +
+// 출원인 주소 지역 일치가 모두 확인된 212개 항목. 이 도구는 그동안 이 항목들을
+// raw_item_name_unclassified와 같은 "review"로 취급해 review_rows_have_regional_metrics
+// 경고 집계가 실제보다 부풀려져 있었다(119a1a2 커밋 메시지에서 이미 알려진 gap) — 이제
+// 확인된 특산품으로 인식한다.
+const GOODS_MATCHED_BASIS = "raw_item_goods_matched";
 const REVIEW_MATCHING_BASIS = "raw_item_name_unclassified";
 
 function parseArgs(argv) {
@@ -34,12 +40,16 @@ function regionIdentity(region) {
 }
 
 function isConfirmedSpecialty(item) {
-  return Boolean(
-    item &&
-      item.matchingBasis === CONFIRMED_MATCHING_BASIS &&
-      item.noticeName &&
-      item.niceClass
-  );
+  if (!item) return false;
+  if (item.matchingBasis === CONFIRMED_MATCHING_BASIS) {
+    return Boolean(item.noticeName && item.niceClass);
+  }
+  if (item.matchingBasis === GOODS_MATCHED_BASIS) {
+    // raw_item_goods_matched는 고시상품명칭 사전 매칭이 아니라 등록원부 지정상품 대조로
+    // 확정된 것이라 niceClass가 없는 게 정상이다(고시명칭 매칭 경로와 근거가 다름).
+    return Boolean(item.noticeName);
+  }
+  return false;
 }
 
 function isRegionalMetricAvailable(item) {
@@ -111,6 +121,11 @@ function auditSnapshot(snapshot) {
 
       if (item.matchingBasis === CONFIRMED_MATCHING_BASIS && (!item.noticeName || !item.niceClass)) {
         addError("incomplete_confirmed_specialty", "confirmed matching basis requires noticeName and niceClass", {
+          example: compactRow(region, item),
+        });
+      }
+      if (item.matchingBasis === GOODS_MATCHED_BASIS && !item.noticeName) {
+        addError("incomplete_confirmed_specialty", "raw_item_goods_matched requires noticeName", {
           example: compactRow(region, item),
         });
       }
@@ -214,7 +229,7 @@ function auditSnapshot(snapshot) {
     reviewRowsWithAvailableRegionalMetrics: reviewAvailableRows.length,
     unresolvedRegionCount: unresolvedRegions.length,
     presentationRule:
-      "Confirmed specialty counts, rates, maps, rankings, and item lists must use only notice_name_and_nice_class rows with noticeName and niceClass.",
+      "Confirmed specialty counts, rates, maps, rankings, and item lists must use only notice_name_and_nice_class rows (with noticeName and niceClass) or raw_item_goods_matched rows (with noticeName; 2026-08-20 AI review, commit 119a1a2).",
   };
 
   return { ok: errors.length === 0, errors, warnings, summary };
