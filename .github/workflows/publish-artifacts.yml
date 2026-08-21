@@ -5,11 +5,13 @@ on:
     branches: [main]
     paths:
       - "07-dashboard/dashboard.html"
+      - "07-dashboard/web/**"
       - "scripts/buildArtifactSite.js"
       - ".github/workflows/publish-artifacts.yml"
   pull_request:
     paths:
       - "07-dashboard/dashboard.html"
+      - "07-dashboard/web/**"
       - "scripts/buildArtifactSite.js"
       - ".github/workflows/publish-artifacts.yml"
   workflow_dispatch:
@@ -37,6 +39,12 @@ jobs:
         with:
           node-version: "22"
           package-manager-cache: false
+
+      - name: Verify committed standalone HTML matches dashboard sources
+        working-directory: 07-dashboard/web
+        run: |
+          npm run build:html
+          git diff --exit-code -- ../dashboard.html
 
       - name: Build current artifact hub and version archive
         run: node scripts/buildArtifactSite.js --output .artifact-site --limit 50

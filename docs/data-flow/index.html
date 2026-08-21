@@ -2,13 +2,14 @@
 <html lang="ko">
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>KIIP 알파 데이터 흐름 현황판</title>
+  <title>KIIP 2026-08-12 데이터 흐름 실행 기록</title>
   <style>
     :root{--ink:#17221e;--muted:#64726c;--line:#dbe3dc;--paper:#f7faf7;--card:#fff;--accent:#13795b;--soft:#e7f4ed;--warn:#9a6516}*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 system-ui,-apple-system,"Noto Sans KR",sans-serif}main{max-width:1180px;margin:auto;padding:42px 22px 70px}header{display:flex;justify-content:space-between;gap:20px;align-items:end;border-bottom:1px solid var(--line);padding-bottom:25px}h1{margin:5px 0 4px;font-size:clamp(28px,5vw,48px);letter-spacing:-.06em}h2{margin:0 0 14px;font-size:23px;letter-spacing:-.04em}.eyebrow{margin:0;color:var(--accent);font-size:12px;font-weight:800;letter-spacing:.12em}.date{color:var(--muted);font-size:13px}.flow{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin:28px 0 36px}.step{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:17px 14px;position:relative;min-height:150px}.step:not(:last-child):after{content:'→';position:absolute;right:-14px;top:53px;color:var(--accent);font-size:24px;z-index:2}.step b{display:block;font-size:24px;margin:9px 0 3px}.step span{color:var(--muted);font-size:13px}.step.done{border-color:#a8d6bd;background:linear-gradient(145deg,#fff,var(--soft))}.step.pending{border-style:dashed}.grid{display:grid;grid-template-columns:1.15fr .85fr;gap:18px}.card{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px;margin-bottom:18px}.stats{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}.stat{padding:15px;border-radius:13px;background:#f1f6f2}.stat b{display:block;font-size:25px}.stat span{color:var(--muted);font-size:13px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:10px 7px;border-bottom:1px solid var(--line);vertical-align:top}th{font-size:12px;color:var(--muted)}code{background:#eef2ef;border-radius:5px;padding:2px 5px;font-size:12px}.tag{display:inline-block;background:var(--soft);color:#146143;border-radius:99px;padding:3px 9px;margin:3px;font-size:12px}.warn{color:var(--warn)}footer{color:var(--muted);font-size:13px;margin-top:20px}@media(max-width:850px){.flow{grid-template-columns:repeat(2,1fr)}.step:not(:last-child):after{display:none}.grid{grid-template-columns:1fr}}@media(max-width:500px){.flow,.stats{grid-template-columns:1fr}main{padding:25px 14px}}
   </style>
 </head>
 <body><main>
-  <header><div><p class="eyebrow">KIIP · DATA LINEAGE</p><h1>알파 데이터 흐름 현황판</h1><div class="date">수집 → 매칭 → 지역 귀속 → 대시보드 · 기준일 2026-08-12</div></div><div class="date">전체 범위 알파 · 부분 수집</div></header>
+  <header><div><p class="eyebrow">KIIP · ARCHIVED DATA LINEAGE</p><h1>2026-08-12 데이터 흐름 실행 기록</h1><div class="date">수집 → 매칭 → 지역 귀속 → 대시보드 · 기준일 2026-08-12</div></div><div class="date">보관본 · 최신 현황 아님</div></header>
+  <section class="card"><h2>보관 기록 안내</h2><p>이 화면의 수치는 2026-08-12 검토 실행을 재현한 값으로 이후 수집·주소 보강·판정 기준 변경을 반영하지 않습니다. 최신 결과는 <a href="https://omelette-archive.github.io/KIIP-artifacts/latest/">공개 대시보드</a>에서 확인하세요.</p></section>
   <section class="flow" aria-label="데이터 처리 단계">
     <div class="step done"><span>01 · 원천 수집</span><b>1,721</b><span>지역×품목 입력 행</span></div>
     <div class="step done"><span>02 · 표준화</span><b>1,692</b><span>지역×품목 정제 행</span></div>
@@ -30,5 +31,5 @@
     <section class="card"><h2>판정 기준</h2><p><span class="tag">주소 우선</span>출원인 주소가 지역과 일치하면 지역 귀속</p><p><span class="tag">고시명칭 포함</span>지정상품에 고시상품명칭이 포함되면 특산품 활용 출원</p><p><span class="tag">사람 검토</span>NICE류만 일치하는 <code>class_only</code></p><p><span class="tag">부분 수집</span>주소 60% 기준은 제거했지만 검색 자체가 부분이면 지역 지표는 보류</p></section>
     <section class="card"><h2>다음 처리</h2><ol><li>등록원부 API를 캐시·소량 호출로 보강</li><li><code>normalized_contains</code> 실제 건수 산출</li><li>분석·스냅샷 재생성</li><li>서울·제주·세종·울산 등 누락 지역 재검증</li></ol><p class="warn">현재 지정상품 보강 건수: 0건 — 보강 실행 후 갱신 필요</p></section>
   </div></div>
-  <footer>근거 파일: <a href="../../03-match-trademarks/README.md">③ 상표 매칭</a> · <a href="../../04-analyze-brand/README.md">④ 분석</a> · <a href="../../07-dashboard/README.md">⑦ 대시보드</a> · <a href="../../07-dashboard/web/public/data/dashboard-snapshot.json">현재 스냅샷</a></footer>
+  <footer>보관 기준일 2026-08-12 · 근거 파일: <a href="../../03-match-trademarks/README.md">③ 상표 매칭</a> · <a href="../../04-analyze-brand/README.md">④ 분석</a> · <a href="../../07-dashboard/README.md">⑦ 대시보드</a> · <a href="../../07-dashboard/web/public/data/dashboard-snapshot.json">최신 스냅샷</a></footer>
 </main></body></html>

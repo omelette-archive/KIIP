@@ -1,10 +1,12 @@
-# 알파 데이터 흐름 현황판
+# 2026-08-12 데이터 흐름 실행 기록 (보관)
 
-수집부터 대시보드까지 각 단계의 입력·출력 구조와 현재 알파 건수를 한 문서에서 확인하기 위한 현황판이다.
-시각화는 [`index.html`](index.html)이며, 현재 `07-dashboard/web/public/data/dashboard-snapshot.json`을 기준으로
-2026-08-12 알파 산출물을 정리했다.
+이 문서는 2026-08-12 검토 실행 당시의 수집·매칭 수치를 재현하기 위한 보관 기록이다.
+현재 진행 현황이나 최신 통계가 아니며, 숫자는 이후 수집·주소 보강·판정 기준 변경을 반영하지 않는다.
+당시 시각화는 [`index.html`](index.html)에서 볼 수 있다. 최신 결과는
+[공개 대시보드](https://omelette-archive.github.io/KIIP-artifacts/latest/)와
+`07-dashboard/web/public/data/dashboard-snapshot.json`을 기준으로 확인한다.
 
-## 현재 알파 건수
+## 2026-08-12 실행 건수
 
 | 단계 | 기준 단위 | 건수 | 의미 |
 | --- | --- | ---: | --- |
@@ -37,8 +39,8 @@
 
 ## 재생성 순서
 
-등록원부 보강 후 ④ 분석과 ⑦ 스냅샷을 다시 생성하고 이 현황판의 숫자를 갱신한다. 현재 HTML은 정적 알파 기록이며,
-실시간 API 호출 화면이 아니다.
+등록원부 보강 후 ④ 분석과 ⑦ 스냅샷을 다시 생성하는 절차를 당시 기준으로 기록했다. 이 HTML과 표의
+숫자는 갱신하지 않는 정적 실행 기록이며 실시간 API 호출 화면이 아니다.
 
 보강 결과를 먼저 빠르게 점검하려면 다음 명령을 사용한다.
 
@@ -52,4 +54,4 @@ node scripts/review-enrichment-output.mjs `
 누락 경고를 출력한다.
 
 관련 구현: [`03-match-trademarks`](../../03-match-trademarks), [`04-analyze-brand`](../../04-analyze-brand),
-[`07-dashboard`](../../07-dashboard), [스냅샷](../../07-dashboard/web/public/data/dashboard-snapshot.json)
+[`07-dashboard`](../../07-dashboard), [최신 스냅샷](../../07-dashboard/web/public/data/dashboard-snapshot.json)

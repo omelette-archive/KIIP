@@ -54,3 +54,6 @@ jobs:
 
       - name: Validate dashboard build and snapshot contract
         run: npm test
+
+      - name: Verify committed standalone HTML matches dashboard sources
+        run: git diff --exit-code -- ../dashboard.html
