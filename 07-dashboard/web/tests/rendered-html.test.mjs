@@ -139,7 +139,9 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(Math.round(coverage.rate * 100), 60);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   assert.match(visibleTextHtml, new RegExp(`수집 특산품 전체 ${localeNumber(coverage.total)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 지역별 집계 완료 ${localeNumber(coverage.decided)}개 · 집계 대기 ${localeNumber(coverage.pending)}개`));
-  assert.match(html, /지역 주소 일치 출원이 확인된 특산품 수 ÷ 이 지역에서 수집된 전체 특산품 수/);
+  // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
+  // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
+  assert.doesNotMatch(html, /출원율 계산/);
   assert.doesNotMatch(html, /확인 특산품 전체 1,015개|831 ÷ 1,015|출원율 82%/);
 });
 
