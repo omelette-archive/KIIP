@@ -25,7 +25,7 @@ const MAP_DESCRIPTIONS: Record<MapMetric, string> = {
   trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
   registration: "지도에 포함된 지역 주소 일치 출원 중 등록 상태인 건의 비율입니다(등록 ÷ 출원).",
   coverage: "고시명칭·NICE류가 확인된 지역×특산품 수입니다.",
-  applicationCoverage: "이 지역의 확인 특산품 전체 중 지역 주소 일치 출원이 1건 이상 확인된 특산품의 비율입니다. 아직 지역별 집계가 안 끝난 품목은 출원 미확인으로 계산되므로, 데이터가 쌓일수록 값이 올라갈 수 있습니다.",
+  applicationCoverage: "이 지역에서 수집된 전체 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로, 데이터가 쌓일수록 값이 올라갈 수 있습니다.",
 };
 
 function number(value: number | null | undefined) { return typeof value === "number" ? value.toLocaleString("ko-KR") : "—"; }
@@ -71,17 +71,15 @@ function specialtyCoverage(regions: Region[]): SpecialtyCoverage {
   let decided = 0;
   let applied = 0;
   regions.forEach((region) => region.items.forEach((item) => {
-    if (!officialItemLabel(item)) return;
     total += 1;
     if (item.metrics.uniqueTrademarkCount.availability !== "available") return;
     decided += 1;
     if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) applied += 1;
   }));
-  // 2026-08-20 계산 방식 변경(사용자 결정): 분모를 "판정 완료"(decided)가 아니라
-  // "이 지역의 확인 특산품 전체"(total)로 바꿨다. 아직 지역별 집계가 안 끝난(집계
-  // 대기) 품목은 출원 확인으로 세지 않으므로 결과적으로 미출원처럼 낮게 잡힌다 —
-  // 데이터 수집이 진행되면서 대기 비율이 줄어들면 이 수치도 자연히 올라간다는
-  // 점을 감안한 의도적 선택이다.
+  // 2026-08-21 사용자 재확인: 분모는 고시명칭 확인 완료분이 아니라 스냅샷에 수집된
+  // 지역×특산품 전체다(현재 전국 1,692개). 아직 명칭·지역별 집계 확인이 덜 끝난
+  // 품목도 분모에 포함하고, 지역 주소 일치 출원이 확인될 때만 분자에 더한다. 따라서
+  // 초기 출원율은 낮게 보이고 후속 확인이 진행되면서 올라가는 것이 의도한 동작이다.
   return { total, decided, applied, pending: total - decided, rate: total ? applied / total : null };
 }
 const NATIONAL_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
@@ -143,13 +141,17 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
   const sourceLine = snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean).join(" · ");
   const provinceStats = useMemo(() => {
-    const stats = new Map<string, { trademarks: number; registered: number; verified: number; officialItems: number; decidedItems: number; appliedItems: number }>();
+    const stats = new Map<string, { trademarks: number; registered: number; verified: number; totalItems: number; decidedItems: number; appliedItems: number }>();
     snapshot.regions.forEach((region) => {
       const name = region.sido || region.region;
-      const current = stats.get(name) || { trademarks: 0, registered: 0, verified: 0, officialItems: 0, decidedItems: 0, appliedItems: 0 };
+      const current = stats.get(name) || { trademarks: 0, registered: 0, verified: 0, totalItems: 0, decidedItems: 0, appliedItems: 0 };
       region.items.forEach((item) => {
         const official = Boolean(officialItemLabel(item));
-        if (official) current.officialItems += 1;
+        current.totalItems += 1;
+        if (item.metrics.uniqueTrademarkCount.availability === "available") {
+          current.decidedItems += 1;
+          if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) current.appliedItems += 1;
+        }
         // 지역 단위 상표 집계(trademarks/verified/registered)는 고시명칭이 확정된
         // 공식 특산품만 포함한다. matchingBasis=raw_item_name_unclassified인 검토대기
         // 원물명·상호(예: "꿀다림 데일리허니", "왕곡한과")는 uniqueTrademarkCount가
@@ -158,15 +160,13 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
           current.verified += 1;
           current.trademarks += item.metrics.uniqueTrademarkCount.value || 0;
           current.registered += item.metrics.registeredTrademarkCount.value || 0;
-          current.decidedItems += 1;
-          if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) current.appliedItems += 1;
         }
       });
       stats.set(name, current);
     });
     return stats;
   }, [snapshot.regions]);
-  const mapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : stat.officialItems));
+  const mapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : stat.totalItems));
   const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => `${itemName(item)} ${item.noticeName || ""}`.toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
   const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode) || filteredRegions[0] || snapshot.regions[0];
   const selectedRegionOfficialItems = selectedRegion ? officialRegionItems(selectedRegion) : [];
@@ -237,7 +237,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
   function regionMapValue(region: Region | undefined, metric: MapMetric = mapMetric) { if (!region) return null; const available = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((metric === "trademarks" || metric === "registration") && available.length === 0) return null; if (metric === "trademarks") return trademarks; if (metric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (metric === "coverage") return coverage.total; return coverage.rate; }
-  function mapValue(name: string, metric: MapMetric = mapMetric) { const stat = provinceStats.get(name); if (!stat) return null; if (metric === "trademarks") return stat.verified ? stat.trademarks : null; if (metric === "registration") return stat.verified && stat.trademarks ? stat.registered / stat.trademarks : null; if (metric === "coverage") return stat.officialItems; return stat.officialItems ? stat.appliedItems / stat.officialItems : null; }
+  function mapValue(name: string, metric: MapMetric = mapMetric) { const stat = provinceStats.get(name); if (!stat) return null; if (metric === "trademarks") return stat.verified ? stat.trademarks : null; if (metric === "registration") return stat.verified && stat.trademarks ? stat.registered / stat.trademarks : null; if (metric === "coverage") return stat.totalItems; return stat.totalItems ? stat.appliedItems / stat.totalItems : null; }
   function mapMetricValueLabel(value: number | null, metric: MapMetric = mapMetric) { if (value === null) return "데이터 없음"; if (metric === "registration" || metric === "applicationCoverage") return percent(value); return `${number(value)}${metric === "trademarks" ? "건" : "개 품목"}`; }
   function mapValueLabel(name: string, metric: MapMetric = mapMetric) { return mapMetricValueLabel(mapValue(name, metric), metric); }
   function openProvince(name: string) { setSelectedProvince(name); setSelectedMunicipality(null); }
@@ -302,7 +302,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   }, [snapshot.regions]);
 
   return <main className="shell">
-    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><span className="brand-mark">K</span><span><strong>지역 브랜드 인사이트</strong><small>지역 특산품 상표 현황</small></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 브랜드 인사이트</strong><small>지역 특산품 상표 현황</small></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
     {tab === "summary" && <>
@@ -415,7 +415,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
       <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-grid">{snapshot.sources.filter((source) => source.sourceUrl).map((source) => <a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer" key={source.sourceId}><span>{source.sourceLabel || source.sourceId}</span><strong>{source.sourceContractVersion || "버전 미기록"}</strong><small>검증 {source.sourceLastVerifiedAt || date(source.sourceFetchedAt)}</small></a>)}<a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer"><span>지도 경계</span><strong>{geometry.boundaryReference.sourceName}</strong><small>{geometry.boundaryReference.sourceBasis} · 참고용</small></a></div></section>
     </section>}
 
-    <footer><span>© 한국지식재산연구원 · Korea Institute of Intellectual Property</span><span>Snapshot {snapshot.snapshotId} · 마지막 생성 {date(snapshot.generatedAt)}</span></footer>
+    <footer><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>Snapshot {snapshot.snapshotId} · 마지막 생성 {date(snapshot.generatedAt)}</span></footer>
   </main>;
 }
 
