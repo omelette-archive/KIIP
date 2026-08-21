@@ -671,10 +671,15 @@ function dashboardClient(snapshot, geometry) {
   // 출원이 KIPRIS에 한 건도 없는 경우다. 검색·주소 판정까지 끝난(availability=
   // available) 것 중 값이 0인 것만 대상으로 한다. 확정 특산품과 아직 미분류인
   // 원물명은 신뢰도가 다르므로 별도 그룹으로 나눈다.
+  // 2026-08-21: 법정동코드가 미해결(region.regionCode 없음)인 지역은 제외한다 — 지역
+  // 코드가 없으면 ③단계 출원인 주소-지역 일치 판정(inside/outside)이 그 지역에 대해
+  // 구조적으로 성립하지 않아, "0건"이 실제 미출원이 아니라 판정 불가일 뿐이다(대전·
+  // 대구·부산·울산·인천광역시, 전남광주통합특별시, 남양주시 등 7개 지역 확인, 사용자 결정).
   function gapRows() {
     const confirmed = new Map();
     const raw = new Map();
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
+      if (!region.regionCode) return;
       if (item.metrics.uniqueTrademarkCount.availability !== "available") return;
       if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) return;
       const officialLabel = officialItemLabel(item);

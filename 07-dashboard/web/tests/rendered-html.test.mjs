@@ -143,7 +143,7 @@ test("shows specialty application coverage with a complete, auditable denominato
   assert.equal(coverage.pending, 59);
   assert.equal(Math.round(coverage.rate * 100), 82);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${localeNumber(coverage.total)}개 · 판정 완료 ${localeNumber(coverage.decided)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 집계 대기 ${localeNumber(coverage.pending)}개`));
+  assert.match(visibleTextHtml, new RegExp(`확인 특산품 전체 ${localeNumber(coverage.total)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 판정 완료 ${localeNumber(coverage.decided)}개 · 집계 대기 ${localeNumber(coverage.pending)}개`));
   assert.match(html, /출원 확인 특산품 수 ÷ 이 지역의 확인 특산품 전체 수/);
   assert.doesNotMatch(html, /출원 확인 831 \/ 전체 1,015/, "pending specialties must not be counted as no-application rows");
 });
