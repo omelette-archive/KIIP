@@ -220,6 +220,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .legend-swatch { width: 14px; height: 9px; border: 1px solid #d2d7e0; border-radius: 3px; background: #e3e6ec; }
 .legend-swatch.low { background: #b7d3ec; }.legend-swatch.high { background: #0f5fa6; }
 .map-warning { margin: 13px 0 0; padding: 10px 12px; border-radius: 9px; background: #fff7e9; color: #795024; font-size: 9.5px; line-height: 1.55; }
+.unclassified-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 9px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; line-height: 1.6; }
 .map-insight { padding: 25px; }
 .map-insight h2 { margin: 0; font-size: 29px; letter-spacing: -.04em; }
 .insight-summary { margin: 8px 0 20px; color: var(--muted); font-size: 11px; }
