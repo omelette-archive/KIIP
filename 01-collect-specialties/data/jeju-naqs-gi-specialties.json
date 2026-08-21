@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "lastVerifiedAt": "2026-08-21",
+  "scope": "국립농산물품질관리원 지리적표시 농산물 중 대상지역이 제주특별자치도 일원인 등록품",
+  "records": [
+    {
+      "sourceRecordId": "naqs-gi-100",
+      "region": "제주특별자치도",
+      "sourceRegionCode": "5000000000",
+      "rawItemName": "한라봉",
+      "sourceItemName": "제주한라봉",
+      "sourceRecordUrl": "https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246"
+    },
+    {
+      "sourceRecordId": "naqs-gi-50",
+      "region": "제주특별자치도",
+      "sourceRegionCode": "5000000000",
+      "rawItemName": "녹차",
+      "sourceItemName": "제주녹차",
+      "sourceRecordUrl": "https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246"
+    },
+    {
+      "sourceRecordId": "naqs-gi-18",
+      "region": "제주특별자치도",
+      "sourceRegionCode": "5000000000",
+      "rawItemName": "돼지고기",
+      "sourceItemName": "제주돼지고기",
+      "sourceRecordUrl": "https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246"
+    }
+  ]
+}

@@ -30,6 +30,19 @@ const SIDO_ALIASES = {
 // 통합·개칭 전 시군구명을 현재 마스터의 승계 지역으로 연결한다.
 // 시도는 현재 마스터와 예전 명칭 모두를 받을 수 있게 별칭으로 지정한다.
 const SIGUNGU_SUCCESSORS = [
+  // 2012-07-01 세종특별자치시 출범으로 연기군 폐지. 과거 연기군으로 명시된
+  // 자료는 현재 세종특별자치시 세종시로 승계한다. 공주시·청원군에서 편입된
+  // 일부 지역까지 "연기군"으로 간주하지는 않는다.
+  // https://www.law.go.kr/법령/세종특별자치시설치등에관한특별법
+  { aliases: ["연기군"], targetSido: "세종특별자치시", targetSigungu: "세종시" },
+
+  // 2006-07-01 제주특별자치도 출범 때 북제주군은 제주시, 남제주군은
+  // 서귀포시 행정구역으로 통합됐다. 도 전체만 적힌 "제주도"는 SIDO_ALIASES로
+  // 도 단위에 남기고 어느 한 시로 임의 배분하지 않는다.
+  // https://www.law.go.kr/법령/제주특별자치도설치및국제자유도시조성을위한특별법
+  { aliases: ["북제주군"], targetSido: "제주특별자치도", targetSigungu: "제주시" },
+  { aliases: ["남제주군"], targetSido: "제주특별자치도", targetSigungu: "서귀포시" },
+
   // 행정안전부: 2010-07-01 창원·마산·진해시를 창원시로 통합
   // https://www.mois.go.kr/frt/bbs/type001/commonSelectBoardArticle.do?bbsId=BBSMSTR_000000000052&nttId=31491
   { aliases: ["마산시", "진해시"], targetSido: "경상남도", targetSigungu: "창원시" },
@@ -39,4 +52,16 @@ const SIGUNGU_SUCCESSORS = [
   { aliases: ["청원군"], targetSido: "충청북도", targetSigungu: "청주시" },
 ];
 
-module.exports = { SIDO_ALIASES, SIGUNGU_SUCCESSORS };
+// 이름이 비어 있거나 오염된 원천에서도 과거 10자리 시군구 코드가 남아 있으면
+// 현재 지역으로 복구한다. 분할 후 목적지가 둘 이상인 코드는 넣지 않는다.
+const REGION_CODE_SUCCESSORS = {
+  "4473000000": "3611000000", // 충청남도 연기군 -> 세종특별자치시 세종시
+  "4971000000": "5011000000", // 제주도 북제주군 -> 제주특별자치도 제주시
+  "4972000000": "5013000000", // 제주도 남제주군 -> 제주특별자치도 서귀포시
+  "4772000000": "2772000000", // 경상북도 군위군 -> 대구광역시 군위군
+  "4371000000": "4311000000", // 충청북도 청원군 -> 충청북도 청주시
+  "4817000000": "4812000000", // 경상남도 마산시 -> 경상남도 창원시
+  "4819000000": "4812000000", // 경상남도 진해시 -> 경상남도 창원시
+};
+
+module.exports = { SIDO_ALIASES, SIGUNGU_SUCCESSORS, REGION_CODE_SUCCESSORS };

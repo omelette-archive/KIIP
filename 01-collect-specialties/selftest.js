@@ -12,7 +12,16 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { parseCsvLine, loadAdminCodes } = require("./lib/adminCodes");
-const { splitRegion, fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
+const {
+  splitRegion,
+  resolveRegionInput,
+  fromGiRegistrations,
+  fromNongsaro,
+} = require("./lib/normalize");
+const {
+  loadOfficialSupplement,
+  normalizeOfficialSupplement,
+} = require("./lib/officialSupplement");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const {
   DEFAULT_BASE_URL: GI_BASE_URL,
@@ -212,6 +221,48 @@ async function run() {
     assert.strictEqual(nongsaro.rows[0].sido, "경상남도");
     assert.strictEqual(nongsaro.rows[0].source, "농사로");
     ok("두 소스 모두 표준 스키마로 정규화되고, 매칭 실패는 경고로만 기록됨");
+  }
+
+  console.log("4-1) 과거 행정구역명·코드 승계와 공식 보완자료");
+  {
+    const historyAdminList = [
+      { code: "3611000000", sido: "세종특별자치시", sigungu: "세종시" },
+      { code: "5011000000", sido: "제주특별자치도", sigungu: "제주시" },
+      { code: "5013000000", sido: "제주특별자치도", sigungu: "서귀포시" },
+    ];
+    assert.deepStrictEqual(splitRegion("충청남도 연기군", historyAdminList), {
+      sido: "세종특별자치시", sigungu: "세종시", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("제주도 북제주군", historyAdminList), {
+      sido: "제주특별자치도", sigungu: "제주시", matched: true,
+    });
+    assert.deepStrictEqual(splitRegion("제주도 남제주군", historyAdminList), {
+      sido: "제주특별자치도", sigungu: "서귀포시", matched: true,
+    });
+    const codeRecovered = resolveRegionInput("", historyAdminList, "4473000000");
+    assert.strictEqual(codeRecovered.sido, "세종특별자치시");
+    assert.strictEqual(codeRecovered.sigungu, "세종시");
+    assert.strictEqual(codeRecovered.regionCode, "3611000000");
+    assert.strictEqual(codeRecovered.matchMethod, "region_code_successor");
+
+    const sejongDocument = loadOfficialSupplement(
+      path.join(__dirname, "data", "sejong-official-specialties.json")
+    );
+    const sejong = normalizeOfficialSupplement(sejongDocument, historyAdminList, "세종 공식 특산품");
+    assert.strictEqual(sejong.rows.length, 7);
+    assert.strictEqual(sejong.warnings.length, 0);
+    assert.ok(sejong.rows.every((row) => row.sido === "세종특별자치시" && row.sigungu === "세종시"));
+    assert.ok(sejong.rows.every((row) => row.regionMatchMethod === "exact_region_code"));
+    assert.ok(sejong.rows.some((row) => row.rawItemName === "수박" && row.sourceItemName === "싱싱세종수박"));
+
+    const jejuDocument = loadOfficialSupplement(
+      path.join(__dirname, "data", "jeju-naqs-gi-specialties.json")
+    );
+    const jeju = normalizeOfficialSupplement(jejuDocument, historyAdminList, "제주 지리적표시");
+    assert.strictEqual(jeju.rows.length, 3);
+    assert.strictEqual(jeju.warnings.length, 0);
+    assert.ok(jeju.rows.every((row) => row.sido === "제주특별자치도" && row.sigungu === ""));
+    ok("연기군·남/북제주군과 과거 코드를 현재 지역으로 승계하고 공식 보완자료를 정규화");
   }
 
   console.log("5) 소스별 필수 설정 검증");

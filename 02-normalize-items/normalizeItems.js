@@ -68,6 +68,12 @@ function readInputCsv(inputPath) {
     sourceUrl: header.indexOf("sourceUrl"),
     sourceLastVerifiedAt: header.indexOf("sourceLastVerifiedAt"),
     collectedAt: header.indexOf("collectedAt"),
+    regionCode: header.indexOf("regionCode"),
+    regionMatchMethod: header.indexOf("regionMatchMethod"),
+    sourceRegionName: header.indexOf("sourceRegionName"),
+    sourceRegionCode: header.indexOf("sourceRegionCode"),
+    sourceItemName: header.indexOf("sourceItemName"),
+    sourceRecordUrl: header.indexOf("sourceRecordUrl"),
   };
   if (idx.sido === -1 || idx.sigungu === -1 || idx.rawItemName === -1) {
     throw new Error(`입력 CSV에 sido/sigungu/rawItemName 컬럼이 필요합니다: ${header.join(",")}`);
@@ -105,6 +111,12 @@ function readInputCsv(inputPath) {
       sourceUrl: idx.sourceUrl === -1 ? "" : fields[idx.sourceUrl] || "",
       sourceLastVerifiedAt: idx.sourceLastVerifiedAt === -1 ? "" : fields[idx.sourceLastVerifiedAt] || "",
       sourceFetchedAt: idx.collectedAt === -1 ? "" : fields[idx.collectedAt] || "",
+      regionCode: idx.regionCode === -1 ? "" : fields[idx.regionCode] || "",
+      regionMatchMethod: idx.regionMatchMethod === -1 ? "" : fields[idx.regionMatchMethod] || "",
+      sourceRegionName: idx.sourceRegionName === -1 ? "" : fields[idx.sourceRegionName] || "",
+      sourceRegionCode: idx.sourceRegionCode === -1 ? "" : fields[idx.sourceRegionCode] || "",
+      sourceItemName: idx.sourceItemName === -1 ? "" : fields[idx.sourceItemName] || "",
+      sourceRecordUrl: idx.sourceRecordUrl === -1 ? "" : fields[idx.sourceRecordUrl] || "",
     };
   });
 }
@@ -126,6 +138,12 @@ const OUTPUT_FIELDS = [
   "sourceUrl",
   "sourceLastVerifiedAt",
   "sourceFetchedAt",
+  "regionCode",
+  "regionMatchMethod",
+  "sourceRegionName",
+  "sourceRegionCode",
+  "sourceItemName",
+  "sourceRecordUrl",
   "itemName",
   "noticeName",
   "niceClass",
@@ -216,6 +234,12 @@ async function main() {
     sourceUrl: row.sourceUrl,
     sourceLastVerifiedAt: row.sourceLastVerifiedAt,
     sourceFetchedAt: row.sourceFetchedAt,
+    regionCode: row.regionCode,
+    regionMatchMethod: row.regionMatchMethod,
+    sourceRegionName: row.sourceRegionName,
+    sourceRegionCode: row.sourceRegionCode,
+    sourceItemName: row.sourceItemName,
+    sourceRecordUrl: row.sourceRecordUrl,
     normalizationVersion: NORMALIZATION_VERSION,
     dictionaryVersion: DICTIONARY_VERSION,
     dictionarySourceUrl: DICTIONARY_SOURCE_URL,

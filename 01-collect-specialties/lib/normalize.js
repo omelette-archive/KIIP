@@ -15,7 +15,11 @@
  * 남긴다.
  */
 
-const { SIDO_ALIASES, SIGUNGU_SUCCESSORS } = require("./regionAliases");
+const {
+  SIDO_ALIASES,
+  SIGUNGU_SUCCESSORS,
+  REGION_CODE_SUCCESSORS,
+} = require("./regionAliases");
 
 const SIDO_SUFFIX_RE = /(특별자치시|특별자치도|광역시|특별시|도)$/;
 
@@ -48,6 +52,38 @@ function uniqueAdminRows(adminList) {
     seen.add(key);
     return true;
   });
+}
+
+function normalizeRegionCode(value) {
+  const digits = String(value || "").replace(/\D/g, "");
+  if (!digits) return "";
+  if (digits.length === 10) return digits;
+  // 일부 공급자는 시군구 코드 5자리만 내려준다. 법정동 코드의 시군구 레벨
+  // 형식과 동일한 경우에만 뒤를 0으로 채워 대조한다.
+  if (digits.length === 5) return `${digits}00000`;
+  return "";
+}
+
+/**
+ * 원천 코드가 현재 마스터에 있으면 이름보다 먼저 사용한다. 과거 코드인 경우에도
+ * 목적지가 하나로 확정되는 명시적 승계표만 적용하며, 나머지는 이름 매칭으로 넘긴다.
+ */
+function resolveRegionByCode(regionCode, adminList) {
+  const sourceRegionCode = normalizeRegionCode(regionCode);
+  if (!sourceRegionCode) return null;
+  const currentRegionCode = REGION_CODE_SUCCESSORS[sourceRegionCode] || sourceRegionCode;
+  const candidates = uniqueAdminRows(adminList).filter((row) => row.code === currentRegionCode);
+  if (candidates.length !== 1) return null;
+  return {
+    sido: candidates[0].sido,
+    sigungu: candidates[0].sigungu,
+    regionCode: currentRegionCode,
+    sourceRegionCode,
+    matched: true,
+    matchMethod: currentRegionCode === sourceRegionCode
+      ? "exact_region_code"
+      : "region_code_successor",
+  };
 }
 
 function narrowBySido(candidates, compactInput) {
@@ -182,8 +218,36 @@ function resolveRegion(regionText, adminList) {
  * @param {string} regionText
  * @param {{sido:string, sigungu:string}[]} adminList
  */
-function splitRegion(regionText, adminList) {
-  const resolved = resolveRegion(regionText, adminList);
+function resolveRegionInput(regionText, adminList, regionCode = "") {
+  const resolvedByCode = resolveRegionByCode(regionCode, adminList);
+  const resolved = resolvedByCode || resolveRegion(regionText, adminList);
+  if (resolved.matched) {
+    const adminRow = uniqueAdminRows(adminList).find(
+      (row) => row.sido === resolved.sido && row.sigungu === resolved.sigungu
+    );
+    return {
+      sido: resolved.sido,
+      sigungu: resolved.sigungu,
+      regionCode: resolved.regionCode || adminRow?.code || "",
+      sourceRegionCode: resolved.sourceRegionCode || normalizeRegionCode(regionCode),
+      matched: true,
+      matchMethod: resolved.matchMethod || "region_name",
+    };
+  }
+  if (resolved.ambiguous) {
+    return {
+      sido: "",
+      sigungu: cleanRegionText(regionText),
+      matched: false,
+      ambiguous: true,
+      candidateSidos: resolved.candidateSidos || [],
+    };
+  }
+  return { sido: "", sigungu: cleanRegionText(regionText), matched: false };
+}
+
+function splitRegion(regionText, adminList, regionCode = "") {
+  const resolved = resolveRegionInput(regionText, adminList, regionCode);
   if (resolved.matched) {
     return { sido: resolved.sido, sigungu: resolved.sigungu, matched: true };
   }
@@ -199,19 +263,44 @@ function splitRegion(regionText, adminList) {
   return { sido: "", sigungu: cleanRegionText(regionText), matched: false };
 }
 
-function toRows(entries, { adminList, source, itemNameOf, regionOf, now = new Date().toISOString() }) {
+function toRows(entries, {
+  adminList,
+  source,
+  itemNameOf,
+  regionOf,
+  regionCodeOf = () => "",
+  sourceItemNameOf = itemNameOf,
+  sourceRecordUrlOf = () => "",
+  now = new Date().toISOString(),
+}) {
   const warnings = [];
   const rows = entries.map((entry) => {
     const region = regionOf(entry);
-    const split = splitRegion(region, adminList);
+    const sourceRegionCode = regionCodeOf(entry);
+    const split = resolveRegionInput(region, adminList, sourceRegionCode);
     if (split.ambiguous) {
       warnings.push(
         `${source}: 시군구명이 여러 시도에 중복돼 확정 못함 - "${region}" (후보: ${split.candidateSidos.join(", ")}) (품목: ${itemNameOf(entry)})`
       );
     } else if (!split.matched) {
-      warnings.push(`${source}: 지역명 매칭 실패 - "${region}" (품목: ${itemNameOf(entry)})`);
+      warnings.push(
+        `${source}: 지역 매칭 실패 - "${region}"` +
+        `${sourceRegionCode ? ` (원천코드: ${sourceRegionCode})` : ""} (품목: ${itemNameOf(entry)})`
+      );
     }
-    return { sido: split.sido, sigungu: split.sigungu, rawItemName: itemNameOf(entry), source, collectedAt: now };
+    return {
+      sido: split.sido,
+      sigungu: split.sigungu,
+      regionCode: split.regionCode || "",
+      regionMatchMethod: split.matchMethod || "unresolved",
+      sourceRegionName: cleanRegionText(region),
+      sourceRegionCode: normalizeRegionCode(sourceRegionCode),
+      sourceItemName: sourceItemNameOf(entry),
+      sourceRecordUrl: sourceRecordUrlOf(entry),
+      rawItemName: itemNameOf(entry),
+      source,
+      collectedAt: now,
+    };
   });
   return { rows, warnings };
 }
@@ -231,14 +320,20 @@ function fromNongsaro(specialties, adminList) {
     source: "농사로",
     itemNameOf: (s) => s.title,
     regionOf: (s) => s.region,
+    regionCodeOf: (s) => s.raw?.areaCode || s.areaCode || "",
+    sourceRecordUrlOf: (s) => s.raw?.linkUrl || "",
   });
 }
 
 module.exports = {
   cleanRegionText,
   compactRegionText,
+  normalizeRegionCode,
+  resolveRegionByCode,
   resolveRegion,
+  resolveRegionInput,
   splitRegion,
+  toRows,
   fromGiRegistrations,
   fromNongsaro,
 };

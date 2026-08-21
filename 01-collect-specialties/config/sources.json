@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "lastVerifiedAt": "2026-08-11",
+  "lastVerifiedAt": "2026-08-21",
   "sources": [
     {
       "id": "admin_codes",
@@ -77,6 +77,56 @@
       "implementation": {
         "status": "live_key_validated",
         "adapter": "lib/nongsaroClient.js"
+      }
+    },
+    {
+      "id": "sejong_official_specialties",
+      "name": "세종특별자치시 읍면동 공식 특산품",
+      "role": "collector",
+      "dataVersion": "sejong-official-specialties-20260821",
+      "lastVerifiedAt": "2026-08-21",
+      "catalogUrl": "https://www.sejong.go.kr/dong/sub05_0105.do",
+      "providerUrl": "https://www.sejong.go.kr/dong/",
+      "formats": ["HTML", "JSON snapshot"],
+      "authentication": {
+        "required": false,
+        "keyEnv": null,
+        "baseUrlEnv": null,
+        "approval": "none"
+      },
+      "quota": {
+        "type": "not_applicable",
+        "value": null,
+        "verification": "공식 홈페이지 표시 항목을 출처 URL과 함께 저장한 검증 스냅샷"
+      },
+      "implementation": {
+        "status": "verified_snapshot",
+        "adapter": "lib/officialSupplement.js + data/sejong-official-specialties.json"
+      }
+    },
+    {
+      "id": "jeju_naqs_gi_specialties",
+      "name": "국립농산물품질관리원 제주 지리적표시 특산품",
+      "role": "collector",
+      "dataVersion": "naqs-jeju-gi-20260821",
+      "lastVerifiedAt": "2026-08-21",
+      "catalogUrl": "https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246",
+      "providerUrl": "https://www.naqs.go.kr/",
+      "formats": ["HTML", "JSON snapshot"],
+      "authentication": {
+        "required": false,
+        "keyEnv": null,
+        "baseUrlEnv": null,
+        "approval": "none"
+      },
+      "quota": {
+        "type": "not_applicable",
+        "value": null,
+        "verification": "대상지역이 제주특별자치도 일원인 공식 지리적표시 등록품 검증 스냅샷"
+      },
+      "implementation": {
+        "status": "verified_snapshot",
+        "adapter": "lib/officialSupplement.js + data/jeju-naqs-gi-specialties.json"
       }
     },
     {

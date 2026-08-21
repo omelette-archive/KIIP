@@ -27,7 +27,13 @@
 |---|---|---|
 | `sido` | 법정동코드 마스터로 확인한 시도 | 예(매칭 실패 시 빈 값) |
 | `sigungu` | 법정동코드 마스터로 확인한 시군구 | 예(매칭 실패 시 원문 지역) |
+| `regionCode` | 최신 법정동코드 기준 현재 지역코드 | 아니요(도 단위·미매칭은 빈 값) |
+| `regionMatchMethod` | 코드 완전일치·과거 코드 승계·이름 별칭 등 매칭 경로 | 예 |
+| `sourceRegionName` | 원천에 적힌 지역명 | 아니요 |
+| `sourceRegionCode` | 원천에 적힌 지역코드 | 아니요 |
 | `rawItemName` | 소스가 제공한 품목명 | 예 |
+| `sourceItemName` | 브랜드성 표현을 포함한 원문 표시명 | 아니요 |
+| `sourceRecordUrl` | 개별 원문을 다시 확인할 URL | 아니요 |
 | `source` | 사람이 읽을 수 있는 출처명 | 예 |
 | `sourceId` | 소스 레지스트리의 안정 ID | 예 |
 | `sourceContractVersion` | 수집 시점의 API/데이터 계약 버전 | 예 |
@@ -42,8 +48,9 @@
 - `specialty_raw_versions`: 원문 payload, 정규화 payload, hash, append-only 버전과 수집 실행 ID
 - `specialty_normalizations`: 규칙 버전, 확정 값, 검토 상태와 결정 이력
 
-GI 키는 `등록신청 공고번호+등록일`, 농사로 키는 `지역코드+링크 URL`(링크가 없으면 제목)을
-사용한다. 식별 필드가 없으면 canonical raw payload의 SHA-256을 fallback으로 사용한다. 동일 키와
+GI 키는 `등록신청 공고번호+등록일`, 농사로 키는 `지역코드+링크 URL`(링크가 없으면 제목),
+공식 보완자료는 저장된 `sourceRecordId`를 사용한다. 식별 필드가 없으면 canonical raw payload의
+SHA-256을 fallback으로 사용한다. 동일 키와
 동일 내용은 `last_seen`만 갱신하고, 내용이 달라졌을 때만 `specialty_raw_versions`에 새 버전을
 추가한다. 실행마다 바뀌는 `collectedAt`은 변경 hash에서 제외한다.
 
@@ -68,9 +75,9 @@ URL 경로에 들어가고 JSON 본문은 `Grid_20141225000000000157_1` 객체�
 | `GGRPH_INDICT_SFE` | 특징 설명 | raw 보존 후보 |
 | `HMPG_IMAGE_FILE_NO` | 이미지 파일번호 | raw 보존 후보 |
 
-현재 CSV에는 다음 단계가 사용하는 5개 공통 필드만 기록한다. 위 부가 필드와 원문은 이미
-`specialty_raw_records`·`specialty_raw_versions`에 저장하며, 키 값은 어떤 산출물에도 저장하지
-않는다.
+현재 CSV에는 후속 단계가 사용하는 공통 필드와 지역 승계 감사 필드를 기록한다. 설명·생산량 등
+나머지 원문은 `specialty_raw_records`·`specialty_raw_versions`에 저장하며, 인증키 값은 어떤
+산출물에도 저장하지 않는다.
 
 농사로 `areaBrand/areaBrandLst`는 특산품 수집 원본이 아니라 KIPRIS 결과의 지역·품목 검증자료다.
 따라서 ① CSV/SQLite에 섞지 않고 `03-match-trademarks/fetchAreaBrands.js`로 별도 JSON을 만든다.

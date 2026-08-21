@@ -1,6 +1,6 @@
 # 데이터 출처·기준·버전 관리
 
-최종 갱신: 2026-08-12
+최종 갱신: 2026-08-21
 목적: 산출물의 숫자와 판정이 어떤 원본·규칙·시점에서 나왔는지 다른 작업자가 역추적할 수 있게 한다.
 
 ## 1. 원칙
@@ -23,6 +23,8 @@
 | `admin_codes` | 국토교통부 전국 법정동 코드 | <https://www.data.go.kr/data/15063424/fileData.do> | 파일 `법정동코드_전국_20260703.csv`, 다운로드 2026-08-06 | 지역 문자열을 시도·시군구로 정규화 |
 | `gi` | 국립농산물품질관리원 지리적표시 등록정보 | <https://www.data.go.kr/data/15080629/openapi.do> | MAFRA Grid 실계약 검증 2026-08-10 | 대표 특산품 후보와 등록 지역 수집 |
 | `nongsaro` | 농촌진흥청 농사로 지역특산물 | <https://www.data.go.kr/data/15101361/openapi.do> | `localSpcprd/localSpcprdLst`, 실계약 검증 2026-08-10 | 지역특산물 원본 수집 |
+| `sejong_official_specialties` | 세종특별자치시 읍면동 공식 특산품 | <https://www.sejong.go.kr/dong/sub05_0105.do> | 공식 페이지 검증 스냅샷 2026-08-21 | 농사로 세종 0건 보완(7품목) |
+| `jeju_naqs_gi_specialties` | 국립농산물품질관리원 제주 지리적표시 특산품 | <https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246> | 대상지역 제주도 일원 등록품 검증 2026-08-21 | 농사로 제주 0건 보완(3품목) |
 | `nongsaro_area_brand` | 농촌진흥청 농사로 지역브랜드 | <https://www.nongsaro.go.kr/portal/ps/psz/psza/contentMain.ps?menuId=PS03344> | `nongsaro-area-brand-v1`, `areaBrandLst`, 실계약 검증 2026-08-10 | KIPRIS 출원번호·지역 연관성 검증자료 |
 | `kipris_trademark` | 지식재산처 KIPRISPlus 상표 단어검색 | <https://plus.kipris.or.kr> | `kipris-trademark-word-search-v1`, 실키 검증 2026-08-10 | 상표 후보·출원번호·상태·NICE류 수집 |
 | `kipris_trademark_applicant` | 지식재산처 KIPRISPlus 상표 출원 속보 출원인 | <https://plus.kipris.or.kr/portal/data/service/DBII_000000000000012/view.do?menuNo=200122&subTab=SC001> | `kipris-trademark-applicant-address-v1`, `trademarkApplicantInfo`, 고유 출원 23,912건 전체 알파 검증 2026-08-12 | 출원번호 기준 출원인 주소 지역 귀속(#50) |
@@ -52,7 +54,8 @@
 ## 4. 산출물 계보
 
 - ① CSV/SQLite 정규화 payload: `sourceId`, `sourceContractVersion`, `sourceUrl`,
-  `sourceLastVerifiedAt`, `collectedAt`을 원본 행마다 기록한다.
+  `sourceLastVerifiedAt`, `collectedAt`과 `sourceRegionName`/`sourceRegionCode`,
+  `regionCode`/`regionMatchMethod`, `sourceItemName`/`sourceRecordUrl`을 원본 행마다 기록한다.
 - ② CSV: `normalizationVersion`, `dictionaryVersion`, `dictionarySourceUrl`,
   `dictionaryDownloadedAt`을 행마다 기록하고 ① 출처 필드를 전달한다.
 - ③ JSON: `trademarkSourceMetadata`, 입력 행 `provenance`, `regionalBrandValidation`을 기록한다.

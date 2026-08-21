@@ -2,17 +2,20 @@
 "use strict";
 /**
  * 지역 특산품 원시 목록을 여러 소스에서 수집해 표준 스키마로 합친다.
- * { sido, sigungu, rawItemName, source, sourceId, sourceContractVersion,
- *   sourceUrl, sourceLastVerifiedAt, collectedAt }[]
+ * { sido, sigungu, regionCode, regionMatchMethod, sourceRegionName,
+ *   sourceRegionCode, sourceItemName, sourceRecordUrl, rawItemName, source,
+ *   sourceId, sourceContractVersion, sourceUrl, sourceLastVerifiedAt, collectedAt }[]
  *
  * 사용법:
- *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro --out <path>
+ *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties --out <path>
  *
  * 소스:
  *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY 필요)
  *   nongsaro  농촌진흥청 지역특산물 (NONGSARO_API_KEY, NONGSARO_API_BASE_URL 필요)
- * 두 소스 모두 제공기관 활용신청 승인이 필요 — 키가 없으면 해당 소스만 건너뛰고
- * 경고를 남긴다(전체 실패시키지 않음).
+ *   sejong_official_specialties  세종시 공식 특산품 검증 스냅샷
+ *   jeju_naqs_gi_specialties     농관원 제주 지리적표시 검증 스냅샷
+ * API 소스는 제공기관 활용신청 승인이 필요하다. 키가 없으면 해당 API 소스만
+ * 건너뛰고 경고를 남기며, 공식 검증 스냅샷은 인증 없이 함께 적재한다.
  */
 
 const fs = require("fs");
@@ -24,11 +27,17 @@ const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createCollectionStore, makeStoredRecords } = require("./lib/collectionStore");
+const {
+  loadOfficialSupplement,
+  normalizeOfficialSupplement,
+} = require("./lib/officialSupplement");
 
 loadEnv();
 
 function parseArgs(argv) {
-  const args = { sources: "gi,nongsaro" };
+  const args = {
+    sources: "gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties",
+  };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (!a.startsWith("--")) continue;
@@ -49,7 +58,7 @@ function printUsageAndExit(message) {
       "  node 01-collect-specialties/collectSpecialties.js [옵션]",
       "",
       "옵션:",
-      "  --sources <목록>   콤마로 구분된 소스 목록 (기본 gi,nongsaro)",
+      "  --sources <목록>   콤마 구분 (기본 gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
       "  --db <path>        누적 SQLite 경로 (기본: CSV와 같은 이름의 .sqlite)",
       "  --limit <n>        소스별 최대 수집 건수 (샘플 검증용)",
@@ -119,7 +128,8 @@ function csvEscape(value) {
 function writeOutputCsv(outPath, rows) {
   const fields = [
     "sido", "sigungu", "rawItemName", "source", "sourceId", "sourceContractVersion",
-    "sourceUrl", "sourceLastVerifiedAt", "collectedAt",
+    "sourceUrl", "sourceLastVerifiedAt", "collectedAt", "regionCode", "regionMatchMethod",
+    "sourceRegionName", "sourceRegionCode", "sourceItemName", "sourceRecordUrl",
   ];
   const lines = [fields.join(",")];
   for (const row of rows) lines.push(fields.map((f) => csvEscape(row[f])).join(","));
@@ -190,7 +200,39 @@ async function collectNongsaro(adminList, warnings, options = {}) {
   }
 }
 
-const COLLECTORS = { gi: collectGi, nongsaro: collectNongsaro };
+const OFFICIAL_SUPPLEMENT_PATHS = {
+  sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
+  jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
+};
+
+async function collectOfficialSupplement(adminList, warnings, options = {}) {
+  const definition = options.sourceDefinition;
+  try {
+    const document = loadOfficialSupplement(OFFICIAL_SUPPLEMENT_PATHS[definition.id]);
+    const records = options.limit === undefined
+      ? document.records
+      : document.records.slice(0, options.limit);
+    const normalized = normalizeOfficialSupplement({ ...document, records }, adminList, definition.name);
+    warnings.push(...normalized.warnings);
+    const rows = addSourceMetadata(normalized.rows, definition);
+    return {
+      rows,
+      rawRecords: makeStoredRecords(definition.id, records, rows),
+      succeeded: true,
+      requestCount: 0,
+    };
+  } catch (err) {
+    warnings.push(`${definition.id} 소스 건너뜀: ${err.message}`);
+    return { rows: [], rawRecords: [], succeeded: false, requestCount: 0, error: err.message };
+  }
+}
+
+const COLLECTORS = {
+  gi: collectGi,
+  nongsaro: collectNongsaro,
+  sejong_official_specialties: collectOfficialSupplement,
+  jeju_naqs_gi_specialties: collectOfficialSupplement,
+};
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));

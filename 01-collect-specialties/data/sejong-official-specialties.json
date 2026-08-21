@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "lastVerifiedAt": "2026-08-21",
+  "scope": "세종특별자치시 읍면동 공식 홈페이지의 '특산품' 페이지",
+  "records": [
+    {
+      "sourceRecordId": "sejong-jochiwon-peach",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "복숭아",
+      "sourceItemName": "복숭아",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0105.do"
+    },
+    {
+      "sourceRecordId": "sejong-jochiwon-pear",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "배",
+      "sourceItemName": "배·금강배",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0105.do"
+    },
+    {
+      "sourceRecordId": "sejong-yeondong-watermelon",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "수박",
+      "sourceItemName": "싱싱세종수박",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0305.do"
+    },
+    {
+      "sourceRecordId": "sejong-yeondong-strawberry",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "딸기",
+      "sourceItemName": "딸기",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0305.do"
+    },
+    {
+      "sourceRecordId": "sejong-geumnam-cucumber",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "오이",
+      "sourceItemName": "오이",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0505.do"
+    },
+    {
+      "sourceRecordId": "sejong-geumnam-pickled-perilla",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "절임깻잎",
+      "sourceItemName": "절임깻잎",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0505.do"
+    },
+    {
+      "sourceRecordId": "sejong-yeonseo-grape",
+      "region": "세종특별자치시 세종시",
+      "sourceRegionCode": "3611000000",
+      "rawItemName": "포도",
+      "sourceItemName": "포도",
+      "sourceRecordUrl": "https://www.sejong.go.kr/dong/sub05_0705.do"
+    }
+  ]
+}

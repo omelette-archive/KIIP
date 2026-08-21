@@ -28,6 +28,8 @@ function fallbackKey(sourceId, rawPayload) {
 }
 
 function sourceRecordKey(sourceId, entry) {
+  const explicitId = String(entry.sourceRecordId || "").trim();
+  if (explicitId) return `${sourceId}:${explicitId}`;
   if (sourceId === "gi") {
     const registrationNumber = String(entry.registrationNumber || "").trim();
     const registrationDate = String(entry.registrationDate || "").trim();
