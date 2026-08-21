@@ -127,12 +127,14 @@ test("uses every collected region-item specialty as the application-rate denomin
   const snapshot = await loadSnapshot();
   const coverage = specialtyCoverage(snapshot);
   // 스냅샷의 regionItemCount 1,692개 전부를 분모로 사용한다. 고시명칭 확인 완료분만
-  // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,012개이며,
+  // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,013개이며,
   // 지역별 집계가 덜 끝난 75개도 분모에 남아 초기 출원율을 보수적으로 낮춘다.
+  // (2026-08-21: 남양주시 "깻잎"이 원본 병합 스크립트의 지역 필드 오류(sido="")로
+  // raw_item_goods_matched 승격에서 누락돼 있던 것을 targeted patch로 보정 — 1,012→1,013.)
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
   assert.equal(coverage.total, 1692);
   assert.equal(coverage.decided, 1617);
-  assert.equal(coverage.applied, 1012);
+  assert.equal(coverage.applied, 1013);
   assert.equal(coverage.pending, 75);
   assert.equal(Math.round(coverage.rate * 100), 60);
   const localeNumber = (n) => n.toLocaleString("ko-KR");

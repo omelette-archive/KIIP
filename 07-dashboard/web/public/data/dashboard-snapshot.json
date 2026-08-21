@@ -36529,7 +36529,7 @@
           "itemName": "깻잎",
           "noticeName": "깻잎",
           "niceClass": null,
-          "matchingBasis": "raw_item_name_unclassified",
+          "matchingBasis": "raw_item_goods_matched",
           "dataState": "complete_nonzero",
           "sources": [
             "label-ee12f051eaf0",
@@ -36537,99 +36537,111 @@
           ],
           "trademarkExamples": [
             {
-              "title": null,
-              "applicationNumber": "4020260166124",
-              "applicationDate": "20260812",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "title": "조선명찬 JOSEON MYEONGCHAN",
+              "applicationNumber": "4020250174160",
+              "applicationDate": "20250916",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "신선한깻잎",
+                  "classCode": "31"
+                }
+              ]
+            },
+            {
+              "title": "북한강 돌짜장 1985 돌판짜장전문점",
+              "applicationNumber": "4020240150832",
+              "applicationDate": "20240814",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
+              "goodsReviewRequired": false,
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎장아찌",
+                  "classCode": "29"
+                }
+              ]
             },
             {
               "title": null,
-              "applicationNumber": "4020260165199",
-              "applicationDate": "20260811",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "applicationNumber": "4020210206920",
+              "applicationDate": "20211012",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎김치",
+                  "classCode": "29"
+                },
+                {
+                  "designatedProductName": "깻잎장아찌",
+                  "classCode": "29"
+                }
+              ]
             },
             {
-              "title": null,
-              "applicationNumber": "4020260165203",
-              "applicationDate": "20260811",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "title": "우리살림",
+              "applicationNumber": "4020090019561",
+              "applicationDate": "20090428",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎(신선한것)",
+                  "classCode": "31"
+                }
+              ]
             },
             {
-              "title": null,
-              "applicationNumber": "4020260162203",
-              "applicationDate": "20260807",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "title": "순수자연 PURE NATURAL",
+              "applicationNumber": "4020110016121",
+              "applicationDate": "20110329",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎(신선한것)",
+                  "classCode": "31"
+                }
+              ]
             },
             {
-              "title": null,
-              "applicationNumber": "4020260162003",
-              "applicationDate": "20260807",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "title": "솔샘김치",
+              "applicationNumber": "4020240214353",
+              "applicationDate": "20241121",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎김치",
+                  "classCode": "29"
+                }
+              ]
             },
             {
-              "title": null,
-              "applicationNumber": "4020260161165",
-              "applicationDate": "20260806",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
+              "title": "하루채",
+              "applicationNumber": "4320070000011",
+              "applicationDate": "20070621",
+              "applicationStatus": "등록",
+              "goodsMatchMethod": "normalized_contains",
               "goodsReviewRequired": false,
-              "goodsEvidence": []
-            },
-            {
-              "title": null,
-              "applicationNumber": "4020260161461",
-              "applicationDate": "20260806",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
-              "goodsReviewRequired": false,
-              "goodsEvidence": []
-            },
-            {
-              "title": null,
-              "applicationNumber": "4020260159317",
-              "applicationDate": "20260804",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
-              "goodsReviewRequired": false,
-              "goodsEvidence": []
-            },
-            {
-              "title": null,
-              "applicationNumber": "4020260156426",
-              "applicationDate": "20260731",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
-              "goodsReviewRequired": false,
-              "goodsEvidence": []
-            },
-            {
-              "title": null,
-              "applicationNumber": "4020260156155",
-              "applicationDate": "20260730",
-              "applicationStatus": "출원",
-              "goodsMatchMethod": "unverified",
-              "goodsReviewRequired": false,
-              "goodsEvidence": []
+              "goodsEvidence": [
+                {
+                  "designatedProductName": "깻잎(신선한것)",
+                  "classCode": "31"
+                }
+              ]
             }
           ],
           "metrics": {
             "uniqueTrademarkCount": {
-              "value": 0,
+              "value": 7,
               "availability": "available",
               "status": "complete",
               "sourceIds": [
@@ -36639,9 +36651,9 @@
                 "nongsaro",
                 "nongsaro_area_brand"
               ],
-              "calculatedAt": "2026-08-20T01:27:36.182Z",
-              "methodVersion": "brand-analysis-v4-regional-metric-gate",
-              "rationale": "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계",
+              "calculatedAt": "2026-08-20T07:05:51.187Z",
+              "methodVersion": "raw-item-goods-match-ai-review-v1",
+              "rationale": "지정상품 정규화 일치(exact/contains) + 출원인 주소 지역 일치 출원만 집계 (2026-08-20 AI 검토: 고시상품명칭 사전에 이 원물명의 표제어가 없어 사전 매칭은 불가했으나, 등록원부 지정상품 텍스트에 원물명이 정확/포함 일치하고 출원인 주소도 이 지역과 일치하는 출원만 선별해 집계함. 근거는 03-match-trademarks/output/goods-match-final-results-full.json과 docs/raw-item-goods-match-review-2026-08-20.md 참고.)",
               "blockingIssue": null
             },
             "nationwideSearchTrademarkCount": {
@@ -36661,7 +36673,7 @@
               "blockingIssue": "#50"
             },
             "registeredTrademarkCount": {
-              "value": 0,
+              "value": 7,
               "availability": "available",
               "status": "complete",
               "sourceIds": [
@@ -36671,13 +36683,13 @@
                 "nongsaro",
                 "nongsaro_area_brand"
               ],
-              "calculatedAt": "2026-08-20T01:27:36.182Z",
-              "methodVersion": "brand-analysis-v4-regional-metric-gate",
-              "rationale": "지역 inside 검증 출원 중 등록 상태",
+              "calculatedAt": "2026-08-20T07:05:51.187Z",
+              "methodVersion": "raw-item-goods-match-ai-review-v1",
+              "rationale": "위 지정상품·지역 일치 출원 중 등록 상태 (2026-08-20 AI 검토: 고시상품명칭 사전에 이 원물명의 표제어가 없어 사전 매칭은 불가했으나, 등록원부 지정상품 텍스트에 원물명이 정확/포함 일치하고 출원인 주소도 이 지역과 일치하는 출원만 선별해 집계함. 근거는 03-match-trademarks/output/goods-match-final-results-full.json과 docs/raw-item-goods-match-review-2026-08-20.md 참고.)",
               "blockingIssue": null
             },
             "registrationRate": {
-              "value": null,
+              "value": 1,
               "availability": "available",
               "status": "complete",
               "sourceIds": [
@@ -36687,9 +36699,9 @@
                 "nongsaro",
                 "nongsaro_area_brand"
               ],
-              "calculatedAt": "2026-08-20T01:27:36.182Z",
-              "methodVersion": "brand-analysis-v4-regional-metric-gate",
-              "rationale": "지역 inside 등록 출원 / 지역 inside 고유 출원",
+              "calculatedAt": "2026-08-20T07:05:51.187Z",
+              "methodVersion": "raw-item-goods-match-ai-review-v1",
+              "rationale": "등록 ÷ 지정상품·지역 일치 고유 출원 (2026-08-20 AI 검토: 고시상품명칭 사전에 이 원물명의 표제어가 없어 사전 매칭은 불가했으나, 등록원부 지정상품 텍스트에 원물명이 정확/포함 일치하고 출원인 주소도 이 지역과 일치하는 출원만 선별해 집계함. 근거는 03-match-trademarks/output/goods-match-final-results-full.json과 docs/raw-item-goods-match-review-2026-08-20.md 참고.)",
               "blockingIssue": null
             },
             "localApplicantShare": {
@@ -36726,7 +36738,7 @@
             },
             "confirmedGoodsMatchCount": {
               "value": 0,
-              "availability": "blocked",
+              "availability": "available",
               "status": "complete",
               "sourceIds": [
                 "kipris_trademark",
@@ -36735,14 +36747,14 @@
                 "nongsaro",
                 "nongsaro_area_brand"
               ],
-              "calculatedAt": "2026-08-20T01:27:36.182Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
-              "blockingIssue": "#12"
+              "calculatedAt": "2026-08-20T07:05:51.187Z",
+              "methodVersion": "raw-item-goods-match-ai-review-v1",
+              "rationale": "지정상품명이 원물명과 정규화 완전일치(normalized_exact)한 출원 수 (2026-08-20 AI 검토: 고시상품명칭 사전에 이 원물명의 표제어가 없어 사전 매칭은 불가했으나, 등록원부 지정상품 텍스트에 원물명이 정확/포함 일치하고 출원인 주소도 이 지역과 일치하는 출원만 선별해 집계함. 근거는 03-match-trademarks/output/goods-match-final-results-full.json과 docs/raw-item-goods-match-review-2026-08-20.md 참고.)",
+              "blockingIssue": null
             },
             "goodsReviewCandidateCount": {
-              "value": 0,
-              "availability": "blocked",
+              "value": 7,
+              "availability": "available",
               "status": "complete",
               "sourceIds": [
                 "kipris_trademark",
@@ -36751,10 +36763,10 @@
                 "nongsaro",
                 "nongsaro_area_brand"
               ],
-              "calculatedAt": "2026-08-20T01:27:36.182Z",
-              "methodVersion": "ip-registry-designated-goods-v0-review",
-              "rationale": "normalized_contains 또는 class_only 후보",
-              "blockingIssue": "#12"
+              "calculatedAt": "2026-08-20T07:05:51.187Z",
+              "methodVersion": "raw-item-goods-match-ai-review-v1",
+              "rationale": "지정상품명에 원물명이 포함(normalized_contains)된 출원 수 (2026-08-20 AI 검토: 고시상품명칭 사전에 이 원물명의 표제어가 없어 사전 매칭은 불가했으나, 등록원부 지정상품 텍스트에 원물명이 정확/포함 일치하고 출원인 주소도 이 지역과 일치하는 출원만 선별해 집계함. 근거는 03-match-trademarks/output/goods-match-final-results-full.json과 docs/raw-item-goods-match-review-2026-08-20.md 참고.)",
+              "blockingIssue": null
             },
             "gapScore": {
               "value": null,
