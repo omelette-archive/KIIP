@@ -194,7 +194,7 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
 
-test("renders tab navigation and a data-connected ranking table", async () => {
+test("renders tab navigation and separate application/registration ranking tables", async () => {
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
@@ -202,35 +202,47 @@ test("renders tab navigation and a data-connected ranking table", async () => {
   assert.match(html, /지역별 출원율/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
-  assert.match(html, /class="ranking-table"/, "레퍼런스의 등록상표 랭킹 TOP 10/50에 대응하는 테이블");
+  // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
+  // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
+  assert.match(html, /지역·대표 특산품 출원 랭킹/, "출원 랭킹 섹션이 있어야 함");
+  assert.match(html, /지역·대표 특산품 등록 랭킹/, "등록 랭킹 섹션이 있어야 함");
+  assert.doesNotMatch(html, /class="ranking-toggle"|TOP 50/, "TOP10\/50 토글은 제거돼야 함(고정 TOP 10)");
+  const rankingTableCount = (html.match(/class="ranking-table"/g) || []).length;
+  assert.equal(rankingTableCount, 2, "출원·등록 랭킹 테이블이 각각 하나씩, 총 두 개 있어야 함");
+
+  const appHeadingIndex = html.indexOf("지역·대표 특산품 출원 랭킹");
+  const regHeadingIndex = html.indexOf("지역·대표 특산품 등록 랭킹");
+  assert.ok(appHeadingIndex >= 0 && regHeadingIndex > appHeadingIndex, "출원 랭킹이 등록 랭킹보다 먼저 나와야 함");
+  const appTbody = html.slice(html.indexOf("<tbody>", appHeadingIndex), html.indexOf("</tbody>", appHeadingIndex));
+  const regTbody = html.slice(html.indexOf("<tbody>", regHeadingIndex), html.indexOf("</tbody>", regHeadingIndex));
+
   // 품목명은 정규화된 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
   // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
-  // 조인 검증용일 뿐 대표 특산품이 아니다. registeredTrademarkCount 내림차순 정렬이 실제로
-  // 동작하는지도 확인한다. 단, 지역 귀속이 막힌 스냅샷이면 전국 검색 후보로 억지 순위를
-  // 만들지 않고 빈 랭킹을 유지해야 한다(#50).
-  const tbodyIndex = html.indexOf("<tbody>");
-  const firstRow = html.slice(tbodyIndex, html.indexOf("</tr>", tbodyIndex)).replace(/<!--.*?-->/gs, "");
-  const firstRanking = snapshot.regions
-    .flatMap((region) => region.items.map((item) => ({ region, item })))
+  // 조인 검증용일 뿐 대표 특산품이 아니다. 각 랭킹이 실제로 해당 지표(출원 확인 건수 /
+  // 등록 완료 건수) 내림차순으로 정렬되는지 확인한다. 단, 지역 귀속이 막힌 스냅샷이면
+  // 전국 검색 후보로 억지 순위를 만들지 않고 빈 랭킹을 유지해야 한다(#50).
+  const rankingCandidates = snapshot.regions.flatMap((region) => region.items.map((item) => ({ region, item })));
+  const checkFirstRow = (firstRow, ranking) => {
+    if (ranking) {
+      assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
+      assert.match(firstRow, new RegExp(`>${escapeRegExp(ranking.item.itemName)}<`), "주 라벨은 현재 데이터의 대표 특산품명이어야 함");
+      assert.match(firstRow, new RegExp(escapeRegExp(ranking.item.noticeName)), "고시명칭은 집계 근거로 병기해야 함");
+    } else {
+      assert.doesNotMatch(firstRow, />1<\/td>/, "지역 귀속 미검증 전국 후보로 순위를 만들면 안 됨");
+    }
+    // 랭킹 표 자체에 옛 브랜드명이 품목 라벨로 남아있으면 안 된다. html 전체를 검사하면
+    // 무관한 실제 원물명에 우연히 같은 글자가 포함된 경우(예: "꿀다림 데일리허니")까지
+    // 걸려서 firstRow(랭킹 1위 행)만 검사한다.
+    assert.doesNotMatch(firstRow, /데일리|일선정품|상큼愛/, "랭킹 표에 고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
+  };
+  const firstAppRanking = [...rankingCandidates]
+    .filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available")
+    .sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0))[0];
+  const firstRegRanking = [...rankingCandidates]
     .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
-    .sort(
-      (a, b) =>
-        (b.item.metrics.registeredTrademarkCount.value || 0) -
-        (a.item.metrics.registeredTrademarkCount.value || 0)
-    )[0];
-  if (firstRanking) {
-    assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
-    assert.match(firstRow, new RegExp(`>${escapeRegExp(firstRanking.item.itemName)}<`), "주 라벨은 현재 데이터의 대표 특산품명이어야 함");
-    assert.match(firstRow, new RegExp(escapeRegExp(firstRanking.item.noticeName)), "고시명칭은 집계 근거로 병기해야 함");
-  } else {
-    assert.doesNotMatch(firstRow, />1<\/td>/, "지역 귀속 미검증 전국 후보로 순위를 만들면 안 됨");
-    assert.match(html, /검증 중/, "차단된 지역 지표는 0건이 아니라 검증 중으로 표시해야 함");
-  }
-  // 랭킹 표 자체에 옛 브랜드명이 품목 라벨로 남아있으면 안 된다. html 전체를 검사하면
-  // 무관한 실제 원물명에 우연히 같은 글자가 포함된 경우(예: "꿀다림 데일리허니")까지
-  // 걸려서 firstRow(랭킹 1위 행)만 검사한다 — line 128의 정확 일치 검사가 전체 스냅샷은
-  // 이미 커버한다.
-  assert.doesNotMatch(firstRow, /데일리|일선정품|상큼愛/, "랭킹 표에 고시명칭 미정제 브랜드명이 품목으로 남아있으면 안 됨");
+    .sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0))[0];
+  checkFirstRow(appTbody.slice(0, appTbody.indexOf("</tr>")), firstAppRanking);
+  checkFirstRow(regTbody.slice(0, regTbody.indexOf("</tr>")), firstRegRanking);
 });
 
 test("renders matching criteria once, on the data overview tab, not on the summary tab", async () => {

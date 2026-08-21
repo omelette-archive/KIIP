@@ -91,10 +91,9 @@ a { color: inherit; text-decoration: none; }
 .tab-button:hover { color: var(--ink); }
 .tab-button.active { border-color: var(--line); border-bottom-color: var(--surface); background: var(--surface); color: var(--green-dark); }
 
-.ranking { margin-top: 20px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.ranking-toggle { display: inline-flex; gap: 6px; padding: 4px; border-radius: 999px; background: #eef2f7; }
-.ranking-toggle button { padding: 6px 13px; border: 0; border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
-.ranking-toggle button.active { background: var(--green); color: #fff; }
+.ranking-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px; }
+.ranking { padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.ranking .section-heading > span { color: var(--faint); font-size: 11px; }
 .ranking-note { margin: 14px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
 .ranking-table-wrap { margin-top: 16px; overflow-x: auto; }
 .ranking-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
@@ -366,6 +365,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .source-grid { grid-template-columns: repeat(2, 1fr); }
   .map-workspace { grid-template-columns: 1fr; }
   .coverage-workspace { grid-template-columns: 1fr; }
+  .ranking-columns { grid-template-columns: 1fr; }
   .map-stage { min-height: 460px; }
   .coverage-kpis { grid-template-columns: repeat(2, 1fr); }
   .coverage-kpis article:nth-child(2) { border-right: 0; }

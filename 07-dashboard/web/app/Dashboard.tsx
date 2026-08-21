@@ -164,7 +164,6 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const [selectedRegionCode, setSelectedRegionCode] = useState(regionKey(snapshot.regions[0]));
   const [selectedItemId, setSelectedItemId] = useState("");
   const [mapMetric, setMapMetric] = useState<MapMetric>("coverage");
-  const [rankingLimit, setRankingLimit] = useState<10 | 50>(10);
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
   const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
 
@@ -288,11 +287,15 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     const label = officialItemLabel(item);
     return label ? [{ region, item, label }] : [];
   })).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
-  const rankingRows = snapshot.regions
-    .flatMap((region) => region.items.flatMap((item) => {
-      const label = officialItemLabel(item);
-      return label ? [{ region, item, label }] : [];
-    }))
+  const RANKING_LIMIT = 10;
+  const rankingCandidates = snapshot.regions.flatMap((region) => region.items.flatMap((item) => {
+    const label = officialItemLabel(item);
+    return label ? [{ region, item, label }] : [];
+  }));
+  const applicationRankingRows = [...rankingCandidates]
+    .filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available")
+    .sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
+  const registrationRankingRows = [...rankingCandidates]
     .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
   const municipalityGeometry = selectedProvince ? geometry.municipalities[selectedProvince] : null;
@@ -340,7 +343,10 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
         </div>
         <aside className="map-insight"><h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")}</h2><div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>{selectedProvince && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}<div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)} · NICE {item.niceClass}류</small></span><b>{item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "지역별 집계 대기"}</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>}</div></aside>
       </section>
-      <section className="ranking" aria-label="지역 주소 일치 출원 중 등록 랭킹"><div className="section-heading"><div><h2>지역·대표 특산품 등록 상표 랭킹</h2></div><div className="ranking-toggle" role="group" aria-label="랭킹 표시 건수">{([10, 50] as const).map((limit) => <button type="button" key={limit} className={rankingLimit === limit ? "active" : ""} onClick={() => setRankingLimit(limit)}>TOP {limit}</button>)}</div></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>등록 완료</th></tr></thead><tbody>{rankingRows.slice(0, rankingLimit).map(({ region, item, label }, index) => <tr key={`${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></section>
+      <section className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
+        <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+        <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+      </section>
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
