@@ -47,8 +47,8 @@ test("renders the data-connected Korean dashboard", async () => {
   const snapshot = await loadSnapshot();
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
-  assert.match(html, /<title>지역 브랜드 인사이트<\/title>/i);
-  assert.match(html, /지역 특산품 상표 분석/);
+  assert.match(html, /<title>지역 특산물 상표 출원 분석<\/title>/i);
+  assert.match(html, /지역 특산품 상표 출원 현황/);
   // 2026-08-19 피드백: "알파테스트라는 말을 제외시키고... 최종본처럼" — 상단 배지·요약 탭
   // 곳곳에 반복 노출하던 "알파 테스트" 문구를 모두 걷어낸다.
   // 같은 이유로 요약 탭의 "데이터 준비 상태"(pipeline-progress) 섹션도 제거했다 —
@@ -383,7 +383,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /const uniqueItems/, "도 단위 목록에서 중복 품목을 숨겨 총 특산품 수와 목록 수가 달라지면 안 됨");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
-  assert.match(html, /<title>지역 브랜드 인사이트<\/title>/);
+  assert.match(html, /<title>지역 특산물 상표 출원 분석<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
   assert.match(html, /특산품 수/);
@@ -406,12 +406,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
   assert.match(html, /전국 지역 브랜드 지도/);
-  // 2026-08-20: "미출원 특산품" 탭 — 실제 특산품인데 그 지역 주소 상표 출원이 0건인
-  // 항목을 확인 특산품/검토대기 원물 두 그룹으로 나눠 보여준다(사용자 요청).
-  assert.match(html, /미출원 특산품/);
+  // 2026-08-21: "지역 출원 미확인" 탭 — 품목명·지정상품 일치 근거·지역 주소 판정이 모두
+  // 갖춰진 항목만 보여준다(사용자 요청 — 브랜드명·미분류 원물명 오염 방지).
+  assert.match(html, /지역 출원 미확인/);
   assert.match(html, /function gapsScreen\(\)/);
-  assert.match(html, /고시명칭·지정상품까지 확인됐지만 출원 없음/);
-  assert.match(html, /고시명칭 미확정 원물명 검색 결과 출원 없음/);
+  assert.match(html, /지정상품 일치/);
   assert.match(html, /id="gap-search"/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /class="compare-readiness"/);
@@ -419,7 +418,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /지역별 특산품 출원 현황/);
   assert.match(html, /전체 특산품 출원율/);
   assert.doesNotMatch(html, /판정 완료분 출원율/);
-  assert.match(html, /출원 확인 \$\{coverage\.applied\}\/\$\{coverage\.total\}/);
+  assert.match(html, /전체 \$\{coverage\.total\}개 중 출원 확인 \$\{coverage\.applied\}개/);
   assert.doesNotMatch(html, /\$\{coverage\.applied\}\/\$\{coverage\.decided\}/);
   assert.match(html, /원본 대기/);
   assert.doesNotMatch(html, /class="compare-grid"/);

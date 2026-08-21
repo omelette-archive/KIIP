@@ -7,8 +7,8 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = incoming.get("x-forwarded-host") || incoming.get("host") || "localhost";
   const protocol = incoming.get("x-forwarded-proto") || (host.includes("localhost") ? "http" : "https");
   const image = `${protocol}://${host}/og.png`;
-  const title = "지역 브랜드 인사이트";
-  const description = "지역 특산품과 상표 데이터를 근거·수집 상태와 함께 살펴보는 내부 대시보드";
+  const title = "지역 특산물 상표 출원 분석";
+  const description = "지역 특산품의 상표 출원·등록 현황을 지역과 품목별로 제공하는 KIIP 대시보드";
   return {
     title,
     description,

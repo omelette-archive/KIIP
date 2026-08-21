@@ -18,8 +18,8 @@ type MapMetric = "trademarks" | "registration" | "coverage" | "applicationCovera
 type SpecialtyCoverage = { total: number; decided: number; applied: number; pending: number; rate: number | null };
 type PositionedMapLabel = { name: string; displayName: string; x: number; y: number; targetX: number; targetY: number; leader: boolean };
 
-const STATE_LABELS: Record<string, string> = { complete_nonzero: "수집 완료", complete_zero: "결과 0건", partial: "부분 수집", error: "오류", skipped: "건너뜀", not_collected: "미수집", complete: "완료" };
-const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", gaps: "미출원 특산품", compare: "특화작목 비교", data: "데이터 개요" };
+const STATE_LABELS: Record<string, string> = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "추가 확인 필요", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
+const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", gaps: "지역 출원 미확인", compare: "특화작목 비교", data: "데이터 개요" };
 const MAP_LABELS: Record<MapMetric, string> = { coverage: "특산품 수", trademarks: "상표 건수", applicationCoverage: "출원율", registration: "등록률" };
 const MAP_DESCRIPTIONS: Record<MapMetric, string> = {
   trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
@@ -119,11 +119,11 @@ function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하
 function regionKey(region: Region) { return region.regionCode || region.region; }
 function fill(value: number | null, max: number) { if (value === null) return "#e3e6ec"; const ratio = Math.max(0.12, Math.min(1, max ? value / max : 0)); return `color-mix(in srgb, #0f5fa6 ${Math.round(24 + ratio * 68)}%, #e9eef4)`; }
 function regionalMetricPendingReason(item: Item) {
-  if (item.dataState === "partial") return "상표 검색이 일부만 수집되어 지역별 집계를 아직 확정하지 않았습니다.";
-  if (item.dataState === "error") return "상표 검색 오류로 지역별 집계를 아직 확정하지 않았습니다.";
-  if (item.dataState === "skipped") return "검색 조건이 확정되지 않아 지역별 집계를 시작하지 않았습니다.";
-  if (item.dataState === "not_collected") return "상표 검색 전이라 지역별 집계를 시작하지 않았습니다.";
-  return "지역별 출원 집계에 필요한 데이터가 아직 준비되지 않았습니다.";
+  if (item.dataState === "partial") return "검색 결과의 수집 상한에 도달하여 추가 확인이 필요합니다.";
+  if (item.dataState === "error") return "검색 결과를 확인하지 못했습니다.";
+  if (item.dataState === "skipped") return "품목 분류 확인이 필요해 지역별 현황에서 제외했습니다.";
+  if (item.dataState === "not_collected") return "상표 출원 현황 확인 전입니다.";
+  return "지역별 출원 현황을 추가로 확인하고 있습니다.";
 }
 
 export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; geometry: MapGeometry }) {
@@ -200,39 +200,35 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   // 순으로 상위 100개만 우선 보여준다(2026-08-19 결정).
   const ITEM_ROW_LIMIT = 100;
   const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
-  // 2026-08-20: "미출원 특산품" — 실제로 존재하는 특산품인데 그 지역 주소로 낸 상표
-  // 출원이 KIPRIS에 한 건도 없는 경우다. 검색·주소 판정까지 끝난(availability=
-  // available) 것 중 값이 0인 것만 대상으로 한다 — 아직 판정 안 끝난(partial/blocked)
-  // 항목을 "미출원"으로 잘못 보여주면 안 된다. 확정 특산품(고시명칭·지정상품 매칭)과
-  // 아직 미분류인 원물명은 신뢰도가 다르므로 별도 그룹으로 나눈다.
-  // 2026-08-21: 법정동코드가 미해결(region.regionCode 없음)인 지역은 제외한다 — 지역
-  // 코드가 없으면 ③단계 출원인 주소-지역 일치 판정(inside/outside)이 그 지역에 대해
-  // 구조적으로 성립하지 않아, "0건"이 실제 미출원이 아니라 판정 불가일 뿐이다(대전·
-  // 대구·부산·울산·인천광역시, 전남광주통합특별시, 남양주시 등 7개 지역 확인, 사용자 결정).
+  // 지역 출원 미확인 목록은 특산품명, 지정상품 일치 근거, 지역 주소 판정이 모두 갖춰진
+  // 항목만 공개한다. 단순 고시명칭 검색 결과나 미분류 원물명은 상표명·유사 품목이 섞일 수
+  // 있으므로 이 목록에서 제외한다. "0건" 역시 전국에 출원이 없다는 뜻이 아니라 현재
+  // 확보한 후보 가운데 해당 지역 주소의 출원이 확인되지 않았다는 뜻으로만 사용한다.
   const unfiledRows = useMemo(() => {
     const confirmed = new Map<string, { name: string; regions: string[] }>();
-    const raw = new Map<string, { name: string; regions: string[] }>();
+    let excludedCount = 0;
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
       if (!region.regionCode) return;
       if (item.metrics.uniqueTrademarkCount.availability !== "available") return;
       if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) return;
       const officialLabel = officialItemLabel(item);
-      const bucket = officialLabel ? confirmed : item.matchingBasis === "raw_item_name_unclassified" ? raw : null;
-      if (!bucket) return;
-      const name = officialLabel || itemName(item);
-      const row = bucket.get(name) || { name, regions: [] };
+      if (!officialLabel) return;
+      const confirmedGoods = item.metrics.confirmedGoodsMatchCount;
+      const hasDesignatedGoodsEvidence = item.matchingBasis === "raw_item_goods_matched" ||
+        (confirmedGoods?.availability === "available" && (confirmedGoods.value || 0) > 0);
+      if (!hasDesignatedGoodsEvidence) { excludedCount += 1; return; }
+      const row = confirmed.get(officialLabel) || { name: officialLabel, regions: [] };
       if (!row.regions.includes(region.region)) row.regions.push(region.region);
-      bucket.set(name, row);
+      confirmed.set(officialLabel, row);
     }));
     const sortRows = (map: Map<string, { name: string; regions: string[] }>) =>
       [...map.values()].sort((a, b) => b.regions.length - a.regions.length || a.name.localeCompare(b.name, "ko-KR"));
-    return { confirmed: sortRows(confirmed), raw: sortRows(raw) };
+    return { confirmed: sortRows(confirmed), excludedCount };
   }, [snapshot.regions]);
   const gapKeyword = gapQuery.trim().toLocaleLowerCase("ko-KR");
   const matchesGapKeyword = (row: { name: string; regions: string[] }) =>
     !gapKeyword || row.name.toLocaleLowerCase("ko-KR").includes(gapKeyword) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(gapKeyword));
   const visibleUnfiledConfirmed = unfiledRows.confirmed.filter(matchesGapKeyword);
-  const visibleUnfiledRaw = unfiledRows.raw.filter(matchesGapKeyword);
 
   function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
@@ -308,11 +304,11 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   }, [snapshot.regions]);
 
   return <main className="shell">
-    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 브랜드 인사이트 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 브랜드 인사이트</strong><small>지역 특산품 상표 현황</small></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 생성 {date(snapshot.generatedAt)}</span></div></header>
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산물 상표 출원 분석 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산물 상표 출원 분석</strong><small>지역 특산품 상표 출원 현황</small></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>데이터 생성일 {date(snapshot.generatedAt)}</span></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
     {tab === "summary" && <>
-      <section className="hero"><div><h1>지역 특산품 상표 분석</h1><p className="hero-copy">지역별 특산품과 관련 상표 현황을 한눈에 확인합니다.</p></div><div className="hero-note"><span>조사 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}건의 지역-품목 기록</strong><p>지금까지 확인한 데이터 범위이며, 계속 늘어납니다.</p></div></section>
+      <section className="hero"><div><h1>지역 특산품 상표 출원 현황</h1><p className="hero-copy">지역별 특산품의 상표 출원·등록 현황을 지역과 품목 기준으로 제공합니다.</p></div><div className="hero-note"><span>조사 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}건의 지역-품목 기록</strong><p>현재까지 수집된 데이터 기준이며, 지속 업데이트 예정입니다.</p></div></section>
       <section className="metrics" aria-label="핵심 지표"><article><span>특산품 출원율</span><strong>{percent(nationalSpecialtyCoverage.rate)}</strong><small>수집 특산품 전체 {number(nationalSpecialtyCoverage.total)}개 중 {number(nationalSpecialtyCoverage.applied)}개 출원 확인 · 지역별 집계 완료 {number(nationalSpecialtyCoverage.decided)}개 · 집계 대기 {number(nationalSpecialtyCoverage.pending)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>{pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거 · 지역별 출원 수와는 다른 전국 검색 결과</small></article><article><span>출원인 주소 확보율</span><strong>{pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>{pipeline ? `고유 후보 중 확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>{pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>검색 수집이 완료된 지역×특산품 항목 수</small></article></section>
       <section className="map-workspace">
         <div className="map-card"><div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip">참고 경계 · 2013 KOSTAT</span></div>
@@ -332,7 +328,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
-      <div className="screen-heading"><div><h1>지역별 특산품 출원율</h1></div><p>지도 색과 숫자로 시도별 출원율을 비교하고, 시도를 누르면 시군구까지 내려갑니다.</p></div>
+      <div className="screen-heading"><div><h1>지역별 특산품 출원율</h1></div><p>시도별 출원율을 비교하고, 선택한 시도의 시군구별 현황을 확인할 수 있습니다.</p></div>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
       <section className="coverage-kpis" aria-label={`${coverageAreaDisplayName} 특산품 출원 현황`}>
         <article><span>선택 지역</span><strong>{coverageAreaDisplayName}</strong><small>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</small></article>
@@ -351,15 +347,15 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
         <div className="coverage-legend" aria-label="출원율 색상 범례"><span>0%</span><i /><span>25%</span><span>50%</span><span>75%</span><span>100%</span><b>회색은 데이터 없음</b></div>
         <p className="map-warning">{selectedProvince ? "특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "특산품·상표 데이터가 없는 시도도 지명은 표시하며 회색으로 구분합니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p>
       </section>
-      <section className="coverage-directory"><div className="section-heading"><div><h2>{coverageAreaDisplayName} 명칭 확인 완료 특산품 목록</h2></div><span>목록 {number(coverageListedItemCount)}개 · 전체 수집 {number(coverageArea.total)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
-        <div className="coverage-region-grid">{coverageBreakdown.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>전체 수집 특산품 {number(row.coverage.total)}개 중 출원 확인 {number(row.coverage.applied)}개 · 지역별 집계 완료 {number(row.coverage.decided)}개{row.coverage.pending ? ` · 대기 ${number(row.coverage.pending)}개` : ""}</small></div><b>{percent(row.coverage.rate)}</b>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}</span><small>{item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "집계 대기"}</small></button>)}</div></article>)}</div>
+      <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
+        <div className="coverage-region-grid">{coverageBreakdown.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}</span><small>{item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "지역 출원 미확인" : "추가 확인 필요"}</small></button>)}</div></article>)}</div>
       </section>
     </section>}
 
-    {tab === "regions" && <section className="screen-section"><div className="screen-heading"><div><h1>지자체별 조회</h1></div><p>지역 → 품목 → 근거 지표 순으로 확인합니다.</p></div><section className="workspace" aria-label="지역별 상세 조회"><aside className="region-panel"><div className="panel-heading"><div><h2>수집 지역</h2></div><span>{filteredRegions.length}건</span></div><label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label><div className="region-list">{filteredRegions.map((region) => { const count = regionTrademarkValue(region); const coverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} className={regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.region}</strong><small>{coverage.total}개 수집 특산품 · 출원율 {percent(coverage.rate)} (출원 확인 {coverage.applied}/{coverage.total}) · 지역별 집계 완료 {coverage.decided}개{coverage.pending ? ` · ${coverage.pending}개 대기` : ""}<br />{count === null ? "지역별 출원 집계 대기" : `주소 일치 출원 ${number(count)}건`}</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}{filteredRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div></aside><RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} /></section></section>}
+    {tab === "regions" && <section className="screen-section"><div className="screen-heading"><div><h1>지자체별 조회</h1></div><p>지자체별 특산품과 해당 지역 주소로 확인된 상표 출원 현황을 제공합니다.</p></div><section className="workspace" aria-label="지역별 상세 조회"><aside className="region-panel"><div className="panel-heading"><div><h2>지자체 목록</h2></div><span>{filteredRegions.length}곳</span></div><label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label><div className="region-list">{filteredRegions.map((region) => { const count = regionTrademarkValue(region); const coverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} className={regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.region}</strong><small>특산품 {coverage.total}개 · 출원 확인 {coverage.applied}개 · 출원율 {percent(coverage.rate)}<br />{count === null ? "지역 출원 현황 추가 확인 필요" : `지역 주소 일치 출원 ${number(count)}건`}</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}{filteredRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div></aside><RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} /></section></section>}
 
     {tab === "items" && <section className="screen-section">
-      <div className="screen-heading"><div><h1>품목별 조회</h1></div><p>품목마다 확인 지역과 상표 현황을 카드 한 장에 요약했습니다.</p></div>
+      <div className="screen-heading"><div><h1>품목별 조회</h1></div><p>품목별 확인 지역과 상표 출원·등록 현황을 제공합니다.</p></div>
       <div className="item-screen">
         <div className="item-screen-toolbar"><label><span className="sr-only">품목 검색</span><input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label><span>{itemRows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${itemRows.length}개` : `검색 결과 ${itemRows.length}개`}</span></div>
         <div className="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div>
@@ -374,22 +370,15 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
     </section>}
 
     {tab === "gaps" && <section className="screen-section">
-      <div className="screen-heading"><div><h1>미출원 특산품</h1></div><p>실제로 존재하는 특산품인데, 그 지역 주소로 낸 상표 출원이 KIPRIS에 한 건도 없는 경우입니다.</p></div>
-      <div className="compare-banner"><span>읽는 법</span><strong>검색·주소 판정까지 끝난 것만 표시합니다</strong><p>상표 출원이 없다는 것이지 특산품 자체가 없다는 뜻이 아닙니다 — 생산·판매는 되지만 아직 상표 등록을 안 했을 수 있습니다. 아직 검색·주소 확인이 안 끝난 항목은(집계 대기) 여기 포함하지 않습니다.</p></div>
-      <label className="search-field"><span className="sr-only">품목 또는 지역 검색</span><input value={gapQuery} onChange={(event) => setGapQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
-      <section className="compare-region-section">
-        <div className="compare-section-head"><div><span>확인 특산품 기준</span><h2>고시명칭·지정상품까지 확인됐지만 출원 없음</h2></div><p>신뢰도가 가장 높은 목록입니다 — 특산품 분류까지 끝난 항목입니다.</p></div>
+      <div className="screen-heading"><div><h1>지역 출원 미확인</h1></div><p>특산품 지정상품과 지역 귀속 근거를 모두 확인한 항목만 제공합니다.</p></div>
+      <div className="compare-banner gap-definition"><span>표시 기준</span><strong>지정상품 일치 · 출원인 주소 판정 완료</strong><p>전국 검색 결과가 있더라도 해당 지역 주소의 출원이 확인되지 않은 경우입니다. 전국에 관련 출원이 없다는 의미는 아니며, 지정상품 근거가 확인되지 않은 품목은 목록에서 제외합니다.</p></div>
+      {unfiledRows.confirmed.length > 0 && <label className="search-field gap-search"><span className="sr-only">품목 또는 지역 검색</span><input value={gapQuery} onChange={(event) => setGapQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>}
+      <section className="compare-region-section gap-results">
+        <div className="compare-section-head"><div><span>확인 기준 충족</span><h2>지역 주소의 출원이 확인되지 않은 특산품</h2></div><p>품목명과 지정상품 근거가 확인된 결과입니다.</p></div>
         <div className="item-card-grid">{visibleUnfiledConfirmed.map((row) => <article className="item-card" key={row.name}>
-          <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 출원 0건</small></div><span className="item-status pending">미출원</span></div>
+          <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 지역 출원 미확인</small></div><span className="item-status pending">지역 출원 미확인</span></div>
           <details className="item-regions-detail"><summary>해당 지역 {row.regions.length}개 보기</summary><div className="region-chips">{row.regions.map((region) => <span key={region}>{region}</span>)}</div></details>
-        </article>)}{visibleUnfiledConfirmed.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div>
-      </section>
-      <section className="compare-region-section">
-        <div className="compare-section-head"><div><span>검토대기 원물 기준</span><h2>고시명칭 미확정 원물명 검색 결과 출원 없음</h2></div><p>아직 공식 분류 전인 원물명이라 확인 특산품보다 신뢰도가 낮습니다 — 참고용입니다.</p></div>
-        <details className="method-note"><summary>{visibleUnfiledRaw.length}개 보기</summary><div className="item-card-grid">{visibleUnfiledRaw.map((row) => <article className="item-card" key={row.name}>
-          <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 출원 0건</small></div><span className="item-status pending">미출원(검토대기)</span></div>
-          <details className="item-regions-detail"><summary>해당 지역 {row.regions.length}개 보기</summary><div className="region-chips">{row.regions.map((region) => <span key={region}>{region}</span>)}</div></details>
-        </article>)}{visibleUnfiledRaw.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div></details>
+        </article>)}{visibleUnfiledConfirmed.length === 0 && <div className="gap-empty item-empty"><strong>현재 공개할 수 있는 지역 출원 미확인 항목이 없습니다.</strong><p>지정상품 근거가 확인되지 않은 후보 {number(unfiledRows.excludedCount)}건은 목록에서 제외했습니다. 지정상품과 지역 귀속 근거가 보완되면 이 목록에 반영됩니다.</p></div>}</div>
       </section>
     </section>}
 
