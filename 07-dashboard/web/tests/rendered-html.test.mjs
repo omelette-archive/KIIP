@@ -254,6 +254,22 @@ test("renders matching criteria once, on the data overview tab, not on the summa
   assert.match(standaloneHtml, /고시명칭 일치·포함/, "품목 매칭 기준이 명시돼야 함");
   assert.match(standaloneHtml, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
   assert.match(standaloneHtml, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
+  // 2026-08-21 사용자 지적: "품목 매칭"이 지정상품 검증을 전제로 설명돼 있었지만, 실제로는
+  // 대부분의 "출원 확인" 건수가 아직 지정상품 근거 없이(품목명 검색+주소 일치만) 집계돼
+  // 있어 설명이 실제보다 과신을 준다. 진행 상태를 정직하게 명시해야 한다.
+  assert.match(
+    standaloneHtml,
+    /대부분의 "출원 확인" 건수는 품목명 검색어 \+ 주소 일치까지만 확인된 상태이며 지정상품 근거는 아직 없습니다/,
+    "품목 매칭 기준 설명에 지정상품 미검증 상태에 대한 정직한 안내가 있어야 함",
+  );
+  // 2026-08-21 사용자 결정: 현행 류 기준(품목에 매핑된 NICE류만 집계)은 유지하고, 서비스류
+  // (음식점업 43류·도소매업 35류 등)는 포함하지 않는다는 범위만 명시한다 — 03-match-trademarks/
+  // README.md·docs/data-analysis-guide.md·07-dashboard/README.md와 동일 문구로 통일.
+  assert.match(
+    standaloneHtml,
+    /음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다/,
+    "상표 검색 기준에 서비스류 미포함 범위 안내가 있어야 함",
+  );
 });
 
 test("ships a valid dashboard snapshot", async () => {

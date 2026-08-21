@@ -9,6 +9,11 @@
 - KIPRIS 결과는 ②의 `niceClass`로 필터링한다. 류가 없으면 잠정 식품류
   `29·30·31·32·33·40·43`을 사용하며 결과의 `query.classCodeFallbackApplied`에 표시한다.
   이 목록은 업무 확정 기준이 아닌 노이즈 완화용 v1 규칙이다.
+- 고시명칭·NICE류가 확정된 품목은 **그 품목에 매핑된 NICE류만** 현재 집계 범위로
+  사용한다. 예를 들어 `굴비`가 29류로 매핑되어 있으면 29류 결과를 집계하며,
+  음식점업 43류·도소매업 35류처럼 실제 활용과 연관될 수 있는 서비스류는 현재 수치에
+  포함하지 않는다. 서비스류 확장은 현행 원물 중심 지표와 섞지 않고 후속 분석에서
+  포함 범위와 중복 집계 기준을 별도로 검토한다.
 - KIPRIS 단어검색에 없는 출원인 주소는 출원번호 기반 `trademarkApplicantInfo`로 기본 보강하고,
   등록번호가 있는 hit는 등록원부 `getMarkHistory`로 주소·지정상품을 보조 보강한다. 주소는 법정동코드로 판정하고, 지정상품은
   `normalized_exact|normalized_contains|class_only|mismatch|unverified` 근거를 남긴다.
