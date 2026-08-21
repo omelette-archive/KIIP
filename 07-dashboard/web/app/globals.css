@@ -275,6 +275,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-specialty-list button { display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left; cursor: pointer; }
 .coverage-specialty-list button:hover { border-color: #7fb0dd; background: var(--green-soft); }
 .coverage-specialty-list button small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.coverage-specialty-list button.specialty-filed { border-color: #bcd8a8; background: var(--green-soft); }
+.coverage-specialty-list button.specialty-filed small.filed { color: var(--green); font-weight: 800; }
+.coverage-specialty-list button.specialty-unfiled small.unfiled { color: var(--faint); font-weight: 400; }
+.coverage-specialty-list button.specialty-pending small.pending { color: var(--faint); font-style: italic; }
 .matching-rule { margin: 18px 0 0; border-left: 4px solid var(--green); }
 .matching-rule strong { font-size: 13px; }.matching-rule p { font-size: 11px; line-height: 1.65; }
 .trademark-examples { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
