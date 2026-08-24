@@ -27,3 +27,32 @@
 `02-normalize-items`의 "품목 → 고시명칭 자동 매핑" + "NICE 상품분류 자동 매핑"에 쓰는
 사전(vocabulary) 데이터. tksm 품목명을 이 사전과 대조/임베딩 매칭해서 가장 가까운
 고시명칭·NICE분류·유사군코드를 붙이는 방식을 검토 중.
+
+# 품목 유형 분류 데이터 (`item-categories-v1.json`)
+
+이슈 #109(품목 카테고리화 요청)에 대응해 만든, 확정 특산품 고시명칭(2026-08-24 기준
+291개) → 유형(과일/채소/곡물 등) 매핑.
+
+## 왜 룰 기반 사전인가
+
+농사로 `localSpcprd` API 실응답을 직접 확인한 결과 유형 필드가 없다(`areaCode`,
+`cntntsSj`, `areaNm`, `imgUrl`, `svcDt`, `linkUrl`만 존재). 자동으로 뽑아 쓸 소스가 없어
+사람이 직접 유형화했다. 생성형 AI가 특산품 데이터를 직접 판정하지 않는다는 기존 원칙
+(이슈 #16)에 맞춰, 결과를 결정론적 정적 조회 테이블(이 파일)로 관리한다 — 매 실행마다
+같은 입력에 같은 유형이 나온다.
+
+## 구조
+
+- `categories`: 유형 코드 → 한글 라벨 12종(`grain`/`vegetable`/`fruit`/`special_crop`/
+  `forest_product`/`livestock`/`seafood`/`processed_food`/`beverage_alcohol`/
+  `flower_plant`/`craft`/`other`)
+- `items`: 고시명칭(접두어 "신선한 "/"미가공 " 제거된 표시명 기준, `Dashboard.tsx`의
+  `officialItemLabel()`과 동일 규칙) → 유형 코드
+- `reviewRequired`: 분류가 모호해 최선 추정으로 남긴 항목(잔디, 천일염, 칠보석, 허굴농차,
+  황토소금) — 후속 확인 대상
+
+## 갱신 방법
+
+새 고시명칭이 추가되면 이 파일에 항목을 더한다. 아직 자동 검증 스크립트는 없다 — 추가할
+때 `dashboard-snapshot.json`의 확인 특산품(고시명칭) 목록과 대조해 누락이 없는지 확인
+필요.
