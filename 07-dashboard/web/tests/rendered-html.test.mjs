@@ -49,6 +49,8 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /<html[^>]*lang="ko"/i);
   assert.match(html, /<title>지역 특산물 상표 출원 분석<\/title>/i);
   assert.match(html, /지역 특산품 상표 출원 현황/);
+  assert.match(html, /마지막 업데이트/);
+  assert.doesNotMatch(html, /데이터 생성일|마지막 생성/);
   // 2026-08-19 피드백: "알파테스트라는 말을 제외시키고... 최종본처럼" — 상단 배지·요약 탭
   // 곳곳에 반복 노출하던 "알파 테스트" 문구를 모두 걷어낸다.
   // 같은 이유로 요약 탭의 "데이터 준비 상태"(pipeline-progress) 섹션도 제거했다 —
@@ -98,11 +100,15 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
   assert.match(mapInsight, /class="metric-count-hero"/, "기본 특산품 수 지표는 원형 비율 대신 큰 숫자로 보여야 함");
   assert.doesNotMatch(mapInsight, /class="rate-ring"/, "특산품 수를 비율 원형 게이지로 표시하면 안 됨");
+  assert.doesNotMatch(mapInsight, /<em>개<\/em>|<em>건<\/em>/, "큰 숫자 옆 개·건 단위는 설명과 중복되므로 표시하지 않음");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
   assert.match(standaloneHtml, /metric-count-hero[\s\S]*특산품 수[\s\S]*상표 건수/);
   assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
+  assert.match(standaloneHtml, /dashboardUpdatedAt = latestDate\([\s\S]*metric\.calculatedAt/);
+  assert.match(standaloneHtml, /dateOnly\(latestDate\(source\.sourceFetchedAt, source\.sourceLastVerifiedAt\)\)/);
+  assert.doesNotMatch(standaloneHtml, /<small>검증 \$\{esc\(source\.sourceLastVerifiedAt/);
   // 집계 대기 품목도 전체 1,692개 분모에 포함하며, 확인이 진행되면 값이 올라간다.
   assert.match(html, /아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로/);
   assert.doesNotMatch(html, />수집 범위<|>브랜드 공백|상표 활용 여지|출원인 주소-대상 지역 일치/);

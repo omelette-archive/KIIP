@@ -14,6 +14,13 @@ function dashboardClient(snapshot, geometry) {
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
   const date = (value) => value ? new Intl.DateTimeFormat("ko-KR", { dateStyle: "medium", timeStyle: "short", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록";
+  const dateOnly = (value) => value ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록";
+  const latestDate = (...values) => values.filter((value) => value && Number.isFinite(Date.parse(value))).sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null;
+  const dashboardUpdatedAt = latestDate(
+    snapshot.generatedAt,
+    ...snapshot.sources.flatMap((source) => [source.sourceFetchedAt, source.sourceLastVerifiedAt]),
+    ...snapshot.regions.flatMap((region) => region.items.flatMap((item) => Object.values(item.metrics).map((metric) => metric.calculatedAt))),
+  );
   const itemName = (item) => item.itemName || item.noticeName || "미지정 품목";
   // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
   // 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
@@ -217,8 +224,8 @@ function dashboardClient(snapshot, geometry) {
       : state.mapMetric === "registration"
         ? `<div class="rate-hero">${rateRing(visibleRegistrationRate, "등록률")}<div class="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 ${number(visibleTrademarkCount)}건 중 등록 ${number(visibleRegisteredCount)}건</small></div></div>`
         : state.mapMetric === "coverage"
-          ? `<div class="metric-count-hero"><strong>${number(visibleSpecialtyCoverage.total)}<em>개</em></strong><div class="rate-hero-detail"><span>특산품 수</span><small>현재 선택 지역에서 수집된 지역×특산품 항목입니다.</small></div></div>`
-          : `<div class="metric-count-hero"><strong>${number(visibleTrademarkCount)}<em>건</em></strong><div class="rate-hero-detail"><span>상표 건수</span><small>출원인 주소가 현재 선택 지역과 일치한 고유 상표 출원입니다.</small></div></div>`;
+          ? `<div class="metric-count-hero"><strong>${number(visibleSpecialtyCoverage.total)}</strong><div class="rate-hero-detail"><span>특산품 수</span><small>현재 선택 지역에서 수집된 지역×특산품 항목입니다.</small></div></div>`
+          : `<div class="metric-count-hero"><strong>${number(visibleTrademarkCount)}</strong><div class="rate-hero-detail"><span>상표 건수</span><small>출원인 주소가 현재 선택 지역과 일치한 고유 상표 출원입니다.</small></div></div>`;
     const insightList = visibleInsightItems.slice(0, 5).map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span><strong>${esc(region.sigungu || region.region)} / ${esc(label)}</strong><small>${esc(noticeBasis(item))} · NICE ${esc(item.niceClass)}류</small></span><b>${esc(insightItemValue(item))}</b></button>`).join("") || '<p class="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>';
     return `<section class="hero"><div><h1>지역 특산품 상표 출원 현황</h1><p class="hero-copy">지역별 특산품의 상표 출원·등록 현황을 지역과 품목 기준으로 제공합니다.</p></div><div class="hero-note"><span>조사 범위</span><strong>${snapshot.coverage.observedRegionCount}개 지역 · ${snapshot.coverage.regionItemCount}건의 지역-품목 기록</strong><p>현재까지 수집된 데이터 기준이며, 지속 업데이트 예정입니다.</p></div></section>
     <section class="metrics"><article><span>특산품 출원율</span><strong>${percent(nationalSpecialtyCoverage.rate)}</strong><small>수집 특산품 전체 ${number(nationalSpecialtyCoverage.total)}개 중 ${number(nationalSpecialtyCoverage.applied)}개 출원 확인 · 지역별 집계 완료 ${number(nationalSpecialtyCoverage.decided)}개 · 집계 대기 ${number(nationalSpecialtyCoverage.pending)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>${pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거 · 지역별 출원 수와는 다른 전국 검색 결과</small></article><article><span>출원인 주소 확보율</span><strong>${pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>${pipeline ? `고유 후보 중 확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>${pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>검색 수집이 완료된 지역×특산품 항목 수</small></article></section>
@@ -375,7 +382,8 @@ function dashboardClient(snapshot, geometry) {
     return `<section class="criteria" aria-label="판정 기준과 매칭 방법"><div class="section-heading"><div><h2>판정 기준과 매칭 방법</h2></div><span>현재 출처 ${esc(sourceLine)}</span></div><div class="criteria-grid">${rows.map(([label, value, note]) => `<article><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`).join("")}</div></section>`;
   }
   function provenanceHtml() {
-    return `<section class="provenance"><div class="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>${esc(snapshot.schemaVersion)}</span></div><div class="source-grid">${snapshot.sources.filter((source) => source.sourceUrl).map((source) => `<a href="${esc(source.sourceUrl)}" target="_blank" rel="noreferrer"><span>${esc(source.sourceLabel || source.sourceId)}</span><strong>${esc(source.sourceContractVersion || "버전 미기록")}</strong><small>검증 ${esc(source.sourceLastVerifiedAt || date(source.sourceFetchedAt))}</small></a>`).join("")}<a href="${esc(geometry.boundaryReference.sourceUrl)}" target="_blank" rel="noreferrer"><span>지도 경계</span><strong>${esc(geometry.boundaryReference.sourceName)}</strong><small>${esc(geometry.boundaryReference.sourceBasis)} · 참고용</small></a></div></section>`;
+    const boundaryDate = geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록";
+    return `<section class="provenance"><div class="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>${esc(snapshot.schemaVersion)}</span></div><div class="source-grid">${snapshot.sources.filter((source) => source.sourceUrl).map((source) => `<a href="${esc(source.sourceUrl)}" target="_blank" rel="noreferrer"><span>${esc(source.sourceLabel || source.sourceId)}</span><strong>${esc(source.sourceContractVersion || "버전 미기록")}</strong><small>${esc(dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt)))}</small></a>`).join("")}<a href="${esc(geometry.boundaryReference.sourceUrl)}" target="_blank" rel="noreferrer"><span>지도 경계</span><strong>${esc(geometry.boundaryReference.sourceName)}</strong><small>${esc(boundaryDate)}</small></a></div></section>`;
   }
   function bind() {
     document.querySelectorAll("[data-map-metric]").forEach((button) => { button.onclick = () => { state.mapMetric = button.dataset.mapMetric; render(); }; });
@@ -395,9 +403,9 @@ function dashboardClient(snapshot, geometry) {
     bind();
   }
 
-  document.querySelector("#generated").textContent = `마지막 생성 ${date(snapshot.generatedAt)}`;
+  document.querySelector("#generated").textContent = `마지막 업데이트 ${date(dashboardUpdatedAt)}`;
   document.querySelector("#scope-label").textContent = scopeLabel;
-  document.querySelector("#snapshot-id").textContent = `Snapshot ${snapshot.snapshotId} · 마지막 생성 ${date(snapshot.generatedAt)}`;
+  document.querySelector("#snapshot-id").textContent = `Snapshot ${snapshot.snapshotId} · 업데이트 ${date(dashboardUpdatedAt)}`;
   document.querySelector("#brand-home").onclick = () => { state.tab = "summary"; render(); };
   render();
 }
