@@ -286,13 +286,12 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const visibleRegions = selectedProvince ? snapshot.regions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : snapshot.regions;
   const nationalSpecialtyCoverage = specialtyCoverage(snapshot.regions);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
-  // 지도 옆 미리보기는 상표명(예: 등록 브랜드 "임금님표쌀")이나 아직 고시명칭이 확정 안 된
-  // 원문 표기가 아니라, 확정된 특산물 고시명칭만 보여준다. 개별 상표명은 지역 상세에서
-  // 검색 근거와 함께 확인한다.
-  const visibleItems = visibleRegions.flatMap((region) => region.items.flatMap((item) => {
-    const label = officialItemLabel(item);
-    return label ? [{ region, item, label }] : [];
-  }));
+  // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
+  // 미리보기에 뜨는 개수(예: 2개)가 안 맞아 보인다는 지적. 고시명칭 매칭은 판정 기준의
+  // 하나일 뿐 특산품 여부와 무관하다는 원칙(coverage-specialty-list와 동일)을 여기도 적용해
+  // 지역의 전체 품목을 보여주되, 상표명은 여전히 안 보여준다 — label은 특산품명(고시명칭 또는
+  // 원물명)만 쓰고 개별 상표명은 지역 상세에서 검색 근거와 함께 확인한다.
+  const visibleItems = visibleRegions.flatMap((region) => region.items.map((item) => ({ region, item, label: officialItemLabel(item) || itemName(item) })));
   const visibleTrademarkCount = visibleItems.reduce((sum, { item }) => item.metrics.uniqueTrademarkCount.availability === "available" ? sum + (item.metrics.uniqueTrademarkCount.value || 0) : sum, 0);
   const visibleRegisteredCount = visibleItems.reduce((sum, { item }) => item.metrics.registeredTrademarkCount.availability === "available" ? sum + (item.metrics.registeredTrademarkCount.value || 0) : sum, 0);
   const visibleRegistrationRate = visibleTrademarkCount ? visibleRegisteredCount / visibleTrademarkCount : null;
@@ -373,7 +372,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           {mapMetric === "trademarks" && <div className="metric-count-hero"><strong>{number(visibleTrademarkCount)}</strong><div className="rate-hero-detail"><span>상표 건수</span><small>출원인 주소가 현재 선택 지역과 일치한 고유 상표 출원입니다.</small></div></div>}
           {selectedProvince && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}
           <div className="mini-list-heading"><strong>{insightListLabel}</strong><span>최대 5개</span></div>
-          <div className="mini-list">{visibleInsightItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)} · NICE {item.niceClass}류</small></span><b>{insightItemValue(item)}</b></button>)}{visibleInsightItems.length === 0 && <p className="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>}</div>
+          <div className="mini-list">{visibleInsightItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)}{item.niceClass ? ` · NICE ${item.niceClass}류` : ""}</small></span><b>{insightItemValue(item)}</b></button>)}{visibleInsightItems.length === 0 && <p className="empty">이 지역에는 수집된 특산품이 없습니다.</p>}</div>
         </aside>
       </section>
       <section className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
