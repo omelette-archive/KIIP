@@ -292,11 +292,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   function mapMetricValueLabel(value: number | null, metric: MapMetric = mapMetric) { if (value === null) return "데이터 없음"; if (metric === "registration" || metric === "applicationCoverage") return percent(value); return `${number(value)}${metric === "trademarks" ? "건" : "개 품목"}`; }
   function mapValueLabel(name: string, metric: MapMetric = mapMetric) { return mapMetricValueLabel(mapValue(name, metric), metric); }
   function openProvince(name: string) { setSelectedProvince(name); setSelectedMunicipality(null); }
-  // 이슈 #113: 지도 경계(2013 KOSTAT, 참고용)와 실제 행정구역 데이터(법정동코드,
-  // 2023-06-30 반영)가 어긋나는 지역이 있다 — 군위군은 2023년 경북→대구 편입됐지만
-  // 지도 도형은 아직 예전 경북 그룹 아래 그려진다. sido까지 정확히 일치하는 지역이
-  // 없으면 시군구명만으로도 찾아, 지도에서 어느 시/도 아래 그려져 있든 클릭이 항상
-  // 실제(현재) 행정구역의 데이터로 연결되게 한다.
+  // 이슈 #80/#113: 지도 경계는 2026-08-24부터 vuski/admdongkor(2026-07-01 기준,
+  // 군위군의 경북→대구 편입 등 최신 행정구역 변경이 반영됨)로 바뀌어 군위군 같은
+  // 불일치는 더 이상 발생하지 않는다. 다만 지도 도형은 여전히 제3자가 재배포하는
+  // 참고용 데이터라 향후 개편에서 또 어긋날 수 있으므로, sido까지 정확히 일치하는
+  // 지역이 없으면 시군구명만으로도 찾는 안전망은 남겨둔다.
   function findMunicipalityRegion(province: string | null, name: string) {
     return snapshot.regions.find((region) => region.sido === province && region.sigungu === name)
       || snapshot.regions.find((region) => region.sigungu === name);
@@ -379,7 +379,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <section className="hero"><div><h1>지역 특산품 상표 출원 현황</h1><p className="hero-copy" aria-hidden="true">지역별 특산품의 상표 출원·등록 현황을 지역과 품목 기준으로 제공합니다.</p></div><div className="hero-note"><span>조사 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}건</strong><p>지속 업데이트 예정</p></div></section>
       <section className="metrics" aria-label="핵심 지표"><article><span>특산품 출원율</span><strong>{percent(nationalSpecialtyCoverage.rate)}</strong><small>전체 {number(nationalSpecialtyCoverage.total)}개 중 확인 {number(nationalSpecialtyCoverage.applied)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>{pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거</small></article><article><span>출원인 주소 확보율</span><strong>{pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>{pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>지역×특산품 집계 가능 항목</small></article></section>
       <section className="map-workspace">
-        <div className="map-card"><div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip" title="지도 도형은 2013년 경계 기준 참고용입니다. 법정동코드 데이터(2023-06-30 반영)는 최신이지만, 군위군처럼 이후 편입·개편된 지역은 지도에서 예전 시/도 아래 그려질 수 있습니다 — 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.">참고 경계 · 2013 KOSTAT</span></div>
+        <div className="map-card"><div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip" title={`지도 도형은 ${geometry.boundaryReference.sourceName} 제공 경계(${geometry.boundaryReference.sourceBasis})를 참고용으로 씁니다 — 제3자가 재배포하는 데이터라 향후 행정구역 개편이 지도 도형에 늦게 반영될 수 있으며, 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.`}>참고 경계 · {geometry.boundaryReference.sourceBasis.match(/\d{4}-\d{2}-\d{2}/)?.[0] || geometry.boundaryReference.sourceName}</span></div>
           <div className="map-toolbar"><div className="map-metrics">{(Object.keys(MAP_LABELS) as MapMetric[]).map((key) => <button type="button" key={key} className={mapMetric === key ? "active" : ""} onClick={() => setMapMetric(key)} title={MAP_DESCRIPTIONS[key]} aria-label={`${MAP_LABELS[key]}: ${MAP_DESCRIPTIONS[key]}`}>{MAP_LABELS[key]}</button>)}</div>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div>
           <p className="map-metric-description"><strong>{MAP_LABELS[mapMetric]}</strong><span>{MAP_DESCRIPTIONS[mapMetric]}</span></p>
           <div className="map-stage"><svg className="korea-map" viewBox={activeMapViewBox} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? <>

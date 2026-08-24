@@ -93,7 +93,7 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
-  assert.match(html, /2013 KOSTAT/);
+  assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
   assert.match(html, />특산품 수<\/button>/);
   assert.match(html, />상표 건수<\/button>/);
   assert.match(html, />출원율<\/button>/);
