@@ -177,7 +177,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-flow: row;
+  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-flow: row;
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
@@ -365,6 +365,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .data-reading-note strong { font-size: 12px; }.data-reading-note p { margin: 0; font-size: 10.5px; line-height: 1.75; }
 
 @media (max-width: 980px) {
+  .primary-tabs button { padding: 8px 6px; font-size: 11px; }
   .hero { grid-template-columns: 1fr; gap: 10px; }
   .hero-note { padding-left: 0; border-left: 0; }
   .metrics { grid-template-columns: repeat(2, 1fr); }

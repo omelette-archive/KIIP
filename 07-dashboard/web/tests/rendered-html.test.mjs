@@ -436,7 +436,7 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   );
   assert.match(
     standaloneHtml,
-    /return region\.items\.map\(\(row\) => \{ const value = row\.metrics\.uniqueTrademarkCount\.value \|\| 0; return `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}"/,
+    /return region\.items\.map\(\(row\) => \{ const value = row\.metrics\.uniqueTrademarkCount\.value \|\| 0; const selected = item\.specialtyId === row\.specialtyId;.*return `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{selected\}"/,
     "특산품 탭은 region.items 전체를 렌더링해야 함(2026-08-24: 출원건수 기반 태그 클라우드로 변경, #112)",
   );
   assert.doesNotMatch(
@@ -533,8 +533,22 @@ test("sizes region/item tag clouds by application count instead of listing them 
   assert.match(standaloneHtml, /class="region-chips word-cloud"/, "품목별 조회의 지역 목록이 태그 클라우드여야 함");
   assert.match(
     standaloneHtml,
-    /style="font-size:\$\{wordCloudFontSize\(value, max\)\}px"/,
+    /style="font-size:\$\{wordCloudFontSize\(value, max\)\}px;color:\$\{wordCloudColor\(region\)\}"/,
     "각 태그의 font-size는 인라인 style로 출원건수에 비례해 지정해야 함",
+  );
+  // 2026-08-24(이슈 #112 후속): 태그 클라우드를 더 컬러풀하게 해달라는 요청 —
+  // dataviz 스킬로 검증한(all-pairs CVD·정상시각 하한 통과) 4색 텍스트 팔레트를
+  // 이름 해시로 고정 배정한다. 선택된 특산품 탭은 초록 배경에 흰 글자를 유지해야
+  // 하므로 그 경우만 색을 비워 CSS의 aria-selected 규칙이 이기게 한다.
+  assert.match(
+    standaloneHtml,
+    /const WORD_CLOUD_PALETTE = \["#2876d4", "#cd4d10", "#008856", "#4a3aa7"\];/,
+    "태그 클라우드 색상 팔레트는 dataviz 스킬로 검증한 4색 상수여야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /const colorStyle = selected \? "" : `;color:\$\{wordCloudColor\(row\.specialtyId \|\| itemName\(row\)\)\}`;/,
+    "선택된 특산품 탭은 색을 비워 CSS의 흰 글자·초록 배경(aria-selected)이 그대로 적용돼야 함",
   );
 });
 
