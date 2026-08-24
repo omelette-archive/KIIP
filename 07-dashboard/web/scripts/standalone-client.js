@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/no-unused-vars -- embedded and invoked by dashboard.html */
 function dashboardClient(snapshot, geometry) {
   const labels = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "검토중", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
-  const tabs = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", gaps: "지역 출원 미확인", compare: "특화작목 비교", data: "데이터 개요" };
+  const tabs = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교", data: "데이터 개요" };
   const mapLabels = { coverage: "특산품 수", trademarks: "상표 건수", applicationCoverage: "출원율", registration: "등록률" };
   const mapDescriptions = {
     trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
@@ -9,7 +9,7 @@ function dashboardClient(snapshot, geometry) {
     coverage: "현재 스냅샷에 수집된 지역×특산품 수입니다.",
     applicationCoverage: "이 지역에서 수집된 전체 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로, 데이터가 쌓일수록 값이 올라갈 수 있습니다.",
   };
-  const state = { tab: "summary", query: "", itemQuery: "", gapQuery: "", regionKey: snapshot.regions[0]?.regionCode || snapshot.regions[0]?.region, itemId: "", mapMetric: "coverage", province: null, municipality: null };
+  const state = { tab: "summary", query: "", itemQuery: "", expandedRegionProvince: null, regionKey: snapshot.regions[0]?.regionCode || snapshot.regions[0]?.region, itemId: "", mapMetric: "coverage", province: null, municipality: null };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
@@ -68,7 +68,7 @@ function dashboardClient(snapshot, geometry) {
     const nationwide = item.metrics.nationwideSearchTrademarkCount;
     return typeof nationwide?.value === "number" ? { value: nationwide.value, provisional: true } : { value: null, provisional: false };
   };
-  const goodsMethod = (method) => ({ normalized_exact: "특산품 활용 확정", normalized_contains: "고시명칭 포함·인정", class_only: "NICE류 검토", mismatch: "지정상품 불일치", unverified: "미검증" })[method] || method;
+  const goodsMethod = (method) => ({ normalized_exact: "품목명 일치", normalized_contains: "품목명 포함", class_only: "품목명 미확인", mismatch: "지정상품 불일치", unverified: "미확인" })[method] || method;
   const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
   // 2026-08-21: 대전·대구·부산·울산·인천광역시, 전남광주통합특별시는 원본 소스(농사로)에
@@ -231,20 +231,50 @@ function dashboardClient(snapshot, geometry) {
       return `<div class="detail-panel">${heading}<div class="item-tabs" role="tablist"></div><p class="empty">이 지역에는 등록된 특산품 데이터가 없습니다.</p></div>`;
     }
     const examples = item.trademarkExamples || [];
-    const confirmedExamples = examples.filter((example) => (example.goodsEvidence?.length || 0) > 0);
+    const confirmedExamples = examples.filter((example) =>
+      (example.goodsEvidence?.length || 0) > 0 &&
+      ["normalized_exact", "normalized_contains"].includes(example.goodsMatchMethod)
+    );
     const regionGoodsConfirmed = item.matchingBasis === "raw_item_goods_matched";
     const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
     const localCount = item.metrics.uniqueTrademarkCount.value || 0;
     const registeredCount = item.metrics.registeredTrademarkCount.value || 0;
     const pendingReason = regionalMetricPendingReason(item);
-    return `<div class="detail-panel">${heading}<div class="item-tabs">${region.items.map((row) => `<button type="button" data-region-item="${esc(row.specialtyId || "")}" aria-selected="${item.specialtyId === row.specialtyId}">${esc(itemName(row))}</button>`).join("")}</div><div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span>${item.itemVerdict?.source === "algorithm" ? `<span class="verdict-chip" title="${esc(verdictTitle(item.itemVerdict))}">AI 판정</span>` : ""}</div><div class="metric-reading-note"><strong>아래 수치의 기준</strong><p>전국 검색 결과 전체가 아니라, 출원인 주소가 <b>${esc(region.region)}</b>으로 확인된 출원을 지역 수치로 셉니다. 등록 비율은 그중 등록 상태 건수 ÷ 지역 주소 일치 출원 건수입니다. 다만 이 주소 일치만으로는 지정상품이 실제로 이 품목과 일치하는지 확인되지 않습니다 — 지정상품 근거까지 확인된 사례는 아래 "지정상품 근거 확인 사례"에서만 봅니다.</p></div><div class="detail-grid"><article><span>${esc(itemName(item))} · 지역 주소 일치 출원</span><strong>${regionalAvailable ? `${number(localCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? `출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원` : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${esc(pendingReason)}`}</small></article><article><span>그중 등록 상태</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `${number(registeredCount)} ÷ ${number(localCount)} · 등록 비율 ${percent(item.metrics.registrationRate.value)}` : "지역 주소 일치 출원 0건 · 등록 비율 계산 불가" : "지역 주소 일치 출원 수가 확정된 뒤 계산합니다."}</small></article><article><span>주소 확인 후보 중 이 지역 비율</span><strong>${regionalAvailable ? item.metrics.localApplicantShare.value === null ? "계산 불가" : percent(item.metrics.localApplicantShare.value) : "지역별 집계 대기"}</strong><small>${regionalAvailable ? "주소를 판정할 수 있었던 전국 검색 후보 중 이 지역 주소와 일치한 비율 · 주소 미확보 후보 제외" : esc(pendingReason)}</small></article><article><span>이 특산품의 출원 판정</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "판정은 완료됐으며 특산품 출원율의 분모에만 포함" : "판정 전이라 출원 미확인으로 계산되어 특산품 출원율의 분모에 포함됩니다"}</small></article></div><div class="review-strip"><div><span>지정상품 자동 일치</span><strong>${number(item.metrics.confirmedGoodsMatchCount.value)}건</strong></div><div><span>지정상품 개별 검토</span><strong>${number(item.metrics.goodsReviewCandidateCount.value)}건</strong></div><p>상표명은 사례로 보존하고, 대표 특산품 집계 키와 분리합니다.</p></div><section class="trademark-examples"><div class="example-heading"><strong>지정상품 근거 확인 사례</strong><span>등록원부 지정상품이 이 품목과 일치·포함 확인된 출원만 표시 · 최대 ${confirmedExamples.length || 0}건</span></div>${confirmedExamples.length ? `<div class="example-list">${confirmedExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${esc(example.applicationNumber || "출원번호 미기록")} · ${esc(example.applicationDate || "출원일 미기록")} · ${esc(example.applicationStatus || "상태 미기록")}</small></div><span class="goods-chip ${example.goodsReviewRequired ? "review" : ""}">${esc(goodsMethod(example.goodsMatchMethod))}</span><p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>${regionGoodsConfirmed ? '<small class="example-region-note">출원인 주소도 이 지역으로 확인됨</small>' : ""}</article>`).join("")}</div>` : `<p class="empty">${examples.length ? `지정상품 근거가 확인된 사례가 아직 없습니다 · 품목명 검색으로만 걸러진 전국 후보 ${number(examples.length)}건은 실제 연관성이 확인되지 않아 표시하지 않습니다.` : "현재 스냅샷에는 개별 상표명이 포함되지 않았습니다."}</p>`}</section></div>`;
+    return `<div class="detail-panel">
+      ${heading}
+      <div class="item-tabs">${region.items.map((row) => `<button type="button" data-region-item="${esc(row.specialtyId || "")}" aria-selected="${item.specialtyId === row.specialtyId}">${esc(itemName(row))}</button>`).join("")}</div>
+      <div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span>${item.itemVerdict?.source === "algorithm" ? `<span class="verdict-chip" title="${esc(verdictTitle(item.itemVerdict))}">AI 판정</span>` : ""}</div>
+      <div class="metric-reading-note"><strong>출원 건수 기준</strong><p><b>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</b>은 출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
+      <div class="detail-grid">
+        <article><span>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</span><strong>${regionalAvailable ? `${number(localCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? `출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원` : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${esc(pendingReason)}`}</small></article>
+        <article><span>그중 등록</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
+        <article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
+      </div>
+      <section class="trademark-examples"><div class="example-heading"><strong>등록원부 지정상품에서 확인된 ${esc(itemName(item))} 출원</strong><span>상표명이 아니라 지정상품명에서 품목명이 직접 확인된 사례입니다 · ${confirmedExamples.length || 0}건</span></div>${confirmedExamples.length ? `<div class="example-list">${confirmedExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${esc(example.applicationNumber || "출원번호 미기록")} · ${esc(example.applicationDate || "출원일 미기록")} · ${esc(example.applicationStatus || "상태 미기록")}</small></div><span class="goods-chip">${esc(goodsMethod(example.goodsMatchMethod))}</span><p>등록원부 지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>${regionGoodsConfirmed ? '<small class="example-region-note">출원인 주소도 이 지역으로 확인됨</small>' : ""}</article>`).join("")}</div>` : `<p class="empty">${examples.length ? `등록원부 지정상품에서 ${esc(itemName(item))} 품목이 확인된 출원 사례가 아직 없습니다. 품목명 검색 후보는 실제 관련성이 확정되지 않아 표시하지 않습니다.` : "현재 스냅샷에는 확인 가능한 지정상품 사례가 없습니다."}</p>`}</section>
+    </div>`;
   }
   function regionsScreen() {
     const keyword = state.query.trim().toLocaleLowerCase("ko-KR");
     const rows = !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => itemName(item).toLocaleLowerCase("ko-KR").includes(keyword)));
     if (!rows.some((region) => regionKey(region) === state.regionKey) && rows[0]) state.regionKey = regionKey(rows[0]);
     const region = selectedRegion(), item = selectedItem(region);
-    return `<section class="screen-section"><div class="screen-heading"><div><h1>지자체별 조회</h1></div><p>지자체별 특산품과 해당 지역 주소로 확인된 상표 출원 현황을 제공합니다.</p></div><section class="workspace"><aside class="region-panel"><div class="panel-heading"><div><h2>지자체 목록</h2></div><span>${rows.length}곳</span></div><label class="search-field"><span class="sr-only">지역 또는 품목 검색</span><input id="region-search" value="${esc(state.query)}" placeholder="지역 또는 품목 검색"></label><div class="region-list">${rows.map((row) => { const available = row.items.filter((entry) => officialItemLabel(entry) && entry.metrics.uniqueTrademarkCount.availability === "available"); const count = available.reduce((sum, entry) => sum + (entry.metrics.uniqueTrademarkCount.value || 0), 0); const coverage = specialtyCoverage([row]); return `<button type="button" data-region="${esc(regionKey(row))}" class="region-button ${regionKey(row) === state.regionKey ? "active" : ""}"><span><strong>${esc(row.region)}</strong><small>특산품 ${coverage.total}개 · 출원 확인 ${coverage.applied}개 · 출원율 ${percent(coverage.rate)}<br>${available.length ? `지역 주소 일치 출원 ${number(count)}건` : "지역 출원 현황 검토중"}</small></span><span class="state state-${esc(row.dataState)}">${esc(labels[row.dataState] || row.dataState)}</span></button>`; }).join("") || '<p class="empty">검색 결과가 없습니다.</p>'}</div></aside>${regionDetail(region, item)}</section></section>`;
+    const groups = new Map();
+    rows.forEach((row) => {
+      const province = row.sido || row.region;
+      const group = groups.get(province) || [];
+      group.push(row);
+      groups.set(province, group);
+    });
+    const grouped = [...groups.entries()]
+      .map(([province, regions]) => ({ province, regions: regions.sort((a, b) => (a.sigungu || a.region).localeCompare(b.sigungu || b.region, "ko-KR")) }))
+      .sort((a, b) => displayRegionName(a.province).localeCompare(displayRegionName(b.province), "ko-KR"));
+    const groupsHtml = grouped.map(({ province, regions }) => {
+      const expanded = Boolean(keyword) || state.expandedRegionProvince === province;
+      const coverage = specialtyCoverage(regions);
+      const municipalities = expanded ? `<div class="region-list municipality-list">${regions.map((row) => { const available = row.items.filter((entry) => officialItemLabel(entry) && entry.metrics.uniqueTrademarkCount.availability === "available"); const count = available.reduce((sum, entry) => sum + (entry.metrics.uniqueTrademarkCount.value || 0), 0); const rowCoverage = specialtyCoverage([row]); const municipalityName = row.sigungu && row.sigungu !== row.sido ? row.sigungu : "시도 전체"; return `<button type="button" data-region="${esc(regionKey(row))}" class="region-button ${regionKey(row) === state.regionKey ? "active" : ""}"><span><strong>${esc(municipalityName)}</strong><small>특산품 ${rowCoverage.total}개 · 출원 확인 ${rowCoverage.applied}개 · 출원율 ${percent(rowCoverage.rate)}<br>${available.length ? `지역 주소 일치 출원 ${number(count)}건` : "지역 출원 현황 검토중"}</small></span><span class="state state-${esc(row.dataState)}">${esc(labels[row.dataState] || row.dataState)}</span></button>`; }).join("")}</div>` : "";
+      return `<section class="province-group"><button type="button" class="province-toggle" data-region-group="${esc(province)}" aria-expanded="${expanded}"><span><strong>${esc(displayRegionName(province))}</strong><small>시군구 ${regions.length}곳 · 특산품 ${coverage.total}개</small></span><b aria-hidden="true">${expanded ? "−" : "+"}</b></button>${municipalities}</section>`;
+    }).join("");
+    return `<section class="screen-section"><div class="screen-heading"><div><h1>지자체별 조회</h1></div><p>시도를 선택하면 시군구별 특산품과 해당 지역 주소로 확인된 상표 출원 현황을 볼 수 있습니다.</p></div><section class="workspace"><aside class="region-panel"><div class="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 ${grouped.length}곳 · 시군구 ${rows.length}곳</span></div><label class="search-field"><span class="sr-only">지역 또는 품목 검색</span><input id="region-search" value="${esc(state.query)}" placeholder="지역 또는 품목 검색"></label><div class="province-list">${groupsHtml || '<p class="empty">검색 결과가 없습니다.</p>'}</div></aside>${regionDetail(region, item)}</section></section>`;
   }
   function itemRows() {
     const rows = new Map();
@@ -266,38 +296,6 @@ function dashboardClient(snapshot, geometry) {
   }
   function itemsScreen() {
     const rows = itemRows(); const ITEM_ROW_LIMIT = 100; const visibleRows = rows.slice(0, ITEM_ROW_LIMIT); return `<section class="screen-section"><div class="screen-heading"><div><h1>품목별 조회</h1></div><p>품목마다 확인 지역과 상표 현황을 카드 한 장에 요약했습니다.</p></div><div class="item-screen"><div class="item-screen-toolbar"><label><span class="sr-only">품목 검색</span><input id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><span>${rows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `검색 결과 ${rows.length}개`}</span></div><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-card-grid">${visibleRows.map((row, index) => { const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const statusClass = pendingRegions === 0 ? "complete" : decidedRegions ? "partial" : "pending"; const statusLabel = pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"; const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return `<article class="item-card"><div class="item-card-head"><div><span class="item-rank">${String(index + 1).padStart(2, "0")}</span><h2>${esc(row.name)}</h2><small>${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips">${row.regions.map((region) => `<span>${esc(region)}</span>`).join("")}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}</article>`; }).join("") || '<p class="empty item-empty">검색 결과가 없습니다.</p>'}</div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
-  }
-  // 지역 출원 미확인 목록은 특산품명, 지정상품 일치 근거, 지역 주소 판정이 모두 갖춰진
-  // 항목만 공개한다. 단순 고시명칭 검색 결과와 미분류 원물명은 공개 목록에서 제외한다.
-  function gapRows() {
-    const confirmed = new Map();
-    let excludedCount = 0;
-    snapshot.regions.forEach((region) => region.items.forEach((item) => {
-      if (!region.regionCode) return;
-      if (item.metrics.uniqueTrademarkCount.availability !== "available") return;
-      if ((item.metrics.uniqueTrademarkCount.value || 0) > 0) return;
-      const officialLabel = officialItemLabel(item);
-      if (!officialLabel) return;
-      const confirmedGoods = item.metrics.confirmedGoodsMatchCount;
-      const hasDesignatedGoodsEvidence = item.matchingBasis === "raw_item_goods_matched" || (confirmedGoods?.availability === "available" && (confirmedGoods.value || 0) > 0);
-      if (!hasDesignatedGoodsEvidence) { excludedCount += 1; return; }
-      const row = confirmed.get(officialLabel) || { name: officialLabel, regions: [] };
-      if (!row.regions.includes(region.region)) row.regions.push(region.region);
-      confirmed.set(officialLabel, row);
-    }));
-    const sortRows = (map) => [...map.values()].sort((a, b) => b.regions.length - a.regions.length || a.name.localeCompare(b.name, "ko-KR"));
-    const keyword = state.gapQuery.trim().toLocaleLowerCase("ko-KR");
-    const matches = (row) => !keyword || row.name.toLocaleLowerCase("ko-KR").includes(keyword) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(keyword));
-    const allConfirmed = sortRows(confirmed);
-    return { confirmed: allConfirmed.filter(matches), totalConfirmed: allConfirmed.length, excludedCount };
-  }
-  function gapItemCard(row, statusLabel) {
-    return `<article class="item-card"><div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.regions.length}개 지역에서 지역 출원 미확인</small></div><span class="item-status pending">${esc(statusLabel)}</span></div><details class="item-regions-detail"><summary>해당 지역 ${row.regions.length}개 보기</summary><div class="region-chips">${row.regions.map((region) => `<span>${esc(region)}</span>`).join("")}</div></details></article>`;
-  }
-  function gapsScreen() {
-    const rows = gapRows();
-    const empty = `<div class="gap-empty item-empty"><strong>현재 공개할 수 있는 지역 출원 미확인 항목이 없습니다.</strong><p>지정상품 근거가 확인되지 않은 후보 ${number(rows.excludedCount)}건은 목록에서 제외했습니다. 지정상품과 지역 귀속 근거가 보완되면 이 목록에 반영됩니다.</p></div>`;
-    return `<section class="screen-section"><div class="screen-heading"><div><h1>지역 출원 미확인</h1></div><p>특산품 지정상품과 지역 귀속 근거를 모두 확인한 항목만 제공합니다.</p></div><div class="compare-banner gap-definition"><span>표시 기준</span><strong>지정상품 일치 · 출원인 주소 판정 완료</strong><p>전국 검색 결과가 있더라도 해당 지역 주소의 출원이 확인되지 않은 경우입니다. 전국에 관련 출원이 없다는 의미는 아니며, 지정상품 근거가 확인되지 않은 품목은 목록에서 제외합니다.</p></div>${rows.totalConfirmed ? `<label class="search-field gap-search"><span class="sr-only">품목 또는 지역 검색</span><input id="gap-search" value="${esc(state.gapQuery)}" placeholder="품목명 또는 지역명 검색"></label>` : ""}<section class="compare-region-section gap-results"><div class="compare-section-head"><div><span>확인 기준 충족</span><h2>지역 주소의 출원이 확인되지 않은 특산품</h2></div><p>품목명과 지정상품 근거가 확인된 결과입니다.</p></div><div class="item-card-grid">${rows.confirmed.map((row) => gapItemCard(row, "지역 출원 미확인")).join("") || empty}</div></section></section>`;
   }
   function dataScreen() {
     if (!pipeline) return '<section class="screen-section"><p class="empty">파이프라인 개요 데이터가 없습니다.</p></section>';
@@ -342,7 +340,7 @@ function dashboardClient(snapshot, geometry) {
   // 피드백에 따라 데이터 개요로 옮김. 그 전에는 모든 탭에 반복 노출하던 것을 정리했었음).
   function criteriaHtml() {
     const rows = [
-      ["품목 매칭", "고시명칭 일치·포함", '지정상품명이 고시상품명칭과 일치하거나 포함되면 특산품 활용 출원으로 인정하고, NICE류만 일치하면 개별 검토로 분리합니다. 다만 등록원부 지정상품 조회가 아직 진행 중이라, 대부분의 "출원 확인" 건수는 품목명 검색어 + 주소 일치까지만 확인된 상태이며 지정상품 근거는 아직 없습니다 — 근거가 확인된 사례는 지자체별 조회의 "지정상품 근거 확인 사례"에서만 봅니다.'],
+      ["품목 관련성 확인", "지정상품명에서 품목명 확인", '등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다. NICE류만 일치하거나 검색어로만 포착된 후보는 확인 사례에 포함하지 않습니다. 대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다.'],
       ["지역 매칭", "법정동코드 완전일치", "국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만"],
       ["상표 검색", "KIPRIS 단어검색(고시명칭 기준)", "검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음. 현재 수치는 각 특산품에 매핑된 고시상품 NICE류 기준입니다. 음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다."],
       ["지역 주소 일치 출원 / 등록 완료", "출원인 주소가 해당 지역으로 확인된 출원만", "등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수입니다. 전국 검색 후보와 주소 미확보 건은 제외합니다."],
@@ -358,23 +356,16 @@ function dashboardClient(snapshot, geometry) {
     document.querySelectorAll("[data-province]").forEach((shape) => { const open = () => { state.province = shape.dataset.province; state.municipality = null; render(); }; shape.onclick = open; shape.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) open(); }; });
     document.querySelectorAll("[data-municipality]").forEach((shape) => { const open = () => { state.municipality = shape.dataset.municipality; const region = snapshot.regions.find((row) => row.sido === state.province && row.sigungu === state.municipality); if (region) state.regionKey = regionKey(region); render(); }; shape.onclick = open; shape.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) open(); }; });
     const back = document.querySelector("#map-back"); if (back) back.onclick = () => { state.province = null; state.municipality = null; render(); };
-    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
-    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
+    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { const region = snapshot.regions.find((row) => regionKey(row) === button.dataset.openRegion); state.expandedRegionProvince = region?.sido || region?.region || null; state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
+    document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { state.expandedRegionProvince = state.expandedRegionProvince === button.dataset.regionGroup ? null : button.dataset.regionGroup; render(); }; });
+    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { const region = snapshot.regions.find((row) => regionKey(row) === button.dataset.region); state.expandedRegionProvince = region?.sido || region?.region || state.expandedRegionProvince; state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
-    bindSearchInput("#gap-search", "gapQuery");
   }
   function render() {
     nav();
-    document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "gaps" ? gapsScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
-    if (state.tab === "regions") {
-      document.querySelectorAll(".detail-grid article").forEach((article) => {
-        if (article.querySelector("span")?.textContent?.trim() === "그중 등록 상태") article.remove();
-      });
-      const metricNote = document.querySelector(".detail-panel .metric-reading-note p");
-      if (metricNote) metricNote.textContent = "전국 검색 결과 전체가 아니라, 출원인 주소가 해당 지역으로 확인된 출원을 지역 수치로 셉니다.";
-    }
+    document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
     bind();
   }
 

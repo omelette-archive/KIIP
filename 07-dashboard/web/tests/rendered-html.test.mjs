@@ -265,15 +265,15 @@ test("renders matching criteria once, on the data overview tab, not on the summa
   // 로직에도 쓰이지 않는 죽은 문구였다(gapScore는 타입에만 존재하고 읽히지 않음) —
   // 사용자 요청으로 검토 후 제거했다. 이 자리를 실제로 쓰이는 매칭 기준으로 대체.
   assert.doesNotMatch(standaloneClientSource, /GI 출처 또는 상표 출원 3건 이상/, "실제로 쓰이지 않는 대표 특산품 판정 기준 문구는 노출되면 안 됨");
-  assert.match(standaloneHtml, /고시명칭 일치·포함/, "품목 매칭 기준이 명시돼야 함");
+  assert.match(standaloneHtml, /지정상품명에서 품목명 확인/, "품목 관련성 확인 기준이 명시돼야 함");
   assert.match(standaloneHtml, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
   assert.match(standaloneHtml, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
-  // 2026-08-21 사용자 지적: "품목 매칭"이 지정상품 검증을 전제로 설명돼 있었지만, 실제로는
+  // 2026-08-21 사용자 지적: 품목 관련성 설명이 지정상품 검증을 전제로 읽혔지만, 실제로는
   // 대부분의 "출원 확인" 건수가 아직 지정상품 근거 없이(품목명 검색+주소 일치만) 집계돼
   // 있어 설명이 실제보다 과신을 준다. 진행 상태를 정직하게 명시해야 한다.
   assert.match(
     standaloneHtml,
-    /대부분의 "출원 확인" 건수는 품목명 검색어 \+ 주소 일치까지만 확인된 상태이며 지정상품 근거는 아직 없습니다/,
+    /대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다/,
     "품목 매칭 기준 설명에 지정상품 미검증 상태에 대한 정직한 안내가 있어야 함",
   );
   // 2026-08-21 사용자 결정: 현행 류 기준(품목에 매핑된 NICE류만 집계)은 유지하고, 서비스류
@@ -414,8 +414,8 @@ test("hides goods-unverified trademark examples instead of showing nationwide ke
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(
     standaloneHtml,
-    /const confirmedExamples = examples\.filter\(\(example\) => \(example\.goodsEvidence\?\.length \|\| 0\) > 0\);/,
-    "상표 사례 목록은 goodsEvidence가 있는 것만 걸러서 렌더링해야 함",
+    /const confirmedExamples = examples\.filter\(\(example\) =>[\s\S]*\["normalized_exact", "normalized_contains"\]\.includes\(example\.goodsMatchMethod\)/,
+    "상표 사례 목록은 지정상품 근거가 있고 품목명이 일치·포함된 것만 렌더링해야 함",
   );
   assert.match(
     standaloneHtml,
@@ -424,8 +424,8 @@ test("hides goods-unverified trademark examples instead of showing nationwide ke
   );
   assert.match(
     standaloneHtml,
-    /지정상품 근거가 확인된 사례가 아직 없습니다/,
-    "지정상품 근거가 없는 품목은 전국 후보를 나열하지 않고 명시적으로 안내해야 함",
+    /등록원부 지정상품에서 .*이 확인된 출원 사례가 아직 없습니다/,
+    "지정상품에서 품목명이 확인되지 않은 경우 전국 후보를 나열하지 않고 안내해야 함",
   );
   assert.doesNotMatch(
     standaloneHtml,
@@ -483,15 +483,20 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수/);
   assert.doesNotMatch(html, /if \(!officialItemLabel\(item\)\) return;\s*total \+= 1/);
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
-  assert.match(html, /article\.querySelector\("span"\).*그중 등록 상태/);
+  assert.doesNotMatch(html, /주소 확인 후보 중 이 지역 비율|지정상품 자동 일치|지정상품 개별 검토|지정상품 근거 확인 사례/);
+  assert.match(html, /출원 건수 기준/);
+  assert.match(html, /등록원부 지정상품에서 확인된 \$\{esc\(itemName\(item\)\)\} 출원/);
+  assert.match(html, /등록원부 지정상품:/);
+  assert.match(html, /class="province-list"/);
+  assert.match(html, /data-region-group=/);
+  assert.match(html, /시도 \$\{grouped\.length\}곳 · 시군구 \$\{rows\.length\}곳/);
+  assert.match(html, /expandedRegionProvince/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.doesNotMatch(html, /class="showcase"|recent-showcase|최근 1년 상표 출원이 많은/, "표본 상표 또는 중복 표본 집계 랭킹을 공개 요약에 표시하면 안 됨");
-  // 2026-08-21: "지역 출원 미확인" 탭 — 품목명·지정상품 일치 근거·지역 주소 판정이 모두
-  // 갖춰진 항목만 보여준다(사용자 요청 — 브랜드명·미분류 원물명 오염 방지).
-  assert.match(html, /지역 출원 미확인/);
-  assert.match(html, /function gapsScreen\(\)/);
-  assert.match(html, /지정상품 일치/);
-  assert.match(html, /id="gap-search"/);
+  // 2026-08-24: 비어 있던 별도 미확인 탭은 제거하고, 품목별 조회의 미출원(검토중)
+  // 상태에서 향후 확장 제안을 이어가도록 화면 구조를 단순화한다.
+  assert.doesNotMatch(html, /지역 출원 미확인|function gapsScreen\(\)|id="gap-search"/);
+  assert.match(html, /미출원\(검토중\)/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /class="compare-readiness"/);
   assert.match(html, /비교 기준 원본 확보 전 · 준비 현황만 확인 가능/);
