@@ -436,8 +436,8 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   );
   assert.match(
     standaloneHtml,
-    /<div class="item-tabs">\$\{region\.items\.map\(\(row\) => `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}">\$\{esc\(itemName\(row\)\)\}<\/button>`\)/,
-    "특산품 탭은 region.items 전체를 아무 표시 없이 렌더링해야 함",
+    /return region\.items\.map\(\(row\) => \{ const value = row\.metrics\.uniqueTrademarkCount\.value \|\| 0; return `<button type="button" data-region-item="\$\{esc\(row\.specialtyId \|\| ""\)\}" aria-selected="\$\{item\.specialtyId === row\.specialtyId\}"/,
+    "특산품 탭은 region.items 전체를 렌더링해야 함(2026-08-24: 출원건수 기반 태그 클라우드로 변경, #112)",
   );
   assert.doesNotMatch(
     standaloneHtml,
@@ -516,6 +516,25 @@ test("resolves a municipality shape to its region even when the map's stale boun
     standaloneHtml,
     /snapshot\.regions\.find\(\(row\) => row\.sido === state\.province && row\.sigungu === shape\.name\)/,
     "지도 클릭 핸들러가 findMunicipalityRegion을 거치지 않고 sido 정확 일치만 쓰면 안 됨",
+  );
+});
+
+test("sizes region/item tag clouds by application count instead of listing them plainly", async () => {
+  // 이슈 #112: 지자체별 조회의 품목 목록, 품목별 조회의 지역 목록을 리스트 대신
+  // 출원건수 기반 태그 클라우드(글자 크기 비례)로 바꿔달라는 요청. 정확한 크기 비교
+  // 정확도가 막대그래프보다 낮다는 걸 안내했지만 사용자가 요청대로 진행을 선택함.
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(
+    standaloneHtml,
+    /const wordCloudFontSize = \(value, max\) => \{/,
+    "출원건수를 글자 크기로 변환하는 공용 헬퍼가 있어야 함",
+  );
+  assert.match(standaloneHtml, /class="item-tabs word-cloud"/, "지자체별 조회의 품목 탭이 태그 클라우드여야 함");
+  assert.match(standaloneHtml, /class="region-chips word-cloud"/, "품목별 조회의 지역 목록이 태그 클라우드여야 함");
+  assert.match(
+    standaloneHtml,
+    /style="font-size:\$\{wordCloudFontSize\(value, max\)\}px"/,
+    "각 태그의 font-size는 인라인 style로 출원건수에 비례해 지정해야 함",
   );
 });
 
