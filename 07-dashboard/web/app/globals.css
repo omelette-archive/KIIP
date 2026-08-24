@@ -216,6 +216,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-insight { padding: 25px; }
 .map-insight h2 { margin: 0; font-size: 29px; letter-spacing: -.04em; }
 .insight-summary { margin: 8px 0 20px; color: var(--muted); font-size: 11px; }
+.metric-count-hero { display: flex; align-items: center; gap: 20px; min-height: 128px; margin: 14px 0 4px; }
+.metric-count-hero > strong { min-width: 112px; color: var(--green-dark); font-size: 48px; line-height: 1; letter-spacing: -.055em; }
+.metric-count-hero > strong em { margin-left: 5px; color: var(--muted); font-size: 17px; font-style: normal; letter-spacing: 0; }
+.mini-list-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 18px 0 9px; }
+.mini-list-heading strong { font-size: 11px; }
+.mini-list-heading span { color: var(--faint); font-size: 9px; }
 .mini-list { display: grid; gap: 8px; }
 .mini-list button { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 13px; border: 1px solid var(--line); border-radius: 11px; background: #f4f6f9; color: inherit; text-align: left; cursor: pointer; }
 .mini-list button:hover { border-color: #a4c3e0; background: var(--green-soft); }

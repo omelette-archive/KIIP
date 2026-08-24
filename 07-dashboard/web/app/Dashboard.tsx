@@ -122,14 +122,14 @@ function regionKey(region: Region) { return region.regionCode || region.region; 
 function fill(value: number | null, max: number) { if (value === null) return "#e3e6ec"; const ratio = Math.max(0.12, Math.min(1, max ? value / max : 0)); return `color-mix(in srgb, #0f5fa6 ${Math.round(24 + ratio * 68)}%, #e9eef4)`; }
 // 2026-08-21: 출원율을 텍스트로만 보여주지 말고 큰 숫자 + 원형 게이지로 한눈에
 // 보여달라는 요청(사용자) — 지도 옆 요약 패널과 지역별 출원율 탭 양쪽에서 공유한다.
-function RateRing({ value, size = 128, strokeWidth = 12 }: { value: number | null; size?: number; strokeWidth?: number }) {
+function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: { value: number | null; label?: string; size?: number; strokeWidth?: number }) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const ratio = value === null ? 0 : Math.max(0, Math.min(1, value));
   const offset = circumference * (1 - ratio);
   const center = size / 2;
   return (
-    <svg className="rate-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`출원율 ${percent(value)}`}>
+    <svg className="rate-ring" width={size} height={size} viewBox={`0 0 ${size} ${size}`} role="img" aria-label={`${label} ${percent(value)}`}>
       <circle className="rate-ring-track" cx={center} cy={center} r={radius} strokeWidth={strokeWidth} fill="none" />
       {value !== null && <circle className="rate-ring-fill" cx={center} cy={center} r={radius} strokeWidth={strokeWidth} fill="none" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" transform={`rotate(-90 ${center} ${center})`} />}
       <text className="rate-ring-label" x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">{percent(value)}</text>
@@ -268,7 +268,25 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   const visibleItems = visibleRegions.flatMap((region) => region.items.flatMap((item) => {
     const label = officialItemLabel(item);
     return label ? [{ region, item, label }] : [];
-  })).sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
+  }));
+  const visibleTrademarkCount = visibleItems.reduce((sum, { item }) => item.metrics.uniqueTrademarkCount.availability === "available" ? sum + (item.metrics.uniqueTrademarkCount.value || 0) : sum, 0);
+  const visibleRegisteredCount = visibleItems.reduce((sum, { item }) => item.metrics.registeredTrademarkCount.availability === "available" ? sum + (item.metrics.registeredTrademarkCount.value || 0) : sum, 0);
+  const visibleRegistrationRate = visibleTrademarkCount ? visibleRegisteredCount / visibleTrademarkCount : null;
+  const visibleInsightItems = [...visibleItems].sort((a, b) => {
+    if (mapMetric === "registration") return (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0);
+    if (mapMetric === "coverage") return `${a.region.region} ${a.label}`.localeCompare(`${b.region.region} ${b.label}`, "ko-KR");
+    return (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0);
+  });
+  const insightListLabel = mapMetric === "coverage" ? "수집 특산품 예시" : mapMetric === "trademarks" ? "상표 출원 상위 특산품" : mapMetric === "registration" ? "등록 상위 특산품" : "특산품별 출원 확인 현황";
+  function insightItemValue(item: Item) {
+    const available = item.metrics.uniqueTrademarkCount.availability === "available";
+    const filed = item.metrics.uniqueTrademarkCount.value || 0;
+    if (mapMetric === "coverage") return "수집 항목";
+    if (!available) return "지역별 집계 대기";
+    if (mapMetric === "trademarks") return `상표 ${number(filed)}건`;
+    if (mapMetric === "registration") return filed ? `등록 ${number(item.metrics.registeredTrademarkCount.value || 0)}건 · ${percent(item.metrics.registrationRate.value)}` : "등록 대상 출원 없음";
+    return filed > 0 ? `출원 확인 · ${number(filed)}건` : "미출원(검토중)";
+  }
   const RANKING_LIMIT = 10;
   const rankingCandidates = snapshot.regions.flatMap((region) => region.items.flatMap((item) => {
     const label = officialItemLabel(item);
@@ -323,7 +341,16 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
           </>}{activeMapLabels.map((label) => label.leader ? <g className="map-region-label map-region-label-callout" key={`${label.name}-label`}><polyline points={`${label.targetX},${label.targetY} ${(label.targetX + label.x) / 2},${(label.targetY + label.y) / 2} ${label.x + 22},${label.y + 4}`} /><text x={label.x} y={label.y} className="map-label map-label-province">{label.displayName}</text></g> : <text key={`${label.name}-label`} x={label.x} y={label.y} className={municipalityGeometry ? "map-label map-label-municipality" : "map-label map-label-province"}>{label.displayName}</text>)}</svg></div>
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div>
         </div>
-        <aside className="map-insight"><h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")}</h2><div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>{selectedProvince && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}<div className="mini-list">{visibleItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)} · NICE {item.niceClass}류</small></span><b>{item.metrics.uniqueTrademarkCount.availability === "available" ? (item.metrics.uniqueTrademarkCount.value || 0) > 0 ? `출원 확인 · ${number(item.metrics.uniqueTrademarkCount.value)}건` : "출원 없음 · 판정 완료" : "지역별 집계 대기"}</b></button>)}{visibleItems.length === 0 && <p className="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>}</div></aside>
+        <aside className="map-insight">
+          <h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")}</h2>
+          {mapMetric === "applicationCoverage" && <div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} label="출원율" /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>}
+          {mapMetric === "registration" && <div className="rate-hero"><RateRing value={visibleRegistrationRate} label="등록률" /><div className="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 {number(visibleTrademarkCount)}건 중 등록 {number(visibleRegisteredCount)}건</small></div></div>}
+          {mapMetric === "coverage" && <div className="metric-count-hero"><strong>{number(visibleSpecialtyCoverage.total)}<em>개</em></strong><div className="rate-hero-detail"><span>특산품 수</span><small>현재 선택 지역에서 수집된 지역×특산품 항목입니다.</small></div></div>}
+          {mapMetric === "trademarks" && <div className="metric-count-hero"><strong>{number(visibleTrademarkCount)}<em>건</em></strong><div className="rate-hero-detail"><span>상표 건수</span><small>출원인 주소가 현재 선택 지역과 일치한 고유 상표 출원입니다.</small></div></div>}
+          {selectedProvince && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}
+          <div className="mini-list-heading"><strong>{insightListLabel}</strong><span>최대 5개</span></div>
+          <div className="mini-list">{visibleInsightItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)} · NICE {item.niceClass}류</small></span><b>{insightItemValue(item)}</b></button>)}{visibleInsightItems.length === 0 && <p className="empty">이 지역에는 고시명칭이 확인된 특산품이 없습니다.</p>}</div>
+        </aside>
       </section>
       <section className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
         <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>

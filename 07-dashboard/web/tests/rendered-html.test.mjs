@@ -93,6 +93,16 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, />등록률<\/button>/);
   assert.match(html, /지역 주소 일치 출원 중 등록 상태인 건의 비율입니다/);
   assert.match(html, /현재 스냅샷에 수집된 지역×특산품 수입니다/);
+  const mapInsightStart = html.indexOf('class="map-insight"');
+  const mapInsightEnd = html.indexOf("</aside>", mapInsightStart);
+  const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
+  assert.match(mapInsight, /class="metric-count-hero"/, "기본 특산품 수 지표는 원형 비율 대신 큰 숫자로 보여야 함");
+  assert.doesNotMatch(mapInsight, /class="rate-ring"/, "특산품 수를 비율 원형 게이지로 표시하면 안 됨");
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
+  assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
+  assert.match(standaloneHtml, /metric-count-hero[\s\S]*특산품 수[\s\S]*상표 건수/);
+  assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
   // 집계 대기 품목도 전체 1,692개 분모에 포함하며, 확인이 진행되면 값이 올라간다.
   assert.match(html, /아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로/);
   assert.doesNotMatch(html, />수집 범위<|>브랜드 공백|상표 활용 여지|출원인 주소-대상 지역 일치/);
@@ -114,7 +124,7 @@ test("keeps trademark-like raw labels out of the map specialty summary", async (
   const rankingStart = html.indexOf('class="ranking"');
   const rankingEnd = html.indexOf("</section>", rankingStart);
   const ranking = html.slice(rankingStart, rankingEnd);
-  assert.match(insight, /감말랭이/, "the map summary should show a confirmed specialty label");
+  assert.match(insight, /고시명칭/, "the map summary should show confirmed specialty labels with their notice basis");
   assert.doesNotMatch(insight, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as map specialties");
   assert.doesNotMatch(ranking, /마춤 쌀|임금님표/, "raw brand-like or trademark example labels must not be presented as ranked specialties");
   assert.doesNotMatch(html, /class="showcase"/, "unverified trademark samples should not be promoted on the summary screen");
