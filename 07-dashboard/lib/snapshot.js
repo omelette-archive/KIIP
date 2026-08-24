@@ -341,6 +341,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             applicationNumber: clean(example.applicationNumber) || null,
             applicationDate: clean(example.applicationDate) || null,
             applicationStatus: clean(example.applicationStatus) || null,
+            statusCategory: clean(example.statusCategory) || null,
+            applicantRegionMatch: clean(example.applicantRegionMatch) || null,
             goodsMatchMethod: clean(example.goodsMatchMethod) || "unverified",
             goodsReviewRequired: Boolean(example.goodsReviewRequired),
             goodsEvidence: Array.isArray(example.goodsEvidence) ? example.goodsEvidence : [],

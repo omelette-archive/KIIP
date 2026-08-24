@@ -3,9 +3,14 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const snapshotUrl = new URL("../public/data/dashboard-snapshot.json", import.meta.url);
+const registrationExamplesUrl = new URL("../public/data/verified-registration-examples.json", import.meta.url);
 
 async function loadSnapshot() {
   return JSON.parse(await readFile(snapshotUrl, "utf8"));
+}
+
+async function loadRegistrationExamples() {
+  return JSON.parse(await readFile(registrationExamplesUrl, "utf8"));
 }
 
 function specialtyCoverage(snapshot) {
@@ -410,11 +415,7 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   );
 });
 
-test("hides goods-unverified trademark examples instead of showing nationwide keyword noise", async () => {
-  // 2026-08-21 사용자 지적: "전국 검색 상표 사례"가 품목명 검색어만 겹치는 무관한 상표
-  // (예: 해&들米 품목에 "고춧가루 전문 기업 하남댁 명가"가 뜸)까지 그대로 보여줘 혼란을
-  // 준다. 지정상품 근거(goodsEvidence)가 실제로 확인된 사례만 보여주고, 하나도 없으면
-  // 전국 후보를 나열하지 않고 명시적으로 "근거 없음"이라고 밝혀야 한다.
+test("shows registered regional examples without nationwide keyword noise", async () => {
   const snapshot = await loadSnapshot();
   const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
   const haeDeulMi = goseong.items.find((item) => item.itemName === "해&들米");
@@ -426,19 +427,25 @@ test("hides goods-unverified trademark examples instead of showing nationwide ke
   const chikso = goseong.items.find((item) => item.itemName === "칡소");
   assert.ok(chikso && chikso.matchingBasis === "raw_item_goods_matched" && chikso.trademarkExamples.some((example) => (example.goodsEvidence || []).length > 0),
     "칡소는 raw_item_goods_matched이고 지정상품 근거가 있어야 이 테스트가 의미가 있음");
+  const registrationExamples = await loadRegistrationExamples();
+  const gimcheonGrape = registrationExamples.entries.find((entry) => entry.region === "경상북도 김천시" && entry.itemName === "포도");
+  assert.equal(gimcheonGrape.examples.length, 4);
+  assert.ok(gimcheonGrape.examples.every((example) => example.statusCategory === "registered" && example.applicantRegionMatch === "inside"));
 
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(
     standaloneHtml,
-    /const confirmedExamples = examples\.filter\(\(example\) =>[\s\S]*\["normalized_exact", "normalized_contains"\]\.includes\(example\.goodsMatchMethod\)/,
-    "상표 사례 목록은 지정상품 근거가 있고 품목명이 일치·포함된 것만 렌더링해야 함",
+    /const registeredExamples = examples\.filter\(\(example\) =>[\s\S]*example\.applicantRegionMatch === "inside"/,
+    "상표 사례 목록은 등록 상태와 지역 주소 일치를 기준으로 렌더링해야 함",
   );
   assert.match(
     standaloneHtml,
     /const regionGoodsConfirmed = item\.matchingBasis === "raw_item_goods_matched";/,
     "raw_item_goods_matched 항목은 이미 지역 주소 일치까지 확인된 사례라는 것을 표시할 수 있어야 함",
   );
-  assert.match(standaloneHtml, /확인된 등록 사례가 없습니다/, "등록원부 확인 사례가 없으면 짧은 등록 사례 안내를 보여야 함");
+  assert.match(standaloneHtml, /마음을 담은 청개구리 포도원/);
+  assert.match(standaloneHtml, /4020150073635/);
+  assert.doesNotMatch(standaloneHtml, /상세 사례 미연결/);
   assert.doesNotMatch(standaloneHtml, /확인된 출원 사례|품목명 검색 후보는 실제 관련성이 확정되지 않아 표시하지 않습니다/);
   assert.doesNotMatch(
     standaloneHtml,
@@ -484,7 +491,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /등록률/);
   assert.doesNotMatch(html, />수집 범위<|>브랜드 공백|상표 활용 여지/);
   assert.match(html, /지역 확인 출원/);
-  assert.match(html, /그중 등록/);
+  assert.match(html, /등록 건수/);
+  assert.doesNotMatch(html, /그중 등록/);
   assert.match(html, /지역별 집계 대기/);
   assert.match(html, /class="item-card-grid"/);
   assert.match(html, /지역 확인 전 전국 검색 후보/);
@@ -499,7 +507,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /주소 확인 후보 중 이 지역 비율|지정상품 자동 일치|지정상품 개별 검토|지정상품 근거 확인 사례/);
   assert.match(html, /출원 건수 기준/);
   assert.match(html, /\$\{esc\(itemName\(item\)\)\} 등록 사례/);
-  assert.match(html, /등록원부 지정상품 확인 · \$\{confirmedExamples\.length \|\| 0\}건/);
+  assert.match(html, /등록 \$\{number\(registeredCount\)\}건 중 사례 \$\{number\(registeredExamples\.length\)\}건/);
+  assert.match(html, /등록 항목이 확인되지 않았습니다/);
   assert.match(html, /지정상품:/);
   assert.doesNotMatch(html, /등록원부 지정상품에서 확인된 .* 출원|상표명이 아니라 지정상품명에서 품목명이 직접 확인된 사례입니다/);
   assert.match(html, /class="province-list"/);

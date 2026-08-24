@@ -128,6 +128,15 @@ function selectTrademarkExamples(examples, limit) {
       selected.push(row);
     }
   };
+  // The dashboard uses these examples to substantiate the regional registered count.
+  // Keep registered, in-region records even when they are older than recent filings.
+  const registeredInside = recent.filter(
+    (row) =>
+      clean(row.applicantRegionMatch).toLowerCase() === "inside" &&
+      (clean(row.statusCategory).toLowerCase() === "registered" ||
+        statusCategory(row.applicationStatus) === "registered")
+  );
+  for (const row of registeredInside) add(row);
   for (const row of evidence.slice(0, Math.min(3, max))) add(row);
   for (const row of recent) add(row);
   return selected.sort(
@@ -374,6 +383,8 @@ function finalizeBucket(bucket, options) {
       applicationDate: clean(hit.applicationDate) || null,
       applicant: clean(hit.applicant) || null,
       applicationStatus: clean(hit.applicationStatus) || null,
+      statusCategory: status,
+      applicantRegionMatch: applicantRegion,
       goodsMatchMethod: clean(hit.goodsMatchMethod) || "unverified",
       goodsReviewRequired: Boolean(hit.goodsReviewRequired),
       goodsEvidence: Array.isArray(hit.goodsEvidence) ? hit.goodsEvidence.slice(0, 3) : [],

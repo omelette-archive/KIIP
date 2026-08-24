@@ -3,7 +3,8 @@
 import { useMemo, useState } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
-type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicationStatus: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
+type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicant?: string | null; applicationStatus: string | null; statusCategory?: string | null; applicantRegionMatch?: string | null; niceClass?: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
+type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string; sourceUrl: string; entries: { region: string; specialtyId: string | null; itemName: string; query: string; examples: TrademarkExample[] }[] };
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
@@ -127,7 +128,6 @@ function tradeDisplay(item: Item): { value: number | null; provisional: boolean 
   const nationwide = item.metrics.nationwideSearchTrademarkCount;
   return typeof nationwide?.value === "number" ? { value: nationwide.value, provisional: true } : { value: null, provisional: false };
 }
-function goodsMethod(method: string) { return ({ normalized_exact: "품목명 일치", normalized_contains: "품목명 포함", class_only: "품목명 미확인", mismatch: "지정상품 불일치", unverified: "미확인" } as Record<string, string>)[method] || method; }
 function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`; }
 function regionKey(region: Region) { return region.regionCode || region.region; }
 function fill(value: number | null, max: number) { if (value === null) return "#e3e6ec"; const ratio = Math.max(0.12, Math.min(1, max ? value / max : 0)); return `color-mix(in srgb, #0f5fa6 ${Math.round(24 + ratio * 68)}%, #e9eef4)`; }
@@ -167,7 +167,7 @@ function regionalMetricPendingReason(item: Item) {
   return "지역별 출원 현황을 추가로 확인하고 있습니다.";
 }
 
-export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; geometry: MapGeometry }) {
+export default function Dashboard({ snapshot, geometry, registrationExamples }: { snapshot: Snapshot; geometry: MapGeometry; registrationExamples: VerifiedRegistrationExamples }) {
   const [tab, setTab] = useState<Tab>("summary");
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
@@ -409,7 +409,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
             </section>;
           })}{groupedRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div>
         </aside>
-        <RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} />
+        <RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} verifiedExamples={registrationExamples.entries.find((entry) => entry.region === selectedRegion.region && entry.specialtyId === selectedItem?.specialtyId)?.examples || []} />
       </section>
     </section>}
 
@@ -461,7 +461,7 @@ export default function Dashboard({ snapshot, geometry }: { snapshot: Snapshot; 
   </main>;
 }
 
-function RegionDetail({ region, item, onItem }: { region: Region; item: Item | undefined; onItem: (id: string) => void }) {
+function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Region; item: Item | undefined; onItem: (id: string) => void; verifiedExamples: TrademarkExample[] }) {
   const heading = <div className="detail-heading"><div><h2>{region.region}</h2><p>법정동코드 {region.regionCode || "미확정"}</p></div><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></div>;
   if (!item) {
     return <div className="detail-panel">
@@ -470,19 +470,18 @@ function RegionDetail({ region, item, onItem }: { region: Region; item: Item | u
       <p className="empty">이 지역에는 등록된 특산품 데이터가 없습니다.</p>
     </div>;
   }
-  const examples = item.trademarkExamples || [];
-  // 2026-08-21 감사: 검색어(품목명) 일치만으로 걸러진 전국 상표 후보를 "사례"로 보여주면
-  // 실제로는 무관한 상표(예: "고춧가루 전문 기업 하남댁 명가")까지 섞여 나온다(사용자 지적).
-  // 등록원부 지정상품 근거(goodsEvidence)가 실제로 확인된 사례만 보여준다.
-  // matchingBasis=raw_item_goods_matched(2026-08-20 AI 검토, 커밋 119a1a2)는 이 근거 확보
-  // 과정에서 출원인 주소 지역 일치까지 이미 확인된 것만 골랐으므로 별도 표시를 붙인다.
-  const confirmedExamples = examples.filter((example) =>
-    (example.goodsEvidence?.length || 0) > 0 &&
-    ["normalized_exact", "normalized_contains"].includes(example.goodsMatchMethod)
-  );
   const regionGoodsConfirmed = item.matchingBasis === "raw_item_goods_matched";
+  const examples = [...verifiedExamples, ...(item.trademarkExamples || [])]
+    .filter((example, index, rows) => rows.findIndex((row) => row.applicationNumber === example.applicationNumber) === index);
+  const registeredExamples = examples.filter((example) => {
+    const registered = example.statusCategory === "registered" || (example.applicationStatus || "").includes("등록");
+    const local = example.applicantRegionMatch === "inside" ||
+      (regionGoodsConfirmed && (example.goodsEvidence?.length || 0) > 0 && ["normalized_exact", "normalized_contains"].includes(example.goodsMatchMethod));
+    return registered && local;
+  }).slice(0, 10);
   const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
   const localCount = item.metrics.uniqueTrademarkCount.value || 0;
+  const registeredCount = item.metrics.registeredTrademarkCount.value || 0;
   const pendingReason = regionalMetricPendingReason(item);
   return <div className="detail-panel">
     {heading}
@@ -491,9 +490,9 @@ function RegionDetail({ region, item, onItem }: { region: Region; item: Item | u
     <div className="metric-reading-note"><strong>출원 건수 기준</strong><p><b>{region.sigungu || region.region} {itemName(item)} 출원</b>은 출원인 주소가 {region.region}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
     <div className="detail-grid">
       <article><span>{region.sigungu || region.region} {itemName(item)} 출원</span><strong>{regionalAvailable ? `${number(localCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? `출원인 주소가 ${region.region}으로 확인된 고유 출원` : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${pendingReason}`}</small></article>
-      <article><span>그중 등록</span><strong>{regionalAvailable ? `${number(item.metrics.registeredTrademarkCount.value || 0)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(item.metrics.registeredTrademarkCount.value || 0)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
+      <article><span>등록 건수</span><strong>{regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
-    <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록원부 지정상품 확인 · {confirmedExamples.length || 0}건</span></div>{confirmedExamples.length ? <div className="example-list">{confirmedExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{example.applicationNumber || "출원번호 미기록"} · {example.applicationDate || "출원일 미기록"} · {example.applicationStatus || "상태 미기록"}</small></div><span className="goods-chip">{goodsMethod(example.goodsMatchMethod)}</span><p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>{regionGoodsConfirmed && <small className="example-region-note">지역 주소 일치</small>}</article>)}</div> : <p className="empty">확인된 등록 사례가 없습니다.</p>}</section>
+    <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small></article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;
 }

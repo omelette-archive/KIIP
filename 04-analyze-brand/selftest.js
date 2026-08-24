@@ -604,6 +604,34 @@ console.log("0) 상표 사례는 최신순을 유지하면서 지정상품 근�
   ok("최근 사례가 10건을 넘더라도 지정상품 확정 근거 최소 1건은 사례 목록에 포함");
 }
 
+console.log("9-1) 과거 지역 등록 사례를 최신 출원보다 우선 보존");
+{
+  const recent = Array.from({ length: 12 }, (_, index) => ({
+    title: `최신-출원-${index}`,
+    applicationNumber: `P-${index}`,
+    applicationDate: `2026${String(12 - index).padStart(2, "0")}01`,
+    applicationStatus: "출원",
+    statusCategory: "pending",
+    applicantRegionMatch: "inside",
+    goodsMatchMethod: "unverified",
+    goodsEvidence: [],
+  }));
+  const oldRegistered = {
+    title: "과거-지역-등록",
+    applicationNumber: "REG-OLD-1",
+    applicationDate: "20150101",
+    applicationStatus: "등록",
+    statusCategory: "registered",
+    applicantRegionMatch: "inside",
+    goodsMatchMethod: "unverified",
+    goodsEvidence: [],
+  };
+  const selected = selectTrademarkExamples([...recent, oldRegistered], 10);
+  assert.strictEqual(selected.length, 10);
+  assert.ok(selected.some((row) => row.applicationNumber === "REG-OLD-1"));
+  ok("최신 출원 10건이 있어도 과거 지역 등록 사례를 보존");
+}
+
 console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론적으로 재적용");
 {
   const analysis = analyzeEntries([

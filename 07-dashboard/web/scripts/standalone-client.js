@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars -- embedded and invoked by dashboard.html */
-function dashboardClient(snapshot, geometry) {
+function dashboardClient(snapshot, geometry, registrationExamples) {
   const labels = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "검토중", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
   const tabs = { summary: "요약", applications: "지역별 출원율", regions: "지자체별 조회", items: "품목별 조회", compare: "특화작목 비교", data: "데이터 개요" };
   const mapLabels = { coverage: "특산품 수", trademarks: "상표 건수", applicationCoverage: "출원율", registration: "등록률" };
@@ -75,7 +75,6 @@ function dashboardClient(snapshot, geometry) {
     const nationwide = item.metrics.nationwideSearchTrademarkCount;
     return typeof nationwide?.value === "number" ? { value: nationwide.value, provisional: true } : { value: null, provisional: false };
   };
-  const goodsMethod = (method) => ({ normalized_exact: "품목명 일치", normalized_contains: "품목명 포함", class_only: "품목명 미확인", mismatch: "지정상품 불일치", unverified: "미확인" })[method] || method;
   const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
   // 2026-08-21: 대전·대구·부산·울산·인천광역시, 전남광주통합특별시는 원본 소스(농사로)에
@@ -263,12 +262,16 @@ function dashboardClient(snapshot, geometry) {
     if (!item) {
       return `<div class="detail-panel">${heading}<div class="item-tabs" role="tablist"></div><p class="empty">이 지역에는 등록된 특산품 데이터가 없습니다.</p></div>`;
     }
-    const examples = item.trademarkExamples || [];
-    const confirmedExamples = examples.filter((example) =>
-      (example.goodsEvidence?.length || 0) > 0 &&
-      ["normalized_exact", "normalized_contains"].includes(example.goodsMatchMethod)
-    );
     const regionGoodsConfirmed = item.matchingBasis === "raw_item_goods_matched";
+    const verifiedExamples = registrationExamples.entries.find((entry) => entry.region === region.region && entry.specialtyId === item.specialtyId)?.examples || [];
+    const examples = [...verifiedExamples, ...(item.trademarkExamples || [])]
+      .filter((example, index, rows) => rows.findIndex((row) => row.applicationNumber === example.applicationNumber) === index);
+    const registeredExamples = examples.filter((example) => {
+      const registered = example.statusCategory === "registered" || (example.applicationStatus || "").includes("등록");
+      const local = example.applicantRegionMatch === "inside" ||
+        (regionGoodsConfirmed && (example.goodsEvidence?.length || 0) > 0 && ["normalized_exact", "normalized_contains"].includes(example.goodsMatchMethod));
+      return registered && local;
+    }).slice(0, 10);
     const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
     const localCount = item.metrics.uniqueTrademarkCount.value || 0;
     const registeredCount = item.metrics.registeredTrademarkCount.value || 0;
@@ -280,10 +283,10 @@ function dashboardClient(snapshot, geometry) {
       <div class="metric-reading-note"><strong>출원 건수 기준</strong><p><b>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</b>은 출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
       <div class="detail-grid">
         <article><span>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</span><strong>${regionalAvailable ? `${number(localCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? `출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원` : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${esc(pendingReason)}`}</small></article>
-        <article><span>그중 등록</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
+        <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
         <article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
-      <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록원부 지정상품 확인 · ${confirmedExamples.length || 0}건</span></div>${confirmedExamples.length ? `<div class="example-list">${confirmedExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${esc(example.applicationNumber || "출원번호 미기록")} · ${esc(example.applicationDate || "출원일 미기록")} · ${esc(example.applicationStatus || "상태 미기록")}</small></div><span class="goods-chip">${esc(goodsMethod(example.goodsMatchMethod))}</span><p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>${regionGoodsConfirmed ? '<small class="example-region-note">지역 주소 일치</small>' : ""}</article>`).join("")}</div>` : '<p class="empty">확인된 등록 사례가 없습니다.</p>'}</section>
+      <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small></article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;
   }
   function regionsScreen() {

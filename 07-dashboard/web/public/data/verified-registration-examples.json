@@ -1,0 +1,71 @@
+{
+  "schemaVersion": "verified-registration-examples-v1",
+  "verifiedAt": "2026-08-24",
+  "sourceUrl": "https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark",
+  "entries": [
+    {
+      "region": "경상북도 김천시",
+      "specialtyId": "sp-v1-04707e21c5d54133",
+      "itemName": "포도",
+      "query": "TN=[포도]*TC=[31]*AP=[김천]",
+      "examples": [
+        {
+          "title": "마음을 담은 청개구리 포도원",
+          "applicationNumber": "4020150073635",
+          "applicationDate": null,
+          "applicant": "신희철",
+          "applicationStatus": "등록",
+          "statusCategory": "registered",
+          "applicantRegionMatch": "inside",
+          "regionMatchBasis": "kipris_applicant_query",
+          "niceClass": "31",
+          "goodsMatchMethod": "class_only",
+          "goodsReviewRequired": false,
+          "goodsEvidence": []
+        },
+        {
+          "title": "덕촌놈포도 그때 그시절 귀했던 포도가 달콤함을 가득 담아 찾아왔습니다.",
+          "applicationNumber": "4020220150128",
+          "applicationDate": null,
+          "applicant": "이윤기",
+          "applicationStatus": "등록",
+          "statusCategory": "registered",
+          "applicantRegionMatch": "inside",
+          "regionMatchBasis": "kipris_applicant_query",
+          "niceClass": "31",
+          "goodsMatchMethod": "class_only",
+          "goodsReviewRequired": false,
+          "goodsEvidence": []
+        },
+        {
+          "title": "먹고시포도",
+          "applicationNumber": "4020220143842",
+          "applicationDate": null,
+          "applicant": "조아람",
+          "applicationStatus": "등록",
+          "statusCategory": "registered",
+          "applicantRegionMatch": "inside",
+          "regionMatchBasis": "kipris_applicant_query",
+          "niceClass": "31",
+          "goodsMatchMethod": "class_only",
+          "goodsReviewRequired": false,
+          "goodsEvidence": []
+        },
+        {
+          "title": "마녀포도",
+          "applicationNumber": "4020200149096",
+          "applicationDate": null,
+          "applicant": "최장호",
+          "applicationStatus": "등록",
+          "statusCategory": "registered",
+          "applicantRegionMatch": "inside",
+          "regionMatchBasis": "kipris_applicant_query",
+          "niceClass": "31",
+          "goodsMatchMethod": "class_only",
+          "goodsReviewRequired": false,
+          "goodsEvidence": []
+        }
+      ]
+    }
+  ]
+}

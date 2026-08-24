@@ -51,6 +51,8 @@ function bucket(overrides = {}) {
       applicationNumber: "40-2025-0000001",
       applicationDate: "20250102",
       applicationStatus: "등록",
+      statusCategory: "registered",
+      applicantRegionMatch: "inside",
       goodsMatchMethod: "normalized_exact",
       goodsReviewRequired: false,
       goodsEvidence: [{ classCode: "31", designatedProductName: "신선한 사과" }],
@@ -274,6 +276,8 @@ assert.strictEqual(andong.items[0].metrics.gapScore.blockingIssue, "#29");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.availability, "preview");
 assert.strictEqual(andong.items[0].metrics.confirmedGoodsMatchCount.blockingIssue, "#12");
 assert.strictEqual(andong.items[0].trademarkExamples[0].title, "사과애");
+assert.strictEqual(andong.items[0].trademarkExamples[0].statusCategory, "registered");
+assert.strictEqual(andong.items[0].trademarkExamples[0].applicantRegionMatch, "inside");
 assert.strictEqual(
   andong.items[0].trademarkExamples[0].goodsEvidence[0].designatedProductName,
   "신선한 사과"

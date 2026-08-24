@@ -167,6 +167,8 @@ function examples(apps, limit) {
       applicationDate: app.applicationDate,
       applicant: null,
       applicationStatus: app.applicationStatus,
+      statusCategory: statusCategory(app.applicationStatus),
+      applicantRegionMatch: "inside",
       goodsMatchMethod: app.goodsMatchMethod,
       goodsReviewRequired: false,
       goodsEvidence: app.designatedProducts.map((product) => ({
