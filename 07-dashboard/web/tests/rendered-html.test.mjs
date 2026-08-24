@@ -141,6 +141,26 @@ test("keeps trademark-like raw labels out of the map specialty summary", async (
   assert.doesNotMatch(html, /class="showcase"/, "unverified trademark samples should not be promoted on the summary screen");
 });
 
+test("shows every collected specialty in the map preview, not just officially-named ones", async () => {
+  // 이슈 #111: 지역 특산품 수(예: 고성군 20개)와 요약 페이지 미리보기에 뜨는 개수가 안
+  // 맞아 보인다는 지적 — 고시명칭 미확정 원물명(raw_item_name_unclassified)을 미리보기에서
+  // 걸러내던 게 원인이었다. coverage-specialty-list와 동일한 원칙(고시명칭 매칭은 판정
+  // 기준의 하나일 뿐)을 적용해 지역의 전체 품목을 보여주도록 고쳤다.
+  const snapshot = await loadSnapshot();
+  const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
+  assert.ok(goseong, "고성군 스냅샷 데이터가 있어야 함");
+  assert.equal(goseong.items.length, 20, "고성군에는 20개 품목이 있어야 이 테스트가 의미가 있음");
+  const officialCount = goseong.items.filter((item) => item.matchingBasis === "notice_name_and_nice_class" || item.matchingBasis === "raw_item_goods_matched").length;
+  assert.ok(officialCount < goseong.items.length, "고성군은 고시명칭 확정 품목보다 미분류 원물명이 더 많아야 이 테스트가 의미가 있음(회귀 시 조용히 통과하면 안 됨)");
+
+  const response = await render();
+  const html = await response.text();
+  const insightStart = html.indexOf('class="map-insight"');
+  const insightEnd = html.indexOf("</aside>", insightStart);
+  const insight = html.slice(insightStart, insightEnd);
+  assert.match(insight, /왕곡한과|꿀다림 데일리허니/, "미분류 원물명도 지도 옆 미리보기에 나와야 함(고시명칭 확정 품목만 남기면 안 됨)");
+});
+
 test("uses every collected region-item specialty as the application-rate denominator", async () => {
   const response = await render();
   const html = await response.text();
