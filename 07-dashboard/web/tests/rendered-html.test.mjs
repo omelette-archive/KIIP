@@ -495,6 +495,30 @@ test("shows registered regional examples without nationwide keyword noise", asyn
   );
 });
 
+test("resolves a municipality shape to its region even when the map's stale boundary group disagrees with current data", async () => {
+  // 이슈 #113: 지도 도형(2013 KOSTAT, 참고용)은 군위군을 여전히 경상북도 그룹 아래
+  // 그리지만, 법정동코드 데이터(2023-06-30 반영)는 군위군을 대구광역시로 기록한다.
+  // "경상북도" 지도에서 군위군 도형을 클릭했을 때 sido까지 정확히 일치하는 지역을
+  // 찾으면 실패해 아무 데이터도 안 뜨는 게 예전 동작이었다 — 시군구명만으로도 찾아
+  // 항상 실제(현재) 행정구역 데이터로 연결돼야 한다.
+  const snapshot = await loadSnapshot();
+  const gunwi = snapshot.regions.find((region) => region.sigungu === "군위군");
+  assert.ok(gunwi, "군위군 스냅샷 데이터가 있어야 함");
+  assert.equal(gunwi.sido, "대구광역시", "군위군은 2023년 대구로 편입돼 sido가 대구광역시여야 이 테스트가 의미가 있음");
+
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(
+    standaloneHtml,
+    /const findMunicipalityRegion = \(province, name\) =>\s*\n?\s*snapshot\.regions\.find\(\(region\) => region\.sido === province && region\.sigungu === name\)\s*\n?\s*\|\| snapshot\.regions\.find\(\(region\) => region\.sigungu === name\);/,
+    "sido가 안 맞아도 시군구명만으로 지역을 찾는 폴백이 있어야 함(#113)",
+  );
+  assert.doesNotMatch(
+    standaloneHtml,
+    /snapshot\.regions\.find\(\(row\) => row\.sido === state\.province && row\.sigungu === shape\.name\)/,
+    "지도 클릭 핸들러가 findMunicipalityRegion을 거치지 않고 sido 정확 일치만 쓰면 안 됨",
+  );
+});
+
 test("ships traceable province and municipality geometry", async () => {
   const raw = await readFile(new URL("../public/data/map-geometry.json", import.meta.url), "utf8");
   const geometry = JSON.parse(raw);
