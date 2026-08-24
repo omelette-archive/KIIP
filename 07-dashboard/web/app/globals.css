@@ -167,6 +167,12 @@ a { color: inherit; text-decoration: none; }
 .source-grid span { color: var(--green); font-size: 10px; font-weight: 800; }
 .source-grid strong { margin: 12px 0 9px; font-size: 12px; overflow-wrap: anywhere; }
 .source-grid small { color: var(--faint); font-size: 9px; }
+.source-table-wrap { overflow-x: auto; margin-top: 18px; }
+.source-table { width: 100%; border-collapse: collapse; min-width: 720px; font-size: 12px; }
+.source-table th, .source-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.source-table thead th { color: var(--faint); font-size: 10px; font-weight: 800; white-space: nowrap; }
+.source-table tbody th { font-weight: 700; color: var(--ink); }
+.source-table a { color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 17px; }
 summary { color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 details ul { margin: 14px 0 0; padding-left: 19px; color: var(--muted); font-size: 10.5px; line-height: 1.7; }
