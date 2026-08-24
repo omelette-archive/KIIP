@@ -195,6 +195,27 @@ test("keeps item totals, registration denominator, and pending states explicit",
   assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 213));
 });
 
+test("tags official items with a category and lets the items tab filter by it", async () => {
+  // 이슈 #109(품목 카테고리화). 02-normalize-items/data/item-categories-v1.json을
+  // 07-dashboard/lib/snapshot.js가 대조해 확인 특산품(notice_name_and_nice_class /
+  // raw_item_goods_matched)에만 category를 붙인다. 미분류 원물명(raw_item_name_unclassified)
+  // 에는 붙이지 않는다.
+  const snapshot = await loadSnapshot();
+  const apple = snapshot.regions.flatMap((region) => region.items).find((item) => item.itemName === "사과" && item.matchingBasis === "notice_name_and_nice_class");
+  assert.ok(apple, "사과 스냅샷 데이터가 있어야 함");
+  assert.deepEqual(apple.category, { code: "fruit", label: "과일" });
+  const unclassified = snapshot.regions.flatMap((region) => region.items).find((item) => item.matchingBasis === "raw_item_name_unclassified");
+  assert.ok(unclassified, "미분류 원물명 항목이 있어야 함");
+  assert.equal(unclassified.category, null, "미분류 원물명에는 카테고리를 붙이면 안 됨");
+
+  // "items" 탭은 기본 탭(summary)이 아니라 클라이언트 상태 전환 후에만 렌더링되므로,
+  // 정적 HTML에는 필터 버튼의 실제 값이 아니라 이를 만드는 JS 소스만 들어있다.
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(standaloneHtml, /class="item-category-filter"/, "품목별 조회에 유형 필터가 있어야 함");
+  assert.match(standaloneHtml, /data-category-filter="\$\{esc\(category\.code\)\}"/, "실제 유형 코드로 필터 버튼을 만들어야 함");
+  assert.match(standaloneHtml, /function availableCategories\(\)/, "실제 데이터에 등장하는 유형만 필터로 노출해야 함");
+});
+
 test("publishes only goods-confirmed regional application gaps", async () => {
   // 2026-08-21 감사: 지역 출원 수 0만으로는 미출원을 단정할 수 없다. 고시명칭 검색
   // 후보에는 유사 품목·상표명이 섞일 수 있으므로, 지정상품 일치 근거와 지역코드가 모두

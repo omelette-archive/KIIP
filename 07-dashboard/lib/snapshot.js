@@ -4,6 +4,7 @@ const crypto = require("crypto");
 const { loadAdminRegionCodes } = require("../../01-collect-specialties/lib/adminCodes");
 const { loadSourceCoverageGaps } = require("../../01-collect-specialties/lib/sourceCoverageGaps");
 const { getSourceDefinition, loadSourceRegistry } = require("../../01-collect-specialties/lib/sourceRegistry");
+const ITEM_CATEGORIES = require("../../02-normalize-items/data/item-categories-v1.json");
 
 const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
 const DASHBOARD_CONTRACT_VERSION = "dashboard-data-contract-v0-draft";
@@ -18,6 +19,23 @@ function clean(value) {
 
 function hash(value, length = 16) {
   return crypto.createHash("sha256").update(value, "utf8").digest("hex").slice(0, length);
+}
+
+// 이슈 #109(품목 카테고리화). 고시명칭이 확정된 항목(notice_name_and_nice_class /
+// raw_item_goods_matched)만 02-normalize-items/data/item-categories-v1.json과 대조한다.
+// "신선한 "/"미가공 " 접두어는 매칭 규칙이 붙인 수식어라 대조 전에 떼어낸다 — Dashboard.tsx의
+// officialItemLabel()과 동일 규칙. 매핑에 없는 명칭(아직 미분류)은 category: null로 둔다.
+const CATEGORY_OFFICIAL_MATCHING_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
+const CATEGORY_DISPLAY_PREFIXES = ["신선한 ", "미가공 "];
+function itemCategory(row) {
+  const basis = clean(row.matchingBasis) || "notice_name_and_nice_class";
+  if (!CATEGORY_OFFICIAL_MATCHING_BASES.has(basis)) return null;
+  let name = clean(row.noticeName);
+  if (!name) return null;
+  const prefix = CATEGORY_DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
+  if (prefix) name = name.slice(prefix.length);
+  const code = ITEM_CATEGORIES.items[name];
+  return code ? { code, label: ITEM_CATEGORIES.categories[code] || code } : null;
 }
 
 function canonicalItem(row) {
@@ -328,6 +346,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       noticeName: clean(row.noticeName) || null,
       niceClass: clean(row.niceClass) || null,
       matchingBasis: clean(row.matchingBasis) || "notice_name_and_nice_class",
+      category: itemCategory(row),
       itemVerdict: {
         source: clean(row.itemVerdictSource) || "unresolved",
         method: clean(row.itemMatchMethod) || null,

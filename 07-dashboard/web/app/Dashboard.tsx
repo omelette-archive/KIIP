@@ -6,7 +6,8 @@ type Metric = { value: number | null; availability: "available" | "preview" | "b
 type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicant?: string | null; applicationStatus: string | null; statusCategory?: string | null; applicantRegionMatch?: string | null; niceClass?: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
 type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string; sourceUrl: string; entries: { region: string; specialtyId: string | null; itemName: string; query: string; examples: TrademarkExample[] }[] };
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
-type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type ItemCategory = { code: string; label: string };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; category?: ItemCategory | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
@@ -171,6 +172,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [tab, setTab] = useState<Tab>("summary");
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
+  const [categoryFilter, setCategoryFilter] = useState("");
   const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState(regionKey(snapshot.regions[0]));
   const [selectedItemId, setSelectedItemId] = useState("");
@@ -229,11 +231,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const selectedRegionOfficialItems = selectedRegion ? officialRegionItems(selectedRegion) : [];
   const selectedItem = selectedRegionItems.find((item) => item.specialtyId === selectedItemId) || selectedRegionOfficialItems[0] || selectedRegionItems[0];
   const itemRows = useMemo(() => {
-    const rows = new Map<string, { name: string; searchTerms: string[]; trademarks: number; trademarksDisplay: number; hasProvisional: boolean; registered: number; available: number; availableRegions: string[]; regions: string[]; states: string[] }>();
+    const rows = new Map<string, { name: string; category: ItemCategory | null; searchTerms: string[]; trademarks: number; trademarksDisplay: number; hasProvisional: boolean; registered: number; available: number; availableRegions: string[]; regions: string[]; states: string[] }>();
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
       const name = officialItemLabel(item);
       if (!name) return; // 아직 고시명칭이 확정되지 않은 원물명은 여기서 제외(지역 상세에서는 계속 표시)
-      const row = rows.get(name) || { name, searchTerms: [], trademarks: 0, trademarksDisplay: 0, hasProvisional: false, registered: 0, available: 0, availableRegions: [], regions: [], states: [] };
+      const row = rows.get(name) || { name, category: item.category || null, searchTerms: [], trademarks: 0, trademarksDisplay: 0, hasProvisional: false, registered: 0, available: 0, availableRegions: [], regions: [], states: [] };
       row.searchTerms.push(...[item.itemName, item.noticeName, name].filter((value): value is string => Boolean(value)));
       const trade = tradeDisplay(item);
       if (trade.value !== null) { row.trademarksDisplay += trade.value; if (trade.provisional) row.hasProvisional = true; }
@@ -246,8 +248,17 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     // 정렬은 확정 건수(trademarks) 기준으로 한다 — 전국 검색까지 섞은 trademarksDisplay로
     // 정렬하면 지역 확인이 안 된 노이즈가 큰 품목이 상위 100개 컷에서 확정 데이터를
     // 밀어낼 수 있다(2026-08-19 결정).
-    return [...rows.values()].filter((row) => !keyword || row.searchTerms.some((term) => term.toLocaleLowerCase("ko-KR").includes(keyword)) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(keyword))).sort((a, b) => b.trademarks - a.trademarks);
-  }, [itemQuery, snapshot.regions]);
+    return [...rows.values()]
+      .filter((row) => !keyword || row.searchTerms.some((term) => term.toLocaleLowerCase("ko-KR").includes(keyword)) || row.regions.some((region) => region.toLocaleLowerCase("ko-KR").includes(keyword)))
+      .filter((row) => !categoryFilter || row.category?.code === categoryFilter)
+      .sort((a, b) => b.trademarks - a.trademarks);
+  }, [itemQuery, categoryFilter, snapshot.regions]);
+  // 이슈 #109(품목 카테고리화): 실제로 데이터에 등장하는 유형만 필터 버튼으로 보여준다.
+  const availableCategories = useMemo(() => {
+    const seen = new Map<string, string>();
+    snapshot.regions.forEach((region) => region.items.forEach((item) => { if (item.category) seen.set(item.category.code, item.category.label); }));
+    return [...seen.entries()].map(([code, label]) => ({ code, label })).sort((a, b) => a.label.localeCompare(b.label, "ko-KR"));
+  }, [snapshot.regions]);
   const comparisonRows = useMemo(() => [...provinceStats.keys()].map((province) => {
     const regions = snapshot.regions.filter((region) => (region.sido || region.region) === province);
     const coverage = specialtyCoverage(regions);
@@ -418,9 +429,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <div className="screen-heading"><div><h1>품목별 조회</h1></div><p>품목별 확인 지역과 상표 출원·등록 현황을 제공합니다.</p></div>
       <div className="item-screen">
         <div className="item-screen-toolbar"><label><span className="sr-only">품목 검색</span><input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label><span>{itemRows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${itemRows.length}개` : `검색 결과 ${itemRows.length}개`}</span></div>
+        <div className="item-category-filter" role="group" aria-label="품목 유형 필터"><button type="button" className={categoryFilter === "" ? "active" : ""} onClick={() => setCategoryFilter("")}>전체</button>{availableCategories.map((category) => <button type="button" key={category.code} className={categoryFilter === category.code ? "active" : ""} onClick={() => setCategoryFilter(category.code)}>{category.label}</button>)}</div>
         <div className="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div>
         <div className="item-card-grid">{visibleItemRows.map((row, index) => { const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return <article className="item-card" key={row.name}>
-          <div className="item-card-head"><div><span className="item-rank">{String(index + 1).padStart(2, "0")}</span><h2>{row.name}</h2><small>{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
+          <div className="item-card-head"><div><span className="item-rank">{String(index + 1).padStart(2, "0")}</span><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
           <details className="item-regions-detail"><summary>전체 {row.regions.length}개 지역 보기</summary><div className="region-chips">{row.regions.map((region) => <span key={region}>{region}</span>)}</div></details>
           <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
           {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
