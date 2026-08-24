@@ -152,6 +152,25 @@ async function run() {
     assert.strictEqual(unresolved.verdictSource, "unresolved");
     assert.match(unresolved.reviewCandidates, /"item":"탈"/);
     ok("확실한 행만 규칙으로 확정하고 애매한 행은 후보와 함께 별도 검토 대상으로 남김(AI 호출 없음)");
+
+    const derivativeDictionary = makeDictionary([
+      { item: "매실주", niceClass: "33", similarGroupCode: "G0402" },
+      { item: "옥수수차", niceClass: "30", similarGroupCode: "G0602" },
+      { item: "탈", niceClass: "28", similarGroupCode: "G0301" },
+    ]);
+    const exactStem = normalizeByRules({ ...region, rawItemName: "매실" }, derivativeDictionary, { topK: 5 });
+    assert.strictEqual(exactStem.status, "review_required");
+    assert.strictEqual(exactStem.matchMethod, "rule_unresolved_processed_derivative");
+    assert.match(exactStem.reviewReason, /가공품\/파생품 형태\("주"\)로만 존재함 — 매실주/);
+    assert.match(exactStem.reviewReason, /#74/);
+
+    const partialStem = normalizeByRules({ ...region, rawItemName: "찰옥수수" }, derivativeDictionary, { topK: 5 });
+    assert.strictEqual(partialStem.matchMethod, "rule_unresolved_processed_derivative", "원물명이 후보의 어간을 포함하는 경우(찰옥수수 ⊃ 옥수수)도 잡아야 함(#74)");
+    assert.match(partialStem.reviewReason, /옥수수차/);
+
+    const noDerivative = normalizeByRules({ ...region, rawItemName: "안동하회탈" }, derivativeDictionary, { topK: 5 });
+    assert.strictEqual(noDerivative.matchMethod, "rule_unresolved", "가공품 접미어 패턴이 없으면 기존 일반 사유를 그대로 써야 함");
+    ok("원물의 유일한 사전 후보가 가공품/파생품 형태뿐인 경우를 별도 reviewReason/matchMethod로 표시함(#74, A안 유지 — 자동 확정하지 않고 검토대기로만 구분)");
   }
 
   console.log("5-1) 사용자 승인 별칭 — 승인 묶음만 공식 고시명칭으로 자동 확정");

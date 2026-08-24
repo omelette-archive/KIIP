@@ -5,6 +5,36 @@ const { isServiceClass } = require("./filters");
 const approvedAliases = require("../data/approved-aliases.json");
 
 const EXCLUDED_SUFFIX_RE = /(나무|묘목|모종|종묘|종자|씨앗)$/;
+// 이슈 #74(2026-08-18 결정): 원물(매실)의 사전 후보가 가공품/파생품(매실주) 형태로만
+// 존재하는 경우를 별도로 표시한다. A안(가공품 상표를 원물 브랜드 근거로 인정 안 함)은
+// 그대로 유지하되, 이 패턴만 review_required 중에서 골라내려면 매번 후보 문자열을
+// 다시 스캔해야 하는 문제를 해결한다. 접미어 목록은 #74에서 실측 확인된 상위 패턴만
+// 반영했다(주/차/김치/젓/기름) — B안 채택 시의 자동 인정 규칙이 아니라 사람이 재검토할
+// 대상을 표시하는 용도이므로, 목록을 넓히려면 별도 실측·이슈 갱신을 거친다.
+const PROCESSED_DERIVATIVE_SUFFIXES = ["주", "차", "김치", "젓", "기름"];
+
+/**
+ * 후보 중 "원물명 + 가공품 접미어" 형태만 있고 원물명 그대로인 후보는 없는 경우를 찾는다.
+ * 정확 어간 일치(매실주→매실)를 우선하고, 없으면 부분 포함 관계(옥수수차→찰옥수수)까지 본다.
+ */
+function findProcessedDerivativeCandidate(itemName, candidates) {
+  let partial = null;
+  for (const candidate of candidates) {
+    const base = String(candidate.item || "").replace(/^(신선한|미가공)\s*/, "");
+    for (const suffix of PROCESSED_DERIVATIVE_SUFFIXES) {
+      if (!base.endsWith(suffix) || base === suffix) continue;
+      const stem = base.slice(0, -suffix.length);
+      if (stem === itemName) return { candidate, suffix, stem };
+      // 접두 수식어 차이(찰옥수수→옥수수차)만 허용한다 — stem이 itemName의 접미(어간)이거나
+      // 그 반대여야 한다. 둘 다 접두 방향(전통장류/전통차처럼 우연히 앞부분만 같은 경우)은
+      // 원물-가공품 관계가 아니라 무관한 공통 접두어일 뿐이라 제외한다.
+      if (!partial && (stem.endsWith(itemName) || itemName.endsWith(stem))) {
+        partial = { candidate, suffix, stem };
+      }
+    }
+  }
+  return partial;
+}
 // 원본이 "기타(그 외/미분류)"처럼 실제 품목이 아닌 범용 표기인데, 고시상품명칭에 우연히 같은
 // 글자의 다른 품목(예: "기타" = 악기 15류)이 있어 그대로 두면 무관한 품목으로 확정돼버린다.
 // 알파테스트 실행에서 "기타" raw 이름이 15류 악기로 오매칭되는 걸 실측으로 확인해 추가함.
@@ -80,7 +110,7 @@ function getOfficialNameIndex(dictionary) {
   return cached;
 }
 
-function reviewResult(base, itemName, candidates, reviewReason) {
+function reviewResult(base, itemName, candidates, reviewReason, matchMethod = "rule_unresolved") {
   return {
     ...base,
     itemName,
@@ -89,7 +119,7 @@ function reviewResult(base, itemName, candidates, reviewReason) {
     similarGroupCode: "",
     excluded: false,
     status: "review_required",
-    matchMethod: "rule_unresolved",
+    matchMethod,
     confidence: "",
     verdictSource: "unresolved",
     reviewReason,
@@ -211,6 +241,16 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
       ),
       error: "",
     };
+  }
+  const derivative = candidates.length ? findProcessedDerivativeCandidate(itemName, candidates) : null;
+  if (derivative) {
+    return reviewResult(
+      base,
+      itemName,
+      candidates,
+      `원물의 사전 후보가 가공품/파생품 형태("${derivative.suffix}")로만 존재함 — ${derivative.candidate.item}(#74, A안 유지: 가공품 상표를 원물 브랜드 근거로 인정하지 않음)`,
+      "rule_unresolved_processed_derivative"
+    );
   }
   return reviewResult(
     base,
