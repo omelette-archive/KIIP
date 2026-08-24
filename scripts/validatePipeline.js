@@ -285,6 +285,11 @@ function validateContracts(tempDir) {
 }
 
 function main() {
+  // 2026-08-24: 로컬 보안 소프트웨어가 orca 폴더 안 데이터 파일을 주기적으로 잠그고
+  // .sLDH로 격리하는 문제가 반복돼(사용자 보고), 검증을 시작하기 전에 먼저 자동 복구한다.
+  // git 추적 파일은 여기서 즉시 복구되고, 미추적 파일이 남으면(있어선 안 되는 경우) 다른
+  // 검증 단계처럼 실패로 처리해 사람이 확인하게 한다.
+  runNode("잠긴 데이터 파일 자동 복구", ["scripts/restoreLockedDataFiles.js"]);
   validateSyntax();
   runNode("dashboard snapshot audit selftest", ["scripts/auditDashboardSnapshot.selftest.js"]);
   runNode("dashboard public snapshot audit", [
