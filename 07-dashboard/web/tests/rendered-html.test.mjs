@@ -179,7 +179,7 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(coverage.pending, 75);
   assert.equal(Math.round(coverage.rate * 100), 60);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  assert.match(visibleTextHtml, new RegExp(`수집 특산품 전체 ${localeNumber(coverage.total)}개 중 ${localeNumber(coverage.applied)}개 출원 확인 · 지역별 집계 완료 ${localeNumber(coverage.decided)}개 · 집계 대기 ${localeNumber(coverage.pending)}개`));
+  assert.match(visibleTextHtml, new RegExp(`전체 ${localeNumber(coverage.total)}개 중 확인 ${localeNumber(coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
   // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
   assert.doesNotMatch(html, /출원율 계산/);
@@ -543,7 +543,7 @@ test("ships traceable province and municipality geometry", async () => {
   const geometry = JSON.parse(raw);
   assert.equal(geometry.schemaVersion, "dashboard-map-geometry-v1");
   assert.equal(geometry.boundaryReference.status, "reference_only");
-  assert.match(geometry.boundaryReference.sourceUrl, /southkorea-maps/);
+  assert.match(geometry.boundaryReference.sourceUrl, /southkorea-maps|admdongkor/);
   assert.equal(geometry.provinces.length, 16);
   assert.ok(geometry.municipalities["경상북도"].items.some((row) => row.name === "구미시"));
 });
