@@ -438,11 +438,8 @@ test("hides goods-unverified trademark examples instead of showing nationwide ke
     /const regionGoodsConfirmed = item\.matchingBasis === "raw_item_goods_matched";/,
     "raw_item_goods_matched 항목은 이미 지역 주소 일치까지 확인된 사례라는 것을 표시할 수 있어야 함",
   );
-  assert.match(
-    standaloneHtml,
-    /등록원부 지정상품에서 .*이 확인된 출원 사례가 아직 없습니다/,
-    "지정상품에서 품목명이 확인되지 않은 경우 전국 후보를 나열하지 않고 안내해야 함",
-  );
+  assert.match(standaloneHtml, /확인된 등록 사례가 없습니다/, "등록원부 확인 사례가 없으면 짧은 등록 사례 안내를 보여야 함");
+  assert.doesNotMatch(standaloneHtml, /확인된 출원 사례|품목명 검색 후보는 실제 관련성이 확정되지 않아 표시하지 않습니다/);
   assert.doesNotMatch(
     standaloneHtml,
     /전국 검색 상표 사례/,
@@ -501,8 +498,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /출원인 주소-대상 지역 일치|두 번째 값은 상표의 유효성 비율이 아닙니다|지역 내 출원 관계|지역 고유 상표|지역 등록 상표|>검증 중</);
   assert.doesNotMatch(html, /주소 확인 후보 중 이 지역 비율|지정상품 자동 일치|지정상품 개별 검토|지정상품 근거 확인 사례/);
   assert.match(html, /출원 건수 기준/);
-  assert.match(html, /등록원부 지정상품에서 확인된 \$\{esc\(itemName\(item\)\)\} 출원/);
-  assert.match(html, /등록원부 지정상품:/);
+  assert.match(html, /\$\{esc\(itemName\(item\)\)\} 등록 사례/);
+  assert.match(html, /등록원부 지정상품 확인 · \$\{confirmedExamples\.length \|\| 0\}건/);
+  assert.match(html, /지정상품:/);
+  assert.doesNotMatch(html, /등록원부 지정상품에서 확인된 .* 출원|상표명이 아니라 지정상품명에서 품목명이 직접 확인된 사례입니다/);
   assert.match(html, /class="province-list"/);
   assert.match(html, /data-region-group=/);
   assert.match(html, /시도 \$\{grouped\.length\}곳 · 시군구 \$\{rows\.length\}곳/);
