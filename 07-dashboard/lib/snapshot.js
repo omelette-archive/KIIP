@@ -354,6 +354,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         row.registrationYearCounts && Object.keys(row.registrationYearCounts).length
           ? row.registrationYearCounts
           : null,
+      applicationMonthCounts: row.applicationMonthCounts && Object.keys(row.applicationMonthCounts).length
+        ? row.applicationMonthCounts
+        : null,
+      registrationMonthCounts:
+        row.registrationMonthCounts && Object.keys(row.registrationMonthCounts).length
+          ? row.registrationMonthCounts
+          : null,
       itemVerdict: {
         source: clean(row.itemVerdictSource) || "unresolved",
         method: clean(row.itemMatchMethod) || null,

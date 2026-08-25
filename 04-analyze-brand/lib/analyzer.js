@@ -19,6 +19,17 @@ function applicationYear(value) {
   return year >= 1800 && year <= 2200 ? year : null;
 }
 
+// KIPRIS 원본 날짜는 YYYYMMDD(예: 20020408)다. applicationYear와 같은 유효 범위
+// 검증을 거친 뒤 "YYYY-MM" 키로 만든다.
+function applicationMonth(value) {
+  const match = clean(value).match(/^(\d{4})(\d{2})/);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (year < 1800 || year > 2200 || month < 1 || month > 12) return null;
+  return `${match[1]}-${match[2]}`;
+}
+
 function statusCategory(value) {
   const status = clean(value);
   if (INACTIVE_STATUS_WORDS.some((word) => status.includes(word))) return "inactive";
@@ -344,6 +355,8 @@ function finalizeBucket(bucket, options) {
   };
   const yearCounts = new Map();
   const registrationYearCounts = new Map();
+  const monthCounts = new Map();
+  const registrationMonthCounts = new Map();
   let invalidApplicationDateCount = 0;
   let invalidRegistrationDateCount = 0;
   let applicantAddressEvidenceCount = 0;
@@ -393,6 +406,8 @@ function finalizeBucket(bucket, options) {
       goodsEvidence: Array.isArray(hit.goodsEvidence) ? hit.goodsEvidence.slice(0, 3) : [],
     });
     const year = applicationYear(hit.applicationDate);
+    const month = applicationMonth(hit.applicationDate);
+    if (month !== null) monthCounts.set(month, (monthCounts.get(month) || 0) + 1);
     if (year === null) {
       invalidApplicationDateCount++;
     } else {
@@ -410,6 +425,12 @@ function finalizeBucket(bucket, options) {
     const registrationYear = applicationYear(
       hit.registrationDate ?? hit.registryEvidence?.registrationDate
     );
+    const registrationMonth = applicationMonth(
+      hit.registrationDate ?? hit.registryEvidence?.registrationDate
+    );
+    if (registrationMonth !== null) {
+      registrationMonthCounts.set(registrationMonth, (registrationMonthCounts.get(registrationMonth) || 0) + 1);
+    }
     if (clean(hit.registrationDate ?? hit.registryEvidence?.registrationDate)) {
       if (registrationYear === null) invalidRegistrationDateCount++;
       else {
@@ -476,6 +497,14 @@ function finalizeBucket(bucket, options) {
   for (const year of [...registrationYearCounts.keys()].sort((a, b) => a - b)) {
     registrationYearCountsResult[String(year)] = registrationYearCounts.get(year);
   }
+  const applicationMonthCounts = {};
+  for (const month of [...monthCounts.keys()].sort()) {
+    applicationMonthCounts[month] = monthCounts.get(month);
+  }
+  const registrationMonthCountsResult = {};
+  for (const month of [...registrationMonthCounts.keys()].sort()) {
+    registrationMonthCountsResult[month] = registrationMonthCounts.get(month);
+  }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
 
   const result = {};
@@ -500,6 +529,8 @@ function finalizeBucket(bucket, options) {
     regionalMetricBlockingReasons,
     applicationYearCounts,
     registrationYearCounts: registrationYearCountsResult,
+    applicationMonthCounts,
+    registrationMonthCounts: registrationMonthCountsResult,
     invalidRegistrationDateCount,
     recentPeriod: { startYear: recentStart, endYear: recentEnd, count: recentApplicationCount },
     previousPeriod: { startYear: previousStart, endYear: previousEnd, count: previousApplicationCount },
