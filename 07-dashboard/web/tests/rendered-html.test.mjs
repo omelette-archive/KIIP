@@ -698,6 +698,11 @@ test("defaults municipality lookup to a responsive province overview with cleane
   assert.match(standaloneHtml, /function provinceDetail\(province, regions\)/);
   assert.match(standaloneHtml, /광역 기본 보기/);
   assert.match(standaloneHtml, /state\.regionKey = ""; state\.itemId = "";/, "광역 선택 시 시군구 선택을 해제해야 함");
+  assert.match(
+    standaloneHtml,
+    /state\.expandedRegionProvince = state\.expandedRegionProvince === province \? null : province;/,
+    "같은 광역자치단체를 다시 누르면 시군구 목록이 닫혀야 함",
+  );
   assert.match(standaloneHtml, /"치악산 배": "배"/);
   assert.match(standaloneHtml, /"조엄고구마": "고구마"/);
   assert.match(standaloneHtml, /"쌀토토미": "쌀"/);

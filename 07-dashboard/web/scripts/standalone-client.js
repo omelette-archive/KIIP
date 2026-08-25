@@ -10,7 +10,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     applicationCoverage: "이 지역에서 수집된 전체 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로, 데이터가 쌓일수록 값이 올라갈 수 있습니다.",
   };
   const firstRegionProvince = snapshot.regions.find((region) => region.sido && region.sido !== "전국")?.sido || null;
-  const state = { tab: "summary", query: "", itemQuery: "", categoryFilter: "", expandedRegionProvince: firstRegionProvince, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null };
+  const state = { tab: "summary", query: "", itemQuery: "", categoryFilter: "", selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
@@ -406,12 +406,12 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const grouped = [...groups.entries()]
       .map(([province, regions]) => ({ province, regions: regions.sort((a, b) => (a.sigungu || a.region).localeCompare(b.sigungu || b.region, "ko-KR")) }))
       .sort((a, b) => displayRegionName(a.province).localeCompare(displayRegionName(b.province), "ko-KR"));
-    const activeProvince = grouped.some((group) => group.province === state.expandedRegionProvince) ? state.expandedRegionProvince : grouped[0]?.province || null;
+    const activeProvince = grouped.some((group) => group.province === state.selectedRegionProvince) ? state.selectedRegionProvince : grouped[0]?.province || null;
     const activeProvinceRegions = grouped.find((group) => group.province === activeProvince)?.regions || [];
     const region = rows.find((row) => regionKey(row) === state.regionKey) || null;
     const item = selectedItem(region);
     const groupsHtml = grouped.map(({ province, regions }) => {
-      const expanded = Boolean(keyword) || activeProvince === province;
+      const expanded = Boolean(keyword) || state.expandedRegionProvince === province;
       const coverage = specialtyCoverage(regions);
       const municipalities = expanded ? `<div class="region-list municipality-list">${regions.map((row) => { const available = row.items.filter((entry) => officialItemLabel(entry) && entry.metrics.uniqueTrademarkCount.availability === "available"); const count = available.reduce((sum, entry) => sum + (entry.metrics.uniqueTrademarkCount.value || 0), 0); const rowCoverage = specialtyCoverage([row]); const municipalityName = row.sigungu && row.sigungu !== row.sido ? row.sigungu : "시도 전체"; return `<button type="button" data-region="${esc(regionKey(row))}" class="region-button ${regionKey(row) === state.regionKey ? "active" : ""}"><span><strong>${esc(municipalityName)}</strong><small>특산품 ${rowCoverage.total}개 · 출원 확인 ${rowCoverage.applied}개 · 출원율 ${percent(rowCoverage.rate)}<br>${available.length ? `지역 주소 일치 출원 ${number(count)}건` : "지역 출원 현황 검토중"}</small></span><span class="state state-${esc(row.dataState)}">${esc(labels[row.dataState] || row.dataState)}</span></button>`; }).join("")}</div>` : "";
       return `<section class="province-group"><button type="button" class="province-toggle" data-region-group="${esc(province)}" aria-expanded="${expanded}"><span><strong>${esc(displayRegionName(province))}</strong><small>시군구 ${regions.length}곳 · 특산품 ${coverage.total}개</small></span><b aria-hidden="true">${expanded ? "−" : "+"}</b></button>${municipalities}</section>`;
@@ -553,7 +553,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 그대로 보이게 한다. 좌측 목록에서 직접 아코디언을 펼치는 클릭(data-region-group)은
     // 그대로 유지된다.
     document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
-    document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { state.expandedRegionProvince = button.dataset.regionGroup; state.regionKey = ""; state.itemId = ""; render(); }; });
+    document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { const province = button.dataset.regionGroup; state.selectedRegionProvince = province; state.expandedRegionProvince = state.expandedRegionProvince === province ? null : province; state.regionKey = ""; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
     bindSearchInput("#region-search", "query");

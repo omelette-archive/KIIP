@@ -290,7 +290,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(defaultRegionProvince);
+  const [selectedRegionProvince, setSelectedRegionProvince] = useState<string | null>(defaultRegionProvince);
+  const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [mapMetric, setMapMetric] = useState<MapMetric>("coverage");
@@ -350,7 +351,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const selectedRegionItems = selectedRegion ? selectedRegion.items : [];
   const selectedRegionOfficialItems = selectedRegion ? officialRegionItems(selectedRegion) : [];
   const selectedItem = selectedRegionItems.find((item) => item.specialtyId === selectedItemId) || selectedRegionOfficialItems[0] || selectedRegionItems[0];
-  const activeRegionProvince = groupedRegions.some((group) => group.province === expandedRegionProvince) ? expandedRegionProvince : groupedRegions[0]?.province || null;
+  const activeRegionProvince = groupedRegions.some((group) => group.province === selectedRegionProvince) ? selectedRegionProvince : groupedRegions[0]?.province || null;
   const activeProvinceRegions = groupedRegions.find((group) => group.province === activeRegionProvince)?.regions || [];
   const itemRows = useMemo(() => {
     const rows = new Map<string, { name: string; category: ItemCategory | null; searchTerms: string[]; trademarks: number; trademarksDisplay: number; hasProvisional: boolean; registered: number; available: number; availableRegions: string[]; regions: string[]; regionCounts: Record<string, number>; states: string[] }>();
@@ -589,10 +590,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 {groupedRegions.length}곳 · 시군구 {filteredRegions.length}곳</span></div>
           <label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
           <div className="province-list">{groupedRegions.map(({ province, regions }) => {
-            const expanded = Boolean(query.trim()) || activeRegionProvince === province;
+            const expanded = Boolean(query.trim()) || expandedRegionProvince === province;
             const coverage = specialtyCoverage(regions);
             return <section className="province-group" key={province}>
-              <button type="button" className="province-toggle" aria-expanded={expanded} onClick={() => { setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); }}>
+              <button type="button" className="province-toggle" aria-expanded={expanded} onClick={() => { setSelectedRegionProvince(province); setExpandedRegionProvince((current) => current === province ? null : province); setSelectedRegionCode(""); setSelectedItemId(""); }}>
                 <span><strong>{displayRegionName(province)}</strong><small>시군구 {regions.length}곳 · 특산품 {coverage.total}개</small></span><b aria-hidden="true">{expanded ? "−" : "+"}</b>
               </button>
               {expanded && <div className="region-list municipality-list">{regions.map((region) => { const count = regionTrademarkValue(region); const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} className={selectedRegion && regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개 · 출원율 {percent(rowCoverage.rate)}<br />{count === null ? "지역 출원 현황 검토중" : `지역 주소 일치 출원 ${number(count)}건`}</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}</div>}
