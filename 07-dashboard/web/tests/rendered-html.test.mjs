@@ -172,9 +172,15 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,013개다.
   // (2026-08-21: 남양주시 "깻잎"이 원본 병합 스크립트의 지역 필드 오류(sido="")로
   // raw_item_goods_matched 승격에서 누락돼 있던 것을 targeted patch로 보정 — 1,012→1,013.)
-  // (2026-08-25: 품질인증수산물(NFQS) 실데이터를 지역 통계에 추가하고,
-  // 지역 미제공 KOFPI 90건은 전국 카탈로그에만 반영. #114)
+  // (2026-08-25: 품질인증수산물(NFQS) 실데이터를 지역 통계에 추가하고, 지역 미제공
+  // KOFPI 90건은 "전국" 의사(疑似) 지역에 담아 지도·지역별 통계에서는 제외한다(#114).
+  // regionItemCount는 그 "전국 제외" 지역 통계용 값이고, catalogItemCount가 전국까지
+  // 포함한 원본 전체 행 수다(scripts/auditDashboardSnapshot.js가 각각을 실제 행 수와
+  // 대조해 검증함) — 서로 다른 스코프라 더 이상 같은 값이 아니다.
+  const nationwideCatalogCount = snapshot.regions.filter((region) => region.sido === "전국")
+    .reduce((sum, region) => sum + region.items.length, 0);
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
+  assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
   assert.equal(coverage.total, 1876);
   assert.equal(coverage.decided, 1761);
   assert.equal(coverage.applied, 1013);
@@ -359,8 +365,10 @@ test("ships a valid dashboard snapshot", async () => {
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
   // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
-  // 1,615 -> 1,617이 됐다. (2026-08-25: 품질인증수산물(NFQS) 184건 추가 반영으로
-  // 1,617 -> 1,761(NFQS 반영, 지역 미제공 KOFPI는 지역 지표 제외). #114)
+  // 1,615 -> 1,617이 됐다. (2026-08-25: 품질인증수산물(NFQS) 실데이터 추가 반영으로
+  // 1,617 -> 1,761. 지역 정보가 없는 KOFPI 90건("전국" 의사 지역)은 지역별 통계
+  // 성격의 이 필드에서 제외한다 — scripts/auditDashboardSnapshot.js가 정확히 이
+  // "전국 제외" 기준으로 검증한다(catalogItemCount는 전국 포함 원본 전체). #114)
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1761);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);

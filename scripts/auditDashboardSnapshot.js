@@ -169,19 +169,41 @@ function auditSnapshot(snapshot) {
   const reviewWithExamples = reviewRows.filter(({ item }) => (item.trademarkExamples || []).length > 0);
   const allAvailableCount = allRows.filter(({ item }) => isRegionalMetricAvailable(item)).length;
 
-  if (snapshot.coverage?.regionItemCount !== undefined && snapshot.coverage.regionItemCount !== allRows.length) {
-    addError("region_item_count_mismatch", "coverage.regionItemCount does not match snapshot rows", {
+  // 2026-08-25(#114): 임산물DB백과(KOFPI)는 지역 정보가 없어 "전국" 의사(疑似) 지역에
+  // 담는다 — 지도·지역별 통계(regionItemCount/regionalMetricGate)는 실제 지역을 전제로
+  // 하므로 이 행들을 제외하고, 원본 전체 건수는 catalogItemCount로 별도 확인한다.
+  const nationwideRows = allRows.filter(({ region }) => region.sido === "전국");
+  const regionalRows = allRows.filter(({ region }) => region.sido !== "전국");
+  const regionalAvailableCount = regionalRows.filter(({ item }) => isRegionalMetricAvailable(item)).length;
+
+  if (snapshot.coverage?.regionItemCount !== undefined && snapshot.coverage.regionItemCount !== regionalRows.length) {
+    addError("region_item_count_mismatch", "coverage.regionItemCount does not match snapshot rows with a real region", {
       reported: snapshot.coverage.regionItemCount,
+      actual: regionalRows.length,
+    });
+  }
+  if (snapshot.coverage?.catalogItemCount !== undefined && snapshot.coverage.catalogItemCount !== allRows.length) {
+    addError("catalog_item_count_mismatch", "coverage.catalogItemCount does not match total snapshot rows", {
+      reported: snapshot.coverage.catalogItemCount,
       actual: allRows.length,
     });
   }
   if (
-    snapshot.pipelineStatus?.regionalMetricGate?.availableRegionItemCount !== undefined &&
-    snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount !== allAvailableCount
+    snapshot.coverage?.nationwideCatalogItemCount !== undefined &&
+    snapshot.coverage.nationwideCatalogItemCount !== nationwideRows.length
   ) {
-    addError("available_gate_count_mismatch", "regionalMetricGate available count does not match item metrics", {
+    addError("nationwide_catalog_item_count_mismatch", "coverage.nationwideCatalogItemCount does not match 전국 rows", {
+      reported: snapshot.coverage.nationwideCatalogItemCount,
+      actual: nationwideRows.length,
+    });
+  }
+  if (
+    snapshot.pipelineStatus?.regionalMetricGate?.availableRegionItemCount !== undefined &&
+    snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount !== regionalAvailableCount
+  ) {
+    addError("available_gate_count_mismatch", "regionalMetricGate available count does not match item metrics with a real region", {
       reported: snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount,
-      actual: allAvailableCount,
+      actual: regionalAvailableCount,
     });
   }
 
