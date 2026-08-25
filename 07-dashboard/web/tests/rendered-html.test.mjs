@@ -88,7 +88,7 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
-  assert.match(html, /지역별 출원율/);
+  assert.match(html, /지역별 상표 출원/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
@@ -262,8 +262,8 @@ test("renders tab navigation and separate application/registration ranking table
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지역별 출원율/지자체별/품목별/특화작목/데이터 개요 6개 탭이 있어야 함");
-  assert.match(html, /지역별 출원율/);
+  assert.match(html, /class="primary-tabs"/, "요약/지역별 상표 출원/지자체별/품목별/특화작목/데이터 개요 6개 탭이 있어야 함");
+  assert.match(html, /지역별 상표 출원/);
   assert.match(html, /지자체별 조회/);
   assert.match(html, /품목별 조회/);
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
@@ -631,7 +631,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /원본 대기/);
   assert.doesNotMatch(html, /class="compare-grid"/);
   assert.match(html, /데이터 개요/);
-  assert.match(html, /특산물과 상표가<br>데이터가 되기까지/);
+  assert.match(html, /수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다\./);
   assert.match(html, /고유 특산품명/);
   assert.match(html, /상표 매칭 결과/);
   assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);
