@@ -167,17 +167,18 @@ test("uses every collected region-item specialty as the application-rate denomin
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   const snapshot = await loadSnapshot();
   const coverage = specialtyCoverage(snapshot);
-  // 스냅샷의 regionItemCount 1,692개 전부를 분모로 사용한다. 고시명칭 확인 완료분만
-  // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,013개이며,
-  // 지역별 집계가 덜 끝난 75개도 분모에 남아 초기 출원율을 보수적으로 낮춘다.
+  // 스냅샷의 regionItemCount 전부를 분모로 사용한다. 고시명칭 확인 완료분만
+  // 사용하던 과거 분모 1,015개로 되돌아가면 안 된다. 현재 출원 확인은 1,013개다.
   // (2026-08-21: 남양주시 "깻잎"이 원본 병합 스크립트의 지역 필드 오류(sido="")로
   // raw_item_goods_matched 승격에서 누락돼 있던 것을 targeted patch로 보정 — 1,012→1,013.)
+  // (2026-08-25: 품질인증수산물(NFQS) 실데이터 184건을 추가 반영 — 1,692→1,874,
+  // 집계 가능 1,617→1,761. #114)
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
-  assert.equal(coverage.total, 1692);
-  assert.equal(coverage.decided, 1617);
+  assert.equal(coverage.total, 1874);
+  assert.equal(coverage.decided, 1761);
   assert.equal(coverage.applied, 1013);
-  assert.equal(coverage.pending, 75);
-  assert.equal(Math.round(coverage.rate * 100), 60);
+  assert.equal(coverage.pending, 113);
+  assert.equal(Math.round(coverage.rate * 100), 54);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   assert.match(visibleTextHtml, new RegExp(`전체 ${localeNumber(coverage.total)}개 중 확인 ${localeNumber(coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
@@ -357,8 +358,9 @@ test("ships a valid dashboard snapshot", async () => {
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
   // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
-  // 1,615 -> 1,617이 됐다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1617);
+  // 1,615 -> 1,617이 됐다. (2026-08-25: 품질인증수산물(NFQS) 184건 추가 반영으로
+  // 1,617 -> 1,761. #114)
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1761);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -386,7 +388,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.length, 1617, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.length, 1761, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
