@@ -495,10 +495,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         {trendHasData ? <>
           <div className="trend-controls">
             <div className="trend-presets" role="group" aria-label="추이 그래프 기간 프리셋">
-              <button type="button" className={trendStartYear === null && trendEndYear === null ? "active" : ""} onClick={() => { setTrendStartYear(null); setTrendEndYear(null); }}>전체</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 4); setTrendEndYear(trendFullEnd); }}>최근 5년</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 2); setTrendEndYear(trendFullEnd); }}>최근 3년</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
+              <button type="button" className={trendStart === trendFullStart && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(null); setTrendEndYear(null); }}>전체</button>
+              <button type="button" className={trendStart === trendFullEnd - 4 && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd - 4); setTrendEndYear(trendFullEnd); }}>최근 5년</button>
+              <button type="button" className={trendStart === trendFullEnd - 2 && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd - 2); setTrendEndYear(trendFullEnd); }}>최근 3년</button>
+              <button type="button" className={trendStart === trendFullEnd && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
             </div>
             <div className="trend-range-inputs"><label><span className="sr-only">시작 연도</span>{trendStart}<input type="number" aria-label="시작 연도" value={trendStart} onChange={(event) => setTrendStartYear(Number(event.target.value) || trendFullStart)} /></label><span>~</span><label><span className="sr-only">끝 연도</span>{trendEnd}<input type="number" aria-label="끝 연도" value={trendEnd} onChange={(event) => setTrendEndYear(Number(event.target.value) || trendFullEnd)} /></label></div>
           </div>
