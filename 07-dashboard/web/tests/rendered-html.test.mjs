@@ -52,7 +52,7 @@ test("renders the data-connected Korean dashboard", async () => {
   const snapshot = await loadSnapshot();
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
-  assert.match(html, /<title>지역 특산물 상표 출원 분석<\/title>/i);
+  assert.match(html, /<title>지역 특산품 상표 출원<\/title>/i);
   assert.match(html, /지역 특산품 상표 출원 현황/);
   assert.match(html, /마지막 업데이트/);
   assert.doesNotMatch(html, /데이터 생성일|마지막 생성/);
@@ -581,7 +581,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
   assert.match(html, /row\.searchTerms\.some\(\(term\) => term && term\.toLocaleLowerCase\("ko-KR"\)\.includes\(keyword\)\)/, "품목 검색은 공식 표시명 외 원물명·고시명칭도 검색해야 함");
-  assert.match(html, /<title>지역 특산물 상표 출원 분석<\/title>/);
+  assert.match(html, /<title>지역 특산품 상표 출원<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
   assert.match(html, /특산품 수/);
