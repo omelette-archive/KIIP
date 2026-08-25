@@ -625,6 +625,27 @@ test("shows an adjustable year-range application/registration trend chart", asyn
     /const sumYearCounts = \(items, field\) => \{/,
     "연도별 출원·등록 건수를 합산하는 공용 헬퍼가 있어야 함",
   );
+  assert.match(
+    standaloneHtml,
+    /const TREND_CHART = \{ width: 640, height: 190/,
+    "추이 그래프는 지자체 상세에 맞는 소형 크기를 사용해야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /const regionTrendHtml = \(region\) => \{/,
+    "선택한 지자체의 전체 특산품 추이를 집계하는 렌더러가 있어야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /class="trend-chart trend-chart-compact region-trend"/,
+    "지자체 상세에는 별도의 컴팩트 추이 그래프가 있어야 함",
+  );
+  assert.match(standaloneHtml, /지역 출원·등록 추이/);
+  assert.match(
+    standaloneHtml,
+    /\$\{regionTrendHtml\(region\)\}[\s\S]*class="item-tabs word-cloud"/,
+    "지역 추이 그래프는 선택한 지자체의 품목 탭보다 위에 표시되어야 함",
+  );
   assert.match(standaloneHtml, /class="trend-chart"/, "지역별 상표 출원 탭에 추이 그래프 섹션이 있어야 함");
   assert.match(
     standaloneHtml,

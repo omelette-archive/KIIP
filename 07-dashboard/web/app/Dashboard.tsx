@@ -94,7 +94,7 @@ function sumYearCounts(items: Item[], field: "applicationYearCounts" | "registra
   }
   return totals;
 }
-const TREND_CHART = { width: 720, height: 260, padLeft: 46, padRight: 14, padTop: 14, padBottom: 26 };
+const TREND_CHART = { width: 640, height: 190, padLeft: 42, padRight: 12, padTop: 12, padBottom: 24 };
 function trendScales(startYear: number, endYear: number, maxValue: number) {
   const { width, height, padLeft, padRight, padTop, padBottom } = TREND_CHART;
   const span = Math.max(1, endYear - startYear);
@@ -121,6 +121,29 @@ function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: numb
   if (rect.width === 0) return fullStart;
   const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
   return Math.round(fullStart + fraction * (fullEnd - fullStart));
+}
+
+function RegionTrend({ region }: { region: Region }) {
+  const applicationTotals = sumYearCounts(region.items, "applicationYearCounts");
+  const registrationTotals = sumYearCounts(region.items, "registrationYearCounts");
+  const years = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])]
+    .map(Number)
+    .sort((a, b) => a - b);
+  if (years.length === 0) return <section className="trend-chart trend-chart-compact region-trend"><div className="section-heading"><div><h2>지역 출원·등록 추이</h2></div><span>{region.region}</span></div><p className="empty">이 지역은 아직 연도별 데이터가 없습니다.</p></section>;
+  const start = years[0];
+  const end = years[years.length - 1];
+  const max = Math.max(1, ...years.map((year) => Math.max(applicationTotals[year] || 0, registrationTotals[year] || 0)));
+  const scale = trendScales(start, end, max);
+  return <section className="trend-chart trend-chart-compact region-trend"><div className="section-heading"><div><h2>지역 출원·등록 추이</h2></div><span>{region.region} 전체 특산품 · 연도별</span></div>
+    <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${region.region} ${start}년부터 ${end}년까지 출원·등록 추이`}>
+      {[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 7} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
+      <path d={`${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
+      <path d={trendLinePath(years, registrationTotals, scale)} className="trend-line trend-line-registered" />
+      <path d={trendLinePath(years, applicationTotals, scale)} className="trend-line trend-line-application" />
+      {trendYearLabels(years).map((year) => <text key={year} x={scale.x(year)} y={TREND_CHART.height - 5} className="trend-axis-label trend-axis-x">{year}</text>)}
+    </svg>
+    <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록</p>
+  </section>;
 }
 // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
 // 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
@@ -635,6 +658,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
   const itemTabsMaxTrademarks = Math.max(1, ...region.items.map((row) => row.metrics.uniqueTrademarkCount.value || 0));
   return <div className="detail-panel">
     {heading}
+    <RegionTrend region={region} />
     <div className="item-tabs word-cloud" role="tablist" aria-label={`${region.region} 특산품 · 출원건수 기준 글자 크기`}>{region.items.map((row) => { const value = row.metrics.uniqueTrademarkCount.value || 0; return <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")} style={{ fontSize: `${wordCloudFontSize(value, itemTabsMaxTrademarks)}px`, color: item.specialtyId === row.specialtyId ? undefined : wordCloudColor(row.specialtyId || itemName(row)) }} title={`${itemName(row)} · 출원 ${number(value)}건`}>{itemName(row)}</button>; })}</div>
     <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span>{item.itemVerdict?.source === "algorithm" && <span className="verdict-chip" title={verdictTitle(item.itemVerdict)}>AI 판정</span>}</div>
     <div className="metric-reading-note"><strong>출원 건수 기준</strong><p><b>{region.sigungu || region.region} {itemName(item)} 출원</b>은 출원인 주소가 {region.region}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
