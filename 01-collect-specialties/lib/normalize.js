@@ -325,16 +325,33 @@ function fromNongsaro(specialties, adminList) {
   });
 }
 
-// #114: 국립수산물품질관리원 품질인증수산물. 이 API는 지역 코드를 안 주고 업체 주소만
-// 준다(예: "부산광역시 사하구 감천항로 24") — regionOf가 주소 문자열 전체를 넘기면
-// toRows()가 이미 쓰는 resolveRegion()이 부분 대조로 시도·시군구를 뽑아낸다.
+// #114: NFQS `jisokaddr` is certified-facility metadata, not specialty-origin evidence.
 function fromNfqsCertifications(certifications, adminList) {
-  return toRows(certifications, {
-    adminList,
-    source: "품질인증수산물",
-    itemNameOf: (c) => c.productName,
-    regionOf: (c) => c.companyAddress,
-  });
+  // `jisokaddr` is the certified company's/facility's address. It is not a
+  // fishing ground, place of production, origin, or specialty-region field.
+  // Keep the official certified-product catalog searchable, but never turn a
+  // processing facility location into a regional specialty assignment.
+  void adminList;
+  const now = new Date().toISOString();
+  return {
+    rows: certifications.map((certification) => ({
+      sido: "",
+      sigungu: "",
+      regionCode: "",
+      regionMatchMethod: "facility_location_not_specialty_origin",
+      sourceRegionName: "전국(인증사업장 소재지는 특산품 생산지 근거가 아님)",
+      sourceRegionCode: "",
+      sourceItemName: certification.productName,
+      sourceRecordUrl: "https://www.data.go.kr/data/15058693/openapi.do",
+      sourceScope: "nationwide_certified_product_catalog",
+      rawItemName: certification.productName,
+      source: "품질인증수산물",
+      collectedAt: now,
+    })),
+    warnings: [
+      `nfqs_quality_cert: 인증사업장 주소를 지역 특산품 근거로 사용하지 않고 전국 인증품 ${certifications.length}건으로 수집`,
+    ],
+  };
 }
 
 function fromKofpiProducts(products, now = new Date().toISOString()) {

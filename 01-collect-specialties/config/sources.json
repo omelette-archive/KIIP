@@ -138,6 +138,12 @@
       "catalogUrl": "https://www.data.go.kr/data/15058693/openapi.do",
       "providerUrl": "https://www.nfqs.go.kr/hpmg/front/api/quality_api.do",
       "formats": ["XML"],
+      "geographicScope": {
+        "catalogScope": "nationwide",
+        "addressFieldMeaning": "certified_facility_location",
+        "regionalSpecialtyEligible": false,
+        "regionalSpecialtyReason": "jisokaddr is the certified facility address, not a fishing ground, origin, or production-area field"
+      },
       "authentication": {
         "required": true,
         "keyEnv": "NFQS_QUALITY_API_KEY",

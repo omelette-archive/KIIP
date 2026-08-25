@@ -135,6 +135,14 @@ function auditSnapshot(snapshot) {
         });
       }
 
+      if (region.sido !== "전국" && (item.sources || []).includes("nfqs_quality_cert")) {
+        addError(
+          "nfqs_facility_location_used_as_specialty_region",
+          "NFQS quality-certification facility addresses must not create regional specialty rows",
+          { example: compactRow(region, item) }
+        );
+      }
+
       const metric = item?.metrics?.uniqueTrademarkCount;
       if (!metric || typeof metric.availability !== "string") {
         addError("missing_regional_metric", "uniqueTrademarkCount metric and availability are required", {

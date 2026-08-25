@@ -7,6 +7,12 @@ const path = require("path");
 const { analyzeEntries } = require("../04-analyze-brand/lib/analyzer");
 const { buildDashboardSnapshot } = require("../07-dashboard/lib/snapshot");
 
+const SUPPLEMENTAL_SOURCE_IDS = new Set([
+  "nfqs_quality_cert",
+  "kofpi_forest_product",
+  "forest_product_production_survey",
+]);
+
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
 }
@@ -19,6 +25,13 @@ function union(values) {
   return [...new Set(values.filter(Boolean))];
 }
 
+function successfulSearchPageRequestCount(document) {
+  return Object.values(document.queryFacts || {}).reduce(
+    (sum, fact) => sum + Number(fact.pages?.fetchedCount || 0),
+    0
+  );
+}
+
 function mergeMetric(base, extra) {
   if (!base) return extra;
   if (!extra) return base;
@@ -28,7 +41,7 @@ function mergeMetric(base, extra) {
 function mergeItem(base, extra) {
   const substantiveBaseSources = (base.sources || []).filter((sourceId) =>
     !sourceId.startsWith("label-") &&
-    !["nfqs_quality_cert", "kofpi_forest_product", "forest_product_production_survey"].includes(sourceId)
+    !SUPPLEMENTAL_SOURCE_IDS.has(sourceId)
   );
   if (substantiveBaseSources.length === 0 &&
       (base.sources || []).some((sourceId) => ["nfqs_quality_cert", "kofpi_forest_product"].includes(sourceId))) {
@@ -53,6 +66,67 @@ function mergeItem(base, extra) {
     registrationYearCounts: base.registrationYearCounts || extra.registrationYearCounts || null,
     metrics,
   };
+}
+
+function stripPreviouslyMergedSupplementalRows(regions, nfqsFacilityRegionItemKeys = new Set()) {
+  return regions.map((region) => ({
+    ...structuredClone(region),
+    items: region.items.flatMap((sourceItem) => {
+      const item = structuredClone(sourceItem);
+      const nonSupplementalSources = (item.sources || []).filter((sourceId) =>
+        !SUPPLEMENTAL_SOURCE_IDS.has(sourceId));
+      const substantiveSources = nonSupplementalSources.filter((sourceId) =>
+        !sourceId.startsWith("label-"));
+      const regionItemKey = `${region.region}\u001f${itemKey(item)}`;
+      if (substantiveSources.length === 0 &&
+          ((item.sources || []).some((sourceId) => SUPPLEMENTAL_SOURCE_IDS.has(sourceId)) ||
+            nfqsFacilityRegionItemKeys.has(regionItemKey))) {
+        return [];
+      }
+      item.sources = nonSupplementalSources;
+      delete item.regionalEvidence;
+      for (const metric of Object.values(item.metrics || {})) {
+        if (Array.isArray(metric?.sourceIds)) {
+          metric.sourceIds = metric.sourceIds.filter((sourceId) => !SUPPLEMENTAL_SOURCE_IDS.has(sourceId));
+        }
+      }
+      return [item];
+    }),
+  })).filter((region) => region.items.length > 0);
+}
+
+function collectNfqsFacilityRegionItemKeys(document) {
+  return new Set((document.results || [])
+    .filter((result) => result.input?.sourceId === "nfqs_quality_cert")
+    .map((result) => {
+      const region = [result.input?.sido, result.input?.sigungu].filter(Boolean).join(" ");
+      return `${region}\u001f${itemKey(result.input || {})}`;
+    }));
+}
+
+function normalizeNfqsFacilityScopes(document) {
+  for (const result of document.results || []) {
+    if (result.input?.sourceId !== "nfqs_quality_cert") continue;
+    result.input = {
+      ...result.input,
+      sido: "전국",
+      sigungu: "지역 미제공",
+      regionCode: "",
+      regionMatchMethod: "facility_location_not_specialty_origin",
+      sourceRegionName: "전국(인증사업장 소재지는 특산품 생산지 근거가 아님)",
+      sourceScope: "nationwide_certified_product_catalog",
+    };
+    result.provenance = {
+      ...(result.provenance || {}),
+      sourceRegionName: result.input.sourceRegionName,
+      regionMatchMethod: result.input.regionMatchMethod,
+    };
+    result.query = {
+      ...(result.query || {}),
+      region: "전국 지역 미제공",
+      regionMatch: "not_applicable",
+    };
+  }
 }
 
 function expandForestRegionalResults(document, evidenceDocument) {
@@ -150,13 +224,15 @@ function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
 function main() {
   const root = path.resolve(__dirname, "..");
   const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
-  const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r2-enriched.json");
+  const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r3-enriched.json");
   const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
   const base = readJson(basePath);
   const document = readJson(matchPath);
   const forestRegionEvidence = readJson(forestRegionPath);
   const sourceInputRowCount = document.inputCount;
+  const nfqsFacilityRegionItemKeys = collectNfqsFacilityRegionItemKeys(document);
 
+  normalizeNfqsFacilityScopes(document);
   expandForestRegionalResults(document, forestRegionEvidence);
 
   const analysis = analyzeEntries(document, {
@@ -179,7 +255,10 @@ function main() {
     warnings: [],
   };
   const extra = buildDashboardSnapshot({ analysis, gap, strategy }, { mode: "full", stage: "alpha" });
-  const regions = mergeRegions(base.regions, extra.regions);
+  const regions = mergeRegions(
+    stripPreviouslyMergedSupplementalRows(base.regions, nfqsFacilityRegionItemKeys),
+    extra.regions
+  );
   const forestEvidenceCoverage = attachForestPrimaryRegionEvidence(regions, forestRegionEvidence);
   const regionalRegions = regions.filter((region) => region.sido !== "전국");
   const nationwideCatalogRegions = regions.filter((region) => region.sido === "전국");
@@ -218,7 +297,8 @@ function main() {
         uniqueQueryCount: document.uniqueQueryCount,
         completeUniqueQueryCount: document.completeUniqueQueryCount,
         partialUniqueQueryCount: document.partialUniqueQueryCount,
-        requestCount: document.requestCount,
+        requestCount: successfulSearchPageRequestCount(document),
+        requestAttemptCount: document.requestCount,
         uniqueApplicationCount: document.applicationApplicantEnrichment?.uniqueApplicationCount || 0,
         completeApplicationCount: document.applicationApplicantEnrichment?.completeApplicationCount || 0,
         applicantRegionCounts: document.applicationApplicantEnrichment?.applicantRegionCounts || null,
@@ -244,8 +324,9 @@ function main() {
     warnings: union([
       ...base.warnings,
       "NFQS 품질인증수산물 290행과 KOFPI 임산물 90행을 2026-08-25 실 API로 수집하고 KIPRIS 검색 결과를 병합했습니다.",
+      "NFQS jisokaddr는 인증사업장 소재지이므로 지역 특산품 귀속에 사용하지 않고 전국 인증 수산물 카탈로그로만 표시합니다.",
       `KOFPI 임산물 ${forestEvidenceCoverage.matchedItems}개에는 2024년 임산물생산조사의 공식 주산지 근거 ${forestEvidenceCoverage.evidenceRows}건을 연결하고 출원인 주소를 주산지별로 재검증했습니다.`,
-      "신규 수산·임산 KIPRIS 검색은 최대 150페이지·필터 통과 1,500건 범위로 재수집하고 출원인 주소 46,789건을 보강했습니다. 범위 상한에 도달한 일반어는 부분 수집으로 계속 표시합니다.",
+      `신규 수산·임산 KIPRIS 검색은 최대 750페이지·필터 통과 3,000건 범위로 재수집하고 출원인 주소 ${document.applicationApplicantEnrichment?.completeApplicationCount || 0}건을 보강했습니다. 범위 상한에 도달한 일반어는 부분 수집으로 계속 표시합니다.`,
     ]),
     regions,
   };

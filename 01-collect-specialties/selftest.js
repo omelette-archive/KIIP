@@ -416,7 +416,7 @@ async function run() {
     ok("HTTP 200이어도 농사로 resultCode가 00이 아니면 실패 처리됨");
   }
 
-  console.log("7-2) nfqsClient — cert_key 파라미터·User-Agent 필수·주소 기반 지역 매칭(#114)");
+  console.log("7-2) nfqsClient — cert_key·User-Agent 및 사업장 주소의 비지역화(#114)");
   {
     const requestedUrls = [];
     const requestedHeaders = [];
@@ -449,10 +449,13 @@ async function run() {
     assert.ok(requestedHeaders[0]["User-Agent"], "일반 User-Agent 헤더 없이 호출하면 실제 서버가 빈 응답을 주므로 항상 지정해야 함");
     const adminList = loadAdminCodes();
     const normalized = fromNfqsCertifications(records, adminList);
-    assert.strictEqual(normalized.rows[0].sido, "부산광역시");
-    assert.strictEqual(normalized.rows[0].sigungu, "사하구");
+    assert.strictEqual(normalized.rows[0].sido, "");
+    assert.strictEqual(normalized.rows[0].sigungu, "");
+    assert.strictEqual(normalized.rows[0].regionMatchMethod, "facility_location_not_specialty_origin");
+    assert.strictEqual(normalized.rows[0].sourceScope, "nationwide_certified_product_catalog");
     assert.strictEqual(normalized.rows[0].rawItemName, "간고등어");
-    ok("cert_key 파라미터로 호출하고, 업체 주소 문자열에서 시도·시군구를 뽑아냄");
+    assert.match(normalized.warnings[0], /인증사업장 주소를 지역 특산품 근거로 사용하지 않고/);
+    ok("cert_key로 호출하되 인증사업장 주소를 지역 특산품 소재지로 승격하지 않음");
   }
 
   console.log("7-2b) nfqsClient — API 결과코드 오류 감지");

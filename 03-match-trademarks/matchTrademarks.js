@@ -526,7 +526,7 @@ async function runBatch(rows, client, options) {
         collected.stopReason !== saved.stopReason ||
         (collected.hits?.length || 0) !== (saved.hits?.length || 0);
       if (options.saveCheckpoint && checkpointChanged) {
-        options.saveCheckpoint(checkpointQueries);
+        options.saveCheckpoint(checkpointQueries, budget.used);
       }
     }
     return { ...group, collected, reusedFromCheckpoint: collected === saved };
@@ -562,7 +562,8 @@ async function runBatch(rows, client, options) {
     results,
     uniqueQueryCount: groups.length,
     uniqueQueryStatusCounts,
-    requestCount: budget.used,
+    requestCount: (options.priorRequestCount || 0) + budget.used,
+    requestCountThisRun: budget.used,
     resumedQueryCount,
   };
 }
@@ -799,8 +800,9 @@ async function main() {
     );
     const checkpoint = args.resume
       ? loadCheckpoint(checkpointPath, numeric)
-      : { schemaVersion: "1.0", options: numeric, queries: {} };
-    const saveCheckpoint = (queries) =>
+      : { schemaVersion: "1.0", options: numeric, requestCount: 0, queries: {} };
+    const priorRequestCount = Number(checkpoint.requestCount) || 0;
+    const saveCheckpoint = (queries, requestCountThisRun = 0) =>
       writeJsonAtomic(checkpointPath, {
         schemaVersion: "1.0",
         options: {
@@ -808,6 +810,7 @@ async function main() {
           maxPages: numeric.maxPages,
           maxHitsPerQuery: numeric.maxHitsPerQuery,
         },
+        requestCount: priorRequestCount + requestCountThisRun,
         updatedAt: new Date().toISOString(),
         queries,
       });
@@ -819,6 +822,7 @@ async function main() {
       ...batchPlanOptions,
       resume: Boolean(args.resume),
       checkpointQueries: checkpoint.queries || {},
+      priorRequestCount,
       saveCheckpoint,
       areaBrandContext,
     });
@@ -848,6 +852,7 @@ async function main() {
       duplicateQueryRowCount: searchableRows - batch.uniqueQueryCount,
       reviewRequiredSearchEnabled: batchPlanOptions.includeReviewRequired,
       requestCount: batch.requestCount,
+      requestCountThisRun: batch.requestCountThisRun,
       resumedQueryCount: batch.resumedQueryCount,
       successCount: results.filter((row) => row.status === "ok").length,
       partialCount: results.filter((row) => row.collectionStatus === "partial").length,

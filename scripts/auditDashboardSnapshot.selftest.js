@@ -63,6 +63,14 @@ const invalidReport = auditSnapshot(invalid);
 assert.strictEqual(invalidReport.ok, false);
 assert.ok(invalidReport.errors.some((error) => error.code === "incomplete_confirmed_specialty"));
 
+const nfqsFacilityAsRegion = snapshotFixture();
+nfqsFacilityAsRegion.regions[0].items[0].sources = ["nfqs_quality_cert"];
+const nfqsFacilityAsRegionReport = auditSnapshot(nfqsFacilityAsRegion);
+assert.strictEqual(nfqsFacilityAsRegionReport.ok, false);
+assert.ok(nfqsFacilityAsRegionReport.errors.some(
+  (error) => error.code === "nfqs_facility_location_used_as_specialty_region"
+));
+
 // 2026-08-20 AI 검토(커밋 119a1a2)로 확정된 raw_item_goods_matched 항목은 고시명칭
 // 사전 매칭이 아니라 등록원부 지정상품 대조로 확정된 것이라 niceClass가 없어도
 // 확인된 특산품(review가 아님)으로 인식해야 한다.

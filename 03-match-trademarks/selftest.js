@@ -552,18 +552,34 @@ async function run() {
     assert.strictEqual(interrupted.results[0].stopReason, "request_budget");
     assert.strictEqual(interrupted.results[0].hits.length, 4);
     assert.strictEqual(interrupted.results[1].hits.length, 4);
+    assert.strictEqual(interrupted.requestCount, 2);
+    assert.strictEqual(interrupted.requestCountThisRun, 2);
 
     calledPages.length = 0;
-    const resumed = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
+    const resumed = await runBatch(rows, client, {
+      ...baseOptions,
+      maxRequests: 3,
+      resume: true,
+      priorRequestCount: interrupted.requestCount,
+    });
     assert.deepStrictEqual(calledPages, [3], "재개 시 다음 미완료 페이지만 호출해야 함");
     assert.strictEqual(resumed.results[0].collectionStatus, "complete");
     assert.deepStrictEqual(resumed.uniqueQueryStatusCounts, { complete: 1, partial: 0, error: 0 });
     assert.strictEqual(resumed.results[0].hits.length, 5);
+    assert.strictEqual(resumed.requestCount, 3);
+    assert.strictEqual(resumed.requestCountThisRun, 1);
 
     calledPages.length = 0;
-    const reused = await runBatch(rows, client, { ...baseOptions, maxRequests: 3, resume: true });
+    const reused = await runBatch(rows, client, {
+      ...baseOptions,
+      maxRequests: 3,
+      resume: true,
+      priorRequestCount: resumed.requestCount,
+    });
     assert.deepStrictEqual(calledPages, [], "완료 쿼리는 재실행 시 API를 다시 호출하면 안 됨");
     assert.strictEqual(reused.resumedQueryCount, 1);
+    assert.strictEqual(reused.requestCount, 3);
+    assert.strictEqual(reused.requestCountThisRun, 0);
     assert.ok(reused.results.every((row) => row.reusedFromCheckpoint));
     const compact = compactBatchOutput({
       schemaVersion: "1.2",
