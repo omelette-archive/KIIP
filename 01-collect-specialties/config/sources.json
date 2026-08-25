@@ -151,14 +151,14 @@
         "verification": "공식 페이지에 명시된 할당량 없음. 2026-08-25 실키로 직접 호출해 resultCode=00(NORMAL SERVICE) 확인 — 파라미터명이 표준 serviceKey가 아니라 cert_key인 점이 핵심(serviceKey로는 키 유무와 무관하게 항상 PARAMETER ERROR). 페이지네이션 파라미터 없이 전체 약 114KB(수백 건) 응답."
       },
       "implementation": {
-        "status": "adapter_implemented_not_in_default_sources",
+        "status": "live_collector_in_default_sources",
         "adapter": "lib/nfqsClient.js + lib/normalize.js:fromNfqsCertifications"
       }
     },
     {
       "id": "kofpi_forest_product",
       "name": "한국임업진흥원 임산물DB백과",
-      "role": "normalization_reference",
+      "role": "collector",
       "dataVersion": "kofpi-forest-products-v1",
       "lastVerifiedAt": "2026-08-25",
       "catalogUrl": "https://www.kofpi.or.kr/public/dataOpen_02.do",
@@ -176,8 +176,8 @@
         "verification": "공식 페이지에 명시된 할당량 없음. 일반 브라우저 User-Agent 헤더 없이 호출하면 '보안 정책에 따라 차단' 메시지(빈 200 응답)가 반환됨을 직접 확인. 2026-08-25 대분류 8종·소분류 90품목 전량 조회해 02-normalize-items/data/kofpi-forest-products-v1.json으로 정적 저장(지역 정보가 없는 순수 품목 사전이라 01단계 수집 소스가 아니라 02단계 정규화 참고 사전으로 씀, #114)"
       },
       "implementation": {
-        "status": "reference_snapshot_implemented",
-        "adapter": "02-normalize-items/lib/ruleNormalizer.js (findKofpiForestProductReference) + 02-normalize-items/data/kofpi-forest-products-v1.json"
+        "status": "live_collector_implemented",
+        "adapter": "01-collect-specialties/lib/kofpiClient.js + lib/normalize.js:fromKofpiProducts"
       }
     },
     {

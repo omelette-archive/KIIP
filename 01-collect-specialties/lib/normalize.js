@@ -337,6 +337,28 @@ function fromNfqsCertifications(certifications, adminList) {
   });
 }
 
+function fromKofpiProducts(products, now = new Date().toISOString()) {
+  return {
+    rows: products.map((product) => ({
+      sido: "",
+      sigungu: "",
+      regionCode: "",
+      regionMatchMethod: "source_has_no_region_nationwide_scope",
+      sourceRegionName: "전국(지역 미제공)",
+      sourceRegionCode: "",
+      sourceItemName: product.productName,
+      sourceRecordUrl: "https://www.kofpi.or.kr/public/dataOpen_02.do",
+      sourceScope: "nationwide_catalog",
+      rawItemName: product.productName,
+      source: "임산물DB백과",
+      collectedAt: now,
+    })),
+    warnings: [
+      `kofpi_forest_product: 지역 필드가 없는 전국 임산물 ${products.length}건을 지역 미지정으로 수집`,
+    ],
+  };
+}
+
 module.exports = {
   cleanRegionText,
   compactRegionText,
@@ -349,4 +371,5 @@ module.exports = {
   fromGiRegistrations,
   fromNongsaro,
   fromNfqsCertifications,
+  fromKofpiProducts,
 };

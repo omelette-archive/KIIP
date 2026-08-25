@@ -166,6 +166,24 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
   const itemName = cleanItemName(row.rawItemName, row);
   if (!itemName) return reviewResult(base, "", [], "정제할 품목명이 없음");
 
+  if (["nfqs_quality_cert", "kofpi_forest_product"].includes(row.sourceId)) {
+    return {
+      ...base,
+      itemName,
+      noticeName: "",
+      niceClass: "",
+      similarGroupCode: "",
+      excluded: false,
+      status: "ok",
+      matchMethod: "source_catalog_item",
+      confidence: "1.0000",
+      verdictSource: "official_source_catalog",
+      reviewReason: "",
+      reviewCandidates: "[]",
+      error: "",
+    };
+  }
+
   const candidates = findCandidates(itemName, dictionary, {}, { topK });
   const officialNameIndex = getOfficialNameIndex(dictionary);
 

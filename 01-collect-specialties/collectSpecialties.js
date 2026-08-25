@@ -26,7 +26,8 @@ const { loadAdminCodes } = require("./lib/adminCodes");
 const { createClient: createGiClient, normalizeDate: normalizeGiDate } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { createClient: createNfqsClient } = require("./lib/nfqsClient");
-const { fromGiRegistrations, fromNongsaro, fromNfqsCertifications } = require("./lib/normalize");
+const { createClient: createKofpiClient } = require("./lib/kofpiClient");
+const { fromGiRegistrations, fromNongsaro, fromNfqsCertifications, fromKofpiProducts } = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createCollectionStore, makeStoredRecords } = require("./lib/collectionStore");
 const {
@@ -38,7 +39,7 @@ loadEnv();
 
 function parseArgs(argv) {
   const args = {
-    sources: "gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties",
+    sources: "gi,nongsaro,nfqs_quality_cert,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -131,7 +132,7 @@ function writeOutputCsv(outPath, rows) {
   const fields = [
     "sido", "sigungu", "rawItemName", "source", "sourceId", "sourceContractVersion",
     "sourceUrl", "sourceLastVerifiedAt", "collectedAt", "regionCode", "regionMatchMethod",
-    "sourceRegionName", "sourceRegionCode", "sourceItemName", "sourceRecordUrl",
+    "sourceRegionName", "sourceRegionCode", "sourceItemName", "sourceRecordUrl", "sourceScope",
   ];
   const lines = [fields.join(",")];
   for (const row of rows) lines.push(fields.map((f) => csvEscape(row[f])).join(","));
@@ -226,6 +227,26 @@ async function collectNfqs(adminList, warnings, options = {}) {
   }
 }
 
+async function collectKofpi(_adminList, warnings, options = {}) {
+  let requestCount = 0;
+  try {
+    const client = createKofpiClient({ onRequest: () => requestCount++ });
+    const products = await client.listProducts({ limit: options.limit });
+    const normalized = fromKofpiProducts(products);
+    const rows = addSourceMetadata(normalized.rows, options.sourceDefinition);
+    warnings.push(...normalized.warnings);
+    return {
+      rows,
+      rawRecords: makeStoredRecords("kofpi_forest_product", products, rows),
+      succeeded: true,
+      requestCount,
+    };
+  } catch (err) {
+    warnings.push(`kofpi_forest_product 소스 건너뜀: ${err.message}`);
+    return { rows: [], rawRecords: [], succeeded: false, requestCount, error: err.message };
+  }
+}
+
 const OFFICIAL_SUPPLEMENT_PATHS = {
   sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
   jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
@@ -259,6 +280,7 @@ const COLLECTORS = {
   sejong_official_specialties: collectOfficialSupplement,
   jeju_naqs_gi_specialties: collectOfficialSupplement,
   nfqs_quality_cert: collectNfqs,
+  kofpi_forest_product: collectKofpi,
 };
 
 async function main() {

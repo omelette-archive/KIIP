@@ -74,6 +74,7 @@ function readInputCsv(inputPath) {
     sourceRegionCode: header.indexOf("sourceRegionCode"),
     sourceItemName: header.indexOf("sourceItemName"),
     sourceRecordUrl: header.indexOf("sourceRecordUrl"),
+    sourceScope: header.indexOf("sourceScope"),
   };
   if (idx.sido === -1 || idx.sigungu === -1 || idx.rawItemName === -1) {
     throw new Error(`입력 CSV에 sido/sigungu/rawItemName 컬럼이 필요합니다: ${header.join(",")}`);
@@ -117,6 +118,7 @@ function readInputCsv(inputPath) {
       sourceRegionCode: idx.sourceRegionCode === -1 ? "" : fields[idx.sourceRegionCode] || "",
       sourceItemName: idx.sourceItemName === -1 ? "" : fields[idx.sourceItemName] || "",
       sourceRecordUrl: idx.sourceRecordUrl === -1 ? "" : fields[idx.sourceRecordUrl] || "",
+      sourceScope: idx.sourceScope === -1 ? "" : fields[idx.sourceScope] || "",
     };
   });
 }
@@ -144,6 +146,7 @@ const OUTPUT_FIELDS = [
   "sourceRegionCode",
   "sourceItemName",
   "sourceRecordUrl",
+  "sourceScope",
   "itemName",
   "noticeName",
   "niceClass",
@@ -240,6 +243,7 @@ async function main() {
     sourceRegionCode: row.sourceRegionCode,
     sourceItemName: row.sourceItemName,
     sourceRecordUrl: row.sourceRecordUrl,
+    sourceScope: row.sourceScope,
     normalizationVersion: NORMALIZATION_VERSION,
     dictionaryVersion: DICTIONARY_VERSION,
     dictionarySourceUrl: DICTIONARY_SOURCE_URL,
