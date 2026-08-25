@@ -688,28 +688,6 @@ test("shows an adjustable year-range application/registration trend chart", asyn
     /등록\(등록원부 보강 완료 건\)/,
     "등록 계열이 실제 등록일자와 등록원부 보강 범위를 사용한다는 점을 화면에 밝혀야 함",
   );
-  // 2026-08-25(#116): "최근 1년 볼 때 월별로 봐야 그래프가 의미 있다" — KIPRIS 원본
-  // 날짜(YYYYMMDD)에서 뽑은 월별 집계(applicationMonthCounts/registrationMonthCounts)로
-  // 선택된 연도 구간을 달 단위로도 볼 수 있는 토글을 추가했다.
-  const withMonthData = snapshot.regions
-    .flatMap((region) => region.items)
-    .filter((item) => item.applicationMonthCounts && Object.keys(item.applicationMonthCounts).length > 0);
-  assert.ok(withMonthData.length > 0, "실제 KIPRIS 재실행으로 채운 월별 출원 데이터가 스냅샷에 있어야 이 기능이 라이브에서 빈 그래프로 뜨지 않음");
-  assert.match(standaloneHtml, /const sumMonthCounts = \(items, field\) => \{/, "월별 출원·등록 건수를 합산하는 공용 헬퍼가 있어야 함");
-  assert.match(standaloneHtml, /const monthIndexOf = \(monthKey\) => \{/, "\"YYYY-MM\"을 연속 정수로 바꿔 기존 trendScales/trendLinePath를 그대로 재사용해야 함");
-  assert.match(standaloneHtml, /class="trend-granularity"/, "연도별/월별 전환 토글이 있어야 함");
-  assert.match(standaloneHtml, /data-trend-granularity="year"/);
-  assert.match(standaloneHtml, /data-trend-granularity="month"/);
-  assert.match(
-    standaloneHtml,
-    /trendMonthHasData\s*\?\s*`<div class="trend-granularity"/,
-    "월별 데이터가 있는 범위에서만 토글을 노출해야 함(전부 연도별만 있으면 숨김)",
-  );
-  assert.match(
-    standaloneHtml,
-    /class="trend-coverage-note"/,
-    "월별 데이터가 연도별보다 적은 범위에서는 몇 건에만 있는지 알리는 안내가 있어야 함",
-  );
 });
 
 test("ships traceable province and municipality geometry", async () => {

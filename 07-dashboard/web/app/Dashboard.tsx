@@ -8,7 +8,7 @@ type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string;
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
 type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
-type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; category?: ItemCategory | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; category?: ItemCategory | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
@@ -90,30 +90,6 @@ function sumYearCounts(items: Item[], field: "applicationYearCounts" | "registra
     for (const [year, value] of Object.entries(counts)) {
       const y = Number(year);
       if (Number.isFinite(y)) totals[y] = (totals[y] || 0) + value;
-    }
-  }
-  return totals;
-}
-// "YYYY-MM" 문자열을 trendScales/trendLinePath가 다루는 연속된 정수 하나로 바꾼다
-// (year*12 + (month-1)) — 두 헬퍼는 값의 의미와 무관하게 정수 배열만 다루므로
-// 연도와 동일한 방식으로 월별 그래프에도 그대로 재사용할 수 있다.
-function monthIndexOf(monthKey: string) {
-  const [year, month] = monthKey.split("-").map(Number);
-  return year * 12 + (month - 1);
-}
-function monthKeyFromIndex(index: number) {
-  const year = Math.floor(index / 12);
-  const month = (index % 12) + 1;
-  return `${year}-${String(month).padStart(2, "0")}`;
-}
-function sumMonthCounts(items: Item[], field: "applicationMonthCounts" | "registrationMonthCounts") {
-  const totals: Record<number, number> = {};
-  for (const item of items) {
-    const counts = item[field];
-    if (!counts) continue;
-    for (const [month, value] of Object.entries(counts)) {
-      const index = monthIndexOf(month);
-      totals[index] = (totals[index] || 0) + value;
     }
   }
   return totals;
@@ -305,7 +281,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
   const [trendStartYear, setTrendStartYear] = useState<number | null>(null);
   const [trendEndYear, setTrendEndYear] = useState<number | null>(null);
-  const [trendGranularity, setTrendGranularity] = useState<"year" | "month">("year");
 
   const regionalRegions = useMemo(() => snapshot.regions.filter((region) => region.sido !== "전국"), [snapshot.regions]);
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
@@ -497,19 +472,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const trendMax = Math.max(1, ...trendYears.map((year) => Math.max(trendApplicationTotals[year] || 0, trendRegisteredTotals[year] || 0)));
   const trendScale = trendScales(trendStart, trendEnd, trendMax);
   const trendHasData = trendAllYears.length > 0;
-  // 월별 보기는 선택된 연도 구간(trendStart~trendEnd)은 그대로 두고, 그 안을 달 단위로
-  // 촘촘하게 보여준다 — "최근 1년" 같은 짧은 구간에서 그래프가 점 하나로 뜨는 걸 막기
-  // 위해 요청됨(#116). 연도별 재집계와 별개로 이미 계산돼 있는 월별 필드를 쓴다.
-  const trendItemsWithYearData = trendItems.filter((item) => item.applicationYearCounts && Object.keys(item.applicationYearCounts).length > 0);
-  const trendItemsWithMonthData = trendItems.filter((item) => item.applicationMonthCounts && Object.keys(item.applicationMonthCounts).length > 0);
-  const trendMonthHasData = trendItemsWithMonthData.length > 0;
-  const trendGranularityActive = trendGranularity === "month" && trendMonthHasData ? "month" : "year";
-  const trendMonthApplicationTotals = sumMonthCounts(trendItems, "applicationMonthCounts");
-  const trendMonthRegisteredTotals = sumMonthCounts(trendItems, "registrationMonthCounts");
-  const trendMonthIndexes: number[] = [];
-  for (let index = monthIndexOf(`${trendStart}-01`); index <= monthIndexOf(`${trendEnd}-12`); index++) trendMonthIndexes.push(index);
-  const trendMonthMax = Math.max(1, ...trendMonthIndexes.map((index) => Math.max(trendMonthApplicationTotals[index] || 0, trendMonthRegisteredTotals[index] || 0)));
-  const trendMonthScale = trendScales(trendMonthIndexes[0], trendMonthIndexes[trendMonthIndexes.length - 1], trendMonthMax);
   const pipeline = snapshot.pipelineStatus;
   const scopeLabel = snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터";
   const gateTotal = pipeline ? pipeline.regionalMetricGate.availableRegionItemCount + pipeline.regionalMetricGate.blockedRegionItemCount : snapshot.coverage.regionItemCount;
@@ -562,9 +524,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <button type="button" className={trendStart === trendFullEnd && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
             </div>
             <div className="trend-range-inputs"><label><span className="sr-only">시작 연도</span>{trendStart}<input type="number" aria-label="시작 연도" value={trendStart} onChange={(event) => setTrendStartYear(Number(event.target.value) || trendFullStart)} /></label><span>~</span><label><span className="sr-only">끝 연도</span>{trendEnd}<input type="number" aria-label="끝 연도" value={trendEnd} onChange={(event) => setTrendEndYear(Number(event.target.value) || trendFullEnd)} /></label></div>
-            {trendMonthHasData && <div className="trend-granularity" role="group" aria-label="추이 그래프 단위"><button type="button" className={trendGranularityActive === "year" ? "active" : ""} onClick={() => setTrendGranularity("year")}>연도별</button><button type="button" className={trendGranularityActive === "month" ? "active" : ""} onClick={() => setTrendGranularity("month")}>월별</button></div>}
           </div>
-          {trendGranularityActive === "month" && trendItemsWithMonthData.length < trendItemsWithYearData.length && <p className="trend-coverage-note">월별 데이터는 이 범위 품목 {trendItemsWithYearData.length}개 중 {trendItemsWithMonthData.length}개에만 있습니다(나머지는 연도별로만 조회 가능).</p>}
           <div className="trend-range-slider"><span className="trend-range-label">{trendFullStart}년 – {trendFullEnd}년 중 {trendStart}년 – {trendEnd}년 선택</span>
             <div className="trend-range-track">
               <div className="trend-range-fill" style={{ left: `${trendHandlePercent(trendStart, trendFullStart, trendFullEnd)}%`, right: `${100 - trendHandlePercent(trendEnd, trendFullStart, trendFullEnd)}%` }} />
@@ -572,7 +532,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <button type="button" className="trend-range-handle trend-range-handle-end" role="slider" aria-label="끝 연도 조절" aria-valuemin={trendStart} aria-valuemax={trendFullEnd} aria-valuenow={trendEnd} style={{ left: `${trendHandlePercent(trendEnd, trendFullStart, trendFullEnd)}%` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => { if (event.buttons !== 1 || !event.currentTarget.parentElement) return; setTrendEndYear(trendYearAtPointer(event.clientX, event.currentTarget.parentElement, trendFullStart, trendFullEnd)); }} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowDown") { event.preventDefault(); setTrendEndYear(Math.max(trendStart, trendEnd - 1)); } else if (event.key === "ArrowRight" || event.key === "ArrowUp") { event.preventDefault(); setTrendEndYear(Math.min(trendFullEnd, trendEnd + 1)); } }} />
             </div>
           </div>
-          {trendGranularityActive === "year" ? <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${trendStart}년부터 ${trendEnd}년까지 연도별 출원·등록 건수 추이`}>
+          <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${trendStart}년부터 ${trendEnd}년까지 연도별 출원·등록 건수 추이`}>
             {[0, 0.5, 1].map((fraction) => { const value = Math.round(trendMax * fraction); const yPos = trendScale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 8} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
             <path d={`${trendLinePath(trendYears, trendApplicationTotals, trendScale)}L${trendScale.x(trendEnd).toFixed(1)},${trendScale.baseY}L${trendScale.x(trendStart).toFixed(1)},${trendScale.baseY}Z`} className="trend-area" />
             <path d={trendLinePath(trendYears, trendRegisteredTotals, trendScale)} className="trend-line trend-line-registered" />
@@ -580,15 +540,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             {trendYears.map((year) => <circle key={`app-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendApplicationTotals[year] || 0)} r={2.6} className="trend-point trend-point-application"><title>{year}년 출원 {number(trendApplicationTotals[year] || 0)}건</title></circle>)}
             {trendYears.map((year) => <circle key={`reg-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendRegisteredTotals[year] || 0)} r={2.6} className="trend-point trend-point-registered"><title>{year}년 등록 {number(trendRegisteredTotals[year] || 0)}건</title></circle>)}
             {trendYearLabels(trendYears).map((year) => <text key={`label-${year}`} x={trendScale.x(year)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{year}</text>)}
-          </svg> : <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${trendStart}년 ${trendEnd}년 월별 출원·등록 건수 추이`}>
-            {[0, 0.5, 1].map((fraction) => { const value = Math.round(trendMonthMax * fraction); const yPos = trendMonthScale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 8} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
-            <path d={`${trendLinePath(trendMonthIndexes, trendMonthApplicationTotals, trendMonthScale)}L${trendMonthScale.x(trendMonthIndexes[trendMonthIndexes.length - 1]).toFixed(1)},${trendMonthScale.baseY}L${trendMonthScale.x(trendMonthIndexes[0]).toFixed(1)},${trendMonthScale.baseY}Z`} className="trend-area" />
-            <path d={trendLinePath(trendMonthIndexes, trendMonthRegisteredTotals, trendMonthScale)} className="trend-line trend-line-registered" />
-            <path d={trendLinePath(trendMonthIndexes, trendMonthApplicationTotals, trendMonthScale)} className="trend-line trend-line-application" />
-            {trendMonthIndexes.map((index) => <circle key={`app-${index}`} cx={trendMonthScale.x(index)} cy={trendMonthScale.y(trendMonthApplicationTotals[index] || 0)} r={2.2} className="trend-point trend-point-application"><title>{monthKeyFromIndex(index)} 출원 {number(trendMonthApplicationTotals[index] || 0)}건</title></circle>)}
-            {trendMonthIndexes.map((index) => <circle key={`reg-${index}`} cx={trendMonthScale.x(index)} cy={trendMonthScale.y(trendMonthRegisteredTotals[index] || 0)} r={2.2} className="trend-point trend-point-registered"><title>{monthKeyFromIndex(index)} 등록 {number(trendMonthRegisteredTotals[index] || 0)}건</title></circle>)}
-            {trendYearLabels(trendMonthIndexes).map((index) => <text key={`label-${index}`} x={trendMonthScale.x(index)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{monthKeyFromIndex(index)}</text>)}
-          </svg>}
+          </svg>
           <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
         </> : <p className="empty">이 범위는 아직 연도별 출원 데이터가 수집되지 않았습니다.</p>}
       </section>
