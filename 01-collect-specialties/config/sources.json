@@ -130,6 +130,32 @@
       }
     },
     {
+      "id": "nfqs_quality_cert",
+      "name": "해양수산부 국립수산물품질관리원 품질인증수산물",
+      "role": "collector",
+      "dataVersion": "provider-live-api",
+      "lastVerifiedAt": "2026-08-25",
+      "catalogUrl": "https://www.data.go.kr/data/15058693/openapi.do",
+      "providerUrl": "https://www.nfqs.go.kr/hpmg/front/api/quality_api.do",
+      "formats": ["XML"],
+      "authentication": {
+        "required": true,
+        "keyEnv": "NFQS_QUALITY_API_KEY",
+        "baseUrlEnv": "NFQS_QUALITY_API_BASE_URL",
+        "defaultBaseUrl": "https://www.nfqs.go.kr/hpmg/front/api/quality_api.do",
+        "approval": "data_go_kr_service_application"
+      },
+      "quota": {
+        "type": "provider_undocumented",
+        "value": null,
+        "verification": "공식 페이지에 명시된 할당량 없음. 2026-08-25 실키로 직접 호출해 resultCode=00(NORMAL SERVICE) 확인 — 파라미터명이 표준 serviceKey가 아니라 cert_key인 점이 핵심(serviceKey로는 키 유무와 무관하게 항상 PARAMETER ERROR). 페이지네이션 파라미터 없이 전체 약 114KB(수백 건) 응답."
+      },
+      "implementation": {
+        "status": "live_key_validated",
+        "adapter": null
+      }
+    },
+    {
       "id": "kofpi_forest_product",
       "name": "한국임업진흥원 임산물DB백과",
       "role": "collector",
