@@ -3,6 +3,7 @@
 const { findCandidates, stripRegionNames } = require("./candidateSearch");
 const { isServiceClass } = require("./filters");
 const approvedAliases = require("../data/approved-aliases.json");
+const kofpiForestProducts = require("../data/kofpi-forest-products-v1.json");
 
 const EXCLUDED_SUFFIX_RE = /(나무|묘목|모종|종묘|종자|씨앗)$/;
 // 이슈 #74(2026-08-18 결정): 원물(매실)의 사전 후보가 가공품/파생품(매실주) 형태로만
@@ -46,6 +47,29 @@ function canonicalName(value) {
     .normalize("NFC")
     .toLowerCase()
     .replace(/[\s'"`()[\]{}._-]+/g, "");
+}
+
+// 이슈 #114: 한국임업진흥원 임산물DB백과는 지역 정보가 없는 순수 품목 사전이라
+// 지역×품목 행을 새로 만들 수 없다(#114 확인 결과) — 대신 고시명칭 사전에 없는
+// review_required 원물명이 실제로는 알려진 임산물(예: "지리산능이버섯"→"능이")일 때
+// 검토 사유에 학명·영문명·과명을 덧붙여 재검토를 도와준다. 사전 자체를 확정하는 게
+// 아니라 참고 근거만 추가하므로 status/matchMethod의 review_required는 그대로 유지한다.
+const kofpiIndex = new Map();
+for (const [name, info] of Object.entries(kofpiForestProducts.items)) {
+  kofpiIndex.set(canonicalName(name), { name, ...info });
+}
+function findKofpiForestProductReference(itemName) {
+  const key = canonicalName(itemName);
+  const exact = kofpiIndex.get(key);
+  if (exact) return { ...exact, matchType: "exact" };
+  // 접미(어간) 관계만 허용한다(findProcessedDerivativeCandidate와 같은 원칙) — 2글자
+  // 미만 품목명은 우연한 부분일치가 너무 흔해 제외한다(예: "삼"이 무관한 단어에도 낌).
+  let best = null;
+  for (const [kofpiKey, info] of kofpiIndex) {
+    if (kofpiKey.length < 2 || !key.endsWith(kofpiKey)) continue;
+    if (!best || kofpiKey.length > canonicalName(best.name).length) best = { ...info, matchType: "suffix" };
+  }
+  return best;
 }
 
 function cleanItemName(rawItemName, region = {}) {
@@ -250,6 +274,17 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
       candidates,
       `원물의 사전 후보가 가공품/파생품 형태("${derivative.suffix}")로만 존재함 — ${derivative.candidate.item}(#74, A안 유지: 가공품 상표를 원물 브랜드 근거로 인정하지 않음)`,
       "rule_unresolved_processed_derivative"
+    );
+  }
+  const kofpiMatch = findKofpiForestProductReference(itemName);
+  if (kofpiMatch) {
+    const detail = [kofpiMatch.scientificName, kofpiMatch.family].filter(Boolean).join(", ");
+    return reviewResult(
+      base,
+      itemName,
+      candidates,
+      `고시명칭 후보는 없지만 임산물DB백과(한국임업진흥원)에 "${kofpiMatch.name}"(${kofpiMatch.majorCategory}${detail ? `, ${detail}` : ""})로 등재됨 — 원물 확인 참고용, 고시명칭 자동 확정 아님(#114)`,
+      "rule_unresolved_kofpi_forest_product_reference"
     );
   }
   return reviewResult(

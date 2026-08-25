@@ -173,6 +173,21 @@ async function run() {
     ok("원물의 유일한 사전 후보가 가공품/파생품 형태뿐인 경우를 별도 reviewReason/matchMethod로 표시함(#74, A안 유지 — 자동 확정하지 않고 검토대기로만 구분)");
   }
 
+  console.log("5-2) ruleNormalizer — 임산물DB백과(KOFPI) 참고 근거 첨부(#114)");
+  {
+    const dictionary = makeDictionary([{ item: "신선한 사과", niceClass: "31", similarGroupCode: "G0211" }]);
+    const region = { sido: "전라남도", sigungu: "구례군", source: "농사로" };
+    const exact = normalizeByRules({ ...region, rawItemName: "고로쇠수액" }, dictionary, { topK: 5 });
+    assert.strictEqual(exact.status, "review_required");
+    assert.strictEqual(exact.matchMethod, "rule_unresolved_kofpi_forest_product_reference");
+    assert.match(exact.reviewReason, /임산물DB백과\(한국임업진흥원\)에 "수액"/);
+    assert.match(exact.reviewReason, /고시명칭 자동 확정 아님/, "참고 근거만 추가할 뿐 자동 확정이면 안 됨");
+
+    const noMatch = normalizeByRules({ ...region, rawItemName: "안동하회탈" }, dictionary, { topK: 5 });
+    assert.strictEqual(noMatch.matchMethod, "rule_unresolved", "임산물과 무관한 이름은 기존 사유를 그대로 써야 함");
+    ok("고시명칭 후보가 없어도 임산물DB백과에 등재된 이름이면 검토 사유에 학명·과명 참고 근거를 덧붙임(지역×품목 행은 새로 안 만듦)");
+  }
+
   console.log("5-1) 사용자 승인 별칭 — 승인 묶음만 공식 고시명칭으로 자동 확정");
   {
     const dictionary = makeDictionary([
