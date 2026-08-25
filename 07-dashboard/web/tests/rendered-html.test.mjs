@@ -53,8 +53,10 @@ test("renders the data-connected Korean dashboard", async () => {
   const snapshot = await loadSnapshot();
   const visibleTextHtml = html.replace(/<!--.*?-->/gs, "");
   assert.match(html, /<html[^>]*lang="ko"/i);
-  assert.match(html, /<title>지역 특산품 상표 출원<\/title>/i);
-  assert.match(html, /지역 특산품 상표 출원 현황/);
+  assert.match(html, /<title>지역 특산품-상표 분석·정책지원 플랫폼<\/title>/i);
+  // 2026-08-25(#116 재오픈): 요약 화면 클릭 시 나오던 큰 중복 제목(<h1>)이 실제로는
+  // 안 지워져 있던 걸 이번에 완전히 제거했다 — 다시 나타나면 안 됨.
+  assert.doesNotMatch(html, /지역 특산품 상표 출원 현황/, "요약 화면에 중복되는 큰 제목이 다시 나타나면 안 됨");
   assert.match(html, /마지막 업데이트/);
   assert.doesNotMatch(html, /데이터 생성일|마지막 생성/);
   // 2026-08-19 피드백: "알파테스트라는 말을 제외시키고... 최종본처럼" — 상단 배지·요약 탭
@@ -657,7 +659,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
   assert.match(html, /row\.searchTerms\.some\(\(term\) => term && term\.toLocaleLowerCase\("ko-KR"\)\.includes\(keyword\)\)/, "품목 검색은 공식 표시명 외 원물명·고시명칭도 검색해야 함");
-  assert.match(html, /<title>지역 특산품 상표 출원<\/title>/);
+  assert.match(html, /<title>지역 특산품-상표 분석·정책지원 플랫폼<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
   assert.match(html, /dashboard-map-geometry-v1/);
   assert.match(html, /특산품 수/);

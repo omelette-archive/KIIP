@@ -111,6 +111,17 @@ function trendYearLabels(years: number[]) {
   const step = Math.ceil(years.length / 6);
   return years.filter((_, index) => index % step === 0 || index === years.length - 1);
 }
+function trendHandlePercent(year: number, fullStart: number, fullEnd: number) {
+  if (fullEnd <= fullStart) return 0;
+  return ((year - fullStart) / (fullEnd - fullStart)) * 100;
+}
+function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: number, fullEnd: number) {
+  if (fullEnd <= fullStart) return fullStart;
+  const rect = track.getBoundingClientRect();
+  if (rect.width === 0) return fullStart;
+  const fraction = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width));
+  return Math.round(fullStart + fraction * (fullEnd - fullStart));
+}
 // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
 // 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
 // notice_name_and_nice_class일 때만 실제로 지식재산처 고시상품명칭 사전과 대조해 확정된
@@ -443,11 +454,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const gateTotal = pipeline ? pipeline.regionalMetricGate.availableRegionItemCount + pipeline.regionalMetricGate.blockedRegionItemCount : snapshot.coverage.regionItemCount;
   const uniqueSpecialtyCount = useMemo(() => new Set(snapshot.regions.flatMap((region) => region.items.map((item) => itemName(item)))).size, [snapshot.regions]);
   return <main className="shell">
-    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품 상표 출원 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품 상표 출원</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
 
     {tab === "summary" && <>
-      <section className="hero"><div><h1>지역 특산품 상표 출원 현황</h1><p className="hero-copy" aria-hidden="true">지역별 특산품의 상표 출원·등록 현황을 지역과 품목 기준으로 제공합니다.</p></div><div className="hero-note"><span>조사 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}건</strong><p>지속 업데이트 예정</p></div></section>
+      <section className="hero"><div className="hero-note"><span>조사 범위</span><strong>{snapshot.coverage.observedRegionCount}개 지역 · {snapshot.coverage.regionItemCount}건</strong><p>지속 업데이트 예정</p></div></section>
       <section className="metrics" aria-label="핵심 지표"><article><span>특산품 출원율</span><strong>{percent(nationalSpecialtyCoverage.rate)}</strong><small>전체 {number(nationalSpecialtyCoverage.total)}개 중 확인 {number(nationalSpecialtyCoverage.applied)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>{pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거</small></article><article><span>출원인 주소 확보율</span><strong>{pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>{pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>지역×특산품 집계 가능 항목</small></article></section>
       <section className="map-workspace">
         <div className="map-card"><div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span className="reference-chip" title={`지도 도형은 ${geometry.boundaryReference.sourceName} 제공 경계(${geometry.boundaryReference.sourceBasis})를 참고용으로 씁니다 — 제3자가 재배포하는 데이터라 향후 행정구역 개편이 지도 도형에 늦게 반영될 수 있으며, 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.`}>참고 경계 · {geometry.boundaryReference.sourceBasis.match(/\d{4}-\d{2}-\d{2}/)?.[0] || geometry.boundaryReference.sourceName}</span></div>
@@ -480,6 +491,36 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "applications" && <section className="screen-section coverage-screen">
       <p className="screen-note">시도별 출원율을 비교하고, 선택한 시도의 시군구별 현황을 확인할 수 있습니다.</p>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
+      <section className="trend-chart"><div className="section-heading"><div><h2>연도별 출원·등록 추이</h2></div><span>{coverageAreaDisplayName} · 실제 출원일자·등록일자 기준</span></div>
+        {trendHasData ? <>
+          <div className="trend-controls">
+            <div className="trend-presets" role="group" aria-label="추이 그래프 기간 프리셋">
+              <button type="button" className={trendStartYear === null && trendEndYear === null ? "active" : ""} onClick={() => { setTrendStartYear(null); setTrendEndYear(null); }}>전체</button>
+              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 4); setTrendEndYear(trendFullEnd); }}>최근 5년</button>
+              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 2); setTrendEndYear(trendFullEnd); }}>최근 3년</button>
+              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
+            </div>
+            <div className="trend-range-inputs"><label><span className="sr-only">시작 연도</span>{trendStart}<input type="number" aria-label="시작 연도" value={trendStart} onChange={(event) => setTrendStartYear(Number(event.target.value) || trendFullStart)} /></label><span>~</span><label><span className="sr-only">끝 연도</span>{trendEnd}<input type="number" aria-label="끝 연도" value={trendEnd} onChange={(event) => setTrendEndYear(Number(event.target.value) || trendFullEnd)} /></label></div>
+          </div>
+          <div className="trend-range-slider"><span className="trend-range-label">{trendFullStart}년 – {trendFullEnd}년 중 {trendStart}년 – {trendEnd}년 선택</span>
+            <div className="trend-range-track">
+              <div className="trend-range-fill" style={{ left: `${trendHandlePercent(trendStart, trendFullStart, trendFullEnd)}%`, right: `${100 - trendHandlePercent(trendEnd, trendFullStart, trendFullEnd)}%` }} />
+              <button type="button" className="trend-range-handle trend-range-handle-start" role="slider" aria-label="시작 연도 조절" aria-valuemin={trendFullStart} aria-valuemax={trendEnd} aria-valuenow={trendStart} style={{ left: `${trendHandlePercent(trendStart, trendFullStart, trendFullEnd)}%` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => { if (event.buttons !== 1 || !event.currentTarget.parentElement) return; setTrendStartYear(trendYearAtPointer(event.clientX, event.currentTarget.parentElement, trendFullStart, trendFullEnd)); }} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowDown") { event.preventDefault(); setTrendStartYear(Math.max(trendFullStart, trendStart - 1)); } else if (event.key === "ArrowRight" || event.key === "ArrowUp") { event.preventDefault(); setTrendStartYear(Math.min(trendEnd, trendStart + 1)); } }} />
+              <button type="button" className="trend-range-handle trend-range-handle-end" role="slider" aria-label="끝 연도 조절" aria-valuemin={trendStart} aria-valuemax={trendFullEnd} aria-valuenow={trendEnd} style={{ left: `${trendHandlePercent(trendEnd, trendFullStart, trendFullEnd)}%` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => { if (event.buttons !== 1 || !event.currentTarget.parentElement) return; setTrendEndYear(trendYearAtPointer(event.clientX, event.currentTarget.parentElement, trendFullStart, trendFullEnd)); }} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowDown") { event.preventDefault(); setTrendEndYear(Math.max(trendStart, trendEnd - 1)); } else if (event.key === "ArrowRight" || event.key === "ArrowUp") { event.preventDefault(); setTrendEndYear(Math.min(trendFullEnd, trendEnd + 1)); } }} />
+            </div>
+          </div>
+          <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${trendStart}년부터 ${trendEnd}년까지 연도별 출원·등록 건수 추이`}>
+            {[0, 0.5, 1].map((fraction) => { const value = Math.round(trendMax * fraction); const yPos = trendScale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 8} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
+            <path d={`${trendLinePath(trendYears, trendApplicationTotals, trendScale)}L${trendScale.x(trendEnd).toFixed(1)},${trendScale.baseY}L${trendScale.x(trendStart).toFixed(1)},${trendScale.baseY}Z`} className="trend-area" />
+            <path d={trendLinePath(trendYears, trendRegisteredTotals, trendScale)} className="trend-line trend-line-registered" />
+            <path d={trendLinePath(trendYears, trendApplicationTotals, trendScale)} className="trend-line trend-line-application" />
+            {trendYears.map((year) => <circle key={`app-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendApplicationTotals[year] || 0)} r={2.6} className="trend-point trend-point-application"><title>{year}년 출원 {number(trendApplicationTotals[year] || 0)}건</title></circle>)}
+            {trendYears.map((year) => <circle key={`reg-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendRegisteredTotals[year] || 0)} r={2.6} className="trend-point trend-point-registered"><title>{year}년 등록 {number(trendRegisteredTotals[year] || 0)}건</title></circle>)}
+            {trendYearLabels(trendYears).map((year) => <text key={`label-${year}`} x={trendScale.x(year)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{year}</text>)}
+          </svg>
+          <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
+        </> : <p className="empty">이 범위는 아직 연도별 출원 데이터가 수집되지 않았습니다.</p>}
+      </section>
       <section className="coverage-workspace">
       <section className="coverage-map-card">
         <div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구 출원율` : "전국 시도별 출원율"}</h2></div><div className="coverage-map-actions">{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div></div>
@@ -493,29 +534,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         <p className="map-warning">{selectedProvince ? "특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "특산품·상표 데이터가 없는 시도도 지명은 표시하며 회색으로 구분합니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p>
       </section>
       <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
-      </section>
-      <section className="trend-chart"><div className="section-heading"><div><h2>연도별 출원·등록 추이</h2></div><span>{coverageAreaDisplayName} · 실제 출원일자·등록일자 기준</span></div>
-        {trendHasData ? <>
-          <div className="trend-controls">
-            <div className="trend-presets" role="group" aria-label="추이 그래프 기간 프리셋">
-              <button type="button" className={trendStartYear === null && trendEndYear === null ? "active" : ""} onClick={() => { setTrendStartYear(null); setTrendEndYear(null); }}>전체</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 4); setTrendEndYear(trendFullEnd); }}>최근 5년</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd - 2); setTrendEndYear(trendFullEnd); }}>최근 3년</button>
-              <button type="button" onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
-            </div>
-            <div className="trend-range-inputs"><label><span className="sr-only">시작 연도</span>{trendStart}<input type="number" aria-label="시작 연도" value={trendStart} onChange={(event) => setTrendStartYear(Number(event.target.value) || trendFullStart)} /></label><span>~</span><label><span className="sr-only">끝 연도</span>{trendEnd}<input type="number" aria-label="끝 연도" value={trendEnd} onChange={(event) => setTrendEndYear(Number(event.target.value) || trendFullEnd)} /></label></div>
-          </div>
-          <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${trendStart}년부터 ${trendEnd}년까지 연도별 출원·등록 건수 추이`}>
-            {[0, 0.5, 1].map((fraction) => { const value = Math.round(trendMax * fraction); const yPos = trendScale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 8} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
-            <path d={`${trendLinePath(trendYears, trendApplicationTotals, trendScale)}L${trendScale.x(trendEnd).toFixed(1)},${trendScale.baseY}L${trendScale.x(trendStart).toFixed(1)},${trendScale.baseY}Z`} className="trend-area" />
-            <path d={trendLinePath(trendYears, trendRegisteredTotals, trendScale)} className="trend-line trend-line-registered" />
-            <path d={trendLinePath(trendYears, trendApplicationTotals, trendScale)} className="trend-line trend-line-application" />
-            {trendYears.map((year) => <circle key={`app-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendApplicationTotals[year] || 0)} r={2.6} className="trend-point trend-point-application"><title>{year}년 출원 {number(trendApplicationTotals[year] || 0)}건</title></circle>)}
-            {trendYears.map((year) => <circle key={`reg-${year}`} cx={trendScale.x(year)} cy={trendScale.y(trendRegisteredTotals[year] || 0)} r={2.6} className="trend-point trend-point-registered"><title>{year}년 등록 {number(trendRegisteredTotals[year] || 0)}건</title></circle>)}
-            {trendYearLabels(trendYears).map((year) => <text key={`label-${year}`} x={trendScale.x(year)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{year}</text>)}
-          </svg>
-          <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
-        </> : <p className="empty">이 범위는 아직 연도별 출원 데이터가 수집되지 않았습니다.</p>}
       </section>
       <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
         <div className="coverage-region-grid">{coverageBreakdown.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>)}</div>
@@ -588,7 +606,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>데이터명</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).map((source) => <tr key={source.sourceId}><th scope="row">{source.sourceLabel || source.sourceId}</th><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><th scope="row">지도 경계</th><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
     </section>}
 
-    <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품 상표 출원 현황</span></div><span>Snapshot {snapshot.snapshotId} · 업데이트 {date(dashboardUpdatedAt)}</span></footer>
+    <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품-상표 분석·정책지원 플랫폼</span></div><span>Snapshot {snapshot.snapshotId} · 업데이트 {date(dashboardUpdatedAt)}</span></footer>
   </main>;
 }
 
