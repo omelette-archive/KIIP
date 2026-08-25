@@ -581,9 +581,21 @@ function writeJson(output, outArg) {
 
 function writeJsonAtomic(filePath, output) {
   fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
+  const tempPath = `${filePath}.${process.pid}.tmp`;
   fs.writeFileSync(tempPath, JSON.stringify(output, null, 2), "utf8");
-  fs.renameSync(tempPath, filePath);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      fs.renameSync(tempPath, filePath);
+      return;
+    } catch (error) {
+      const retryable = ["EPERM", "EBUSY", "EACCES"].includes(error?.code);
+      if (!retryable || attempt >= 19) {
+        try { fs.rmSync(tempPath, { force: true }); } catch {}
+        throw error;
+      }
+      Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 50 * (attempt + 1));
+    }
+  }
 }
 
 function areaBrandValidationMetadata(context, sourceFile, results) {

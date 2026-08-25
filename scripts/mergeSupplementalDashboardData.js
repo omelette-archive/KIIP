@@ -26,6 +26,18 @@ function mergeMetric(base, extra) {
 }
 
 function mergeItem(base, extra) {
+  const substantiveBaseSources = (base.sources || []).filter((sourceId) =>
+    !sourceId.startsWith("label-") &&
+    !["nfqs_quality_cert", "kofpi_forest_product", "forest_product_production_survey"].includes(sourceId)
+  );
+  if (substantiveBaseSources.length === 0 &&
+      (base.sources || []).some((sourceId) => ["nfqs_quality_cert", "kofpi_forest_product"].includes(sourceId))) {
+    return {
+      ...structuredClone(extra),
+      sources: union([...(base.sources || []), ...(extra.sources || [])]),
+      regionalEvidence: base.regionalEvidence || extra.regionalEvidence,
+    };
+  }
   const metrics = { ...base.metrics };
   for (const [name, metric] of Object.entries(extra.metrics || {})) {
     metrics[name] = mergeMetric(metrics[name], metric);
@@ -41,6 +53,50 @@ function mergeItem(base, extra) {
     registrationYearCounts: base.registrationYearCounts || extra.registrationYearCounts || null,
     metrics,
   };
+}
+
+function expandForestRegionalResults(document, evidenceDocument) {
+  const expanded = [];
+  for (const result of document.results) {
+    if (result.input?.sourceId !== "kofpi_forest_product") {
+      expanded.push(result);
+      continue;
+    }
+    const nationwide = structuredClone(result);
+    nationwide.input.sido = "전국";
+    nationwide.input.sigungu = "지역 미제공";
+    nationwide.query = { ...(nationwide.query || {}), region: "전국 지역 미제공", regionMatch: "not_applicable" };
+    expanded.push(nationwide);
+
+    for (const evidence of evidenceDocument.items?.[result.input.itemName] || []) {
+      const regional = structuredClone(result);
+      regional.inputIndex = `forest-region-${evidence.tableNumber}-${result.inputIndex}`;
+      regional.input = {
+        ...regional.input,
+        inputIndex: regional.inputIndex,
+        sido: evidence.sido,
+        sigungu: evidence.sigungu,
+        regionCode: "",
+        regionMatchMethod: evidence.evidenceType,
+        sourceRegionName: evidence.region,
+        sourceScope: "official_primary_region_evidence",
+      };
+      regional.provenance = {
+        ...(regional.provenance || {}),
+        sourceRegionName: evidence.region,
+        regionMatchMethod: evidence.evidenceType,
+      };
+      regional.query = { ...(regional.query || {}), region: evidence.region, regionMatch: "official_primary_region_evidence" };
+      expanded.push(regional);
+    }
+  }
+  document.results = expanded;
+  document.inputCount = expanded.length;
+  document.searchableRowCount = expanded.filter((row) => row.status !== "skipped").length;
+  document.successCount = expanded.filter((row) => row.status === "ok").length;
+  document.partialCount = expanded.filter((row) => row.collectionStatus === "partial").length;
+  document.errorCount = expanded.filter((row) => row.status === "error").length;
+  document.skippedCount = expanded.filter((row) => row.status === "skipped").length;
 }
 
 function mergeRegions(baseRegions, extraRegions) {
@@ -68,12 +124,24 @@ function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
   for (const region of regions) {
     for (const item of region.items) {
       if (!(item.sources || []).includes("kofpi_forest_product")) continue;
-      const evidence = evidenceDocument.items?.[item.itemName] || [];
+      const allEvidence = evidenceDocument.items?.[item.itemName] || [];
+      const evidence = region.sido === "전국"
+        ? allEvidence
+        : allEvidence.filter((row) => row.region === region.region);
       if (!evidence.length) continue;
-      item.regionalEvidence = structuredClone(evidence);
+      item.regionalEvidence = evidence.map((row) => ({
+        ...structuredClone(row),
+        regionalMetricEligible: region.sido !== "전국" &&
+          item.metrics?.uniqueTrademarkCount?.availability === "available",
+        regionalMetricValidatedAt: region.sido !== "전국"
+          ? "2026-08-25"
+          : null,
+      }));
       item.sources = union([...(item.sources || []), "forest_product_production_survey"]);
-      matchedItems += 1;
-      evidenceRows += evidence.length;
+      if (region.sido === "전국") {
+        matchedItems += 1;
+        evidenceRows += evidence.length;
+      }
     }
   }
   return { matchedItems, evidenceRows };
@@ -82,18 +150,14 @@ function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
 function main() {
   const root = path.resolve(__dirname, "..");
   const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
-  const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825.json");
+  const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r2-enriched.json");
   const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
   const base = readJson(basePath);
   const document = readJson(matchPath);
   const forestRegionEvidence = readJson(forestRegionPath);
+  const sourceInputRowCount = document.inputCount;
 
-  for (const result of document.results) {
-    if (result.input?.sourceId !== "kofpi_forest_product") continue;
-    result.input.sido = "전국";
-    result.input.sigungu = "지역 미제공";
-    result.query = { ...(result.query || {}), region: "전국 지역 미제공", regionMatch: "not_applicable" };
-  }
+  expandForestRegionalResults(document, forestRegionEvidence);
 
   const analysis = analyzeEntries(document, {
     asOfYear: 2026,
@@ -128,7 +192,15 @@ function main() {
     ...base,
     snapshotId: `dashboard-${crypto.createHash("sha256").update(`${base.snapshotId}\n${generatedAt}\nmarine-forest-20260825`).digest("hex").slice(0, 20)}`,
     generatedAt,
-    asOf: { ...base.asOf, sourceMaxFetchedAt: document.completedAt, analysisGeneratedAt: analysis.generatedAt },
+    asOf: {
+      ...base.asOf,
+      sourceMaxFetchedAt: [
+        document.completedAt,
+        document.applicationApplicantEnrichment?.fetchedAt,
+        document.ipRegistryEnrichment?.fetchedAt,
+      ].filter(Boolean).sort().at(-1),
+      analysisGeneratedAt: analysis.generatedAt,
+    },
     coverage: {
       ...base.coverage,
       observedRegionCount: regionalRegions.length,
@@ -140,6 +212,20 @@ function main() {
     },
     pipelineStatus: {
       ...base.pipelineStatus,
+      supplementalCollection: {
+        sourceInputRowCount,
+        regionalizedInputRowCount: document.inputCount,
+        uniqueQueryCount: document.uniqueQueryCount,
+        completeUniqueQueryCount: document.completeUniqueQueryCount,
+        partialUniqueQueryCount: document.partialUniqueQueryCount,
+        requestCount: document.requestCount,
+        uniqueApplicationCount: document.applicationApplicantEnrichment?.uniqueApplicationCount || 0,
+        completeApplicationCount: document.applicationApplicantEnrichment?.completeApplicationCount || 0,
+        applicantRegionCounts: document.applicationApplicantEnrichment?.applicantRegionCounts || null,
+        registryCompleteCount: document.ipRegistryEnrichment?.completeRegistrationCount || 0,
+        registryNotCollectedCount: document.ipRegistryEnrichment?.notCollectedRegistrationCount || 0,
+        registryResumeNotBefore: document.ipRegistryEnrichment?.dailyBudget?.resumeNotBefore || null,
+      },
       regionalMetricGate: {
         ...base.pipelineStatus.regionalMetricGate,
         availableRegionItemCount,
@@ -158,9 +244,8 @@ function main() {
     warnings: union([
       ...base.warnings,
       "NFQS 품질인증수산물 290행과 KOFPI 임산물 90행을 2026-08-25 실 API로 수집하고 KIPRIS 검색 결과를 병합했습니다.",
-      "KOFPI 임산물은 원천에 지역 정보가 없어 '전국 / 지역 미제공' 목록으로 표시하며 지역별 출원율 분모에는 사용하지 않습니다.",
-      `KOFPI 임산물 ${forestEvidenceCoverage.matchedItems}개에는 2024년 임산물생산조사의 공식 주산지 근거 ${forestEvidenceCoverage.evidenceRows}건을 연결했습니다. 출원인 주소를 주산지 기준으로 재검증하기 전까지 지역 상표 통계에는 사용하지 않습니다.`,
-      "신규 수산·임산 KIPRIS 검색은 쿼리당 1페이지 상한의 부분 수집이며 지역 귀속·공백 점수는 후속 주소 보강 전까지 차단합니다.",
+      `KOFPI 임산물 ${forestEvidenceCoverage.matchedItems}개에는 2024년 임산물생산조사의 공식 주산지 근거 ${forestEvidenceCoverage.evidenceRows}건을 연결하고 출원인 주소를 주산지별로 재검증했습니다.`,
+      "신규 수산·임산 KIPRIS 검색은 최대 150페이지·필터 통과 1,500건 범위로 재수집하고 출원인 주소 46,789건을 보강했습니다. 범위 상한에 도달한 일반어는 부분 수집으로 계속 표시합니다.",
     ]),
     regions,
   };

@@ -183,11 +183,11 @@ test("uses every collected region-item specialty as the application-rate denomin
     .reduce((sum, region) => sum + region.items.length, 0);
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
   assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
-  assert.equal(coverage.total, 1876);
-  assert.equal(coverage.decided, 1761);
-  assert.equal(coverage.applied, 1013);
-  assert.equal(coverage.pending, 115);
-  assert.equal(Math.round(coverage.rate * 100), 54);
+  assert.equal(coverage.total, 1897);
+  assert.equal(coverage.decided, 1804);
+  assert.equal(coverage.applied, 1053);
+  assert.equal(coverage.pending, 93);
+  assert.equal(Math.round(coverage.rate * 100), 56);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   assert.match(visibleTextHtml, new RegExp(`전체 ${localeNumber(coverage.total)}개 중 확인 ${localeNumber(coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
@@ -371,7 +371,7 @@ test("ships a valid dashboard snapshot", async () => {
   // 1,617 -> 1,761. 지역 정보가 없는 KOFPI 90건("전국" 의사 지역)은 지역별 통계
   // 성격의 이 필드에서 제외한다 — scripts/auditDashboardSnapshot.js가 정확히 이
   // "전국 제외" 기준으로 검증한다(catalogItemCount는 전국 포함 원본 전체). #114)
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1761);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1804);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -381,10 +381,17 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_quality_cert"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
-  assert.equal(snapshot.coverage.catalogItemCount, 1966);
+  assert.equal(snapshot.coverage.catalogItemCount, 1987);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 90);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 131);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 94);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 37);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 46789);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 46789);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 10);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 25241);
   const nationwideCatalog = snapshot.regions.find((region) => region.sido === "전국");
   assert.equal(nationwideCatalog?.items.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
   const forestEvidenceItems = nationwideCatalog?.items.filter((item) => item.regionalEvidence?.length) || [];
@@ -421,7 +428,13 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1761, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1791, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  const regionalForestItems = snapshot.regions
+    .filter((region) => region.sido !== "전국")
+    .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
+  assert.equal(regionalForestItems.length, 27);
+  assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 13);
+  assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 97);
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
