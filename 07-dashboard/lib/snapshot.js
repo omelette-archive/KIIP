@@ -347,6 +347,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       niceClass: clean(row.niceClass) || null,
       matchingBasis: clean(row.matchingBasis) || "notice_name_and_nice_class",
       category: itemCategory(row),
+      applicationYearCounts: row.applicationYearCounts && Object.keys(row.applicationYearCounts).length
+        ? row.applicationYearCounts
+        : null,
+      registrationYearCounts:
+        row.registrationYearCounts && Object.keys(row.registrationYearCounts).length
+          ? row.registrationYearCounts
+          : null,
       itemVerdict: {
         source: clean(row.itemVerdictSource) || "unresolved",
         method: clean(row.itemMatchMethod) || null,

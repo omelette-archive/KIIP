@@ -343,7 +343,9 @@ function finalizeBucket(bucket, options) {
     unknown: 0,
   };
   const yearCounts = new Map();
+  const registrationYearCounts = new Map();
   let invalidApplicationDateCount = 0;
+  let invalidRegistrationDateCount = 0;
   let applicantAddressEvidenceCount = 0;
   const recentBrands = [];
   const trademarkExamples = [];
@@ -381,6 +383,7 @@ function finalizeBucket(bucket, options) {
       title: clean(hit.title) || null,
       applicationNumber: clean(hit.applicationNumber) || null,
       applicationDate: clean(hit.applicationDate) || null,
+      registrationDate: clean(hit.registrationDate ?? hit.registryEvidence?.registrationDate) || null,
       applicant: clean(hit.applicant) || null,
       applicationStatus: clean(hit.applicationStatus) || null,
       statusCategory: status,
@@ -402,6 +405,18 @@ function finalizeBucket(bucket, options) {
           applicant: clean(hit.applicant) || null,
           applicationStatus: clean(hit.applicationStatus) || null,
         });
+      }
+    }
+    const registrationYear = applicationYear(
+      hit.registrationDate ?? hit.registryEvidence?.registrationDate
+    );
+    if (clean(hit.registrationDate ?? hit.registryEvidence?.registrationDate)) {
+      if (registrationYear === null) invalidRegistrationDateCount++;
+      else {
+        registrationYearCounts.set(
+          registrationYear,
+          (registrationYearCounts.get(registrationYear) || 0) + 1
+        );
       }
     }
   }
@@ -457,6 +472,10 @@ function finalizeBucket(bucket, options) {
   for (const year of [...yearCounts.keys()].sort((a, b) => a - b)) {
     applicationYearCounts[String(year)] = yearCounts.get(year);
   }
+  const registrationYearCountsResult = {};
+  for (const year of [...registrationYearCounts.keys()].sort((a, b) => a - b)) {
+    registrationYearCountsResult[String(year)] = registrationYearCounts.get(year);
+  }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
 
   const result = {};
@@ -480,6 +499,8 @@ function finalizeBucket(bucket, options) {
     regionalMetricAvailability,
     regionalMetricBlockingReasons,
     applicationYearCounts,
+    registrationYearCounts: registrationYearCountsResult,
+    invalidRegistrationDateCount,
     recentPeriod: { startYear: recentStart, endYear: recentEnd, count: recentApplicationCount },
     previousPeriod: { startYear: previousStart, endYear: previousEnd, count: previousApplicationCount },
     recentChange: recentApplicationCount - previousApplicationCount,

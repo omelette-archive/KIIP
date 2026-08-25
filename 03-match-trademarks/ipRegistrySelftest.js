@@ -68,6 +68,7 @@ async function runIpRegistryTests() {
   {
     const parsed = parseMarkHistoryResponse(RESPONSE);
     assert.strictEqual(parsed.found, true);
+    assert.strictEqual(parsed.registrationDate, "20260101");
     assert.strictEqual(parsed.applicants.length, 1);
     assert.strictEqual(parsed.products.length, 2);
     assert.strictEqual(parsed.products[0].designatedProductName, "신선한사과");

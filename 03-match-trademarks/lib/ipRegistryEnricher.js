@@ -185,6 +185,7 @@ function enrichHit(hit, query, record, fetchedAt) {
     ipRegistrySource: IP_REGISTRY_SOURCE_METADATA.sourceId,
     ipRegistryContractVersion: IP_REGISTRY_SOURCE_METADATA.contractVersion,
     ipRegistryFetchedAt: fetchedAt,
+    registrationDate: record.registrationDate || hit.registrationDate || null,
     applicantRegionMatch: applicant.match,
     applicantRegionMatchSource: "ip_registry_applicant_address",
     applicantRegionMatchVersion: APPLICANT_REGION_MATCH_VERSION,
@@ -198,6 +199,7 @@ function enrichHit(hit, query, record, fetchedAt) {
     registryEvidence: {
       registrationNumber: record.registrationNumber || hit.registrationNumber || null,
       applicationNumber: record.applicationNumber || hit.applicationNumber || null,
+      registrationDate: record.registrationDate || hit.registrationDate || null,
       productCount: goods.productCount,
       classMatchedProductCount: goods.classMatchedProductCount,
     },

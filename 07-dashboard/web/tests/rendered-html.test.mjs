@@ -552,6 +552,49 @@ test("sizes region/item tag clouds by application count instead of listing them 
   );
 });
 
+test("shows an adjustable year-range application/registration trend chart", async () => {
+  // 이슈 #116: "지역별 상표 출원" 탭에 연도별 출원·등록 추이 그래프 요청. 등록 계열은
+  // KIPRIS 검색 결과에 포함된 실제 등록일자(registrationDate)를 연도별로 집계한 값이다.
+  const snapshot = await loadSnapshot();
+  const withYearData = snapshot.regions
+    .flatMap((region) => region.items)
+    .filter((item) => item.applicationYearCounts && Object.keys(item.applicationYearCounts).length > 0);
+  assert.ok(withYearData.length > 0, "실제 KIPRIS 재실행으로 채운 연도별 출원 데이터가 스냅샷에 있어야 이 기능이 라이브에서 빈 그래프로 뜨지 않음");
+
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(
+    standaloneHtml,
+    /const sumYearCounts = \(items, field\) => \{/,
+    "연도별 출원·등록 건수를 합산하는 공용 헬퍼가 있어야 함",
+  );
+  assert.match(standaloneHtml, /class="trend-chart"/, "지역별 상표 출원 탭에 추이 그래프 섹션이 있어야 함");
+  assert.match(
+    standaloneHtml,
+    /data-trend-preset="all"/,
+  );
+  assert.match(
+    standaloneHtml,
+    /data-trend-preset="5"/,
+    "전체·최근5년·최근3년·최근1년 프리셋 버튼이 있어야 함(드래그 슬라이더 아님)",
+  );
+  assert.match(standaloneHtml, /id="trend-start-input"/, "시작 연도를 직접 입력할 수 있어야 함");
+  assert.match(standaloneHtml, /id="trend-end-input"/, "끝 연도를 직접 입력할 수 있어야 함");
+  assert.match(
+    standaloneHtml,
+    /class="trend-line trend-line-application"/,
+  );
+  assert.match(
+    standaloneHtml,
+    /class="trend-line trend-line-registered"/,
+    "출원(실선)·등록(점선) 두 계열을 모두 그려야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /등록\(등록원부 보강 완료 건\)/,
+    "등록 계열이 실제 등록일자와 등록원부 보강 범위를 사용한다는 점을 화면에 밝혀야 함",
+  );
+});
+
 test("ships traceable province and municipality geometry", async () => {
   const raw = await readFile(new URL("../public/data/map-geometry.json", import.meta.url), "utf8");
   const geometry = JSON.parse(raw);
