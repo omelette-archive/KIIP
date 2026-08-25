@@ -381,16 +381,23 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
   assert.equal(snapshot.coverage.catalogItemCount, 1966);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 90);
-  assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 25);
-  assert.equal(snapshot.coverage.regionalEvidenceRows, 26);
+  assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
+  assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
   const nationwideCatalog = snapshot.regions.find((region) => region.sido === "전국");
   assert.equal(nationwideCatalog?.items.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
   const forestEvidenceItems = nationwideCatalog?.items.filter((item) => item.regionalEvidence?.length) || [];
-  assert.equal(forestEvidenceItems.length, 25);
-  assert.equal(forestEvidenceItems.reduce((sum, item) => sum + item.regionalEvidence.length, 0), 26);
+  assert.equal(forestEvidenceItems.length, 26);
+  assert.equal(forestEvidenceItems.reduce((sum, item) => sum + item.regionalEvidence.length, 0), 27);
   assert.ok(forestEvidenceItems.every((item) => item.regionalEvidence.every((row) => row.regionalMetricEligible === false)));
   assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "밤")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군"]);
   assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "표고")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군", "전라남도 장흥군"]);
+  // 2026-08-25: extractForestProductionPrimaryRegions.py의 ALIASES에 "고로쇠"→"수액"을
+  // 추가해 표27(고로쇠, 전남 광양시)이 더 이상 unmatchedSourceTables로 빠지지 않는다(#114 리뷰).
+  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "수액")?.regionalEvidence.map((row) => row.region), ["전라남도 광양시"]);
+  // 2026-08-25(#114 리뷰): Dashboard.tsx에만 있고 standalone-client.js에는 없던
+  // "공식 생산 주산지 근거" 안내 문구를 두 구현이 다시 같은 내용을 보여주도록 맞췄다.
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(standaloneHtml, /공식 생산 주산지 근거/, "standalone-client.js도 React와 동일하게 임산물생산조사 근거 문구를 보여줘야 함");
   const items = snapshot.regions.flatMap((region) => region.items);
   assert.ok(items.every((item) => item.itemName && item.noticeName));
   // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과는 matchingBasis=

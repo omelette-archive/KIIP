@@ -1,6 +1,6 @@
 {
   "schemaVersion": "kofpi-primary-regions-v1",
-  "generatedAt": "2026-08-25T04:52:51.982471Z",
+  "generatedAt": "2026-08-25T05:05:28.483667Z",
   "referenceYear": 2024,
   "sourceName": "산림청·한국임업진흥원 2024년 임산물생산조사",
   "sourceUrl": "https://kfss.forest.go.kr/stat/ptl/article/articleDtl.do?bbsId=ptlPdsMntProdReq&articleSeq=2664",
@@ -14,9 +14,9 @@
   "counts": {
     "kofpiCatalogItems": 90,
     "sourcePrimaryRegionTables": 27,
-    "matchedEvidenceRows": 26,
-    "matchedKofpiItems": 25,
-    "unmatchedSourceTables": 1
+    "matchedEvidenceRows": 27,
+    "matchedKofpiItems": 26,
+    "unmatchedSourceTables": 0
   },
   "items": {
     "밤": [
@@ -156,6 +156,24 @@
         "productionUnit": "그루",
         "pdfPage": 40,
         "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "수액": [
+      {
+        "itemName": "수액",
+        "tableNumber": 27,
+        "sourceItemName": "고로쇠",
+        "sido": "전라남도",
+        "sigungu": "광양시",
+        "region": "전라남도 광양시",
+        "productionUnit": "ℓ",
+        "pdfPage": 40,
+        "matchMethod": "approved_alias",
         "evidenceType": "official_primary_production_region",
         "evidenceStrength": "strong",
         "referenceYear": 2024,
@@ -486,15 +504,5 @@
       }
     ]
   },
-  "unmatchedSourceTables": [
-    {
-      "tableNumber": 27,
-      "sourceItemName": "고로쇠",
-      "sido": "전라남도",
-      "sigungu": "광양시",
-      "region": "전라남도 광양시",
-      "productionUnit": "ℓ",
-      "pdfPage": 40
-    }
-  ]
+  "unmatchedSourceTables": []
 }
