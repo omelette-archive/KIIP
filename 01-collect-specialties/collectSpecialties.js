@@ -14,6 +14,7 @@
  *   nongsaro  농촌진흥청 지역특산물 (NONGSARO_API_KEY, NONGSARO_API_BASE_URL 필요)
  *   sejong_official_specialties  세종시 공식 특산품 검증 스냅샷
  *   jeju_naqs_gi_specialties     농관원 제주 지리적표시 검증 스냅샷
+ *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요, 기본 --sources에는 없음 — 명시적으로 지정해야 수집됨)
  * API 소스는 제공기관 활용신청 승인이 필요하다. 키가 없으면 해당 API 소스만
  * 건너뛰고 경고를 남기며, 공식 검증 스냅샷은 인증 없이 함께 적재한다.
  */
@@ -24,7 +25,8 @@ const { loadEnv } = require("./lib/loadEnv");
 const { loadAdminCodes } = require("./lib/adminCodes");
 const { createClient: createGiClient, normalizeDate: normalizeGiDate } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
-const { fromGiRegistrations, fromNongsaro } = require("./lib/normalize");
+const { createClient: createNfqsClient } = require("./lib/nfqsClient");
+const { fromGiRegistrations, fromNongsaro, fromNfqsCertifications } = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createCollectionStore, makeStoredRecords } = require("./lib/collectionStore");
 const {
@@ -200,6 +202,30 @@ async function collectNongsaro(adminList, warnings, options = {}) {
   }
 }
 
+async function collectNfqs(adminList, warnings, options = {}) {
+  let requestCount = 0;
+  try {
+    const client = createNfqsClient({
+      certKey: process.env.NFQS_QUALITY_API_KEY,
+      baseUrl: process.env.NFQS_QUALITY_API_BASE_URL,
+      onRequest: () => requestCount++,
+    });
+    const certifications = await client.listCertifications({ limit: options.limit });
+    const normalized = fromNfqsCertifications(certifications, adminList);
+    const rows = addSourceMetadata(normalized.rows, options.sourceDefinition);
+    warnings.push(...normalized.warnings);
+    return {
+      rows,
+      rawRecords: makeStoredRecords("nfqs_quality_cert", certifications, rows),
+      succeeded: true,
+      requestCount,
+    };
+  } catch (err) {
+    warnings.push(`nfqs_quality_cert 소스 건너뜀: ${err.message}`);
+    return { rows: [], rawRecords: [], succeeded: false, requestCount, error: err.message };
+  }
+}
+
 const OFFICIAL_SUPPLEMENT_PATHS = {
   sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
   jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
@@ -232,6 +258,7 @@ const COLLECTORS = {
   nongsaro: collectNongsaro,
   sejong_official_specialties: collectOfficialSupplement,
   jeju_naqs_gi_specialties: collectOfficialSupplement,
+  nfqs_quality_cert: collectNfqs,
 };
 
 async function main() {

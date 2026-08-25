@@ -17,6 +17,7 @@ const {
   resolveRegionInput,
   fromGiRegistrations,
   fromNongsaro,
+  fromNfqsCertifications,
 } = require("./lib/normalize");
 const {
   loadOfficialSupplement,
@@ -35,6 +36,7 @@ const {
   DEFAULT_BASE_URL: NONGSARO_BASE_URL,
 } = require("./lib/nongsaroClient");
 const { parseNongsaroResponse } = require("./lib/xmlLite");
+const { createClient: createNfqsClient } = require("./lib/nfqsClient");
 const {
   createCollectionStore,
   makeStoredRecords,
@@ -412,6 +414,59 @@ async function run() {
     });
     await assert.rejects(() => client.listSpecialties({ limit: 1 }), /\[11\] 인증키 오류/);
     ok("HTTP 200이어도 농사로 resultCode가 00이 아니면 실패 처리됨");
+  }
+
+  console.log("7-2) nfqsClient — cert_key 파라미터·User-Agent 필수·주소 기반 지역 매칭(#114)");
+  {
+    const requestedUrls = [];
+    const requestedHeaders = [];
+    const fakeFetch = async (url, options) => {
+      requestedUrls.push(url);
+      requestedHeaders.push(options?.headers || {});
+      const itemXml = [
+        "<item>",
+        "<jisoknm>부산지원</jisoknm><codeknm>수산물</codeknm><goodknm>간고등어</goodknm>",
+        "<certno>G020010</certno><custkfirm><![CDATA[(주)동원해사랑]]></custkfirm>",
+        "<headknm>장창익</headknm><resino>6038127694</resino><tel>051-291-5101</tel>",
+        "<jisokaddr>부산광역시 사하구 감천항로 24</jisokaddr>",
+        "<vdatefrom>20250513</vdatefrom><vdateto>20270512</vdateto>",
+        "</item>",
+      ].join("");
+      return {
+        ok: true,
+        status: 200,
+        text: async () =>
+          `<response><header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE</resultMsg></header><body><items>${itemXml}</items></body></response>`,
+      };
+    };
+    const client = createNfqsClient({ certKey: "test-cert-key", fetchImpl: fakeFetch });
+    const records = await client.listCertifications();
+    assert.strictEqual(records.length, 1);
+    assert.strictEqual(records[0].productName, "간고등어");
+    assert.strictEqual(records[0].companyAddress, "부산광역시 사하구 감천항로 24");
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.get("cert_key"), "test-cert-key");
+    assert.strictEqual(new URL(requestedUrls[0]).searchParams.has("serviceKey"), false);
+    assert.ok(requestedHeaders[0]["User-Agent"], "일반 User-Agent 헤더 없이 호출하면 실제 서버가 빈 응답을 주므로 항상 지정해야 함");
+    const adminList = loadAdminCodes();
+    const normalized = fromNfqsCertifications(records, adminList);
+    assert.strictEqual(normalized.rows[0].sido, "부산광역시");
+    assert.strictEqual(normalized.rows[0].sigungu, "사하구");
+    assert.strictEqual(normalized.rows[0].rawItemName, "간고등어");
+    ok("cert_key 파라미터로 호출하고, 업체 주소 문자열에서 시도·시군구를 뽑아냄");
+  }
+
+  console.log("7-2b) nfqsClient — API 결과코드 오류 감지");
+  {
+    const client = createNfqsClient({
+      certKey: "bad-key",
+      fetchImpl: async () => ({
+        ok: true,
+        status: 200,
+        text: async () => "<response><header><resultCode>99</resultCode><resultMsg>알 수 없는 오류</resultMsg></header></response>",
+      }),
+    });
+    await assert.rejects(() => client.listCertifications(), /\[99\] 알 수 없는 오류/);
+    ok("HTTP 200이어도 resultCode가 00이 아니면 실패 처리됨");
   }
 
   console.log("8) collectSpecialties CLI — 모든 소스 실패 시 non-zero 종료");

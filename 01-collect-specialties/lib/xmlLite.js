@@ -49,4 +49,26 @@ function parseNongsaroResponse(xml) {
   return { resultCode, resultMsg, totalCount, items };
 }
 
-module.exports = { decodeEntities, extractTag, extractItemBlocks, parseNongsaroResponse };
+// 국립수산물품질관리원 품질인증수산물 API(#114). resultCode 스키마는 농사로와 같은
+// header/resultCode/resultMsg 형태를 쓰지만, item 필드명은 이 API 고유의 축약형이다.
+function parseNfqsResponse(xml) {
+  const resultCode = extractTag(xml, "resultCode");
+  const resultMsg = extractTag(xml, "resultMsg");
+  const items = extractItemBlocks(xml).map((block) => ({
+    officeName: extractTag(block, "jisoknm"),
+    categoryName: extractTag(block, "codeknm"),
+    productName: extractTag(block, "goodknm"),
+    certificationNumber: extractTag(block, "certno"),
+    companyName: extractTag(block, "custkfirm"),
+    representativeName: extractTag(block, "headknm"),
+    businessRegistrationNumber: extractTag(block, "resino"),
+    phone: extractTag(block, "tel"),
+    companyAddress: extractTag(block, "jisokaddr"),
+    validFrom: extractTag(block, "vdatefrom"),
+    validTo: extractTag(block, "vdateto"),
+    rawXml: block,
+  }));
+  return { resultCode, resultMsg, items };
+}
+
+module.exports = { decodeEntities, extractTag, extractItemBlocks, parseNongsaroResponse, parseNfqsResponse };

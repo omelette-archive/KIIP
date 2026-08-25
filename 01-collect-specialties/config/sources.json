@@ -151,8 +151,8 @@
         "verification": "공식 페이지에 명시된 할당량 없음. 2026-08-25 실키로 직접 호출해 resultCode=00(NORMAL SERVICE) 확인 — 파라미터명이 표준 serviceKey가 아니라 cert_key인 점이 핵심(serviceKey로는 키 유무와 무관하게 항상 PARAMETER ERROR). 페이지네이션 파라미터 없이 전체 약 114KB(수백 건) 응답."
       },
       "implementation": {
-        "status": "live_key_validated",
-        "adapter": null
+        "status": "adapter_implemented_not_in_default_sources",
+        "adapter": "lib/nfqsClient.js + lib/normalize.js:fromNfqsCertifications"
       }
     },
     {

@@ -42,6 +42,10 @@ function sourceRecordKey(sourceId, entry) {
     const title = String(entry.title || raw.title || "").trim();
     if (areaCode && (linkUrl || title)) return `nongsaro:${areaCode}|${linkUrl || title}`;
   }
+  if (sourceId === "nfqs_quality_cert") {
+    const certificationNumber = String(entry.certificationNumber || "").trim();
+    if (certificationNumber) return `nfqs_quality_cert:${certificationNumber}`;
+  }
   return fallbackKey(sourceId, entry.raw || entry);
 }
 

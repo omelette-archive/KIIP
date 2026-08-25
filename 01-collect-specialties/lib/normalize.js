@@ -325,6 +325,18 @@ function fromNongsaro(specialties, adminList) {
   });
 }
 
+// #114: 국립수산물품질관리원 품질인증수산물. 이 API는 지역 코드를 안 주고 업체 주소만
+// 준다(예: "부산광역시 사하구 감천항로 24") — regionOf가 주소 문자열 전체를 넘기면
+// toRows()가 이미 쓰는 resolveRegion()이 부분 대조로 시도·시군구를 뽑아낸다.
+function fromNfqsCertifications(certifications, adminList) {
+  return toRows(certifications, {
+    adminList,
+    source: "품질인증수산물",
+    itemNameOf: (c) => c.productName,
+    regionOf: (c) => c.companyAddress,
+  });
+}
+
 module.exports = {
   cleanRegionText,
   compactRegionText,
@@ -336,4 +348,5 @@ module.exports = {
   toRows,
   fromGiRegistrations,
   fromNongsaro,
+  fromNfqsCertifications,
 };
