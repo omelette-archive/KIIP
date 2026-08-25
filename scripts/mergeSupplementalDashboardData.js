@@ -62,12 +62,31 @@ function mergeRegions(baseRegions, extraRegions) {
   return [...regions.values()].sort((a, b) => a.region.localeCompare(b.region, "ko-KR"));
 }
 
+function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
+  let matchedItems = 0;
+  let evidenceRows = 0;
+  for (const region of regions) {
+    for (const item of region.items) {
+      if (!(item.sources || []).includes("kofpi_forest_product")) continue;
+      const evidence = evidenceDocument.items?.[item.itemName] || [];
+      if (!evidence.length) continue;
+      item.regionalEvidence = structuredClone(evidence);
+      item.sources = union([...(item.sources || []), "forest_product_production_survey"]);
+      matchedItems += 1;
+      evidenceRows += evidence.length;
+    }
+  }
+  return { matchedItems, evidenceRows };
+}
+
 function main() {
   const root = path.resolve(__dirname, "..");
   const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
   const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825.json");
+  const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
   const base = readJson(basePath);
   const document = readJson(matchPath);
+  const forestRegionEvidence = readJson(forestRegionPath);
 
   for (const result of document.results) {
     if (result.input?.sourceId !== "kofpi_forest_product") continue;
@@ -97,6 +116,7 @@ function main() {
   };
   const extra = buildDashboardSnapshot({ analysis, gap, strategy }, { mode: "full", stage: "alpha" });
   const regions = mergeRegions(base.regions, extra.regions);
+  const forestEvidenceCoverage = attachForestPrimaryRegionEvidence(regions, forestRegionEvidence);
   const regionalRegions = regions.filter((region) => region.sido !== "전국");
   const nationwideCatalogRegions = regions.filter((region) => region.sido === "전국");
   const regionalItemCount = regionalRegions.reduce((sum, region) => sum + region.items.length, 0);
@@ -115,6 +135,8 @@ function main() {
       regionItemCount: regionalItemCount,
       catalogItemCount: regionalItemCount + nationwideCatalogItemCount,
       nationwideCatalogItemCount,
+      nationwideCatalogItemsWithRegionalEvidence: forestEvidenceCoverage.matchedItems,
+      regionalEvidenceRows: forestEvidenceCoverage.evidenceRows,
     },
     pipelineStatus: {
       ...base.pipelineStatus,
@@ -124,11 +146,20 @@ function main() {
         blockedRegionItemCount: regionalItemCount - availableRegionItemCount,
       },
     },
-    sources: [...new Map([...base.sources, ...extra.sources].map((source) => [source.sourceId, source])).values()],
+    sources: [...new Map([...base.sources, ...extra.sources, {
+      sourceId: "forest_product_production_survey",
+      sourceLabel: "2024년 임산물생산조사",
+      sourceContractVersion: forestRegionEvidence.schemaVersion,
+      sourceFetchedAt: forestRegionEvidence.generatedAt,
+      sourceUrl: forestRegionEvidence.sourceUrl,
+      sourceLastVerifiedAt: "2026-08-25",
+      idOrigin: "upstream",
+    }].map((source) => [source.sourceId, source])).values()],
     warnings: union([
       ...base.warnings,
       "NFQS 품질인증수산물 290행과 KOFPI 임산물 90행을 2026-08-25 실 API로 수집하고 KIPRIS 검색 결과를 병합했습니다.",
       "KOFPI 임산물은 원천에 지역 정보가 없어 '전국 / 지역 미제공' 목록으로 표시하며 지역별 출원율 분모에는 사용하지 않습니다.",
+      `KOFPI 임산물 ${forestEvidenceCoverage.matchedItems}개에는 2024년 임산물생산조사의 공식 주산지 근거 ${forestEvidenceCoverage.evidenceRows}건을 연결했습니다. 출원인 주소를 주산지 기준으로 재검증하기 전까지 지역 상표 통계에는 사용하지 않습니다.`,
       "신규 수산·임산 KIPRIS 검색은 쿼리당 1페이지 상한의 부분 수집이며 지역 귀속·공백 점수는 후속 주소 보강 전까지 차단합니다.",
     ]),
     regions,

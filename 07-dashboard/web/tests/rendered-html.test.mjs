@@ -378,10 +378,19 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nongsaro"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_quality_cert"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
+  assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
   assert.equal(snapshot.coverage.catalogItemCount, 1966);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 90);
+  assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 25);
+  assert.equal(snapshot.coverage.regionalEvidenceRows, 26);
   const nationwideCatalog = snapshot.regions.find((region) => region.sido === "전국");
   assert.equal(nationwideCatalog?.items.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
+  const forestEvidenceItems = nationwideCatalog?.items.filter((item) => item.regionalEvidence?.length) || [];
+  assert.equal(forestEvidenceItems.length, 25);
+  assert.equal(forestEvidenceItems.reduce((sum, item) => sum + item.regionalEvidence.length, 0), 26);
+  assert.ok(forestEvidenceItems.every((item) => item.regionalEvidence.every((row) => row.regionalMetricEligible === false)));
+  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "밤")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군"]);
+  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "표고")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군", "전라남도 장흥군"]);
   const items = snapshot.regions.flatMap((region) => region.items);
   assert.ok(items.every((item) => item.itemName && item.noticeName));
   // 검토대기(고시명칭 미확정) 행을 원물명으로 검색한 결과는 matchingBasis=

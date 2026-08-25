@@ -1,0 +1,500 @@
+{
+  "schemaVersion": "kofpi-primary-regions-v1",
+  "generatedAt": "2026-08-25T04:52:51.982471Z",
+  "referenceYear": 2024,
+  "sourceName": "산림청·한국임업진흥원 2024년 임산물생산조사",
+  "sourceUrl": "https://kfss.forest.go.kr/stat/ptl/article/articleDtl.do?bbsId=ptlPdsMntProdReq&articleSeq=2664",
+  "sourceFileUrl": "https://kfss.forest.go.kr/stat/ptl/article/articleFileDown.do?fileSeq=8135&workSeq=2664",
+  "sourceFileSha256": "1d13fdd492491ee155d88c9bd620d07e7b8f08b533a10f155075f21b972fd017",
+  "policy": {
+    "scope": "보고서가 명시적으로 공표한 주요 단기소득 임산물의 2024년 주산지",
+    "use": "KOFPI 전국 품목에 지역 근거를 표시하는 용도",
+    "exclusion": "생산량 전체 시군구표와 출원인 주소 재귀속 전에는 지역 상표 통계 분모·분자에 넣지 않음"
+  },
+  "counts": {
+    "kofpiCatalogItems": 90,
+    "sourcePrimaryRegionTables": 27,
+    "matchedEvidenceRows": 26,
+    "matchedKofpiItems": 25,
+    "unmatchedSourceTables": 1
+  },
+  "items": {
+    "밤": [
+      {
+        "itemName": "밤",
+        "tableNumber": 19,
+        "sourceItemName": "밤",
+        "sido": "충청남도",
+        "sigungu": "부여군",
+        "region": "충청남도 부여군",
+        "productionUnit": "kg",
+        "pdfPage": 38,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "호두": [
+      {
+        "itemName": "호두",
+        "tableNumber": 20,
+        "sourceItemName": "호두",
+        "sido": "충청북도",
+        "sigungu": "영동군",
+        "region": "충청북도 영동군",
+        "productionUnit": "kg",
+        "pdfPage": 38,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "대추": [
+      {
+        "itemName": "대추",
+        "tableNumber": 21,
+        "sourceItemName": "대추",
+        "sido": "충청북도",
+        "sigungu": "보은군",
+        "region": "충청북도 보은군",
+        "productionUnit": "kg",
+        "pdfPage": 38,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "감": [
+      {
+        "itemName": "감",
+        "tableNumber": 22,
+        "sourceItemName": "감",
+        "sido": "경상북도",
+        "sigungu": "상주시",
+        "region": "경상북도 상주시",
+        "productionUnit": "kg",
+        "pdfPage": 39,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "잣": [
+      {
+        "itemName": "잣",
+        "tableNumber": 23,
+        "sourceItemName": "잣",
+        "sido": "강원특별자치도",
+        "sigungu": "홍천군",
+        "region": "강원특별자치도 홍천군",
+        "productionUnit": "kg",
+        "pdfPage": 39,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "산딸기": [
+      {
+        "itemName": "산딸기",
+        "tableNumber": 24,
+        "sourceItemName": "산딸기",
+        "sido": "경상남도",
+        "sigungu": "김해시",
+        "region": "경상남도 김해시",
+        "productionUnit": "kg",
+        "pdfPage": 39,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "복분자": [
+      {
+        "itemName": "복분자",
+        "tableNumber": 25,
+        "sourceItemName": "복분자딸기",
+        "sido": "전북특별자치도",
+        "sigungu": "고창군",
+        "region": "전북특별자치도 고창군",
+        "productionUnit": "kg",
+        "pdfPage": 40,
+        "matchMethod": "approved_alias",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "야생화": [
+      {
+        "itemName": "야생화",
+        "tableNumber": 26,
+        "sourceItemName": "야생화",
+        "sido": "전라남도",
+        "sigungu": "해남군",
+        "region": "전라남도 해남군",
+        "productionUnit": "그루",
+        "pdfPage": 40,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "잔디": [
+      {
+        "itemName": "잔디",
+        "tableNumber": 28,
+        "sourceItemName": "잔디",
+        "sido": "전라남도",
+        "sigungu": "장성군",
+        "region": "전라남도 장성군",
+        "productionUnit": "㎡",
+        "pdfPage": 41,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "작약": [
+      {
+        "itemName": "작약",
+        "tableNumber": 29,
+        "sourceItemName": "작약",
+        "sido": "경상북도",
+        "sigungu": "영천시",
+        "region": "경상북도 영천시",
+        "productionUnit": "kg",
+        "pdfPage": 41,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "오미자": [
+      {
+        "itemName": "오미자",
+        "tableNumber": 30,
+        "sourceItemName": "오미자",
+        "sido": "경상북도",
+        "sigungu": "문경시",
+        "region": "경상북도 문경시",
+        "productionUnit": "kg",
+        "pdfPage": 41,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "구기자": [
+      {
+        "itemName": "구기자",
+        "tableNumber": 31,
+        "sourceItemName": "구기자",
+        "sido": "충청남도",
+        "sigungu": "청양군",
+        "region": "충청남도 청양군",
+        "productionUnit": "kg",
+        "pdfPage": 42,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "오갈피": [
+      {
+        "itemName": "오갈피",
+        "tableNumber": 32,
+        "sourceItemName": "오갈피",
+        "sido": "충청남도",
+        "sigungu": "천안시",
+        "region": "충청남도 천안시",
+        "productionUnit": "kg",
+        "pdfPage": 42,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "독활": [
+      {
+        "itemName": "독활",
+        "tableNumber": 33,
+        "sourceItemName": "독활",
+        "sido": "경상남도",
+        "sigungu": "남해군",
+        "region": "경상남도 남해군",
+        "productionUnit": "kg",
+        "pdfPage": 42,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "산양삼": [
+      {
+        "itemName": "산양삼",
+        "tableNumber": 34,
+        "sourceItemName": "산양삼",
+        "sido": "강원특별자치도",
+        "sigungu": "홍천군",
+        "region": "강원특별자치도 홍천군",
+        "productionUnit": "kg",
+        "pdfPage": 43,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "천마": [
+      {
+        "itemName": "천마",
+        "tableNumber": 35,
+        "sourceItemName": "천마",
+        "sido": "전북특별자치도",
+        "sigungu": "무주군",
+        "region": "전북특별자치도 무주군",
+        "productionUnit": "kg",
+        "pdfPage": 43,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "당귀": [
+      {
+        "itemName": "당귀",
+        "tableNumber": 36,
+        "sourceItemName": "당귀",
+        "sido": "강원특별자치도",
+        "sigungu": "평창군",
+        "region": "강원특별자치도 평창군",
+        "productionUnit": "kg",
+        "pdfPage": 43,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "천궁": [
+      {
+        "itemName": "천궁",
+        "tableNumber": 37,
+        "sourceItemName": "천궁",
+        "sido": "경상북도",
+        "sigungu": "영양군",
+        "region": "경상북도 영양군",
+        "productionUnit": "kg",
+        "pdfPage": 44,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "마": [
+      {
+        "itemName": "마",
+        "tableNumber": 38,
+        "sourceItemName": "마",
+        "sido": "경상북도",
+        "sigungu": "안동시",
+        "region": "경상북도 안동시",
+        "productionUnit": "kg",
+        "pdfPage": 44,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "고사리": [
+      {
+        "itemName": "고사리",
+        "tableNumber": 39,
+        "sourceItemName": "고사리",
+        "sido": "전라남도",
+        "sigungu": "광양시",
+        "region": "전라남도 광양시",
+        "productionUnit": "kg",
+        "pdfPage": 44,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "도라지": [
+      {
+        "itemName": "도라지",
+        "tableNumber": 40,
+        "sourceItemName": "도라지",
+        "sido": "강원특별자치도",
+        "sigungu": "홍천군",
+        "region": "강원특별자치도 홍천군",
+        "productionUnit": "kg",
+        "pdfPage": 45,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "더덕": [
+      {
+        "itemName": "더덕",
+        "tableNumber": 41,
+        "sourceItemName": "더덕",
+        "sido": "제주특별자치도",
+        "sigungu": "제주시",
+        "region": "제주특별자치도 제주시",
+        "productionUnit": "kg",
+        "pdfPage": 45,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "취나물": [
+      {
+        "itemName": "취나물",
+        "tableNumber": 42,
+        "sourceItemName": "취나물",
+        "sido": "전라남도",
+        "sigungu": "고흥군",
+        "region": "전라남도 고흥군",
+        "productionUnit": "kg",
+        "pdfPage": 45,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "송이": [
+      {
+        "itemName": "송이",
+        "tableNumber": 43,
+        "sourceItemName": "송이",
+        "sido": "경상북도",
+        "sigungu": "영덕군",
+        "region": "경상북도 영덕군",
+        "productionUnit": "kg",
+        "pdfPage": 46,
+        "matchMethod": "exact_item_name",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ],
+    "표고": [
+      {
+        "itemName": "표고",
+        "tableNumber": 44,
+        "sourceItemName": "생표고",
+        "sido": "충청남도",
+        "sigungu": "부여군",
+        "region": "충청남도 부여군",
+        "productionUnit": "kg",
+        "pdfPage": 46,
+        "matchMethod": "approved_alias",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      },
+      {
+        "itemName": "표고",
+        "tableNumber": 45,
+        "sourceItemName": "건표고",
+        "sido": "전라남도",
+        "sigungu": "장흥군",
+        "region": "전라남도 장흥군",
+        "productionUnit": "kg",
+        "pdfPage": 46,
+        "matchMethod": "approved_alias",
+        "evidenceType": "official_primary_production_region",
+        "evidenceStrength": "strong",
+        "referenceYear": 2024,
+        "regionalMetricEligible": false,
+        "regionalMetricBlockingReason": "상표 출원인 주소를 이 주산지 기준으로 다시 귀속하기 전까지 지역 상표 지표에 사용하지 않음"
+      }
+    ]
+  },
+  "unmatchedSourceTables": [
+    {
+      "tableNumber": 27,
+      "sourceItemName": "고로쇠",
+      "sido": "전라남도",
+      "sigungu": "광양시",
+      "region": "전라남도 광양시",
+      "productionUnit": "ℓ",
+      "pdfPage": 40
+    }
+  ]
+}
