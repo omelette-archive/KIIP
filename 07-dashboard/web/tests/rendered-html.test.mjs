@@ -504,7 +504,7 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   );
   assert.match(
     standaloneHtml,
-    /function selectedItem\(region\) \{ const official = officialRegionItems\(region\); return region\.items\.find\(\(item\) => item\.specialtyId === state\.itemId\) \|\| official\[0\] \|\| region\.items\[0\]; \}/,
+    /function selectedItem\(region\) \{ if \(!region\) return null; const official = officialRegionItems\(region\); return region\.items\.find\(\(item\) => item\.specialtyId === state\.itemId\) \|\| official\[0\] \|\| region\.items\[0\]; \}/,
     "기본 선택은 official을 우선하되, 지정된 itemId가 미분류 원물이어도 그 항목을 그대로 보여줘야 함",
   );
   assert.doesNotMatch(
@@ -627,8 +627,8 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   assert.match(
     standaloneHtml,
-    /const TREND_CHART = \{ width: 640, height: 190/,
-    "추이 그래프는 지자체 상세에 맞는 소형 크기를 사용해야 함",
+    /const TREND_CHART = \{ width: 960, height: 220/,
+    "추이 그래프는 넓은 화면에 맞는 가로형 비율을 사용해야 함",
   );
   assert.match(
     standaloneHtml,
@@ -646,6 +646,7 @@ test("shows an adjustable year-range application/registration trend chart", asyn
     /\$\{regionTrendHtml\(region\)\}[\s\S]*class="item-tabs word-cloud"/,
     "지역 추이 그래프는 선택한 지자체의 품목 탭보다 위에 표시되어야 함",
   );
+  assert.match(standaloneHtml, /class="trend-point trend-point-application"><title>/, "지자체 그래프의 점에도 정확한 건수 툴팁이 있어야 함");
   assert.match(standaloneHtml, /class="trend-chart"/, "지역별 상표 출원 탭에 추이 그래프 섹션이 있어야 함");
   assert.match(
     standaloneHtml,
@@ -688,6 +689,22 @@ test("shows an adjustable year-range application/registration trend chart", asyn
     /등록\(등록원부 보강 완료 건\)/,
     "등록 계열이 실제 등록일자와 등록원부 보강 범위를 사용한다는 점을 화면에 밝혀야 함",
   );
+});
+
+test("defaults municipality lookup to a responsive province overview with cleaned item labels", async () => {
+  const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  assert.match(standaloneHtml, /const firstRegionProvince = snapshot\.regions\.find/);
+  assert.match(standaloneHtml, /regionKey: ""/, "초기 지자체 선택은 특정 시군구가 아니어야 함");
+  assert.match(standaloneHtml, /function provinceDetail\(province, regions\)/);
+  assert.match(standaloneHtml, /광역 기본 보기/);
+  assert.match(standaloneHtml, /state\.regionKey = ""; state\.itemId = "";/, "광역 선택 시 시군구 선택을 해제해야 함");
+  assert.match(standaloneHtml, /"치악산 배": "배"/);
+  assert.match(standaloneHtml, /"조엄고구마": "고구마"/);
+  assert.match(standaloneHtml, /"쌀토토미": "쌀"/);
+  assert.match(standaloneHtml, /"큰송이 버섯": "버섯"/);
+  assert.match(standaloneHtml, /"치악산토종다래": "다래"/);
+  assert.match(standaloneHtml, /\.shell \{ width: 100%; max-width: none;/, "대시보드는 고정 1240px 폭에 갇히면 안 됨");
+  assert.match(standaloneHtml, /@media \(min-width: 1500px\)/, "넓은 화면용 비율 조정이 있어야 함");
 });
 
 test("ships traceable province and municipality geometry", async () => {

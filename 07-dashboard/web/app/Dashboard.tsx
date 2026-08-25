@@ -56,7 +56,21 @@ function snapshotUpdatedAt(snapshot: Snapshot) {
     ...snapshot.regions.flatMap((region) => region.items.flatMap((item) => Object.values(item.metrics).map((metric) => metric.calculatedAt))),
   );
 }
-function itemName(item: Item) { return item.itemName || item.noticeName || "미지정 품목"; }
+// 원천 특산품명은 감사·검색 근거로 그대로 보존하고, 화면에서는 지역·브랜드 수식어를
+// 걷어낸 원물명을 쓴다(#116). 사용자가 직접 지적한 원주 목록만 정확 매핑하며 임의의
+// 접두어 추정은 하지 않는다.
+const ITEM_DISPLAY_ALIASES: Record<string, string> = {
+  "치악산 배": "배",
+  "치악산 한우": "한우",
+  "치악산 복숭아": "복숭아",
+  "큰송이 버섯": "버섯",
+  "치악산 사과": "사과",
+  "조엄고구마": "고구마",
+  "쌀토토미": "쌀",
+  "치악산토종다래": "다래",
+};
+function displayItemName(value: string | null | undefined) { const name = value?.trim() || ""; return ITEM_DISPLAY_ALIASES[name] || name; }
+function itemName(item: Item) { return displayItemName(item.itemName || item.noticeName) || "미지정 품목"; }
 // 이슈 #112: 지자체/품목 목록을 리스트 대신 출원건수 기반 태그 클라우드로 보여달라는
 // 요청. 글자 크기 비교는 막대그래프보다 부정확하다는 점을 감안해(글자 수가 다른
 // 단어끼리는 왜곡될 수 있음), 크기 폭을 좁게(12~24px) 잡고 면적에 가깝게 느껴지도록
@@ -94,7 +108,7 @@ function sumYearCounts(items: Item[], field: "applicationYearCounts" | "registra
   }
   return totals;
 }
-const TREND_CHART = { width: 640, height: 190, padLeft: 42, padRight: 12, padTop: 12, padBottom: 24 };
+const TREND_CHART = { width: 960, height: 220, padLeft: 46, padRight: 16, padTop: 14, padBottom: 28 };
 function trendScales(startYear: number, endYear: number, maxValue: number) {
   const { width, height, padLeft, padRight, padTop, padBottom } = TREND_CHART;
   const span = Math.max(1, endYear - startYear);
@@ -123,7 +137,7 @@ function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: numb
   return Math.round(fullStart + fraction * (fullEnd - fullStart));
 }
 
-function RegionTrend({ region }: { region: Region }) {
+function RegionTrend({ region }: { region: Pick<Region, "region" | "items"> }) {
   const applicationTotals = sumYearCounts(region.items, "applicationYearCounts");
   const registrationTotals = sumYearCounts(region.items, "registrationYearCounts");
   const years = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])]
@@ -140,6 +154,8 @@ function RegionTrend({ region }: { region: Region }) {
       <path d={`${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
       <path d={trendLinePath(years, registrationTotals, scale)} className="trend-line trend-line-registered" />
       <path d={trendLinePath(years, applicationTotals, scale)} className="trend-line trend-line-application" />
+      {years.map((year) => <circle key={`application-${year}`} cx={scale.x(year)} cy={scale.y(applicationTotals[year] || 0)} r="2.8" className="trend-point trend-point-application"><title>{year}년 출원 {number(applicationTotals[year] || 0)}건</title></circle>)}
+      {years.map((year) => <circle key={`registration-${year}`} cx={scale.x(year)} cy={scale.y(registrationTotals[year] || 0)} r="2.8" className="trend-point trend-point-registered"><title>{year}년 등록 {number(registrationTotals[year] || 0)}건</title></circle>)}
       {trendYearLabels(years).map((year) => <text key={year} x={scale.x(year)} y={TREND_CHART.height - 5} className="trend-axis-label trend-axis-x">{year}</text>)}
     </svg>
     <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록</p>
@@ -167,7 +183,7 @@ function officialItemLabel(item: Item): string | null {
   const name = officialNoticeName(item);
   if (!name) return null;
   const prefix = DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
-  return prefix ? name.slice(prefix.length) : name;
+  return displayItemName(prefix ? name.slice(prefix.length) : name);
 }
 // 2026-08-19 데이터 감사 직후 한동안 matchingBasis=raw_item_name_unclassified인
 // 검토대기 원물명·상호(예: "꿀다림 데일리허니", "왕곡한과")를 지역별 출원 탭·지자체 상세
@@ -269,12 +285,13 @@ function regionalMetricPendingReason(item: Item) {
 }
 
 export default function Dashboard({ snapshot, geometry, registrationExamples }: { snapshot: Snapshot; geometry: MapGeometry; registrationExamples: VerifiedRegistrationExamples }) {
+  const defaultRegionProvince = snapshot.regions.find((region) => region.sido && region.sido !== "전국")?.sido || null;
   const [tab, setTab] = useState<Tab>("summary");
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
-  const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
-  const [selectedRegionCode, setSelectedRegionCode] = useState(regionKey(snapshot.regions[0]));
+  const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(defaultRegionProvince);
+  const [selectedRegionCode, setSelectedRegionCode] = useState("");
   const [selectedItemId, setSelectedItemId] = useState("");
   const [mapMetric, setMapMetric] = useState<MapMetric>("coverage");
   const [selectedProvince, setSelectedProvince] = useState<string | null>(null);
@@ -326,13 +343,15 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .map(([province, regions]) => ({ province, regions: regions.sort((a, b) => (a.sigungu || a.region).localeCompare(b.sigungu || b.region, "ko-KR")) }))
       .sort((a, b) => displayRegionName(a.province).localeCompare(displayRegionName(b.province), "ko-KR"));
   }, [filteredRegions]);
-  const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode) || filteredRegions[0] || snapshot.regions[0];
+  const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode);
   // 고시명칭 매칭 여부는 판정 기준의 하나일 뿐이라, 특정 품목(specialtyId)이 지정된
   // 경우 미분류 원물명이라도 그 품목을 그대로 보여준다(사용자 지적, 2026-08-21). 기본
   // 선택값만 공식 특산품을 우선한다.
   const selectedRegionItems = selectedRegion ? selectedRegion.items : [];
   const selectedRegionOfficialItems = selectedRegion ? officialRegionItems(selectedRegion) : [];
   const selectedItem = selectedRegionItems.find((item) => item.specialtyId === selectedItemId) || selectedRegionOfficialItems[0] || selectedRegionItems[0];
+  const activeRegionProvince = groupedRegions.some((group) => group.province === expandedRegionProvince) ? expandedRegionProvince : groupedRegions[0]?.province || null;
+  const activeProvinceRegions = groupedRegions.find((group) => group.province === activeRegionProvince)?.regions || [];
   const itemRows = useMemo(() => {
     const rows = new Map<string, { name: string; category: ItemCategory | null; searchTerms: string[]; trademarks: number; trademarksDisplay: number; hasProvisional: boolean; registered: number; available: number; availableRegions: string[]; regions: string[]; regionCounts: Record<string, number>; states: string[] }>();
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
@@ -564,23 +583,27 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </section>}
 
     {tab === "regions" && <section className="screen-section">
-      <p className="screen-note">시도를 선택하면 시군구별 특산품과 해당 지역 주소로 확인된 상표 출원 현황을 볼 수 있습니다.</p>
+      <p className="screen-note">광역자치단체 합계를 기본으로 보여주며, 시군구를 선택하면 품목별 상세로 전환됩니다.</p>
       <section className="workspace" aria-label="지역별 상세 조회">
         <aside className="region-panel">
           <div className="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 {groupedRegions.length}곳 · 시군구 {filteredRegions.length}곳</span></div>
           <label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
           <div className="province-list">{groupedRegions.map(({ province, regions }) => {
-            const expanded = Boolean(query.trim()) || expandedRegionProvince === province;
+            const expanded = Boolean(query.trim()) || activeRegionProvince === province;
             const coverage = specialtyCoverage(regions);
             return <section className="province-group" key={province}>
-              <button type="button" className="province-toggle" aria-expanded={expanded} onClick={() => setExpandedRegionProvince((current) => current === province ? null : province)}>
+              <button type="button" className="province-toggle" aria-expanded={expanded} onClick={() => { setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); }}>
                 <span><strong>{displayRegionName(province)}</strong><small>시군구 {regions.length}곳 · 특산품 {coverage.total}개</small></span><b aria-hidden="true">{expanded ? "−" : "+"}</b>
               </button>
-              {expanded && <div className="region-list municipality-list">{regions.map((region) => { const count = regionTrademarkValue(region); const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} className={regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개 · 출원율 {percent(rowCoverage.rate)}<br />{count === null ? "지역 출원 현황 검토중" : `지역 주소 일치 출원 ${number(count)}건`}</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}</div>}
+              {expanded && <div className="region-list municipality-list">{regions.map((region) => { const count = regionTrademarkValue(region); const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} className={selectedRegion && regionKey(selectedRegion) === regionKey(region) ? "region-button active" : "region-button"} onClick={() => chooseRegion(region)}><span><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개 · 출원율 {percent(rowCoverage.rate)}<br />{count === null ? "지역 출원 현황 검토중" : `지역 주소 일치 출원 ${number(count)}건`}</small></span><span className={`state state-${region.dataState}`}>{STATE_LABELS[region.dataState] || region.dataState}</span></button>; })}</div>}
             </section>;
           })}{groupedRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div>
         </aside>
-        <RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} verifiedExamples={registrationExamples.entries.find((entry) => entry.region === selectedRegion.region && entry.specialtyId === selectedItem?.specialtyId)?.examples || []} />
+        {selectedRegion
+          ? <RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} verifiedExamples={registrationExamples.entries.find((entry) => entry.region === selectedRegion.region && entry.specialtyId === selectedItem?.specialtyId)?.examples || []} />
+          : activeRegionProvince
+            ? <ProvinceDetail province={activeRegionProvince} regions={activeProvinceRegions} onRegion={chooseRegion} />
+            : <div className="detail-panel"><p className="empty">조회할 광역자치단체를 선택하세요.</p></div>}
       </section>
     </section>}
 
@@ -631,6 +654,24 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품-상표 분석·정책지원 플랫폼</span></div><span>Snapshot {snapshot.snapshotId} · 업데이트 {date(dashboardUpdatedAt)}</span></footer>
   </main>;
+}
+
+function ProvinceDetail({ province, regions, onRegion }: { province: string; regions: Region[]; onRegion: (region: Region) => void }) {
+  const coverage = specialtyCoverage(regions);
+  const items = regions.flatMap((region) => region.items);
+  const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
+  const applications = availableItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0);
+  const registrations = availableItems.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0);
+  return <div className="detail-panel province-detail">
+    <div className="detail-heading"><div><p className="eyebrow">광역 기본 보기</p><h2>{displayRegionName(province)}</h2><p>시군구 {regions.length}곳의 특산품·상표 현황 합계</p></div><span className="state">광역 집계</span></div>
+    <RegionTrend region={{ region: province, items }} />
+    <div className="detail-grid province-summary-grid">
+      <article><span>전체 수집 특산품</span><strong>{number(coverage.total)}개</strong><small>시군구별 지역×품목 합계</small></article>
+      <article><span>출원 확인 특산품</span><strong>{number(coverage.applied)}개</strong><small>전체 특산품 출원율 {percent(coverage.rate)}</small></article>
+      <article><span>지역 주소 일치 출원</span><strong>{number(applications)}건</strong><small>등록 완료 {number(registrations)}건</small></article>
+    </div>
+    <section className="province-municipalities"><div className="section-heading"><div><h2>시군구 상세</h2></div><span>지역을 선택하면 품목별 상세로 전환</span></div><div>{regions.map((region) => { const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} onClick={() => onRegion(region)}><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개</small></button>; })}</div></section>
+  </div>;
 }
 
 function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Region; item: Item | undefined; onItem: (id: string) => void; verifiedExamples: TrademarkExample[] }) {

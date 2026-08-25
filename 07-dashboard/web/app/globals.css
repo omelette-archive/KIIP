@@ -33,7 +33,7 @@ button, input { font: inherit; }
 button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 
-.shell { max-width: 1240px; margin: 0 auto; padding: 0 28px 48px; }
+.shell { width: 100%; max-width: none; margin: 0; padding: 0 clamp(16px, 2.5vw, 52px) 48px; }
 .topbar {
   min-height: 86px; display: flex; align-items: center; justify-content: space-between; gap: 24px;
   border-bottom: 1px solid rgba(16, 25, 43, 0.1);
@@ -100,7 +100,7 @@ a { color: inherit; text-decoration: none; }
 .ranking-table tbody tr:hover { background: #f4f6f9; }
 .ranking-table td.empty { text-align: center; white-space: normal; }
 
-.workspace { display: grid; grid-template-columns: 360px 1fr; gap: 20px; margin-top: 24px; }
+.workspace { display: grid; grid-template-columns: clamp(320px, 22vw, 420px) minmax(0, 1fr); gap: clamp(16px, 1.5vw, 28px); margin-top: 24px; }
 .region-panel, .detail-panel, .provenance { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .region-panel { padding: 22px; }
 .detail-panel { min-height: 560px; padding: 30px; }
@@ -206,8 +206,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-metric-description { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 0; color: var(--muted); font-size: 10px; line-height: 1.55; }
 .map-metric-description strong { flex: none; color: var(--green-dark); }
 .map-metric-description span { min-width: 0; }
-.map-stage { display: grid; place-items: center; min-height: 700px; margin-top: 10px; overflow: hidden; }
-.korea-map { width: min(100%, 700px); max-height: 780px; overflow: visible; }
+.map-stage { display: grid; place-items: center; min-height: clamp(560px, 44vw, 860px); margin-top: 10px; overflow: hidden; }
+.korea-map { width: min(100%, 1000px); max-height: 860px; overflow: visible; }
 .map-shape { stroke: #ffffff; stroke-width: 1.4; cursor: pointer; transition: filter .15s ease, opacity .15s ease, stroke-width .15s ease; }
 .map-shape:hover, .map-shape:focus-visible { filter: brightness(.9) saturate(1.1); stroke: var(--green-dark); stroke-width: 2.8; outline: none; }
 .map-shape.selected { stroke: var(--amber); stroke-width: 3.5; }
@@ -248,7 +248,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .65fr); gap: 20px; margin-top: 20px; }
 .coverage-map-card, .coverage-insight, .coverage-directory { padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .coverage-directory { margin-top: 20px; }
-.trend-chart { width: min(100%, 980px); margin: 20px auto 0; padding: 20px 22px; border: 1px solid #dce8e1; border-radius: 16px; background: linear-gradient(180deg, #fff 0%, #f8fbf9 100%); box-shadow: 0 8px 24px rgba(25, 55, 43, .07); }
+.trend-chart { width: 100%; margin: 20px 0 0; padding: 18px 22px 14px; border: 1px solid #d9e3ef; border-radius: 14px; background: linear-gradient(180deg, #fff 0%, #f5f8fc 100%); box-shadow: 0 6px 18px rgba(16, 45, 76, .06); }
 .trend-chart .section-heading { margin-bottom: 12px; align-items: flex-end; }
 .trend-chart .section-heading h2 { margin: 0; font-size: 19px; }
 .trend-chart .section-heading > span { color: var(--faint); font-size: 12px; }
@@ -266,7 +266,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .trend-range-handle { position: absolute; top: 50%; width: 16px; height: 16px; margin-left: -8px; padding: 0; border: 2px solid var(--green); border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25); transform: translateY(-50%); cursor: grab; touch-action: none; }
 .trend-range-handle:active { cursor: grabbing; }
 .trend-range-handle:focus-visible { outline: 2px solid var(--green); outline-offset: 2px; }
-.trend-svg { display: block; width: 100%; max-height: 220px; height: auto; }
+.trend-svg { display: block; width: 100%; height: auto; aspect-ratio: 48 / 11; }
 .trend-gridline { stroke: var(--line); stroke-width: 1; }
 .trend-axis-label { fill: var(--faint); font-size: 9px; }
 .trend-axis-y { text-anchor: end; dominant-baseline: middle; }
@@ -282,12 +282,23 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .trend-legend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; }
 .trend-legend-application { background: var(--green); }
 .trend-legend-registered { background: var(--amber); background-image: repeating-linear-gradient(90deg, var(--amber) 0 4px, transparent 4px 7px); }
-.trend-chart-compact { width: 100%; margin: 0 0 18px; padding: 15px 17px 12px; border-radius: 13px; box-shadow: none; }
+.trend-chart-compact { width: 100%; margin: 0 0 18px; padding: 14px 17px 10px; border-radius: 12px; box-shadow: none; }
 .trend-chart-compact .section-heading { margin-bottom: 6px; }
 .trend-chart-compact .section-heading h2 { font-size: 16px; }
 .trend-chart-compact .section-heading > span { font-size: 10px; }
-.trend-chart-compact .trend-svg { max-height: 170px; }
+.trend-chart-compact .trend-svg { max-height: none; }
 .trend-chart-compact .trend-legend { margin-top: 5px; }
+.province-detail .detail-heading { margin-bottom: 18px; }
+.province-detail .trend-chart-compact { margin-bottom: 16px; }
+.province-summary-grid { margin-top: 0; }
+.province-municipalities { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--line); }
+.province-municipalities .section-heading { align-items: end; }
+.province-municipalities .section-heading h2 { font-size: 17px; }
+.province-municipalities > div:last-child { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 9px; margin-top: 14px; }
+.province-municipalities button { display: flex; flex-direction: column; gap: 5px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 10px; background: #fff; color: var(--ink); text-align: left; cursor: pointer; }
+.province-municipalities button:hover { border-color: #aac2dc; background: var(--green-soft); }
+.province-municipalities button strong { font-size: 13px; }
+.province-municipalities button small { color: var(--muted); font-size: 10px; }
 .coverage-insight h2 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
 .coverage-insight-stats { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .coverage-insight-stats div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
@@ -403,6 +414,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .match-explanation { margin: 18px 0 0; padding: 13px 15px; border-radius: 10px; background: #eef2f7; color: var(--muted); font-size: 9.5px; line-height: 1.65; }
 .data-reading-note { display: grid; grid-template-columns: 150px 1fr; gap: 18px; margin-top: 14px; padding: 20px 22px; border-radius: 14px; background: var(--amber-soft); color: #6f4d28; }
 .data-reading-note strong { font-size: 12px; }.data-reading-note p { margin: 0; font-size: 10.5px; line-height: 1.75; }
+
+@media (min-width: 1500px) {
+  .map-workspace, .coverage-workspace { grid-template-columns: minmax(0, 2.15fr) minmax(340px, .7fr); gap: 28px; }
+  .item-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .ranking-columns { gap: 28px; }
+}
 
 @media (max-width: 980px) {
   .primary-tabs button { padding: 8px 6px; font-size: 12px; }
