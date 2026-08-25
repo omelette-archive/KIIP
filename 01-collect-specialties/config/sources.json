@@ -130,6 +130,31 @@
       }
     },
     {
+      "id": "kofpi_forest_product",
+      "name": "한국임업진흥원 임산물DB백과",
+      "role": "collector",
+      "dataVersion": "provider-live-api",
+      "lastVerifiedAt": "2026-08-25",
+      "catalogUrl": "https://www.kofpi.or.kr/public/dataOpen_02.do",
+      "providerUrl": "https://www.kofpi.or.kr/public/selBClass.do",
+      "formats": ["JSON"],
+      "authentication": {
+        "required": false,
+        "keyEnv": null,
+        "baseUrlEnv": null,
+        "approval": "none"
+      },
+      "quota": {
+        "type": "provider_undocumented",
+        "value": null,
+        "verification": "공식 페이지에 명시된 할당량 없음. 일반 브라우저 User-Agent 헤더 없이 호출하면 '보안 정책에 따라 차단' 메시지(빈 200 응답)가 반환됨을 직접 확인 — 수집기는 반드시 User-Agent를 지정해야 함. 2026-08-25 selBClass(대분류 8개)·selMClass(수실류 하위 13품목)·selDinfo(감 상세: 학명·영문명·과명) 실응답 확인"
+      },
+      "implementation": {
+        "status": "verified_pending_adapter",
+        "adapter": null
+      }
+    },
+    {
       "id": "nongsaro_area_brand",
       "name": "농촌진흥청 지역 브랜드",
       "role": "trademark_validation_reference",
