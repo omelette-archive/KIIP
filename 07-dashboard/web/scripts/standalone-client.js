@@ -171,9 +171,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const scopeLabel = snapshot.mode === "sample" ? "샘플 데이터" : "전체 데이터";
   const gateTotal = pipeline ? pipeline.regionalMetricGate.availableRegionItemCount + pipeline.regionalMetricGate.blockedRegionItemCount : snapshot.coverage.regionItemCount;
   const uniqueSpecialtyCount = new Set(snapshot.regions.flatMap((region) => region.items.map((item) => itemName(item)))).size;
-  const nationalSpecialtyCoverage = specialtyCoverage(snapshot.regions);
+  const regionalRegions = snapshot.regions.filter((region) => region.sido !== "전국");
+  const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
   const provinceStats = new Map();
-  snapshot.regions.forEach((region) => {
+  regionalRegions.forEach((region) => {
     const name = region.sido || region.region;
     const row = provinceStats.get(name) || { trademarks: 0, registered: 0, verified: 0, totalItems: 0, decidedItems: 0, appliedItems: 0 };
     region.items.forEach((item) => {
@@ -270,7 +271,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const nationalMax = percentageMetric ? 1 : Math.max(1, ...geometry.provinces.map((shape) => provinceValue(shape.name) || 0));
     const municipalMax = percentageMetric ? 1 : municipal ? Math.max(1, ...municipal.items.map((shape) => regionValue(findMunicipalityRegion(state.province, shape.name)) || 0)) : 1;
     const RANKING_LIMIT = 10;
-    const rankingCandidates = snapshot.regions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; }));
+    const rankingCandidates = regionalRegions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; }));
     const applicationRankingRows = [...rankingCandidates].filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available").sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
     const registrationRankingRows = [...rankingCandidates].filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available").sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
     const shapePaths = municipal ? municipal.items.map((shape) => { const region = findMunicipalityRegion(state.province, shape.name); const value = regionValue(region); return `<path d="${shape.d}" class="map-shape ${state.municipality === shape.name ? "selected" : ""}" style="fill:${fill(value, municipalMax)}" tabindex="0" role="button" data-municipality="${esc(shape.name)}" aria-label="${esc(shape.name)} ${mapValueLabel(value)}"><title>${esc(shape.name)} · ${mapValueLabel(value)}</title></path>`; }).join("") : geometry.provinces.map((shape) => { const value = provinceValue(shape.name); return `<path d="${shape.d}" class="map-shape" style="fill:${fill(value, nationalMax)}" tabindex="0" role="button" data-province="${esc(shape.name)}" aria-label="${esc(shape.name)} ${mapValueLabel(value)}"><title>${esc(shape.name)} · ${mapValueLabel(value)}</title></path>`; }).join("");
@@ -300,7 +301,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const municipal = state.province ? geometry.municipalities[state.province] : null;
     const activeViewBox = municipal?.viewBox || geometry.viewBox;
     const activeShapes = municipal?.items || geometry.provinces;
-    const areaRegions = state.province ? snapshot.regions.filter((region) => region.sido === state.province && (!state.municipality || region.sigungu === state.municipality || isUnclassifiedRegion(region))) : snapshot.regions;
+    const areaRegions = state.province ? regionalRegions.filter((region) => region.sido === state.province && (!state.municipality || region.sigungu === state.municipality || isUnclassifiedRegion(region))) : regionalRegions;
     const area = specialtyCoverage(areaRegions);
     const areaName = displayRegionName(state.municipality || state.province || "전국");
     const mapLabelsHtml = mapLabelMarkup(activeShapes, Boolean(municipal));

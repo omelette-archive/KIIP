@@ -97,6 +97,12 @@ function main() {
   };
   const extra = buildDashboardSnapshot({ analysis, gap, strategy }, { mode: "full", stage: "alpha" });
   const regions = mergeRegions(base.regions, extra.regions);
+  const regionalRegions = regions.filter((region) => region.sido !== "전국");
+  const nationwideCatalogRegions = regions.filter((region) => region.sido === "전국");
+  const regionalItemCount = regionalRegions.reduce((sum, region) => sum + region.items.length, 0);
+  const nationwideCatalogItemCount = nationwideCatalogRegions.reduce((sum, region) => sum + region.items.length, 0);
+  const availableRegionItemCount = regionalRegions.reduce((sum, region) =>
+    sum + region.items.filter((item) => item.metrics?.uniqueTrademarkCount?.availability === "available").length, 0);
   const generatedAt = new Date().toISOString();
   const merged = {
     ...base,
@@ -105,8 +111,18 @@ function main() {
     asOf: { ...base.asOf, sourceMaxFetchedAt: document.completedAt, analysisGeneratedAt: analysis.generatedAt },
     coverage: {
       ...base.coverage,
-      observedRegionCount: regions.filter((region) => region.sido !== "전국").length,
-      regionItemCount: regions.reduce((sum, region) => sum + region.items.length, 0),
+      observedRegionCount: regionalRegions.length,
+      regionItemCount: regionalItemCount,
+      catalogItemCount: regionalItemCount + nationwideCatalogItemCount,
+      nationwideCatalogItemCount,
+    },
+    pipelineStatus: {
+      ...base.pipelineStatus,
+      regionalMetricGate: {
+        ...base.pipelineStatus.regionalMetricGate,
+        availableRegionItemCount,
+        blockedRegionItemCount: regionalItemCount - availableRegionItemCount,
+      },
     },
     sources: [...new Map([...base.sources, ...extra.sources].map((source) => [source.sourceId, source])).values()],
     warnings: union([
@@ -118,7 +134,7 @@ function main() {
     regions,
   };
   fs.writeFileSync(basePath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-  console.error(`[mergeSupplementalDashboardData] regions=${regions.length}, items=${merged.coverage.regionItemCount}, snapshot=${merged.snapshotId}`);
+  console.error(`[mergeSupplementalDashboardData] regions=${regionalRegions.length}, regionalItems=${regionalItemCount}, nationwideCatalogItems=${nationwideCatalogItemCount}, snapshot=${merged.snapshotId}`);
 }
 
 main();

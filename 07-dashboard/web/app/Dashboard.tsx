@@ -11,7 +11,7 @@ type Item = { specialtyId: string | null; itemName: string | null; noticeName: s
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
-type Snapshot = { schemaVersion: string; snapshotId: string; mode: "sample" | "full"; generatedAt: string; versions?: Record<string, string | null>; map?: { availability: string; blockingReason?: string | null }; coverage: { targetRegionCount: number | null; observedRegionCount: number; regionItemCount: number; completeQueryCount: number; partialQueryCount: number; errorQueryCount: number; skippedQueryCount?: number; unit?: string }; pipelineStatus?: PipelineStatus; regions: Region[]; sources: Source[]; warnings: string[] };
+type Snapshot = { schemaVersion: string; snapshotId: string; mode: "sample" | "full"; generatedAt: string; versions?: Record<string, string | null>; map?: { availability: string; blockingReason?: string | null }; coverage: { targetRegionCount: number | null; observedRegionCount: number; regionItemCount: number; catalogItemCount?: number; nationwideCatalogItemCount?: number; completeQueryCount: number; partialQueryCount: number; errorQueryCount: number; skippedQueryCount?: number; unit?: string }; pipelineStatus?: PipelineStatus; regions: Region[]; sources: Source[]; warnings: string[] };
 type ProvinceShape = { name: string; d: string; labelX: number; labelY: number };
 type MunicipalityShape = { name: string; d: string; labelX: number; labelY: number };
 type MapGeometry = { schemaVersion: string; viewBox: string; boundaryReference: { sourceName: string; sourceUrl: string; sourceBasis: string; status: string; warning: string }; provinces: ProvinceShape[]; municipalities: Record<string, { viewBox: string; items: MunicipalityShape[] }> };
@@ -247,12 +247,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [trendStartYear, setTrendStartYear] = useState<number | null>(null);
   const [trendEndYear, setTrendEndYear] = useState<number | null>(null);
 
+  const regionalRegions = useMemo(() => snapshot.regions.filter((region) => region.sido !== "전국"), [snapshot.regions]);
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
   const sourceLine = snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean).join(" · ");
   const dashboardUpdatedAt = snapshotUpdatedAt(snapshot);
   const provinceStats = useMemo(() => {
     const stats = new Map<string, { trademarks: number; registered: number; verified: number; totalItems: number; decidedItems: number; appliedItems: number }>();
-    snapshot.regions.forEach((region) => {
+    regionalRegions.forEach((region) => {
       const name = region.sido || region.region;
       const current = stats.get(name) || { trademarks: 0, registered: 0, verified: 0, totalItems: 0, decidedItems: 0, appliedItems: 0 };
       region.items.forEach((item) => {
@@ -275,7 +276,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       stats.set(name, current);
     });
     return stats;
-  }, [snapshot.regions]);
+  }, [regionalRegions]);
   const mapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : stat.totalItems));
   const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => `${itemName(item)} ${item.noticeName || ""}`.toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
   const groupedRegions = useMemo(() => {
@@ -365,7 +366,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 보인다 — 어떤 구를 눌러도 시 전체 미분류 항목은 계속 보여준다(사용자 요청).
   const isUnclassifiedRegion = (region: Region) => region.sigungu === region.sido;
   const visibleRegions = selectedProvince ? snapshot.regions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : snapshot.regions;
-  const nationalSpecialtyCoverage = specialtyCoverage(snapshot.regions);
+  const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
   // 미리보기에 뜨는 개수(예: 2개)가 안 맞아 보인다는 지적. 고시명칭 매칭은 판정 기준의
@@ -392,7 +393,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     return filed > 0 ? `출원 확인 · ${number(filed)}건` : "미출원(검토중)";
   }
   const RANKING_LIMIT = 10;
-  const rankingCandidates = snapshot.regions.flatMap((region) => region.items.flatMap((item) => {
+  const rankingCandidates = regionalRegions.flatMap((region) => region.items.flatMap((item) => {
     const label = officialItemLabel(item);
     return label ? [{ region, item, label }] : [];
   }));
@@ -409,7 +410,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const activeMapLabels = positionedMapLabels(activeMapShapes, Boolean(municipalityGeometry));
   const coverageAreaRegions = selectedProvince
     ? snapshot.regions.filter((region) => region.sido === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region)))
-    : snapshot.regions;
+    : regionalRegions;
   const coverageArea = specialtyCoverage(coverageAreaRegions);
   const coverageAreaName = selectedMunicipality || selectedProvince || "전국";
   const coverageAreaDisplayName = displayRegionName(coverageAreaName);
