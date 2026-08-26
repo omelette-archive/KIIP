@@ -92,13 +92,20 @@ a { color: inherit; text-decoration: none; }
 /* 이슈 #116(2026-08-26): 요약 화면 랭킹 두 표를 .summary-row 3번째 칸에 세로로 쌓아
    특산품 순위·지도와 한 행(row)에 컴팩트하게 들어가게 한다(2단→1행 요청). */
 .ranking-columns { display: flex; flex-direction: column; gap: 16px; }
-.ranking { padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.ranking .section-heading > span { color: var(--faint); font-size: 11px; }
+.ranking { padding: 22px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.ranking .section-heading { flex-wrap: nowrap; }
+.ranking .section-heading h2 { word-break: keep-all; overflow-wrap: normal; }
+.ranking .section-heading > span { flex-shrink: 0; color: var(--faint); font-size: 11px; white-space: nowrap; }
 .ranking-note { margin: 14px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
-.ranking-table-wrap { margin-top: 16px; overflow-x: auto; }
-.ranking-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
-.ranking-table th, .ranking-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
-.ranking-table th { color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: 0.03em; }
+/* 이슈 #116(2026-08-26): 좁아진 3번째 칸에서 표가 옆으로 삐져나가 가로 스크롤이 생기던
+   문제 — table-layout:fixed로 폭을 칸 너비에 고정하고 넘치는 글자는 말줄임표로 처리해서
+   가로 스크롤 자체가 안 생기게 한다. */
+.ranking-table-wrap { margin-top: 16px; overflow-x: hidden; }
+.ranking-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12.5px; }
+.ranking-table th, .ranking-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ranking-table th { color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; }
+.ranking-table th:first-child, .ranking-table td:first-child { width: 32px; }
+.ranking-table th:last-child, .ranking-table td:last-child { width: 64px; text-align: right; }
 .ranking-table tbody tr:hover { background: #f4f6f9; }
 .ranking-table td.empty { text-align: center; white-space: normal; }
 
@@ -199,7 +206,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* 이슈 #116(2026-08-26): "1단"은 세로로 쌓으라는 뜻이 아니라 한 행(row)에 컴팩트하게
    담아달라는 뜻이었다(사용자 재확인) — 특산품 순위·지도·출원 랭킹을 한 화면 폭 안에
    가로로 배치한다. 지도 자체를 넓히는 게 목적이 아니므로 지도 칸은 유동폭만 넓게 잡는다. */
-.summary-row { display: grid; grid-template-columns: minmax(220px, .8fr) minmax(0, 2fr) minmax(260px, 1fr); gap: 20px; margin-top: 24px; align-items: start; }
+.summary-row { display: grid; grid-template-columns: minmax(220px, .75fr) minmax(0, 1.5fr) minmax(340px, 1.15fr); gap: 20px; margin-top: 24px; align-items: start; }
 .map-card, .map-insight, .item-screen, .compare-banner, .compare-sources article, .method-note {
   border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow);
 }
@@ -366,13 +373,24 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .kipris-link:hover { background: var(--green-soft); }
 /* 이슈 #116(2026-08-26): ⑥단계 품목별 비즈니스 확장 전략 브리핑을 지역별 상표 출원 탭의
    품목 상세 카드에 노출한다. 공백 알림(isGapAlert)은 amber 톤으로 강조한다. */
-.business-strategy { margin-top: 18px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--green-soft); }
+.business-strategy { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
 .business-strategy.alert { border-color: #e2c59b; background: var(--amber-soft); }
-.business-strategy .example-heading span { padding: 3px 8px; border-radius: 999px; background: rgba(255,255,255,.6); color: var(--green-dark); font-size: 9px; font-weight: 800; }
-.business-strategy.alert .example-heading span { color: var(--amber); }
-.business-strategy-list { display: grid; gap: 6px; margin: 0; padding-left: 18px; }
-.business-strategy-list li { color: var(--ink); font-size: 11.5px; line-height: 1.6; }
-.business-strategy-note { margin: 10px 0 0; color: var(--muted); font-size: 9px; }
+.strategy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.strategy-head-title { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.strategy-head-title strong { font-size: 15px; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.strategy-status-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 12px; font-weight: 800; }
+.business-strategy.alert .strategy-status-icon { color: var(--amber); }
+.strategy-status-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 9.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.business-strategy.alert .strategy-status-badge { color: var(--amber); }
+.strategy-stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.strategy-stat { padding: 7px 12px; border-radius: 10px; background: rgba(255,255,255,.7); }
+.strategy-stat span { display: block; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
+.strategy-stat strong { display: block; margin-top: 3px; color: var(--ink); font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
+.business-strategy-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
+.business-strategy-list li { position: relative; padding-left: 16px; color: var(--ink); font-size: 12px; line-height: 1.65; }
+.business-strategy-list li::before { content: ""; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 999px; background: var(--green); }
+.business-strategy.alert .business-strategy-list li::before { background: var(--amber); }
+.business-strategy-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(16, 25, 43, .08); color: var(--muted); font-size: 9.5px; }
 /* 이슈 #116(2026-08-26): 품목별 비즈니스 전략 샘플 메뉴 */
 .strategy-sample-list { display: grid; gap: 16px; margin-top: 16px; }
 .strategy-sample-list .business-strategy { margin-top: 0; }
@@ -541,7 +559,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .ranking-table th, .source-table thead th, .detail-grid span,
 .criteria-grid span, .pipeline-grid span { font-size: 11.5px; }
 .state { font-size: 11px; }
-.ranking-table-wrap { max-height: 300px; overflow: auto; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록과 연도별 추이 그래프가 각각 별도 행으로 쌓이던 걸
    한 행에 나란히 넣어달라는 요청 — 지역을 좁혀 구성 목록이 없을 때는 그래프가 전체 폭을 쓴다. */
 .applications-compact-row { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; margin-bottom: 14px; }

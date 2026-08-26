@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
 type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicant?: string | null; applicationStatus: string | null; statusCategory?: string | null; applicantRegionMatch?: string | null; niceClass?: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
@@ -8,7 +9,8 @@ type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string;
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
 type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
-type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: Record<string, unknown> | null };
+type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
+type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
@@ -288,6 +290,35 @@ function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: 
       {value !== null && <circle className="rate-ring-fill" cx={center} cy={center} r={radius} strokeWidth={strokeWidth} fill="none" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" transform={`rotate(-90 ${center} ${center})`} />}
       <text className="rate-ring-label" x="50%" y="50%" textAnchor="middle" dominantBaseline="middle">{percent(value)}</text>
     </svg>
+  );
+}
+// 이슈 #116(2026-08-26) 사용자 재요청: 비즈니스 전략 문장이 그냥 줄글이라 가독성이
+// 떨어진다는 지적 — 상태 아이콘·배지, 근거 수치(고유 상표·등록률·지역외 비중)를 문장 위에
+// 먼저 보여주는 요약 스탯 줄, 문장별 도트 마커로 시각적 앵커를 추가했다.
+function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBriefing; title: string; footer?: ReactNode }) {
+  const evidence = briefing.evidence;
+  const hasStats = evidence && (
+    typeof evidence.uniqueTrademarkCount === "number" ||
+    typeof evidence.registrationRate === "number" ||
+    typeof evidence.localApplicantShare === "number"
+  );
+  return (
+    <section className={briefing.isGapAlert ? "business-strategy alert" : "business-strategy"}>
+      <div className="strategy-head">
+        <div className="strategy-head-title">
+          <span className="strategy-status-icon" aria-hidden="true">{briefing.isGapAlert ? "!" : "✓"}</span>
+          <strong>{title}</strong>
+        </div>
+        <span className="strategy-status-badge">{briefing.isGapAlert ? "공백 알림" : "양호"}</span>
+      </div>
+      {hasStats && <div className="strategy-stat-row">
+        {typeof evidence?.uniqueTrademarkCount === "number" && <div className="strategy-stat"><span>고유 상표</span><strong>{number(evidence.uniqueTrademarkCount)}건</strong></div>}
+        {typeof evidence?.registrationRate === "number" && <div className="strategy-stat"><span>등록률</span><strong>{percent(evidence.registrationRate)}</strong></div>}
+        {typeof evidence?.localApplicantShare === "number" && <div className="strategy-stat"><span>지역 출원인 비중</span><strong>{percent(evidence.localApplicantShare)}</strong></div>}
+      </div>}
+      <ul className="business-strategy-list">{briefing.sentences.map((sentence, index) => <li key={index}>{sentence}</li>)}</ul>
+      <p className="business-strategy-note">⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다({briefing.templateVersion || "버전 미기록"}).{footer}</p>
+    </section>
   );
 }
 // 2026-08-21: 지역별 출원 탭 특산품 목록에 출원 여부를 색으로 구분해 보여준다(사용자
@@ -571,8 +602,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div>
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>고시명칭·NICE</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>NICE류</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>NICE류</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
         </div>
       </section>
     </>}
@@ -670,11 +701,12 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "strategy" && <section className="screen-section strategy-screen">
       <p className="screen-note">⑤·⑥단계 분석에서 이미 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 아직 표본 단계라 공백 알림·양호 사례 1건씩만 시범으로 보여주고, 반응을 보고 전체 품목으로 확장할지 판단합니다.</p>
       {briefingSamples.length === 0 && <p className="empty">아직 표시할 샘플이 없습니다.</p>}
-      <div className="strategy-sample-list">{briefingSamples.map(({ region, item }) => <article key={`${regionKey(region)}-${item.specialtyId}`} className={item.briefing?.isGapAlert ? "business-strategy alert" : "business-strategy"}>
-        <div className="example-heading"><strong>{region.region} · {itemName(item)}</strong><span>{item.briefing?.isGapAlert ? "공백 알림" : "양호"}</span></div>
-        <ul className="business-strategy-list">{item.briefing?.sentences.map((sentence, index) => <li key={index}>{sentence}</li>)}</ul>
-        <p className="business-strategy-note">⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다({item.briefing?.templateVersion || "버전 미기록"}). <button type="button" className="strategy-jump-link" onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}>지자체별 조회에서 자세히 보기 →</button></p>
-      </article>)}</div>
+      <div className="strategy-sample-list">{briefingSamples.map(({ region, item }) => item.briefing && <BusinessStrategyCard
+        key={`${regionKey(region)}-${item.specialtyId}`}
+        briefing={item.briefing}
+        title={`${region.region} · ${itemName(item)}`}
+        footer={<> <button type="button" className="strategy-jump-link" onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}>지자체별 조회에서 자세히 보기 →</button></>}
+      />)}</div>
     </section>}
 
     {tab === "compare" && <section className="screen-section">
@@ -763,7 +795,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
       <article><span>등록 건수</span><strong>{regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
-    {item.briefing && item.briefing.sentences.length > 0 && <section className={item.briefing.isGapAlert ? "business-strategy alert" : "business-strategy"}><div className="example-heading"><strong>비즈니스 확장 전략</strong><span>{item.briefing.isGapAlert ? "공백 알림" : "양호"}</span></div><ul className="business-strategy-list">{item.briefing.sentences.map((sentence, index) => <li key={index}>{sentence}</li>)}</ul><p className="business-strategy-note">⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다({item.briefing.templateVersion || "버전 미기록"}).</p></section>}
+    {item.briefing && item.briefing.sentences.length > 0 && <BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" />}
     <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;
 }
