@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "lastVerifiedAt": "2026-08-26",
+  "scope": "한국학중앙연구원 디지털서귀포문화대전 '특산물' 항목에 열거된 서귀포시 12개 지역 특산물",
+  "records": [
+    { "sourceRecordId": "GC04601135-01", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "마늘", "sourceItemName": "대정읍의 암반수마늘", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-02", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "은갈치", "sourceItemName": "성산읍의 은갈치", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-03", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "하귤", "sourceItemName": "표선면의 하귤나무", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-04", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "된장", "sourceItemName": "표선면 세화1리 전통 된장", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-05", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "자리젓", "sourceItemName": "송산동[보목동]의 자리젓", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-06", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "돼지고기", "sourceItemName": "중문동의 무항생 돼지", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-07", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "표고버섯", "sourceItemName": "용흥동의 표고버섯", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-08", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "소라젓", "sourceItemName": "법환동 소라젓", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-09", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "더덕", "sourceItemName": "성읍2리의 흙더덕", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-10", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "고사리", "sourceItemName": "수망리 고사리", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-11", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "무", "sourceItemName": "성산읍 월동 무", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" },
+    { "sourceRecordId": "GC04601135-12", "region": "제주특별자치도 서귀포시", "sourceRegionCode": "5013000000", "rawItemName": "한우", "sourceItemName": "안덕면 한우", "sourceRecordUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135" }
+  ]
+}

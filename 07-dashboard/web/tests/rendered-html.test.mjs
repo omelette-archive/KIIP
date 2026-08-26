@@ -648,24 +648,9 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   assert.match(standaloneHtml, /class="trend-point trend-point-application"><title>/, "지자체 그래프의 점에도 정확한 건수 툴팁이 있어야 함");
   assert.match(standaloneHtml, /class="trend-chart"/, "지역별 상표 출원 탭에 추이 그래프 섹션이 있어야 함");
-  assert.match(
-    standaloneHtml,
-    /data-trend-preset="all"/,
-  );
-  assert.match(
-    standaloneHtml,
-    /data-trend-preset="5"/,
-    "전체·최근5년·최근3년·최근1년 프리셋 버튼이 있어야 함",
-  );
+  // #116 후속: 프리셋 버튼은 제거하고 직접 입력·드래그 구간 조절만 유지한다.
   assert.match(standaloneHtml, /id="trend-start-input"/, "시작 연도를 직접 입력할 수 있어야 함");
   assert.match(standaloneHtml, /id="trend-end-input"/, "끝 연도를 직접 입력할 수 있어야 함");
-  // 2026-08-25(#116 재오픈): "전체 클릭했을 때만 active가 붙던 걸 최근5/3/1년도
-  // 눌렀을 때 진하게 표시되도록" — 4개 프리셋 모두 현재 선택 구간과 정확히 일치할 때만
-  // active가 붙어야 하고(드래그로 구간을 벗어나면 전부 비활성), 클래스 자체가 항상
-  // 출력돼야 한다(전에는 5/3/1년 버튼에 class 속성 자체가 없어 active가 절대 안 붙었음).
-  assert.match(standaloneHtml, /data-trend-preset="5"[^>]*class="\$\{trendStart/, "최근5년 버튼도 선택 상태에 따라 active 클래스가 붙어야 함");
-  assert.match(standaloneHtml, /data-trend-preset="3"[^>]*class="\$\{trendStart/, "최근3년 버튼도 선택 상태에 따라 active 클래스가 붙어야 함");
-  assert.match(standaloneHtml, /data-trend-preset="1"[^>]*class="\$\{trendStart/, "최근1년 버튼도 선택 상태에 따라 active 클래스가 붙어야 함");
   // 참고 이미지의 양 끝 드래그 핸들 구간 조절 바도 추가했다(사용자가 프리셋 버튼만 있던
   // 이전 결정을 뒤집고 요청) — 지도보다 위쪽에 배치된다(coverage-workspace 앞).
   assert.match(standaloneHtml, /class="trend-range-track"/, "양 끝 드래그 핸들 구간 조절 바가 있어야 함");
@@ -799,5 +784,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /primary-tabs/);
   assert.match(html, /ranking-table/);
   assert.match(html, /class="criteria"/, "판정 기준 섹션이 단독 HTML에도 동일하게 있어야 함");
+  assert.match(html, /광역별 상표 출원·등록 구성/);
+  assert.match(html, /<th>그룹<\/th><th>데이터명<\/th><th>수집 항목<\/th>/);
+  assert.match(html, /source-group/);
+  assert.doesNotMatch(html, /data-trend-preset=|추이 그래프 기간 프리셋/);
   assert.match(html, /dashboardClient\(/);
 });

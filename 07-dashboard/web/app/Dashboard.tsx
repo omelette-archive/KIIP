@@ -49,6 +49,21 @@ function sourceMethod(sourceId: string) {
   if (sourceId === "kipo_notice_goods") return "공식 고시상품명칭 파일 대조";
   return "공식 소스 스냅샷";
 }
+function sourceGroup(sourceId: string) {
+  if (sourceId === "admin_codes") return "지역 정보";
+  if (sourceId.includes("kipris") || sourceId === "ip_registry" || sourceId === "kipo_notice_goods" || sourceId === "nongsaro_area_brand") return "상표 정보";
+  return "특산품 현황";
+}
+function sourceItems(sourceId: string) {
+  const labels: Record<string, string> = {
+    admin_codes: "법정동 코드·행정구역명", gi: "농산물 지리적표시", nongsaro: "지역 특산물",
+    nfqs_quality_cert: "인증 수산물(전국)", kofpi_forest_product: "임산물 품목",
+    kipris_trademark: "상표 출원·상태·일자", kipris_trademark_applicant: "출원인 주소",
+    ip_registry: "등록번호·등록일·지정상품", kipo_notice_goods: "고시상품명칭·NICE류",
+    nongsaro_area_brand: "지역 브랜드·출원번호"
+  };
+  return labels[sourceId] || (sourceId.includes("specialties") ? "지역·품목·원문 명칭" : "원천 제공 항목");
+}
 function snapshotUpdatedAt(snapshot: Snapshot) {
   return latestDate(
     snapshot.generatedAt,
@@ -330,6 +345,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     });
     return stats;
   }, [regionalRegions]);
+  const provinceCompositionRows = [...provinceStats.entries()]
+    .filter(([, stat]) => stat.trademarks > 0)
+    .sort((a, b) => b[1].trademarks - a[1].trademarks)
+    .slice(0, 10);
+  const provinceCompositionMax = Math.max(1, ...provinceCompositionRows.map(([, stat]) => stat.trademarks));
   const mapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : stat.totalItems));
   const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => `${itemName(item)} ${item.noticeName || ""}`.toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
   const groupedRegions = useMemo(() => {
@@ -534,15 +554,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "applications" && <section className="screen-section coverage-screen">
       <p className="screen-note">시도별 출원율을 비교하고, 선택한 시도의 시군구별 현황을 확인할 수 있습니다.</p>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
+      {!selectedProvince && <section className="province-composition"><div className="section-heading"><div><h2>광역별 상표 출원·등록 구성</h2></div><span>지역 주소 일치 출원 상위 10개</span></div><div className="composition-list">{provinceCompositionRows.map(([province, stat], index) => <button type="button" key={province} onClick={() => openProvince(province)}><span className="composition-rank">{index + 1}</span><strong>{displayRegionName(province)}</strong><span className="composition-bar"><i style={{ width: `${stat.trademarks / provinceCompositionMax * 100}%` }}><b style={{ width: `${stat.trademarks ? stat.registered / stat.trademarks * 100 : 0}%` }} /></i></span><small>출원 {number(stat.trademarks)} · 등록 {number(stat.registered)}</small></button>)}</div><p className="composition-legend"><i />출원 <b />등록</p></section>}
       <section className="trend-chart"><div className="section-heading"><div><h2>연도별 출원·등록 추이</h2></div><span>{coverageAreaDisplayName} · 실제 출원일자·등록일자 기준</span></div>
         {trendHasData ? <>
           <div className="trend-controls">
-            <div className="trend-presets" role="group" aria-label="추이 그래프 기간 프리셋">
-              <button type="button" className={trendStart === trendFullStart && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(null); setTrendEndYear(null); }}>전체</button>
-              <button type="button" className={trendStart === trendFullEnd - 4 && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd - 4); setTrendEndYear(trendFullEnd); }}>최근 5년</button>
-              <button type="button" className={trendStart === trendFullEnd - 2 && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd - 2); setTrendEndYear(trendFullEnd); }}>최근 3년</button>
-              <button type="button" className={trendStart === trendFullEnd && trendEnd === trendFullEnd ? "active" : ""} onClick={() => { setTrendStartYear(trendFullEnd); setTrendEndYear(trendFullEnd); }}>최근 1년</button>
-            </div>
             <div className="trend-range-inputs"><label><span className="sr-only">시작 연도</span>{trendStart}<input type="number" aria-label="시작 연도" value={trendStart} onChange={(event) => setTrendStartYear(Number(event.target.value) || trendFullStart)} /></label><span>~</span><label><span className="sr-only">끝 연도</span>{trendEnd}<input type="number" aria-label="끝 연도" value={trendEnd} onChange={(event) => setTrendEndYear(Number(event.target.value) || trendFullEnd)} /></label></div>
           </div>
           <div className="trend-range-slider"><span className="trend-range-label">{trendFullStart}년 – {trendFullEnd}년 중 {trendStart}년 – {trendEnd}년 선택</span>
@@ -650,7 +665,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
       <div className="data-summary-grid"><article className="data-summary-card"><h2>특산물 데이터</h2><div className="data-stat"><strong>{number(uniqueSpecialtyCount)}개</strong><span>고유 특산품명</span></div><div className="data-stat"><strong>{number(snapshot.coverage.regionItemCount)}개</strong><span>지역-품목 조합</span></div><div className="data-stat"><strong>{number(snapshot.coverage.observedRegionCount)}개</strong><span>관측 지역</span></div><p className="data-card-note">같은 특산물도 지역이 다르면 별도 관측 단위로 관리합니다.</p></article><article className="data-summary-card"><h2>상표 매칭 결과</h2><div className="match-bars"><div><span>특산품 출원율 <b>{percent(nationalSpecialtyCoverage.rate)}</b></span><em><i style={{ width: `${Math.round((nationalSpecialtyCoverage.rate || 0) * 100)}%` }} /></em><small>출원 확인 {number(nationalSpecialtyCoverage.applied)} / 전체 수집 특산품 {number(nationalSpecialtyCoverage.total)}(지역별 집계 완료 {number(nationalSpecialtyCoverage.decided)})</small></div><div><span>고유 상표 주소 확보 <b>{number(pipeline.applicantRegionVerification.verifiedCount)}건</b></span><em><i style={{ width: `${Math.round((pipeline.applicantRegionVerification.rate || 0) * 100)}%` }} /></em><small>전국 고유 후보 중 {percent(pipeline.applicantRegionVerification.rate)}</small></div><div><span>지역별 출원 수 표시 가능 <b>{number(pipeline.regionalMetricGate.availableRegionItemCount)}개</b></span><em><i style={{ width: `${Math.round(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal) * 100)}%` }} /></em><small>전체 {number(gateTotal)}개 지역-품목 중 {percent(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal))}</small></div></div><p className="match-explanation">특산품 출원율은 현재 수집된 지역×특산품 전체 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 전체 {number(nationalSpecialtyCoverage.total)}개 중 명칭 확인이나 지역별 집계가 덜 끝난 항목도 분모에 포함하며, 출원이 확인될 때만 분자에 더합니다 — 후속 확인이 진행되면 값이 올라갈 수 있습니다.</p></article></div>
       <div className="data-reading-note"><strong>숫자를 읽는 법</strong><p><b>특산품 출원율 = 지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수</b>입니다. 명칭 확인이나 지역별 집계가 아직 끝나지 않은 항목도 분모에 포함하고 분자에는 넣지 않습니다. <b>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}건</b>은 출원번호 중복을 제거한 전국 검색 후보이며, 등록 비율은 지역 주소 일치 출원 중 등록 상태인 건의 비율로 별도 계산합니다. 검색이 부분 수집 상태인 품목은 0건으로 확정하지 않고 <b>지역별 집계 대기</b>로 표시합니다.</p></div>
-      <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>데이터명</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).map((source) => <tr key={source.sourceId}><th scope="row">{source.sourceLabel || source.sourceId}</th><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><th scope="row">지도 경계</th><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
+      <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>그룹</th><th>데이터명</th><th>수집 항목</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).sort((a, b) => sourceGroup(a.sourceId).localeCompare(sourceGroup(b.sourceId), "ko-KR")).map((source) => <tr key={source.sourceId}><td><span className="source-group">{sourceGroup(source.sourceId)}</span></td><th scope="row">{source.sourceLabel || source.sourceId}</th><td>{sourceItems(source.sourceId)}</td><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><td><span className="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
     </section>}
 
     <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품-상표 분석·정책지원 플랫폼</span></div><span>Snapshot {snapshot.snapshotId} · 업데이트 {date(dashboardUpdatedAt)}</span></footer>

@@ -130,6 +130,19 @@
       }
     },
     {
+      "id": "seogwipo_grandculture_specialties",
+      "name": "한국학중앙연구원 디지털서귀포문화대전 특산물",
+      "role": "collector",
+      "dataVersion": "GC04601135-20260826",
+      "lastVerifiedAt": "2026-08-26",
+      "catalogUrl": "https://www.grandculture.net/seogwipo/dir/GC04601135",
+      "providerUrl": "https://www.grandculture.net/",
+      "formats": ["HTML", "JSON snapshot"],
+      "authentication": { "required": false, "keyEnv": null, "baseUrlEnv": null, "approval": "none" },
+      "quota": { "type": "not_applicable", "value": null, "verification": "한국학중앙연구원 지역문화대전 본문에 번호로 열거된 12개 품목과 지역 표현을 2026-08-26 확인" },
+      "implementation": { "status": "verified_snapshot", "adapter": "lib/officialSupplement.js + data/seogwipo-grandculture-specialties.json" }
+    },
+    {
       "id": "nfqs_quality_cert",
       "name": "해양수산부 국립수산물품질관리원 품질인증수산물",
       "role": "collector",

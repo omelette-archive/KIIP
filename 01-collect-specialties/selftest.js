@@ -264,6 +264,15 @@ async function run() {
     assert.strictEqual(jeju.rows.length, 3);
     assert.strictEqual(jeju.warnings.length, 0);
     assert.ok(jeju.rows.every((row) => row.sido === "제주특별자치도" && row.sigungu === ""));
+
+    const seogwipoDocument = loadOfficialSupplement(
+      path.join(__dirname, "data", "seogwipo-grandculture-specialties.json")
+    );
+    const seogwipo = normalizeOfficialSupplement(seogwipoDocument, historyAdminList, "디지털서귀포문화대전 특산물");
+    assert.strictEqual(seogwipo.rows.length, 12);
+    assert.strictEqual(seogwipo.warnings.length, 0);
+    assert.ok(seogwipo.rows.every((row) => row.sido === "제주특별자치도" && row.sigungu === "서귀포시"));
+    assert.ok(seogwipo.rows.some((row) => row.rawItemName === "은갈치" && row.sourceItemName === "성산읍의 은갈치"));
     ok("연기군·남/북제주군과 과거 코드를 현재 지역으로 승계하고 공식 보완자료를 정규화");
   }
 

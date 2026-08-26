@@ -7,13 +7,14 @@
  *   sourceId, sourceContractVersion, sourceUrl, sourceLastVerifiedAt, collectedAt }[]
  *
  * 사용법:
- *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties --out <path>
+ *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties --out <path>
  *
  * 소스:
  *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY 필요)
  *   nongsaro  농촌진흥청 지역특산물 (NONGSARO_API_KEY, NONGSARO_API_BASE_URL 필요)
  *   sejong_official_specialties  세종시 공식 특산품 검증 스냅샷
  *   jeju_naqs_gi_specialties     농관원 제주 지리적표시 검증 스냅샷
+ *   seogwipo_grandculture_specialties 디지털서귀포문화대전 특산물 검증 스냅샷
  *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요, 기본 --sources에는 없음 — 명시적으로 지정해야 수집됨)
  * API 소스는 제공기관 활용신청 승인이 필요하다. 키가 없으면 해당 API 소스만
  * 건너뛰고 경고를 남기며, 공식 검증 스냅샷은 인증 없이 함께 적재한다.
@@ -39,7 +40,7 @@ loadEnv();
 
 function parseArgs(argv) {
   const args = {
-    sources: "gi,nongsaro,nfqs_quality_cert,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties",
+    sources: "gi,nongsaro,nfqs_quality_cert,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -250,6 +251,7 @@ async function collectKofpi(_adminList, warnings, options = {}) {
 const OFFICIAL_SUPPLEMENT_PATHS = {
   sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
   jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
+  seogwipo_grandculture_specialties: path.join(__dirname, "data", "seogwipo-grandculture-specialties.json"),
 };
 
 async function collectOfficialSupplement(adminList, warnings, options = {}) {
@@ -279,6 +281,7 @@ const COLLECTORS = {
   nongsaro: collectNongsaro,
   sejong_official_specialties: collectOfficialSupplement,
   jeju_naqs_gi_specialties: collectOfficialSupplement,
+  seogwipo_grandculture_specialties: collectOfficialSupplement,
   nfqs_quality_cert: collectNfqs,
   kofpi_forest_product: collectKofpi,
 };

@@ -171,6 +171,7 @@ a { color: inherit; text-decoration: none; }
 .source-table thead th { color: var(--faint); font-size: 10px; font-weight: 800; white-space: nowrap; }
 .source-table tbody th { font-weight: 700; color: var(--ink); }
 .source-table a { color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
+.source-group { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; font-weight: 800; white-space: nowrap; }
 details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 17px; }
 summary { color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 details ul { margin: 14px 0 0; padding-left: 19px; color: var(--muted); font-size: 10.5px; line-height: 1.7; }
@@ -254,7 +255,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .trend-chart .section-heading > span { color: var(--faint); font-size: 12px; }
 .trend-controls { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 14px; }
 .trend-presets { display: flex; gap: 6px; }
-.trend-presets button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
+.trend-presets { display: none; }
 .trend-presets button.active { border-color: var(--green); background: var(--green); color: #fff; }
 .trend-range-inputs { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 11px; }
 .trend-range-inputs label { display: flex; align-items: center; gap: 4px; }
@@ -503,4 +504,35 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition: none !important; }
+}
+
+/* #116: 보조 문구까지 읽기 쉬운 최소 크기로 올린다. */
+.screen-note, .map-metric-description, .map-warning, .insight-summary,
+.criteria-grid small, .pipeline-grid p, .metrics small, .ranking-note,
+.province-toggle small, .region-button small, .detail-heading p:not(.eyebrow),
+.detail-grid small, .source-grid small, .mini-list small, .rate-hero-detail small,
+.province-municipalities button small { font-size: 12px; }
+.metrics span, .ranking-table, .source-table, .coverage-insight-stats dt,
+.trend-range-inputs, .trend-range-label, .trend-legend { font-size: 13px; }
+.ranking-table th, .source-table thead th, .detail-grid span,
+.criteria-grid span, .pipeline-grid span { font-size: 11.5px; }
+.state { font-size: 11px; }
+.ranking-table-wrap { max-height: 300px; overflow: auto; }
+.province-composition { margin-bottom: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
+.province-composition .section-heading h2 { font-size: 19px; }
+.composition-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 24px; margin-top: 12px; }
+.composition-list button { display: grid; grid-template-columns: 24px 82px minmax(80px, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.composition-rank { color: var(--faint); font-size: 11px; font-weight: 800; }
+.composition-list strong { font-size: 13px; }
+.composition-list small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.composition-bar { height: 8px; overflow: hidden; border-radius: 99px; background: #e5ebf1; }
+.composition-bar > i { display: block; height: 100%; border-radius: inherit; background: #70a6de; }
+.composition-bar b { display: block; height: 100%; border-radius: inherit; background: var(--amber); }
+.composition-legend { display: flex; justify-content: flex-end; gap: 7px; margin: 9px 0 0; color: var(--muted); font-size: 11px; }
+.composition-legend i, .composition-legend b { width: 15px; height: 7px; margin-top: 3px; border-radius: 99px; background: #70a6de; }.composition-legend b { background: var(--amber); }
+@media (max-width: 900px) { .composition-list { grid-template-columns: 1fr; } }
+@media (min-width: 1280px) {
+  .map-workspace { grid-template-columns: minmax(0, 1.8fr) minmax(300px, .7fr); }
+  .map-stage { min-height: 360px; }
+  .ranking-columns { margin-top: 14px; gap: 14px; }
 }
