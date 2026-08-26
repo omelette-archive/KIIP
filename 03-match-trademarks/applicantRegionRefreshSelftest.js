@@ -7,6 +7,8 @@ const {
   classifyCacheEntry,
   buildRefreshManifest,
   isForeignNationality,
+  classifyRegistryCacheEntry,
+  buildRegistryRefreshManifest,
 } = require("./lib/applicantRegionRefresh");
 
 function ok(label) {
@@ -147,6 +149,69 @@ async function runApplicantRegionRefreshTests() {
     assert.strictEqual(withUniverse.totalRowCount, 4);
 
     ok("전체 모집단을 카테고리별로 집계하고 재조회 후보만 결정론적으로 뽑아냄");
+  }
+
+  console.log("13-5) classifyRegistryCacheEntry — 경로 B(등록번호, ip-registry-cache.json 형태)");
+  {
+    // 경로 B 캐시는 {status, fetchedAt, record: {...}}로 한 단계 더 감싼다 —
+    // applicant 판정 자체는 classifyApplicant()를 그대로 재사용한다(#73).
+    function registryEntry(applicants, recordOverrides = {}) {
+      return {
+        status: "complete",
+        fetchedAt: "2026-08-11T00:00:00Z",
+        record: { found: true, resultCode: "00", applicants, ...recordOverrides },
+      };
+    }
+    assert.deepStrictEqual(classifyRegistryCacheEntry("1", undefined), {
+      registrationNumber: "1",
+      category: "not_collected",
+      refreshCandidate: false,
+    });
+    assert.strictEqual(
+      classifyRegistryCacheEntry("1", registryEntry([], { found: false, resultCode: "20" })).category,
+      "no_result"
+    );
+    assert.strictEqual(
+      classifyRegistryCacheEntry("1", registryEntry([applicant({ hasSourceAddress: false })])).category,
+      "no_address"
+    );
+    const unmatched = classifyRegistryCacheEntry(
+      "1",
+      registryEntry([applicant({ hasSourceAddress: true, regionNormalizationReason: "address_not_in_admin_master" })])
+    );
+    assert.strictEqual(unmatched.category, "unmatched");
+    assert.strictEqual(unmatched.refreshCandidate, true);
+    const matched = classifyRegistryCacheEntry(
+      "1",
+      registryEntry([applicant({ hasSourceAddress: true, address: "경상북도 안동시" })])
+    );
+    assert.strictEqual(matched.category, "matched");
+    assert.strictEqual(matched.refreshCandidate, false);
+    ok("경로 A와 동일한 applicant 판정 로직을 경로 B의 중첩 캐시 형태에도 그대로 적용");
+  }
+
+  console.log("13-6) buildRegistryRefreshManifest — 경로 B 전체 캐시 집계");
+  {
+    function registryEntry(applicants) {
+      return { status: "complete", fetchedAt: "2026-08-11T00:00:00Z", record: { found: true, applicants } };
+    }
+    const cache = new Map([
+      ["30202000001", registryEntry([applicant({ hasSourceAddress: true, address: "경상북도 안동시" })])],
+      [
+        "30202000002",
+        registryEntry([applicant({ hasSourceAddress: true, regionNormalizationReason: "ambiguous_sigungu" })]),
+      ],
+    ]);
+    const manifest = buildRegistryRefreshManifest(cache);
+    assert.strictEqual(manifest.totalRowCount, 2);
+    assert.strictEqual(manifest.refreshCandidateCount, 1);
+    assert.deepStrictEqual(manifest.candidates.map((row) => row.registrationNumber), ["30202000002"]);
+
+    const withUniverse = buildRegistryRefreshManifest(cache, {
+      registrationNumbers: ["30202000001", "30202000002", "30202000003"],
+    });
+    assert.strictEqual(withUniverse.byCategory.not_collected, 1, "캐시에 없는 등록번호는 not_collected로 집계");
+    ok("등록번호 기준으로도 결정론적 집계·재조회 후보 선별이 동작함");
   }
 }
 

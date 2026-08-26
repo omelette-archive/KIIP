@@ -13,11 +13,14 @@
  * 이 모듈은 새 API 호출 없이, 기존 캐시만 보고 "다시 불러봐야 의미가 있는 건"과
  * "다시 불러도 똑같을 게 뻔한 건"을 구분한다.
  *
- * 범위: 경로 A(출원번호 기반)만 다룬다. 경로 B(ip-registry-cache.json, 등록번호
- * 기반)는 주소·국적이 둘 다 없는 출원인을 캐시 저장 단계에서 아예 걸러내
- * (`sanitizeRegistryRecordForCache`), 이 모듈과 같은 방식의 사후 분류에 필요한
- * 최소 정보(hasSourceAddress)가 없다. 경로 B까지 다루려면 그 캐시 스키마 확장이
- * 먼저 필요하다 — 이번 범위에서는 하지 않는다.
+ * 경로 A(출원번호 기반, trademark-applicant-region-cache.json)와 경로 B(등록번호
+ * 기반, ip-registry-cache.json) 둘 다 다룬다. 두 캐시의 applicant 항목 스키마는
+ * 이미 동일하다(address/nationality/hasSourceAddress/regionNormalizationReason —
+ * `03-match-trademarks/lib/ipRegistryEnricher.js`의 `sanitizeRegistryRecordForCache`
+ * 참고, 2026-08 중 추가됨). 다른 점은 경로 B 캐시가 항목을 한 단계 더 감싼다는
+ * 것뿐이다: `{ status, fetchedAt, record: { found, resultCode, applicants, ... } }`.
+ * (과거 이 주석은 "경로 B는 스키마 확장이 먼저 필요하다"고 적혀 있었으나, 확인해보니
+ * 그 확장은 이미 되어 있었다 — #73.)
  */
 
 const REFRESH_MANIFEST_SCHEMA_VERSION = "applicant-region-refresh-manifest-v1";
@@ -103,10 +106,74 @@ function buildRefreshManifest(cacheEntries, options = {}) {
   };
 }
 
+/**
+ * 경로 B(등록번호, ip-registry-cache.json) 캐시 항목 하나를 재조회 우선순위
+ * 카테고리로 판정한다. entry는 `{status, fetchedAt, record}` 형태이고, applicant
+ * 판정 로직 자체는 classifyApplicant()를 그대로 재사용한다 — 두 캐시의 applicant
+ * 스키마가 이미 같기 때문이다.
+ */
+function classifyRegistryCacheEntry(registrationNumber, entry) {
+  if (!entry || entry.status !== "complete") {
+    return { registrationNumber, category: "not_collected", refreshCandidate: false };
+  }
+  const record = entry.record || {};
+  if (record.found === false || record.resultCode === "20") {
+    return { registrationNumber, category: "no_result", refreshCandidate: false };
+  }
+  const applicants = Array.isArray(record.applicants) ? record.applicants : [];
+  if (applicants.length === 0) {
+    return { registrationNumber, category: "no_address", refreshCandidate: false };
+  }
+  const categories = applicants.map(classifyApplicant);
+  const matchedAddresses = new Set(applicants.filter((a) => a.address).map((a) => a.address));
+  if (matchedAddresses.size > 1) {
+    return { registrationNumber, category: "conflicting", refreshCandidate: false };
+  }
+  if (categories.includes("matched")) {
+    return { registrationNumber, category: "matched", refreshCandidate: false };
+  }
+  if (categories.every((category) => category === "no_address")) {
+    return { registrationNumber, category: "no_address", refreshCandidate: false };
+  }
+  if (categories.every((category) => category === "foreign_address")) {
+    return { registrationNumber, category: "foreign_address", refreshCandidate: false };
+  }
+  if (categories.includes("ambiguous")) {
+    return { registrationNumber, category: "ambiguous", refreshCandidate: true };
+  }
+  return { registrationNumber, category: "unmatched", refreshCandidate: true };
+}
+
+/**
+ * @param {Map<string, object>} cacheEntries 경로 B 기준 캐시(읽기 전용으로만 사용)
+ * @param {{registrationNumbers?: string[], generatedAt?: string}} [options]
+ */
+function buildRegistryRefreshManifest(cacheEntries, options = {}) {
+  const universe = Array.isArray(options.registrationNumbers)
+    ? [...new Set(options.registrationNumbers)]
+    : [...cacheEntries.keys()];
+  const rows = universe
+    .sort((a, b) => a.localeCompare(b))
+    .map((registrationNumber) => classifyRegistryCacheEntry(registrationNumber, cacheEntries.get(registrationNumber)));
+  const byCategory = {};
+  for (const row of rows) byCategory[row.category] = (byCategory[row.category] || 0) + 1;
+  const candidates = rows.filter((row) => row.refreshCandidate);
+  return {
+    schemaVersion: REFRESH_MANIFEST_SCHEMA_VERSION,
+    generatedAt: options.generatedAt || new Date().toISOString(),
+    totalRowCount: rows.length,
+    byCategory,
+    refreshCandidateCount: candidates.length,
+    candidates,
+  };
+}
+
 module.exports = {
   REFRESH_MANIFEST_SCHEMA_VERSION,
   isForeignNationality,
   classifyApplicant,
   classifyCacheEntry,
   buildRefreshManifest,
+  classifyRegistryCacheEntry,
+  buildRegistryRefreshManifest,
 };

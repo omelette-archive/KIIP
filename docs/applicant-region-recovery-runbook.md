@@ -181,11 +181,13 @@ node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
 `--dry-run`으로 재조회 후보 manifest만 먼저 생성해 규모를 확인하고,
 실제 재조회는 `--refresh-cache <별도 경로>`에만 쓴다 — 기준 캐시는 절대 직접
 수정하지 않는다. 검증 후 `--merged-out <경로>`로 "개선된 건만" 반영한 새 캐시를
-만들어, 사람이 확인한 뒤 기준 캐시를 교체한다. 현재는 경로 A(출원번호 기반,
-`trademark-applicant-region-cache.json`)만 지원한다 — 경로 B(등록번호 기반,
-`ip-registry-cache.json`)는 캐시 저장 단계에서 주소·국적이 둘 다 없는 출원인을
-걸러내 재조회 후보 판정에 필요한 최소 정보가 없으므로, 캐시 스키마 확장이
-먼저 필요하다(범위 밖).
+만들어, 사람이 확인한 뒤 기준 캐시를 교체한다. 경로 A(출원번호 기반,
+`trademark-applicant-region-cache.json`)와 경로 B(등록번호 기반,
+`ip-registry-cache.json`) 둘 다 지원한다 — 경로 B는
+`node 03-match-trademarks/refreshUnverifiedRegistryRegions.js --cache <기준 캐시>`를
+쓰며 옵션·동작은 경로 A와 동일하다. (과거 이 문서는 "경로 B는 캐시 스키마 확장이
+먼저 필요하다"고 적혀 있었으나, 확인해보니 그 확장(`hasSourceAddress` 등)은 이미
+돼 있었다 — 2026-08-26, #73.)
 
 ## 6. 재분석 전·후 검증표
 
@@ -208,9 +210,10 @@ node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
 
 ## 7. 현재 한계와 후속 구현
 
-- 경로 A(출원번호)는 미확인 캐시 선별 재조회와 대상 manifest가 구현됐다. 경로 B(등록번호)는
-  재조회 후보 판정에 필요한 최소 상태를 캐시에 보존하도록 스키마를 확장한 뒤 같은 복구 계약을
-  구현해야 한다([#73](https://github.com/omelette-archive/KIIP/issues/73)).
+- 경로 A(출원번호)·경로 B(등록번호) 둘 다 미확인 캐시 선별 재조회와 대상 manifest가
+  구현됐다([#73](https://github.com/omelette-archive/KIIP/issues/73), 2026-08-26). 남은
+  범위는 재조회 후 ④→⑦ 재생성을 한 단계로 묶는 자동화(현재 4.3절 수동 명령만 문서화)와
+  ③ 검색 스냅샷 기준 inside/outside/unverified 전후 비율 자동 집계다.
 - 두 경로의 결과가 모두 있을 때 근거 우선순위는 실행 순서로 구현돼 있다. 후속으로
   A·B 근거를 동시 보존하고 명시적 우선순위를 기록하는 계약이 필요하다.
 - **(2026-08-20 결정)** 경로 B가 아직 전체 모집단을 다 돌지 못한 진행 중 상태이므로,
