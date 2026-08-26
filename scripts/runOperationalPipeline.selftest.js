@@ -28,6 +28,7 @@ try {
     maxHitsPerQuery: 11,
   });
   assert.deepStrictEqual(plan.stages.map((stage) => stage.id), [
+    "00_cleanup_outputs",
     "01_collect",
     "02_normalize",
     "03_match",
@@ -89,11 +90,12 @@ try {
   });
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.failedStage, "02_normalize");
-  assert.deepStrictEqual(invoked, ["01_collect", "02_normalize"]);
+  assert.deepStrictEqual(invoked, ["00_cleanup_outputs", "01_collect", "02_normalize"]);
   assert.strictEqual(result.manifest.status, "failed");
   assert.strictEqual(result.manifest.stages[0].status, "succeeded");
-  assert.strictEqual(result.manifest.stages[1].status, "failed");
-  assert.strictEqual(result.manifest.stages[2].status, "pending");
+  assert.strictEqual(result.manifest.stages[1].status, "succeeded");
+  assert.strictEqual(result.manifest.stages[2].status, "failed");
+  assert.strictEqual(result.manifest.stages[3].status, "pending");
   assert.strictEqual(fs.existsSync(plan.files.dashboardCandidate), false);
   assert.strictEqual(JSON.parse(fs.readFileSync(plan.files.manifest, "utf8")).status, "failed");
 

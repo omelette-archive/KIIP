@@ -142,6 +142,13 @@ function buildPlan(options = {}) {
 
   const stages = [
     nodeStage(
+      "00_cleanup_outputs",
+      "①~⑦ output/ 아래 3일 지난 실행 산출물 정리(등록원부 캐시·일일 예산 상태 파일은 제외)",
+      "scripts/cleanupPipelineOutputs.js",
+      ["--days", "3", "--apply"],
+      []
+    ),
+    nodeStage(
       "01_collect",
       "GI·농사로 특산품 수집과 누적 SQLite 갱신",
       "01-collect-specialties/collectSpecialties.js",
