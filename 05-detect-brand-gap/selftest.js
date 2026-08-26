@@ -168,4 +168,40 @@ console.log("6) detectGaps — 입력 계약 위반 시 명확한 오류");
   ok("④ 출력 형태가 아니면 즉시 실패");
 }
 
+console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 실험)");
+{
+  const analysis = {
+    regionItems: [{
+      region: "경상북도 영양군",
+      itemName: "고추",
+      noticeName: "신선한 고추",
+      niceClass: "31",
+      sources: ["농사로"],
+      regionalUniqueTrademarkCount: 1,
+      regionalRegistrationRate: 0,
+      regionalMetricAvailability: "available",
+    }],
+  };
+  const defaultResult = detectGaps(analysis);
+  assert.strictEqual(defaultResult.scoreVersion, "gap-score-v2-regional-address-gate");
+  assert.strictEqual(defaultResult.ranking.length, 0, "기본 3건 기준으로는 1건짜리가 대표성 미충족이어야 함");
+
+  const relaxed = detectGaps(analysis, { representativeThreshold: 1 });
+  assert.strictEqual(
+    relaxed.scoreVersion,
+    "gap-score-v2-regional-address-gate-threshold1-experiment",
+    "기본값과 다른 기준을 쓰면 scoreVersion에 드러나 결과를 절대 혼동하지 않아야 함(안전조건)"
+  );
+  assert.strictEqual(relaxed.ranking.length, 1, "1건 기준에서는 같은 행이 대표 특산품으로 인정돼야 함");
+  assert.match(relaxed.methodology.representativeBasis, /1건/);
+  assert.match(relaxed.methodology.representativeBasis, /확정 기준 아님/);
+
+  assert.strictEqual(
+    defaultResult.rows[0].gapScore,
+    null,
+    "기준을 바꿔도 기본 3건 결과 자체가 조용히 달라지면 안 됨(원본 재호출로 재확인)"
+  );
+  ok("threshold를 생략하면 확정 기준(3건) 그대로, 다른 값을 주면 scoreVersion에 반영되어 결과가 섞이지 않음");
+}
+
 console.log("\n모든 자체 테스트 통과");

@@ -53,11 +53,12 @@ function hasRepresentativeSource(bucket) {
   return sources.some((source) => REPRESENTATIVE_SOURCES.includes(source));
 }
 
-function isRepresentative(bucket) {
+// 이슈 #29 후속 비교 실험: 기준값(3건)은 그대로 두고, 1건/3건/단계형 안을 같은 스냅샷에서
+// 비교할 수 있도록 threshold를 옵션으로 받는다. 넘기지 않으면 확정 기준(3건) 그대로다.
+function isRepresentative(bucket, threshold = REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD) {
   const sourceRepresentative = hasRepresentativeSource(bucket);
   const hasEnoughTrademarks =
-    regionalMetricAvailable(bucket) &&
-    regionalTrademarkCount(bucket) >= REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
+    regionalMetricAvailable(bucket) && regionalTrademarkCount(bucket) >= threshold;
   return sourceRepresentative || hasEnoughTrademarks;
 }
 
@@ -77,7 +78,8 @@ function registrationScore(bucket) {
  * 검증된 지역 출원만 사용한다. 검색 수집이나 주소 귀속이 불완전하면 값을 0으로 채우지 않고
  * 점수 전체를 차단한다(#50).
  */
-function scoreBucket(bucket) {
+function scoreBucket(bucket, options = {}) {
+  const threshold = options.representativeThreshold ?? REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
   if (!regionalMetricAvailable(bucket)) {
     return {
       representative: hasRepresentativeSource(bucket) ? true : null,
@@ -88,12 +90,12 @@ function scoreBucket(bucket) {
       blockingIssue: "#50",
     };
   }
-  const representative = isRepresentative(bucket);
+  const representative = isRepresentative(bucket, threshold);
   if (!representative) {
     return {
       representative: false,
       gapScore: null,
-      gapReason: `대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 ${REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD}건 이상)을 충족하지 않음`,
+      gapReason: `대표 특산품 판정 기준(지리적표시 등록 또는 상표 출원 ${threshold}건 이상)을 충족하지 않음`,
       scoreAvailability: "not_applicable",
     };
   }

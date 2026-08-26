@@ -43,6 +43,7 @@ function printUsageAndExit(message) {
       "",
       "옵션:",
       "  --out <path>   결과 JSON 저장 경로 (기본: 05-detect-brand-gap/output/gap.json)",
+      "  --representative-threshold <n>  대표 특산품 인정 최소 상표 건수(기본 3, #29 후속 비교 실험용)",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -50,14 +51,19 @@ function printUsageAndExit(message) {
 
 /**
  * @param {object} analysis ④단계 analyzeEntries() 출력
+ * @param {{representativeThreshold?: number}} [options] #29 후속 비교 실험용 — 생략하면
+ *   확정 기준(3건) 그대로다. 다른 값을 넘기면 scoreVersion에 값이 드러나 결과를 절대
+ *   혼동하지 않는다(안전조건).
  */
-function detectGaps(analysis) {
+function detectGaps(analysis, options = {}) {
   if (!analysis || !Array.isArray(analysis.regionItems)) {
     throw new Error("입력은 ④단계 analysis.json이어야 합니다 (regionItems 배열 필요).");
   }
+  const threshold = options.representativeThreshold ?? REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
+  const isDefaultThreshold = threshold === REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD;
 
   const rows = analysis.regionItems.map((bucket) => {
-    const scored = scoreBucket(bucket);
+    const scored = scoreBucket(bucket, { representativeThreshold: threshold });
     return {
       region: bucket.region,
       sido: bucket.sido,
@@ -122,7 +128,7 @@ function detectGaps(analysis) {
 
   return {
     schemaVersion: "1.0",
-    scoreVersion: GAP_SCORE_VERSION,
+    scoreVersion: isDefaultThreshold ? GAP_SCORE_VERSION : `${GAP_SCORE_VERSION}-threshold${threshold}-experiment`,
     generatedAt: new Date().toISOString(),
     sourceGeneratedAt: analysis.generatedAt || null,
     provenance: {
@@ -132,8 +138,8 @@ function detectGaps(analysis) {
     },
     methodology: {
       representativeBasis:
-        `sources에 지리적표시가 포함되었거나 고유 상표 출원이 ${REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD}건 ` +
-        "이상인 지역×품목을 대표 특산품으로 인정(#29 확정, 2026-08-11)",
+        `sources에 지리적표시가 포함되었거나 고유 상표 출원이 ${threshold}건 ` +
+        `이상인 지역×품목을 대표 특산품으로 인정(${isDefaultThreshold ? "#29 확정, 2026-08-11" : "#29 후속 비교 실험, 확정 기준 아님"})`,
       activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준, 미확정)",
       weights: { activity: 0.7, registration: 0.3 },
       weightsConfirmed: false,
@@ -168,7 +174,12 @@ function main() {
     throw new Error(`입력 JSON을 읽을 수 없습니다 (${inputPath}): ${error.message}`);
   }
 
-  const result = detectGaps(analysis);
+  const representativeThreshold =
+    args["representative-threshold"] !== undefined ? Number(args["representative-threshold"]) : undefined;
+  if (representativeThreshold !== undefined && (!Number.isInteger(representativeThreshold) || representativeThreshold < 1)) {
+    throw new Error("--representative-threshold는 1 이상의 정수여야 합니다.");
+  }
+  const result = detectGaps(analysis, { representativeThreshold });
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
   fs.writeFileSync(outPath, JSON.stringify(result, null, 2), "utf8");
   console.error(
