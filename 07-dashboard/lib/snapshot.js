@@ -5,6 +5,7 @@ const { loadAdminRegionCodes } = require("../../01-collect-specialties/lib/admin
 const { loadSourceCoverageGaps } = require("../../01-collect-specialties/lib/sourceCoverageGaps");
 const { getSourceDefinition, loadSourceRegistry } = require("../../01-collect-specialties/lib/sourceRegistry");
 const ITEM_CATEGORIES = require("../../02-normalize-items/data/item-categories-v1.json");
+const { checkMapGeographyCoverage } = require("./mapGeographyCoverage");
 
 const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
 const DASHBOARD_CONTRACT_VERSION = "dashboard-data-contract-v0-draft";
@@ -252,7 +253,8 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     throw new Error("mode는 sample 또는 full이어야 합니다.");
   }
   const generatedAt = options.generatedAt || new Date().toISOString();
-  const regionIndex = createRegionIndex(options.adminCodes);
+  const adminCodes = options.adminCodes || loadAdminRegionCodes();
+  const regionIndex = createRegionIndex(adminCodes);
   const analysisSourceIds = (Array.isArray(analysis?.provenance?.sources)
     ? analysis.provenance.sources
     : [])
@@ -747,6 +749,34 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     .filter(Boolean)
     .sort();
 
+  // 이슈 #80: geometry가 주어지면 현재 유효 시도·시군구 목표 목록과 결정론적으로
+  // 대조해서만 지도를 "available"로 전환한다. geometry가 없으면(예: geometry 없이
+  // 호출하는 기존 테스트) 근거 없이 공개하지 않는다는 기존 안전 기본값을 그대로 유지한다.
+  const geographyCoverage = options.geometry
+    ? checkMapGeographyCoverage({ adminCodes, geometry: options.geometry })
+    : null;
+  const map = geographyCoverage
+    ? {
+        defaultMetric: "data_coverage",
+        availability: geographyCoverage.available ? "available" : "blocked",
+        blockingReason: geographyCoverage.blockingReason,
+        ...(geographyCoverage.available
+          ? {
+              boundaryReference: options.geometry.boundaryReference || null,
+              coverageSummary: geographyCoverage.summary,
+            }
+          : { mismatches: geographyCoverage.mismatches }),
+      }
+    : {
+        defaultMetric: "data_coverage",
+        availability: "blocked",
+        blockingReason: "현재 기준 행정구역 경계 GeoJSON 미연결",
+      };
+  const geographyVersion =
+    geographyCoverage && geographyCoverage.available
+      ? options.geometry.boundaryReference?.sourceBasis || null
+      : null;
+
   return {
     schemaVersion: DASHBOARD_SCHEMA_VERSION,
     snapshotId: `dashboard-${hash(snapshotBasis, 20)}`,
@@ -764,15 +794,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
       dashboardContractVersion: DASHBOARD_CONTRACT_VERSION,
       regionCodeVersion: REGION_CODE_VERSION,
       specialtyIdVersion: SPECIALTY_ID_VERSION,
-      geographyVersion: null,
+      geographyVersion,
     },
     coverage,
     pipelineStatus,
-    map: {
-      defaultMetric: "data_coverage",
-      availability: "blocked",
-      blockingReason: "현재 기준 행정구역 경계 GeoJSON 미연결",
-    },
+    map,
     sources,
     warnings: [...warnings],
     regions,

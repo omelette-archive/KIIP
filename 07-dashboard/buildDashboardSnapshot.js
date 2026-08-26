@@ -35,6 +35,8 @@ function usage(message) {
       "  --partial-unique-query-count <n>  부분 수집된 고유 검색 조합 수",
       "  --query-hit-cap <n>  이번 실행의 검색 조합별 저장 상한",
       "  --serialization-failure-observed-at-or-above <n>  직렬화 실패가 관측된 상한",
+      "  --geometry <path>  지도 도형 GeoJSON 산출물(map-geometry.json). 주면 #80 목표 목록",
+      "                     대조를 통과할 때만 map.availability를 available로 전환한다.",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -73,6 +75,7 @@ function main() {
       queryHitCap: args["query-hit-cap"],
       serializationFailureObservedAtOrAbove:
         args["serialization-failure-observed-at-or-above"],
+      geometry: args.geometry ? readJson(args.geometry, "지도 도형") : undefined,
     }
   );
   fs.mkdirSync(path.dirname(outPath), { recursive: true });

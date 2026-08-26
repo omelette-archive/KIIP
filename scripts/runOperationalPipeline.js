@@ -212,6 +212,8 @@ function buildPlan(options = {}) {
         "full",
         "--stage",
         "alpha",
+        "--geometry",
+        path.join(ROOT, "07-dashboard/web/public/data/map-geometry.json"),
         "--out",
         files.snapshot,
       ],

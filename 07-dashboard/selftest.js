@@ -9,6 +9,7 @@ const {
   resolveRegion,
   specialtyIdentity,
 } = require("./lib/snapshot");
+const { checkMapGeographyCoverage } = require("./lib/mapGeographyCoverage");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -375,6 +376,65 @@ console.log("6) 지정상품 검토 승인 원물은 NICE류 없이도 근거 �
   assert.strictEqual(rawItem.metrics.goodsReviewCandidateCount.value, 1);
   assert.strictEqual(rawItem.metrics.goodsReviewCandidateCount.blockingIssue, null);
   ok("검토 승인 원물의 지역 건수·exact/contains 근거를 일반 주소 집계와 구분해 전달");
+}
+
+console.log("7) 지도 도형-목표 목록 대조 통과 시에만 map.availability를 available로 전환(#80)");
+{
+  const adminCodes = [
+    { code: "1100000000", sido: "서울특별시", sigungu: "", level: "sido" },
+    { code: "4100000000", sido: "경기도", sigungu: "", level: "sido" },
+    { code: "1111000000", sido: "서울특별시", sigungu: "종로구", level: "sigungu" },
+    // "구 설치 시"의 상위 시 코드 — 하위 구 코드가 전부 있으면 충족된 것으로 간주해야 함
+    { code: "4111000000", sido: "경기도", sigungu: "수원시", level: "sigungu" },
+    { code: "4111100000", sido: "경기도", sigungu: "수원시장안구", level: "sigungu" },
+    { code: "4111300000", sido: "경기도", sigungu: "수원시권선구", level: "sigungu" },
+  ];
+  const matchingGeometry = {
+    provinces: [{ name: "서울특별시" }, { name: "경기도" }],
+    municipalities: {
+      서울특별시: { items: [{ code: "11110" }] },
+      경기도: { items: [{ code: "41111" }, { code: "41113" }] },
+    },
+  };
+  const clean = checkMapGeographyCoverage({ adminCodes, geometry: matchingGeometry });
+  assert.strictEqual(clean.available, true, "구 설치 시는 하위 구 코드로 충족돼야 함");
+  assert.deepStrictEqual(clean.mismatches.missingSigungu, []);
+
+  const geometryMissingOneWard = {
+    provinces: [{ name: "서울특별시" }, { name: "경기도" }],
+    municipalities: {
+      서울특별시: { items: [{ code: "11110" }] },
+      경기도: { items: [{ code: "41111" }] },
+    },
+  };
+  const dirty = checkMapGeographyCoverage({ adminCodes, geometry: geometryMissingOneWard });
+  assert.strictEqual(dirty.available, false, "하위 구 하나라도 빠지면 상위 시가 미충족이어야 함");
+  assert.ok(dirty.blockingReason);
+  // 빠진 구(수원시권선구) 자신과, 그 구가 없어 충족 못 하는 상위 시(수원시) 둘 다 잡혀야 함
+  const missingNames = dirty.mismatches.missingSigungu.map((row) => row.sigungu).sort();
+  assert.deepStrictEqual(missingNames, ["수원시", "수원시권선구"]);
+
+  const snapshotWithGeometry = buildDashboardSnapshot(fixture(), {
+    mode: "sample",
+    generatedAt: "2026-08-26T00:00:00Z",
+    adminCodes: [
+      { code: "1100000000", sido: "서울특별시", sigungu: "", level: "sido" },
+      { code: "1111000000", sido: "서울특별시", sigungu: "종로구", level: "sigungu" },
+    ],
+    geometry: {
+      boundaryReference: { sourceName: "테스트 경계", sourceBasis: "2026-01-01 기준 테스트" },
+      provinces: [{ name: "서울특별시" }],
+      municipalities: { 서울특별시: { items: [{ code: "11110" }] } },
+    },
+  });
+  assert.strictEqual(snapshotWithGeometry.map.availability, "available");
+  assert.strictEqual(snapshotWithGeometry.versions.geographyVersion, "2026-01-01 기준 테스트");
+  assert.strictEqual(snapshotWithGeometry.map.boundaryReference.sourceName, "테스트 경계");
+
+  const snapshotWithoutGeometry = buildDashboardSnapshot(fixture(), { mode: "sample" });
+  assert.strictEqual(snapshotWithoutGeometry.map.availability, "blocked");
+  assert.strictEqual(snapshotWithoutGeometry.versions.geographyVersion, null);
+  ok("geometry가 있고 목표 목록과 정확히 대응할 때만 available로 전환, 없으면 기존 안전 기본값 유지");
 }
 
 console.log("\n모든 자체 테스트 통과");
