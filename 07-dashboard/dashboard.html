@@ -549,7 +549,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .applications-compact-row .province-composition, .applications-compact-row .trend-chart { margin-bottom: 0; }
 .province-composition { padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .province-composition .section-heading h2 { font-size: 19px; }
-.composition-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px 24px; margin-top: 12px; }
+/* 이슈 #116(2026-08-26): 광역별 구성 목록은 이제 연도별 추이 그래프와 한 행을 나눠 쓰므로
+   폭이 좁아져 2열은 겹침이 생긴다 — 1열로 유지. */
+.composition-list { display: grid; grid-template-columns: 1fr; gap: 5px 24px; margin-top: 12px; }
 .composition-list button { display: grid; grid-template-columns: 24px 82px minmax(80px, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
 .composition-rank { color: var(--faint); font-size: 11px; font-weight: 800; }
 .composition-list strong { font-size: 13px; }
