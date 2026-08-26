@@ -172,6 +172,10 @@ a { color: inherit; text-decoration: none; }
 .source-table tbody th { font-weight: 700; color: var(--ink); }
 .source-table a { color: var(--green); font-weight: 700; text-decoration: underline; text-underline-offset: 2px; }
 .source-group { display: inline-flex; padding: 5px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; font-weight: 800; white-space: nowrap; }
+.crop-badge { display: inline-flex; align-items: center; margin-left: 7px; padding: 3px 6px; border-radius: 999px; background: #e8e4f5; color: #51438d; font-size: 10px; font-style: normal; font-weight: 800; vertical-align: middle; white-space: nowrap; }
+.crop-badge-대표작목 { background: #fff0d7; color: #92520e; }
+.crop-badge-집중육성작목 { background: #e3f0fb; color: #14568c; }
+.crop-badge-자체육성작목 { background: #e7f4e1; color: #397326; }
 details { margin-top: 20px; border-top: 1px solid var(--line); padding-top: 17px; }
 summary { color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 details ul { margin: 14px 0 0; padding-left: 19px; color: var(--muted); font-size: 10.5px; line-height: 1.7; }

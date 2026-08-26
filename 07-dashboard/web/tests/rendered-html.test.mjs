@@ -785,6 +785,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /ranking-table/);
   assert.match(html, /class="criteria"/, "판정 기준 섹션이 단독 HTML에도 동일하게 있어야 함");
   assert.match(html, /광역별 상표 출원·등록 구성/);
+  assert.match(html, /cropBadgeHtml\(item, true\)/);
+  assert.match(html, /crop-badge-대표작목/);
   assert.match(html, /<th>그룹<\/th><th>데이터명<\/th><th>수집 항목<\/th>/);
   assert.match(html, /source-group/);
   assert.doesNotMatch(html, /data-trend-preset=|추이 그래프 기간 프리셋/);

@@ -25,6 +25,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const ITEM_DISPLAY_ALIASES = { "치악산 배": "배", "치악산 한우": "한우", "치악산 복숭아": "복숭아", "큰송이 버섯": "버섯", "치악산 사과": "사과", "조엄고구마": "고구마", "쌀토토미": "쌀", "치악산토종다래": "다래" };
   const displayItemName = (value) => { const name = String(value || "").trim(); return ITEM_DISPLAY_ALIASES[name] || name; };
   const itemName = (item) => displayItemName(item.itemName || item.noticeName) || "미지정 품목";
+  const cropBadgeHtml = (item, withYear = false) => item.regionalSpecialtyCropBadge
+    ? `<em class="crop-badge crop-badge-${esc(item.regionalSpecialtyCropBadge.tier)}">${esc(item.regionalSpecialtyCropBadge.tier)}${withYear ? ` · ${number(item.regionalSpecialtyCropBadge.referenceYear)}` : ""}</em>`
+    : "";
   // 이슈 #112: 지자체/품목 목록을 리스트 대신 출원건수 기반 태그 클라우드로 보여달라는
   // 요청. 글자 크기 비교는 막대그래프보다 부정확하다는 점을 감안해(글자 수가 다른
   // 단어끼리는 왜곡될 수 있음), 크기 폭을 좁게(12~24px) 잡고 면적에 가깝게 느껴지도록
@@ -386,7 +389,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       ${heading}
       ${regionTrendHtml(region)}
       <div class="item-tabs word-cloud" role="tablist" aria-label="${esc(region.region)} 특산품 · 출원건수 기준 글자 크기">${(() => { const max = Math.max(1, ...region.items.map((row) => row.metrics.uniqueTrademarkCount.value || 0)); return region.items.map((row) => { const value = row.metrics.uniqueTrademarkCount.value || 0; const selected = item.specialtyId === row.specialtyId; const colorStyle = selected ? "" : `;color:${wordCloudColor(row.specialtyId || itemName(row))}`; return `<button type="button" data-region-item="${esc(row.specialtyId || "")}" aria-selected="${selected}" style="font-size:${wordCloudFontSize(value, max)}px${colorStyle}" title="${esc(itemName(row))} · 출원 ${number(value)}건">${esc(itemName(row))}</button>`; }).join(""); })()}</div>
-      <div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span>${item.itemVerdict?.source === "algorithm" ? `<span class="verdict-chip" title="${esc(verdictTitle(item.itemVerdict))}">AI 판정</span>` : ""}</div>
+      <div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}${cropBadgeHtml(item, true)}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span>${item.itemVerdict?.source === "algorithm" ? `<span class="verdict-chip" title="${esc(verdictTitle(item.itemVerdict))}">AI 판정</span>` : ""}</div>
       <div class="metric-reading-note"><strong>출원 건수 기준</strong><p><b>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</b>은 출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
       ${item.regionalEvidence?.length ? `<div class="metric-reading-note"><strong>공식 생산 주산지 근거</strong><p>${esc(item.regionalEvidence.map((evidence) => `${evidence.region} (${evidence.referenceYear})`).join(", "))} · 임산물생산조사 기준입니다. ${item.regionalEvidence.some((evidence) => evidence.regionalMetricEligible) ? "출원인 주소를 주산지와 대조해 지역 상표 통계에 반영했습니다." : "검색 범위가 완료된 뒤 지역 상표 통계에 반영합니다."}</p></div>` : ""}
       <div class="detail-grid">
