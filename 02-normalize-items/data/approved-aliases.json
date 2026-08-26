@@ -1,6 +1,6 @@
 {
-  "version": "specialty-approved-aliases-20260812-v2",
-  "approvedAt": "2026-08-12",
+  "version": "specialty-approved-aliases-20260826-v3",
+  "approvedAt": "2026-08-26",
   "approvalIssue": "#51",
   "approvalChannel": "user_confirmation_in_work_session",
   "proposalCommentUrl": "https://github.com/omelette-archive/KIIP/issues/51#issuecomment-5249928480",
@@ -13,6 +13,10 @@
     {
       "date": "2026-08-12",
       "note": "2차 승인 — 검토대기 상위 빈도 원물명 중 사전에 원물 표기가 없고 가공/일반 범주명만 있는 4~5개. itemName은 원물명 그대로 유지하고 noticeName만 검색용으로 별도 연결한다(병합·삭제 아님). 감/단감·오미자·잡곡·매실·대추는 사전에 원물 항목이 없거나 후보가 여럿(가공품)이라 계속 검토대기로 남김"
+    },
+    {
+      "date": "2026-08-26",
+      "note": "3차 승인(#51 A안 8건) — 검토대기 중 \"고시명칭 후보가 없음\" 군집을 대상으로 브랜드명/지역명이 섞인 원물명을 실제 웹 검색으로 확인해 승인. 약돌한우 등 7개 브랜드 한우는 기존 '한우' 규칙에 별칭만 추가(소고기/29/G0701). 신고배·쌍샘배·신정배(배 품종)→신선한 배(31/G0211). 녹돈·뜨레한돈(돼지고기 브랜드)→돼지고기(29/G0701). 고성오대미·해&들米·단샘미(오대쌀 브랜드)→쌀(30/G020101). 각 noticeName·niceClass·similarGroupCode는 고시상품명칭_13판_2026.csv에서 직접 재조회해 정확히 일치함을 확인했다. 대봉감/장준감/반시(사전에 '감' 없이 '신선한 일본 감'만 존재), 냉품삼/선애삼(근거 약함), 칡소(한우와 다른 별도 품종)는 업무 판단이 필요해 계속 검토대기로 남기고 #51에 근거만 기록한다."
     }
   ],
   "rules": [
@@ -47,10 +51,28 @@
       "similarGroupCode": "G0202"
     },
     {
-      "aliases": ["한우"],
+      "aliases": ["한우", "약돌한우", "능수한우", "알밤한우", "철마한우", "섬한우", "주왕산한우", "천년한우"],
       "noticeName": "소고기",
       "niceClass": "29",
       "similarGroupCode": "G0701"
+    },
+    {
+      "aliases": ["신고배", "쌍샘배", "신정배"],
+      "noticeName": "신선한 배",
+      "niceClass": "31",
+      "similarGroupCode": "G0211"
+    },
+    {
+      "aliases": ["녹돈", "뜨레한돈"],
+      "noticeName": "돼지고기",
+      "niceClass": "29",
+      "similarGroupCode": "G0701"
+    },
+    {
+      "aliases": ["고성오대미", "해&들米", "단샘미"],
+      "noticeName": "쌀",
+      "niceClass": "30",
+      "similarGroupCode": "G020101"
     },
     {
       "aliases": ["벌꿀"],
