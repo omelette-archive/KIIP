@@ -1,0 +1,105 @@
+{
+  "schemaVersion": "regional-specialty-crops-v1",
+  "generatedAt": "2026-08-26T00:10:00.000Z",
+  "referenceYear": 2025,
+  "sourceName": "농촌진흥청 2025년도 지역특화작목 사업 성과 보고회 보도자료 붙임3(지역특화작목 현황)",
+  "sourceUrl": "https://www.rda.go.kr/board/board.do?mode=view&prgId=day_farmprmninfoEntry&dataNo=100000806736",
+  "sourceFileUrl": "https://www.rda.go.kr/fileDownLoadDw.do?boardId=farmprmninfo&dataNo=100000806736&sortNo=2",
+  "sourceFileSha256": "75d4c1ca231a0d0c342f97d91f03d6219d62c5fabfde21265f728d4de78cda48",
+  "legalBasis": "지역특화작목 연구개발 및 육성에 관한 법률(2019년 제정)",
+  "policy": {
+    "scope": "농촌진흥청이 도 농업기술원별로 지정한 대표작목(9)·집중육성작목(18)·자체육성작목(42), 총 69개 — 제1차 종합계획('21~'25) 종료 시점(2025.12) 기준 최신 배정",
+    "use": "대시보드에서 해당 품목·지역에 배지(정부 지정 특화작목)로만 노출한다",
+    "exclusion": "상표 출원 여부·지역 귀속 검증과 무관한 별도의 정부 육성 정책 지정이므로, 지역 통계(분모·분자)나 랭킹에는 반영하지 않는다"
+  },
+  "provinces": {
+    "경기도": [
+      { "itemName": "선인장·다육식물", "tier": "대표작목" },
+      { "itemName": "느타리·표고", "tier": "집중육성작목" },
+      { "itemName": "콩(장류콩)", "tier": "집중육성작목" },
+      { "itemName": "벼(경기미)", "tier": "자체육성작목" },
+      { "itemName": "장미", "tier": "자체육성작목" },
+      { "itemName": "인삼", "tier": "자체육성작목" },
+      { "itemName": "가지", "tier": "자체육성작목" }
+    ],
+    "강원특별자치도": [
+      { "itemName": "옥수수", "tier": "대표작목" },
+      { "itemName": "아스파라거스", "tier": "집중육성작목" },
+      { "itemName": "감자", "tier": "집중육성작목" },
+      { "itemName": "참당귀", "tier": "자체육성작목" },
+      { "itemName": "파프리카(여름작형)", "tier": "자체육성작목" },
+      { "itemName": "토마토(완숙토마토)", "tier": "자체육성작목" },
+      { "itemName": "콩", "tier": "자체육성작목" }
+    ],
+    "충청북도": [
+      { "itemName": "포도·와인", "tier": "대표작목" },
+      { "itemName": "대추", "tier": "집중육성작목" },
+      { "itemName": "곤충(동애등에)", "tier": "집중육성작목" },
+      { "itemName": "수박(중소형과)", "tier": "자체육성작목" },
+      { "itemName": "복숭아(중소형과)", "tier": "자체육성작목" },
+      { "itemName": "사과(중만생종)", "tier": "자체육성작목" },
+      { "itemName": "마늘", "tier": "자체육성작목" },
+      { "itemName": "수수", "tier": "자체육성작목" }
+    ],
+    "충청남도": [
+      { "itemName": "딸기", "tier": "대표작목" },
+      { "itemName": "방울토마토", "tier": "집중육성작목" },
+      { "itemName": "양송이", "tier": "집중육성작목" },
+      { "itemName": "국화(절화용)", "tier": "자체육성작목" },
+      { "itemName": "인삼", "tier": "자체육성작목" },
+      { "itemName": "배", "tier": "자체육성작목" },
+      { "itemName": "생강", "tier": "자체육성작목" },
+      { "itemName": "구기자", "tier": "자체육성작목" }
+    ],
+    "전북특별자치도": [
+      { "itemName": "수박(씨없는수박)", "tier": "대표작목" },
+      { "itemName": "천마", "tier": "집중육성작목" },
+      { "itemName": "파프리카(대형과)", "tier": "집중육성작목" },
+      { "itemName": "곤충(치유)", "tier": "자체육성작목" },
+      { "itemName": "산채(고사리·곤달비)", "tier": "자체육성작목" },
+      { "itemName": "블루베리", "tier": "자체육성작목" },
+      { "itemName": "지황", "tier": "자체육성작목" },
+      { "itemName": "상추", "tier": "자체육성작목" }
+    ],
+    "전라남도": [
+      { "itemName": "유자", "tier": "대표작목" },
+      { "itemName": "무화과", "tier": "집중육성작목" },
+      { "itemName": "차·커피", "tier": "집중육성작목" },
+      { "itemName": "양파(조생종)", "tier": "자체육성작목" },
+      { "itemName": "흑염소", "tier": "자체육성작목" },
+      { "itemName": "양봉", "tier": "자체육성작목" },
+      { "itemName": "고구마", "tier": "자체육성작목" },
+      { "itemName": "참깨", "tier": "자체육성작목" }
+    ],
+    "경상북도": [
+      { "itemName": "참외", "tier": "대표작목" },
+      { "itemName": "포도", "tier": "집중육성작목" },
+      { "itemName": "인삼(시설재배)", "tier": "집중육성작목" },
+      { "itemName": "산약(마)", "tier": "자체육성작목" },
+      { "itemName": "고추", "tier": "자체육성작목" },
+      { "itemName": "복숭아(수출형)", "tier": "자체육성작목" },
+      { "itemName": "떫은감", "tier": "자체육성작목" },
+      { "itemName": "오미자", "tier": "자체육성작목" }
+    ],
+    "경상남도": [
+      { "itemName": "단감", "tier": "대표작목" },
+      { "itemName": "딸기(수출형)", "tier": "집중육성작목" },
+      { "itemName": "도라지", "tier": "집중육성작목" },
+      { "itemName": "사과(조생종)", "tier": "자체육성작목" },
+      { "itemName": "국화(분화류)", "tier": "자체육성작목" },
+      { "itemName": "마늘", "tier": "자체육성작목" },
+      { "itemName": "망고", "tier": "자체육성작목" },
+      { "itemName": "파프리카(중소형)", "tier": "자체육성작목" }
+    ],
+    "제주특별자치도": [
+      { "itemName": "키위", "tier": "대표작목" },
+      { "itemName": "브로콜리", "tier": "집중육성작목" },
+      { "itemName": "메밀", "tier": "집중육성작목" },
+      { "itemName": "당근·비트", "tier": "자체육성작목" },
+      { "itemName": "감귤", "tier": "자체육성작목" },
+      { "itemName": "양배추", "tier": "자체육성작목" },
+      { "itemName": "감자(2기작)", "tier": "자체육성작목" }
+    ]
+  },
+  "counts": { "대표작목": 9, "집중육성작목": 18, "자체육성작목": 42, "total": 69 }
+}
