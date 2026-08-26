@@ -117,6 +117,26 @@ assert.deepStrictEqual(andongApple.regionalMetricBlockingReasons, [
 assert.strictEqual(andongApple.invalidApplicationDateCount, 1);
 ok("오류·0건 포함, 출원번호 중복 제거, 상태별 집계");
 
+console.log("2-1) 원물류(29·30·31류) 전국 후보 지역 주소 일치 비율(#110, 지역 통계와 분리된 참고 지표)");
+assert.deepStrictEqual(andongApple.rawGoodsRegionalShare, {
+  nationwideCandidateCount: 4,
+  regionalAddressMatchCount: 1,
+  rate: 0.25,
+});
+const pocheonApple = result.regionItems.find(
+  (row) => row.region === "경기도 포천시" && row.itemName === "사과"
+);
+assert.ok(pocheonApple);
+assert.strictEqual(pocheonApple.rawGoodsRegionalShare.nationwideCandidateCount, 1);
+assert.strictEqual(pocheonApple.rawGoodsRegionalShare.regionalAddressMatchCount, 0);
+const tal = result.regionItems.find((row) => row.itemName === "탈");
+assert.deepStrictEqual(tal.rawGoodsRegionalShare, {
+  nationwideCandidateCount: 0,
+  regionalAddressMatchCount: 0,
+  rate: null,
+}, "hits가 0건이면 후보도 0건(널 아님) — 지역 버킷 자체는 유지");
+ok("가공품·서비스류를 뺀 29·30·31류 전국 후보 중 이 지역 주소 일치 건수·비율을 지역 통계와 별개로 계산");
+
 console.log("3) 시계열과 지역 검증 지표");
 assert.deepStrictEqual(andongApple.recentPeriod, { startYear: 2024, endYear: 2025, count: 2 });
 assert.deepStrictEqual(andongApple.previousPeriod, { startYear: 2022, endYear: 2023, count: 1 });

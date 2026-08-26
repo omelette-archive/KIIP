@@ -19,6 +19,23 @@ function applicationYear(value) {
   return year >= 1800 && year <= 2200 ? year : null;
 }
 
+// 이슈 #110(2026-08-24 사용자 요청): 고추·오이·사과·딸기·한우처럼 흔한 원물명은 전국
+// 검색 결과가 #50이 막은 동음이의어 노이즈라 지역 출원 통계(uniqueTrademarkCount)에는
+// 못 쓴다. 대신 "가공품·서비스류를 뺀 원물류(29·30·31류) 전국 후보 중 이 지역 주소와
+// 일치하는 비율"을 별도 참고 지표로만 계산한다 — 기존 지역 분자/분모에는 절대 합산하지
+// 않는다. hit.classificationCode는 복수 류가 "|"로 붙어 오는 경우가 있어(예: "30|35") 전부
+// 분리해서 검사한다.
+const RAW_GOODS_NICE_CLASSES = new Set(["29", "30", "31"]);
+function hitNiceClasses(value) {
+  return clean(value)
+    .split(/[|,]/)
+    .map((code) => code.trim().replace(/^0+(?=\d)/, ""))
+    .filter(Boolean);
+}
+function isRawGoodsHit(hit) {
+  return hitNiceClasses(hit.classificationCode).some((code) => RAW_GOODS_NICE_CLASSES.has(code));
+}
+
 function statusCategory(value) {
   const status = clean(value);
   if (INACTIVE_STATUS_WORDS.some((word) => status.includes(word))) return "inactive";
@@ -347,6 +364,8 @@ function finalizeBucket(bucket, options) {
   let invalidApplicationDateCount = 0;
   let invalidRegistrationDateCount = 0;
   let applicantAddressEvidenceCount = 0;
+  let rawGoodsNationwideCandidateCount = 0;
+  let rawGoodsRegionalAddressMatchCount = 0;
   const recentBrands = [];
   const trademarkExamples = [];
 
@@ -372,6 +391,10 @@ function finalizeBucket(bucket, options) {
     // 부가 코드가 비어 있어도 출원인 주소가 해당 지역 inside로 판정되면 지역 귀속은 인정한다.
     regionCounts[applicantRegion]++;
     if (applicantRegion === "inside") regionalStatusCounts[status]++;
+    if (clean(bucket.region) && isRawGoodsHit(hit)) {
+      rawGoodsNationwideCandidateCount++;
+      if (applicantRegion === "inside") rawGoodsRegionalAddressMatchCount++;
+    }
     if (regionalBrandCounts) {
       const category = regionalBrandCategory(hit, bucket);
       if (category === null) regionalBrandCounts.notReferenced++;
@@ -498,6 +521,16 @@ function finalizeBucket(bucket, options) {
       : null,
     regionalMetricAvailability,
     regionalMetricBlockingReasons,
+    // #110: 지역 출원 통계(uniqueTrademarkCount/regionalMetricAvailability)와는 완전히 분리된
+    // 참고 지표다 — 가공품·서비스류를 뺀 원물류(29·30·31류) 전국 후보 중 이 지역 주소와
+    // 일치하는 건수·비율만 담고, 기존 분자·분모에는 합산하지 않는다.
+    rawGoodsRegionalShare: isRegionalBucket
+      ? {
+          nationwideCandidateCount: rawGoodsNationwideCandidateCount,
+          regionalAddressMatchCount: rawGoodsRegionalAddressMatchCount,
+          rate: safeRate(rawGoodsRegionalAddressMatchCount, rawGoodsNationwideCandidateCount),
+        }
+      : null,
     applicationYearCounts,
     registrationYearCounts: registrationYearCountsResult,
     invalidRegistrationDateCount,
