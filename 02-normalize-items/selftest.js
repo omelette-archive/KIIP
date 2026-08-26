@@ -204,6 +204,7 @@ async function run() {
       { item: "신선한 배", niceClass: "31", similarGroupCode: "G0211" },
       { item: "돼지고기", niceClass: "29", similarGroupCode: "G0701" },
       { item: "쌀", niceClass: "30", similarGroupCode: "G020101" },
+      { item: "신선한 시금치", niceClass: "31", similarGroupCode: "G0202" },
     ]);
     const expected = new Map([
       ["파프리카", "신선한 고추"],
@@ -223,8 +224,10 @@ async function run() {
       ["참다래", "신선한 키위"],
       ["화훼", "꽃"],
       ["신고배", "신선한 배"],
+      ["섬배", "신선한 배"],
       ["녹돈", "돼지고기"],
       ["고성오대미", "쌀"],
+      ["섬초", "신선한 시금치"],
     ]);
     for (const [rawItemName, noticeName] of expected) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
@@ -235,13 +238,13 @@ async function run() {
       assert.strictEqual(result.confidence, "1.0000", rawItemName);
       assert.strictEqual(result.verdictSource, "human_approved_alias", rawItemName);
     }
-    for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대추", "대봉감", "칡소"]) {
+    for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대추", "대봉감", "칡소", "한라봉", "천혜향", "대파", "우엉"]) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
       assert.strictEqual(result.status, "review_required", `${rawItemName}은 미승인 상태여야 함`);
     }
     assert.strictEqual(approvedAliases.approvalIssue, "#51");
     assert.strictEqual(approvedAliases.approvedAt, "2026-08-26");
-    ok("승인된 30개 표현만 자동 확정하고, itemName은 원물명 그대로 유지하며 noticeName만 연결, 미승인 의미 변경 후보는 검토대기에 유지");
+    ok("승인된 32개 표현만 자동 확정하고, itemName은 원물명 그대로 유지하며 noticeName만 연결, 미승인 의미 변경 후보는 검토대기에 유지");
   }
 
   console.log("6) normalizeRow — 규칙 처리 오류를 행별로 보존");
