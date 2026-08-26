@@ -71,4 +71,30 @@ function parseNfqsResponse(xml) {
   return { resultCode, resultMsg, items };
 }
 
-module.exports = { decodeEntities, extractTag, extractItemBlocks, parseNongsaroResponse, parseNfqsResponse };
+function parseNfqsGeoResponse(xml) {
+  const resultCode = extractTag(xml, "resultCode");
+  const resultMsg = extractTag(xml, "resultMsg");
+  const items = extractItemBlocks(xml).map((block) => ({
+    officeName: extractTag(block, "jisoknm"),
+    productName: extractTag(block, "goodknm"),
+    registrationNumber: extractTag(block, "certno"),
+    registeredName: extractTag(block, "reg_title_kor"),
+    registeredNameEnglish: extractTag(block, "reg_title_eng"),
+    organizationName: extractTag(block, "custkfirm"),
+    organizationAddress: extractTag(block, "kaddr"),
+    phone: extractTag(block, "tel"),
+    registrationDate: extractTag(block, "vdatefrom"),
+    validTo: extractTag(block, "vdateto"),
+    rawXml: block,
+  }));
+  return { resultCode, resultMsg, items };
+}
+
+module.exports = {
+  decodeEntities,
+  extractTag,
+  extractItemBlocks,
+  parseNongsaroResponse,
+  parseNfqsResponse,
+  parseNfqsGeoResponse,
+};

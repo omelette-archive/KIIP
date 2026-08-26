@@ -183,9 +183,9 @@ test("uses every collected region-item specialty as the application-rate denomin
     .reduce((sum, region) => sum + region.items.length, 0);
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
   assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
-  assert.equal(coverage.total, 1713);
-  assert.equal(coverage.decided, 1625);
-  assert.equal(coverage.applied, 1016);
+  assert.equal(coverage.total, 1736);
+  assert.equal(coverage.decided, 1648);
+  assert.equal(coverage.applied, 1027);
   assert.equal(coverage.pending, 88);
   assert.equal(Math.round(coverage.rate * 100), 59);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
@@ -371,7 +371,7 @@ test("ships a valid dashboard snapshot", async () => {
   // 1,617 -> 1,761. 지역 정보가 없는 KOFPI 90건("전국" 의사 지역)은 지역별 통계
   // 성격의 이 필드에서 제외한다 — scripts/auditDashboardSnapshot.js가 정확히 이
   // "전국 제외" 기준으로 검증한다(catalogItemCount는 전국 포함 원본 전체). #114)
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1625);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1648);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -379,23 +379,31 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nongsaro"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_quality_cert"));
+  assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_geographical_indication"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
-  assert.equal(snapshot.coverage.catalogItemCount, 1844);
-  assert.equal(snapshot.coverage.nationwideCatalogItemCount, 131);
+  assert.equal(snapshot.coverage.catalogItemCount, 1868);
+  assert.equal(snapshot.coverage.nationwideCatalogItemCount, 132);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 131);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 103);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 155);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 127);
   assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 28);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 3210);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 68323);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 68323);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 3234);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 68435);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 68435);
+  assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.nfqsGeographicalIndication, {
+    registeredCount: 24,
+    regionalizedCount: 23,
+    regionReviewCount: 1,
+    liveVerifiedAt: "2026-08-26",
+  });
   assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 10);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 37661);
-  const nationwideCatalog = snapshot.regions.find((region) => region.sido === "전국");
-  assert.equal(nationwideCatalog?.items.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
-  assert.equal(nationwideCatalog?.items.filter((item) => item.sources.includes("nfqs_quality_cert")).length, 41);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 37713);
+  const nationwideCatalogItems = snapshot.regions.filter((region) => region.sido === "전국")
+    .flatMap((region) => region.items);
+  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
+  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("nfqs_quality_cert")).length, 41);
   assert.equal(
     snapshot.regions.filter((region) => region.sido !== "전국")
       .flatMap((region) => region.items)
@@ -404,7 +412,12 @@ test("ships a valid dashboard snapshot", async () => {
     "NFQS 인증사업장 소재지를 지역 특산품으로 귀속하면 안 됨",
   );
   assert.ok(snapshot.warnings.some((warning) => warning.includes("jisokaddr") && warning.includes("인증사업장 소재지")));
-  const forestEvidenceItems = nationwideCatalog?.items.filter((item) => item.regionalEvidence?.length) || [];
+  const regionalGeoItems = snapshot.regions.filter((region) => region.sido !== "전국")
+    .flatMap((region) => region.items)
+    .filter((item) => item.sources.includes("nfqs_geographical_indication"));
+  assert.equal(regionalGeoItems.length, 23);
+  assert.ok(snapshot.warnings.some((warning) => warning.includes("여자만새고막") && warning.includes("지역 검토대기")));
+  const forestEvidenceItems = nationwideCatalogItems.filter((item) => item.regionalEvidence?.length);
   assert.equal(forestEvidenceItems.length, 26);
   assert.equal(forestEvidenceItems.reduce((sum, item) => sum + item.regionalEvidence.length, 0), 27);
   assert.ok(forestEvidenceItems.every((item) => item.regionalEvidence.every((row) => row.regionalMetricEligible === false)));
@@ -438,7 +451,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1651, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1675, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));

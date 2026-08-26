@@ -27,6 +27,8 @@ Copy-Item -LiteralPath 'C:\Users\이준형\orca\KIIP\.env' -Destination '.env'
 | `NONGSARO_LOCAL_BRAND_API_KEY` | 농사로 지역 브랜드 API 신청키 별칭 | 수집·KIPRIS 출원번호 조인에 사용 |
 | `DATA_GO_KR_API_KEY` | 공공데이터포털 일반 서비스키 | 현재 미사용·보관만 |
 | `IP_REGISTRY_API_KEY` | 지식재산처 등록원부 `getMarkHistory` | 등록번호 기반 주소·지정상품 보강에 사용 |
+| `NFQS_QUALITY_API_KEY` | 국립수산물품질관리원 품질인증수산물 API | 전국 인증 수산물 카탈로그 수집에 사용 |
+| `NFQS_GEO_API_KEY` | 국립수산물품질관리원 지리적표시수산물 API | 등록 수산물과 지역 근거 수집에 사용 |
 
 농사로의 지역특산물과 지역 브랜드에 동일한 회원 API 키가 발급돼도 용도를 잊지 않도록 두
 환경변수명을 유지한다. 지역특산물 수집은 `NONGSARO_API_KEY`를 읽고, 지역 브랜드 키는

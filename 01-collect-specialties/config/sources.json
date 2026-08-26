@@ -175,6 +175,38 @@
       }
     },
     {
+      "id": "nfqs_geographical_indication",
+      "name": "해양수산부 국립수산물품질관리원 지리적표시수산물",
+      "role": "collector",
+      "dataVersion": "provider-live-api-plus-official-catalog",
+      "lastVerifiedAt": "2026-08-26",
+      "catalogUrl": "https://www.data.go.kr/data/15058281/openapi.do",
+      "providerUrl": "https://www.nfqs.go.kr/hpmg/front/api/geocert_api.do",
+      "formats": ["XML", "HTML"],
+      "geographicScope": {
+        "catalogScope": "registered_geographical_indications",
+        "addressFieldMeaning": "registered_organization_location",
+        "regionalSpecialtyEligible": true,
+        "regionalSpecialtyReason": "only when the registered geographical name explicitly matches the administrative area resolved from the official organization address"
+      },
+      "authentication": {
+        "required": true,
+        "keyEnv": "NFQS_GEO_API_KEY",
+        "baseUrlEnv": "NFQS_GEO_API_BASE_URL",
+        "defaultBaseUrl": "https://www.nfqs.go.kr/hpmg/front/api/geocert_api.do",
+        "approval": "data_go_kr_service_application"
+      },
+      "quota": {
+        "type": "provider_undocumented",
+        "value": null,
+        "verification": "2026-08-26 실키 호출 resultCode=00(NORMAL SERVICE), 등록 24건 확인. API의 등록명칭·주소 값이 비어 있어 같은 기관 공식 등록현황을 등록번호로 교차 대조함."
+      },
+      "implementation": {
+        "status": "live_collector_in_default_sources",
+        "adapter": "lib/nfqsGeoClient.js + lib/normalize.js:fromNfqsGeographicalIndications"
+      }
+    },
+    {
       "id": "kofpi_forest_product",
       "name": "한국임업진흥원 임산물DB백과",
       "role": "collector",

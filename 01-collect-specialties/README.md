@@ -18,8 +18,9 @@
 | 농사로 특산물(농촌진흥청) | 개발단계 자동승인, 운영단계 심의승인, XML | ✅ 실키·2페이지·빈 결과·인증 오류 검증 |
 | 세종시 공식 특산품 | 인증 불필요, 읍면동 공식 `특산품` 페이지 | ✅ 7품목 검증 스냅샷 |
 | 농관원 제주 지리적표시 | 인증 불필요, 농관원 공식 등록 목록 | ✅ 제주도 일원 3품목 검증 스냅샷 |
-| 임산물DB백과(한국임업진흥원, #114) | 인증 불필요, 일반 User-Agent 헤더 필요(없으면 보안정책 차단) | ✅ 01단계 수집 소스가 아니라 02단계 정규화 참고 사전으로 반영 완료 — 지역 정보가 없는 순수 품목 사전이라(대분류 8·소분류 90품목 전량 저장) `02-normalize-items/data/kofpi-forest-products-v1.json` + `ruleNormalizer.js`가 검토대기 원물명에 학명·과명 참고 근거를 붙임 |
+| 임산물DB백과(한국임업진흥원, #114) | 인증 불필요, 일반 User-Agent 헤더 필요(없으면 보안정책 차단) | ✅ 01단계 전국 임산물 수집원으로 90품목 전량 반영. 지역 필드가 없어 전국 카탈로그로 보존하고 임산물생산조사 주산지 근거가 있는 품목만 별도 지역 연결 |
 | 품질인증수산물(국립수산물품질관리원, #114) | data.go.kr 신청 필요, 파라미터명이 표준과 다름(`cert_key`) | ✅ 실키 290건 확인. `jisokaddr`는 인증사업장 소재지이므로 지역 특산품 귀속에는 쓰지 않고 전국 인증품 카탈로그로만 수집 |
+| 지리적표시수산물(국립수산물품질관리원, #114) | data.go.kr 별도 신청 필요, `cert_key` 사용 | ✅ 실키 24건 확인. API의 빈 등록명칭·주소를 NFQS 공식 등록현황과 등록번호로 대조해 23건 지역 연결, 복수 지역 가능성이 있는 여자만새고막 1건은 검토대기 |
 | 전국 지자체 홈페이지 / 뉴스 기사 | 226개 사이트마다 제각각 / 별도 인프라 필요 | ⚪ 범위 밖 |
 
 GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수다. 전체 무필터 목록은 받을 수
@@ -50,6 +51,8 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 │   ├── adminCodes.js        법정동코드 CSV 파싱 -> 시군구 레벨 마스터 목록
 │   ├── giClient.js          MAFRA 지리적표시 등록정보 클라이언트 (URL 경로 키 + Grid JSON)
 │   ├── nongsaroClient.js    농사로 지역특산물 클라이언트 (공식 localSpcprd XML 계약)
+│   ├── nfqsClient.js        NFQS 품질인증수산물 클라이언트(전국 인증품 카탈로그)
+│   ├── nfqsGeoClient.js     NFQS 지리적표시 API + 공식 등록현황 교차 보강
 │   ├── sourceRegistry.js    소스 레지스트리 로더/검증기
 │   ├── sourceCoverageGaps.js 시도별 수집 공백 로더/검증기(⑦ 대시보드 경고에 사용)
 │   ├── collectionStore.js   SQLite 실행 이력·원문 레코드·append-only 버전 저장
@@ -65,7 +68,7 @@ GI API는 `REGIST_NO_REGIST_DE`(등록일자)의 완전일치 검색이 필수�
 
 ```bash
 cp .env.example .env
-# .env 에 GI_API_KEY, NONGSARO_API_KEY 입력
+# .env 에 GI_API_KEY, NONGSARO_API_KEY, NFQS_QUALITY_API_KEY, NFQS_GEO_API_KEY 입력
 # 두 base URL 환경변수는 공식 기본값 변경/테스트 대응 때만 사용
 
 node 01-collect-specialties/collectSpecialties.js --sources gi \

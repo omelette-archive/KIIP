@@ -163,10 +163,15 @@ function makeBatchQuery(row, options = {}) {
   }
 
   const region = [row.sido, row.sigungu].filter(Boolean).join(" ").trim();
-  const nationwideCatalog = row.sourceScope === "nationwide_catalog";
+  const nationwideCatalog = ["nationwide_catalog", "geographical_indication_region_review"]
+    .includes(row.sourceScope);
   if (!region && !nationwideCatalog) return { skipReason: "지역 정보 없음" };
 
-  if (row.status === "ok" && ["nfqs_quality_cert", "kofpi_forest_product"].includes(row.sourceId)) {
+  if (row.status === "ok" && [
+    "nfqs_quality_cert",
+    "nfqs_geographical_indication",
+    "kofpi_forest_product",
+  ].includes(row.sourceId)) {
     const item = String(row.itemName || row.rawItemName || "").trim();
     if (!item) return { skipReason: "공식 수집원 품목명 없음" };
     return {

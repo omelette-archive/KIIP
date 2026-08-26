@@ -354,6 +354,68 @@ function fromNfqsCertifications(certifications, adminList) {
   };
 }
 
+function regionTokens(sigungu, address = "") {
+  const compact = compactRegionText(sigungu);
+  const tokens = new Set();
+  const root = compact.replace(/(?:특별자치시|시|군|구)$/u, "");
+  if (root.length >= 2) tokens.add(root);
+  for (const match of compact.matchAll(/([가-힣]{2,}?)(?:특별자치시|시|군|구)/gu)) {
+    tokens.add(match[1]);
+    if (match[1].length >= 4) tokens.add(match[1].slice(0, 2));
+  }
+  for (const match of cleanRegionText(address).matchAll(/([가-힣]{2,}?)(?:읍|면|동)(?=\s|$)/gu)) {
+    tokens.add(match[1]);
+  }
+  return [...tokens];
+}
+
+function fromNfqsGeographicalIndications(registrations, adminList) {
+  const now = new Date().toISOString();
+  const rows = [];
+  const warnings = [];
+  let regionalCount = 0;
+
+  for (const registration of registrations) {
+    const split = resolveRegionInput(registration.organizationAddress, adminList, "");
+    const title = compactRegionText(registration.registeredName);
+    const corroborated = split.matched && regionTokens(split.sigungu, registration.organizationAddress)
+      .some((token) => title.startsWith(token));
+    if (corroborated) regionalCount++;
+    else {
+      warnings.push(
+        `nfqs_geographical_indication: 등록명칭과 행정구역을 안전하게 연결하지 못함 - ` +
+        `"${registration.registeredName || registration.productName}" (${registration.registrationNumber})`
+      );
+    }
+    rows.push({
+      sido: corroborated ? split.sido : "",
+      sigungu: corroborated ? split.sigungu : "",
+      regionCode: corroborated ? split.regionCode || "" : "",
+      regionMatchMethod: corroborated
+        ? "registered_geographical_name_corroborated_by_organization_address"
+        : "registered_geographical_name_requires_region_review",
+      sourceRegionName: corroborated
+        ? [split.sido, split.sigungu].filter(Boolean).join(" ")
+        : registration.registeredName,
+      sourceRegionCode: "",
+      sourceItemName: registration.productName,
+      sourceRecordUrl: "https://www.nfqs.go.kr/hpmg/data/actionMarineGeographicForm.do?menuId=M0000230",
+      sourceScope: corroborated
+        ? "regional_geographical_indication"
+        : "geographical_indication_region_review",
+      rawItemName: registration.registeredName || registration.productName,
+      source: "지리적표시수산물",
+      collectedAt: now,
+    });
+  }
+
+  warnings.unshift(
+    `nfqs_geographical_indication: 공식 등록 ${registrations.length}건 중 ` +
+    `등록명칭과 행정구역이 교차 확인된 ${regionalCount}건을 지역 특산품으로 수집`
+  );
+  return { rows, warnings };
+}
+
 function fromKofpiProducts(products, now = new Date().toISOString()) {
   return {
     rows: products.map((product) => ({
@@ -388,5 +450,6 @@ module.exports = {
   fromGiRegistrations,
   fromNongsaro,
   fromNfqsCertifications,
+  fromNfqsGeographicalIndications,
   fromKofpiProducts,
 };

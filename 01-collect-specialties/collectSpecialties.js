@@ -7,7 +7,7 @@
  *   sourceId, sourceContractVersion, sourceUrl, sourceLastVerifiedAt, collectedAt }[]
  *
  * 사용법:
- *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties --out <path>
+ *   node 01-collect-specialties/collectSpecialties.js --sources gi,nongsaro,nfqs_geographical_indication --out <path>
  *
  * 소스:
  *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY 필요)
@@ -15,7 +15,8 @@
  *   sejong_official_specialties  세종시 공식 특산품 검증 스냅샷
  *   jeju_naqs_gi_specialties     농관원 제주 지리적표시 검증 스냅샷
  *   seogwipo_grandculture_specialties 디지털서귀포문화대전 특산물 검증 스냅샷
- *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요, 기본 --sources에는 없음 — 명시적으로 지정해야 수집됨)
+ *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요)
+ *   nfqs_geographical_indication 국립수산물품질관리원 지리적표시수산물(NFQS_GEO_API_KEY 필요)
  * API 소스는 제공기관 활용신청 승인이 필요하다. 키가 없으면 해당 API 소스만
  * 건너뛰고 경고를 남기며, 공식 검증 스냅샷은 인증 없이 함께 적재한다.
  */
@@ -27,8 +28,15 @@ const { loadAdminCodes } = require("./lib/adminCodes");
 const { createClient: createGiClient, normalizeDate: normalizeGiDate } = require("./lib/giClient");
 const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { createClient: createNfqsClient } = require("./lib/nfqsClient");
+const { createClient: createNfqsGeoClient } = require("./lib/nfqsGeoClient");
 const { createClient: createKofpiClient } = require("./lib/kofpiClient");
-const { fromGiRegistrations, fromNongsaro, fromNfqsCertifications, fromKofpiProducts } = require("./lib/normalize");
+const {
+  fromGiRegistrations,
+  fromNongsaro,
+  fromNfqsCertifications,
+  fromNfqsGeographicalIndications,
+  fromKofpiProducts,
+} = require("./lib/normalize");
 const { getSourceDefinition, loadSourceRegistry } = require("./lib/sourceRegistry");
 const { createCollectionStore, makeStoredRecords } = require("./lib/collectionStore");
 const {
@@ -40,7 +48,7 @@ loadEnv();
 
 function parseArgs(argv) {
   const args = {
-    sources: "gi,nongsaro,nfqs_quality_cert,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
+    sources: "gi,nongsaro,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -228,6 +236,30 @@ async function collectNfqs(adminList, warnings, options = {}) {
   }
 }
 
+async function collectNfqsGeographicalIndications(adminList, warnings, options = {}) {
+  let requestCount = 0;
+  try {
+    const client = createNfqsGeoClient({
+      certKey: process.env.NFQS_GEO_API_KEY,
+      baseUrl: process.env.NFQS_GEO_API_BASE_URL,
+      onRequest: () => requestCount++,
+    });
+    const registrations = await client.listRegistrations({ limit: options.limit });
+    const normalized = fromNfqsGeographicalIndications(registrations, adminList);
+    const rows = addSourceMetadata(normalized.rows, options.sourceDefinition);
+    warnings.push(...normalized.warnings);
+    return {
+      rows,
+      rawRecords: makeStoredRecords("nfqs_geographical_indication", registrations, rows),
+      succeeded: true,
+      requestCount,
+    };
+  } catch (err) {
+    warnings.push(`nfqs_geographical_indication 소스 건너뜀: ${err.message}`);
+    return { rows: [], rawRecords: [], succeeded: false, requestCount, error: err.message };
+  }
+}
+
 async function collectKofpi(_adminList, warnings, options = {}) {
   let requestCount = 0;
   try {
@@ -283,6 +315,7 @@ const COLLECTORS = {
   jeju_naqs_gi_specialties: collectOfficialSupplement,
   seogwipo_grandculture_specialties: collectOfficialSupplement,
   nfqs_quality_cert: collectNfqs,
+  nfqs_geographical_indication: collectNfqsGeographicalIndications,
   kofpi_forest_product: collectKofpi,
 };
 

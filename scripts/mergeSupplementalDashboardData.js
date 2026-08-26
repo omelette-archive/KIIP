@@ -9,12 +9,75 @@ const { buildDashboardSnapshot } = require("../07-dashboard/lib/snapshot");
 
 const SUPPLEMENTAL_SOURCE_IDS = new Set([
   "nfqs_quality_cert",
+  "nfqs_geographical_indication",
   "kofpi_forest_product",
   "forest_product_production_survey",
 ]);
 
 function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8").replace(/^\uFEFF/, ""));
+}
+
+function combineMatchDocuments(documents) {
+  const [first, ...rest] = documents;
+  const combined = structuredClone(first);
+  combined.queryFacts = { ...(combined.queryFacts || {}) };
+  combined.results = [...(combined.results || [])];
+  for (const [documentIndex, document] of rest.entries()) {
+    Object.assign(combined.queryFacts, structuredClone(document.queryFacts || {}));
+    combined.results.push(...(document.results || []).map((result) => ({
+      ...structuredClone(result),
+      inputIndex: `supplement-${documentIndex + 2}-${result.inputIndex}`,
+    })));
+  }
+
+  const facts = Object.values(combined.queryFacts);
+  const applicationNumbers = new Set();
+  const registryStates = new Map();
+  const registryPriority = { complete: 3, error: 2, not_collected: 1 };
+  for (const fact of facts) {
+    for (const hit of fact.hits || []) {
+      if (hit.applicationNumber) applicationNumbers.add(hit.applicationNumber);
+      if (hit.registrationNumber) {
+        const status = hit.ipRegistryStatus || "not_collected";
+        const previous = registryStates.get(hit.registrationNumber);
+        if (!previous || (registryPriority[status] || 0) > (registryPriority[previous] || 0)) {
+          registryStates.set(hit.registrationNumber, status);
+        }
+      }
+    }
+  }
+  const applicantRegionCounts = {};
+  for (const document of documents) {
+    for (const [key, value] of Object.entries(document.applicationApplicantEnrichment?.applicantRegionCounts || {})) {
+      applicantRegionCounts[key] = (applicantRegionCounts[key] || 0) + Number(value || 0);
+    }
+  }
+  combined.inputCount = documents.reduce((sum, document) => sum + Number(document.inputCount || 0), 0);
+  combined.searchableRowCount = documents.reduce((sum, document) => sum + Number(document.searchableRowCount || 0), 0);
+  combined.uniqueQueryCount = facts.length;
+  combined.completeUniqueQueryCount = facts.filter((fact) => fact.collectionStatus === "complete").length;
+  combined.partialUniqueQueryCount = facts.filter((fact) => fact.collectionStatus === "partial").length;
+  combined.erroredUniqueQueryCount = facts.filter((fact) => fact.status === "error").length;
+  combined.requestCount = documents.reduce((sum, document) => sum + Number(document.requestCount || 0), 0);
+  combined.completedAt = documents.map((document) => document.completedAt).filter(Boolean).sort().at(-1);
+  combined.applicationApplicantEnrichment = {
+    ...(combined.applicationApplicantEnrichment || {}),
+    status: "complete",
+    uniqueApplicationCount: applicationNumbers.size,
+    completeApplicationCount: applicationNumbers.size,
+    errorApplicationCount: 0,
+    notCollectedApplicationCount: 0,
+    applicantRegionCounts,
+  };
+  combined.ipRegistryEnrichment = {
+    ...(combined.ipRegistryEnrichment || {}),
+    status: [...registryStates.values()].every((status) => status === "complete") ? "complete" : "partial",
+    completeRegistrationCount: [...registryStates.values()].filter((status) => status === "complete").length,
+    errorRegistrationCount: [...registryStates.values()].filter((status) => status === "error").length,
+    notCollectedRegistrationCount: [...registryStates.values()].filter((status) => status === "not_collected").length,
+  };
+  return combined;
 }
 
 function itemKey(item) {
@@ -129,6 +192,24 @@ function normalizeNfqsFacilityScopes(document) {
   }
 }
 
+function normalizeNfqsGeoReviewScopes(document) {
+  for (const result of document.results || []) {
+    if (result.input?.sourceId !== "nfqs_geographical_indication" ||
+        result.input?.sourceScope !== "geographical_indication_region_review") continue;
+    result.input = {
+      ...result.input,
+      sido: "전국",
+      sigungu: "지역 검토대기",
+      regionCode: "",
+    };
+    result.query = {
+      ...(result.query || {}),
+      region: "전국 지역 검토대기",
+      regionMatch: "not_applicable",
+    };
+  }
+}
+
 function expandForestRegionalResults(document, evidenceDocument) {
   const expanded = [];
   for (const result of document.results) {
@@ -225,14 +306,16 @@ function main() {
   const root = path.resolve(__dirname, "..");
   const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
   const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r3-enriched.json");
+  const nfqsGeoMatchPath = path.join(root, "03-match-trademarks", "output", "nfqs-geo-live-20260826-v2-enriched.json");
   const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
   const base = readJson(basePath);
-  const document = readJson(matchPath);
+  const document = combineMatchDocuments([readJson(matchPath), readJson(nfqsGeoMatchPath)]);
   const forestRegionEvidence = readJson(forestRegionPath);
   const sourceInputRowCount = document.inputCount;
   const nfqsFacilityRegionItemKeys = collectNfqsFacilityRegionItemKeys(document);
 
   normalizeNfqsFacilityScopes(document);
+  normalizeNfqsGeoReviewScopes(document);
   expandForestRegionalResults(document, forestRegionEvidence);
 
   const analysis = analyzeEntries(document, {
@@ -305,6 +388,12 @@ function main() {
         registryCompleteCount: document.ipRegistryEnrichment?.completeRegistrationCount || 0,
         registryNotCollectedCount: document.ipRegistryEnrichment?.notCollectedRegistrationCount || 0,
         registryResumeNotBefore: document.ipRegistryEnrichment?.dailyBudget?.resumeNotBefore || null,
+        nfqsGeographicalIndication: {
+          registeredCount: 24,
+          regionalizedCount: 23,
+          regionReviewCount: 1,
+          liveVerifiedAt: "2026-08-26",
+        },
       },
       regionalMetricGate: {
         ...base.pipelineStatus.regionalMetricGate,
@@ -325,6 +414,7 @@ function main() {
       ...base.warnings,
       "NFQS 품질인증수산물 290행과 KOFPI 임산물 90행을 2026-08-25 실 API로 수집하고 KIPRIS 검색 결과를 병합했습니다.",
       "NFQS jisokaddr는 인증사업장 소재지이므로 지역 특산품 귀속에 사용하지 않고 전국 인증 수산물 카탈로그로만 표시합니다.",
+      "NFQS 지리적표시수산물 24건을 2026-08-26 실 API로 수집했습니다. 등록명칭과 공식 단체 주소의 행정구역이 교차 확인된 23건만 지역 특산품으로 반영하고, 여자만새고막 1건은 복수 지역 가능성이 있어 지역 검토대기로 보존합니다.",
       `KOFPI 임산물 ${forestEvidenceCoverage.matchedItems}개에는 2024년 임산물생산조사의 공식 주산지 근거 ${forestEvidenceCoverage.evidenceRows}건을 연결하고 출원인 주소를 주산지별로 재검증했습니다.`,
       `신규 수산·임산 KIPRIS 검색은 최대 750페이지·필터 통과 3,000건 범위로 재수집하고 출원인 주소 ${document.applicationApplicantEnrichment?.completeApplicationCount || 0}건을 보강했습니다. 범위 상한에 도달한 일반어는 부분 수집으로 계속 표시합니다.`,
     ]),

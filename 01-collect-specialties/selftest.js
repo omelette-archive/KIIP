@@ -18,6 +18,7 @@ const {
   fromGiRegistrations,
   fromNongsaro,
   fromNfqsCertifications,
+  fromNfqsGeographicalIndications,
 } = require("./lib/normalize");
 const {
   loadOfficialSupplement,
@@ -37,6 +38,10 @@ const {
 } = require("./lib/nongsaroClient");
 const { parseNongsaroResponse } = require("./lib/xmlLite");
 const { createClient: createNfqsClient } = require("./lib/nfqsClient");
+const {
+  createClient: createNfqsGeoClient,
+  parseCatalogPage: parseNfqsGeoCatalogPage,
+} = require("./lib/nfqsGeoClient");
 const {
   createCollectionStore,
   makeStoredRecords,
@@ -465,6 +470,69 @@ async function run() {
     assert.strictEqual(normalized.rows[0].rawItemName, "간고등어");
     assert.match(normalized.warnings[0], /인증사업장 주소를 지역 특산품 근거로 사용하지 않고/);
     ok("cert_key로 호출하되 인증사업장 주소를 지역 특산품 소재지로 승격하지 않음");
+  }
+
+  console.log("7-2a-geo) nfqsGeoClient — API 누락 필드를 공식 등록현황으로 교차 보강");
+  {
+    const apiXml = [
+      "<response><header><resultCode>00</resultCode><resultMsg>NORMAL SERVICE</resultMsg></header><body><items><item>",
+      "<jisoknm>본원</jisoknm><goodknm>김(마른김, 구운김)</goodknm><certno>제28호</certno>",
+      "<reg_title_kor></reg_title_kor><reg_title_eng></reg_title_eng>",
+      "<custkfirm>사단법인 무안김생산자협의회</custkfirm><kaddr></kaddr>",
+      "<vdatefrom>20240905</vdatefrom><vdateto>29991231</vdateto>",
+      "</item></items></body></response>",
+    ].join("");
+    const catalogHtml = [
+      "<p>총 1건 검색되었습니다.</p><table class=\"board-list-table\">",
+      "<thead><tr><th>품종</th><th>등록명칭</th><th>등록번호</th></tr></thead><tbody>",
+      "<tr><td rowspan=\"2\">본원</td><td>김(마른김, 구운김)</td><td>무안돌김</td>",
+      "<td>사단법인 무안김생산자협의회</td><td>010****</td><td rowspan=\"2\">2024-09-05</td></tr>",
+      "<tr><td>제28호</td><td>Muan Dolgim(Laver)</td><td colspan=\"2\">전라남도 무안군 해제면 만송로 838-17</td></tr>",
+      "</tbody></table>",
+    ].join("");
+    const parsedCatalog = parseNfqsGeoCatalogPage(catalogHtml);
+    assert.strictEqual(parsedCatalog.items.length, 1);
+    assert.strictEqual(parsedCatalog.items[0].registeredName, "무안돌김");
+    assert.strictEqual(parsedCatalog.items[0].organizationAddress, "전라남도 무안군 해제면 만송로 838-17");
+
+    const requested = [];
+    const client = createNfqsGeoClient({
+      certKey: "geo-test-key",
+      fetchImpl: async (url, options = {}) => {
+        requested.push({ url: String(url), options });
+        if (String(url).includes("geocert_api.do")) {
+          return { ok: true, status: 200, text: async () => apiXml, headers: { getSetCookie: () => [] } };
+        }
+        return { ok: true, status: 200, text: async () => catalogHtml, headers: { getSetCookie: () => ["JSESSIONID=test; Path=/"] } };
+      },
+    });
+    const registrations = await client.listRegistrations();
+    assert.strictEqual(registrations.length, 1);
+    assert.strictEqual(registrations[0].registeredName, "무안돌김");
+    assert.strictEqual(registrations[0].catalogEnriched, true);
+    assert.strictEqual(new URL(requested[0].url).searchParams.get("cert_key"), "geo-test-key");
+
+    const normalized = fromNfqsGeographicalIndications(registrations, loadAdminCodes());
+    assert.strictEqual(normalized.rows[0].sigungu, "무안군");
+    assert.strictEqual(normalized.rows[0].rawItemName, "무안돌김");
+    assert.strictEqual(normalized.rows[0].sourceScope, "regional_geographical_indication");
+
+    const subregion = fromNfqsGeographicalIndications([{
+      ...registrations[0],
+      registeredName: "진동미더덕",
+      organizationAddress: "경상남도 창원시 마산합포구 진동면 해양관광로 12",
+    }], loadAdminCodes());
+    assert.strictEqual(subregion.rows[0].sourceScope, "regional_geographical_indication");
+    assert.match(subregion.rows[0].sigungu, /창원|마산/);
+
+    const review = fromNfqsGeographicalIndications([{
+      ...registrations[0],
+      registeredName: "여자만새고막",
+      organizationAddress: "전라남도 여수시 율촌면 두언길 21",
+    }], loadAdminCodes());
+    assert.strictEqual(review.rows[0].sido, "");
+    assert.strictEqual(review.rows[0].sourceScope, "geographical_indication_region_review");
+    ok("빈 API 등록명칭·주소를 공식 등록번호로 보강하고 명칭-행정구역 교차 확인 건만 지역 귀속");
   }
 
   console.log("7-2b) nfqsClient — API 결과코드 오류 감지");

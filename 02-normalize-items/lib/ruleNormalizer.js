@@ -163,10 +163,12 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
     rawItemName: row.rawItemName || "",
     source: row.source || "",
   };
-  const itemName = cleanItemName(row.rawItemName, row);
+  const itemName = row.sourceId === "nfqs_geographical_indication"
+    ? String(row.rawItemName || "").normalize("NFC").trim()
+    : cleanItemName(row.rawItemName, row);
   if (!itemName) return reviewResult(base, "", [], "정제할 품목명이 없음");
 
-  if (["nfqs_quality_cert", "kofpi_forest_product"].includes(row.sourceId)) {
+  if (["nfqs_quality_cert", "nfqs_geographical_indication", "kofpi_forest_product"].includes(row.sourceId)) {
     return {
       ...base,
       itemName,
