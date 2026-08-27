@@ -11,6 +11,7 @@ const {
   trademarkKey,
 } = require("./lib/analyzer");
 const { applyRawGoodsReview } = require("./lib/rawGoodsReview");
+const { runNationwideFlowTests } = require("./nationwideFlowSelftest");
 
 function hit(number, title, date, status, regionMatch) {
   return {
@@ -727,4 +728,9 @@ console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론
   ok("복합 지역명 보정, 건수·등록률·exact/contains·근거·상위 집계를 함께 재현");
 }
 
-console.log("\n모든 자체 테스트 통과");
+runNationwideFlowTests()
+  .then(() => console.log("\n모든 자체 테스트 통과"))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
