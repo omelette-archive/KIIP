@@ -120,6 +120,27 @@ async function runNationwideFlowTests() {
     ok("무한정 남아있으면 maxPages에서 bounded로 멈추고 무한 호출하지 않음");
   }
 
+  console.log("8b) topApplicantsByStage — 출원번호가 비어있는 첫 히트가 있어도 이후 정상 값으로 채움");
+  {
+    const hits = [
+      hit({ applicant: "A", applicationNumber: "" }),
+      hit({ applicant: "A", applicationNumber: "123" }),
+    ];
+    const top = topApplicantsByStage(hits, 5);
+    assert.strictEqual(top[0].sampleApplicationNumber, "123");
+    ok("빈 출원번호를 건너뛰고 실제 값이 있는 히트로 대표 출원번호를 채움");
+  }
+
+  console.log("8c) resolveApplicantRegion — 대표 출원번호가 아예 없으면 API를 부르지 않고 unmatched");
+  {
+    let calls = 0;
+    const fakeClient = { async getApplicants() { calls += 1; return { found: false, applicants: [] }; } };
+    const region = await resolveApplicantRegion(fakeClient, null, [], () => ({ status: "matched" }), new Map());
+    assert.strictEqual(region.status, "unmatched");
+    assert.strictEqual(calls, 0);
+    ok("출원번호가 없으면 API 오류 대신 unmatched를 즉시 반환");
+  }
+
   console.log("9) resolveApplicantRegion — 캐시 재사용 및 주소 정규화");
   {
     let apiCalls = 0;

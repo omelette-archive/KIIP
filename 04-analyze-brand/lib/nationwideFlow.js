@@ -76,8 +76,10 @@ function topApplicantsByStage(stageHits, limit = 5) {
   const byApplicant = new Map();
   for (const hit of stageHits) {
     if (!hit.applicant) continue;
-    const entry = byApplicant.get(hit.applicant) || { applicant: hit.applicant, count: 0, sampleApplicationNumber: hit.applicationNumber };
+    const entry = byApplicant.get(hit.applicant) || { applicant: hit.applicant, count: 0, sampleApplicationNumber: null };
     entry.count += 1;
+    // 여러 히트 중 실제로 출원번호가 있는 첫 건만 대표값으로 남긴다(빈 값으로 API 호출 오류 방지).
+    if (!entry.sampleApplicationNumber && hit.applicationNumber) entry.sampleApplicationNumber = hit.applicationNumber;
     byApplicant.set(hit.applicant, entry);
   }
   return [...byApplicant.values()].sort((a, b) => b.count - a.count).slice(0, limit);
@@ -107,6 +109,7 @@ async function collectNationwideHits(kiprisClient, term, { maxPages = 30, numOfR
  * (키: 정규화된 출원번호, 값: { status:"complete", found, applicants:[...] }).
  */
 async function resolveApplicantRegion(applicantClient, applicationNumber, adminList, normalizeApplicantAddress, cache) {
+  if (!applicationNumber) return { status: "unmatched" };
   const cached = cache.get(applicationNumber);
   let applicants;
   if (cached?.status === "complete") {

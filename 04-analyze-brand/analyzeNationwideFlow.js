@@ -90,13 +90,18 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
     const topApplicants = topApplicantsByStage(stages[key], Number(options.topApplicants));
     const withRegion = [];
     for (const applicant of topApplicants) {
-      const region = await resolveApplicantRegion(
-        applicantClient,
-        applicant.sampleApplicationNumber,
-        adminList,
-        normalizeApplicantAddress,
-        applicantCache
-      );
+      let region = { status: "unmatched" };
+      try {
+        region = await resolveApplicantRegion(
+          applicantClient,
+          applicant.sampleApplicationNumber,
+          adminList,
+          normalizeApplicantAddress,
+          applicantCache
+        );
+      } catch (error) {
+        console.error(`    출원인 주소 조회 실패(${applicant.applicant}): ${error.message}`);
+      }
       withRegion.push({ ...applicant, region: region.status === "matched" ? region.normalizedRegion : null });
     }
     stageSummary[key] = { count: stages[key].length, topApplicants: withRegion };
