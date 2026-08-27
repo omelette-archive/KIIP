@@ -645,8 +645,8 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   assert.match(
     standaloneHtml,
-    /const regionTrendHtml = \(region\) => \{/,
-    "선택한 지자체의 전체 특산품 추이를 집계하는 렌더러가 있어야 함",
+    /const regionTrendHtml = \(region, heading = "지역 출원·등록 추이", subtitle\) => \{/,
+    "선택한 지자체(또는 품목)의 연도별 추이를 집계하는 공용 렌더러가 있어야 함",
   );
   assert.match(
     standaloneHtml,

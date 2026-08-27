@@ -104,7 +104,7 @@ a { color: inherit; text-decoration: none; }
 .ranking-table { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: 12.5px; }
 .ranking-table th, .ranking-table td { padding: 8px 6px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ranking-table th { color: var(--muted); font-size: 10.5px; font-weight: 800; letter-spacing: 0.02em; }
-.ranking-table th:first-child, .ranking-table td:first-child { width: 32px; }
+.ranking-table th:first-child, .ranking-table td:first-child { width: 44px; overflow: visible; }
 .ranking-table th:last-child, .ranking-table td:last-child { width: 64px; text-align: right; }
 .ranking-table tbody tr:hover { background: #f4f6f9; }
 .ranking-table td.empty { text-align: center; white-space: normal; }
@@ -195,11 +195,11 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-flow: row;
+  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-flow: row;
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
-.primary-tabs button { min-height: 46px; padding: 8px 14px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 15px; cursor: pointer; }
+.primary-tabs button { min-height: 46px; padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
 
@@ -262,7 +262,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-kpis small { margin-top: 8px; font-size: 10px; line-height: 1.55; }
 .coverage-rate-kpi { background: var(--green-dark); color: white; }
 .coverage-rate-kpi span, .coverage-rate-kpi small { color: #cfe0f2; }
-.coverage-workspace { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(280px, .65fr); gap: 20px; margin-top: 20px; }
 .coverage-map-card, .coverage-insight, .coverage-directory { padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .coverage-directory { margin-top: 20px; }
 .trend-chart { width: 100%; margin: 20px 0 0; padding: 18px 22px 14px; border: 1px solid #d9e3ef; border-radius: 14px; background: linear-gradient(180deg, #fff 0%, #f5f8fc 100%); box-shadow: 0 6px 18px rgba(16, 45, 76, .06); }
@@ -397,6 +396,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-jump-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--green); font-size: 9px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 8px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
+.gi-mark-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #eef1fb; color: #4a4fc4; font-size: 8px; font-weight: 800; white-space: nowrap; }
 .example-region-note { grid-column: 1 / -1; margin-top: 2px; color: var(--green); font-size: 8.5px; font-weight: 700; }
 .verdict-chip { padding: 5px 9px; border-radius: 999px; background: var(--violet-soft); color: var(--violet); font-size: 8px; font-weight: 800; white-space: nowrap; }
 
@@ -408,6 +408,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-category-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .item-category-filter button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 .item-category-filter button.active { border-color: var(--green); background: var(--green); color: #fff; }
+.province-tabbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 18px; }
+.province-tabbar button { padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.province-tabbar button.active { border-color: var(--green); background: var(--green); color: #fff; }
 .item-reading-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 16px; padding: 13px 15px; border-radius: 11px; background: var(--green-soft); color: #445164; font-size: 12px; line-height: 1.5; }
 .item-reading-guide > strong { color: var(--green-dark); font-size: 12px; }.item-reading-guide span { display: inline-flex; gap: 5px; }.item-reading-guide b { color: var(--green-dark); }
 .item-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
@@ -421,6 +424,21 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-card-metrics { display: grid; grid-template-columns: repeat(3, 1fr); margin-top: 16px; border: 1px solid var(--line); border-radius: 11px; overflow: hidden; }
 .item-card-metrics > div { min-width: 0; padding: 13px 12px; border-right: 1px solid var(--line); }.item-card-metrics > div:last-child { border-right: 0; }.item-card-metrics span, .item-card-metrics strong, .item-card-metrics small { display: block; }.item-card-metrics span { color: var(--muted); font-size: 11px; }.item-card-metrics strong { margin-top: 5px; color: var(--ink); font-size: 18px; }.item-card-metrics small { margin-top: 4px; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
 .item-card-metrics strong.rate-high { color: var(--green); }
+/* 이슈 #116(2026-08-26): 품목별 조회 카드에 연도별 출원건수 그래프·광역 단위 출원 비중
+   원그래프 추가 요청 — 카드마다 컴팩트 추이 그래프와 도넛+범례를 나란히 붙인다. */
+.item-card-charts { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr); gap: 12px; margin-top: 14px; align-items: start; }
+.item-card-charts .trend-chart-compact { margin: 0; padding: 12px 14px 8px; }
+.item-card-charts .trend-chart-compact .section-heading h2 { font-size: 13px; }
+.item-card-charts .trend-chart-compact .section-heading > span { font-size: 9.5px; }
+.item-share-block { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.item-share-block .section-heading h2 { font-size: 13px; }
+.item-share { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
+.item-share.empty { display: block; margin-top: 4px; }
+.item-share-donut { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; }
+.item-share-legend { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.item-share-legend li { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-share-legend li i { flex-shrink: 0; width: 8px; height: 8px; border-radius: 999px; }
+.item-share-legend li b { margin-left: auto; padding-left: 6px; color: var(--ink); font-weight: 800; }
 .provisional-note { margin: 11px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); font-size: 11px; line-height: 1.5; }
 .item-empty { grid-column: 1 / -1; }.method-note { margin-top: 15px; padding: 14px 16px; box-shadow: none; background: #eef2f7; }.method-note summary { cursor: pointer; font-size: 12px; font-weight: 800; }.method-note p { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
 
@@ -460,7 +478,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .data-reading-note strong { font-size: 12px; }.data-reading-note p { margin: 0; font-size: 10.5px; line-height: 1.75; }
 
 @media (min-width: 1500px) {
-  .coverage-workspace { grid-template-columns: minmax(0, 2.15fr) minmax(340px, .7fr); gap: 28px; }
+  .applications-compact-row { gap: 22px; }
   .item-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .ranking-columns { gap: 28px; }
 }
@@ -475,7 +493,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .detail-grid { grid-template-columns: repeat(2, 1fr); }
   .source-grid { grid-template-columns: repeat(2, 1fr); }
   .summary-row { grid-template-columns: 1fr; }
-  .coverage-workspace { grid-template-columns: 1fr; }
+  .applications-compact-row, .applications-compact-row.solo { grid-template-columns: 1fr; }
   .map-stage { min-height: 460px; }
   .coverage-kpis { grid-template-columns: repeat(2, 1fr); }
   .coverage-kpis article:nth-child(2) { border-right: 0; }
@@ -561,18 +579,23 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .state { font-size: 11px; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록과 연도별 추이 그래프가 각각 별도 행으로 쌓이던 걸
    한 행에 나란히 넣어달라는 요청 — 지역을 좁혀 구성 목록이 없을 때는 그래프가 전체 폭을 쓴다. */
-.applications-compact-row { display: grid; grid-template-columns: minmax(260px, 1fr) minmax(0, 1.6fr); gap: 20px; align-items: start; margin-bottom: 14px; }
-.applications-compact-row.solo { grid-template-columns: 1fr; }
-.applications-compact-row .province-composition, .applications-compact-row .trend-chart { margin-bottom: 0; }
+/* 이슈 #116(2026-08-26): 광역 구성·추이 그래프·지도·전국 요약 4개 패널을 2단으로 쌓지
+   말고 한 행에 나란히 배치해달라는 요청 — 지도에 가장 넓은 폭을 주고 나머지는 압축한다. */
+.applications-compact-row { display: grid; grid-template-columns: minmax(200px, .8fr) minmax(260px, 1.05fr) minmax(320px, 1.3fr) minmax(190px, .75fr); gap: 16px; align-items: start; margin-bottom: 20px; }
+.applications-compact-row.solo { grid-template-columns: minmax(280px, 1.2fr) minmax(320px, 1.5fr) minmax(200px, .8fr); }
+.applications-compact-row .province-composition, .applications-compact-row .trend-chart, .applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { margin: 0; }
+.applications-compact-row .trend-chart { padding: 16px 18px 12px; }
+.applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { padding: 18px; }
+.applications-compact-row .map-stage { min-height: 320px; }
 .province-composition { padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
 .province-composition .section-heading h2 { font-size: 19px; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록은 이제 연도별 추이 그래프와 한 행을 나눠 쓰므로
    폭이 좁아져 2열은 겹침이 생긴다 — 1열로 유지. */
 .composition-list { display: grid; grid-template-columns: 1fr; gap: 5px 24px; margin-top: 12px; }
-.composition-list button { display: grid; grid-template-columns: 24px 82px minmax(80px, 1fr) auto; align-items: center; gap: 8px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.composition-list button { display: grid; grid-template-columns: 20px 76px minmax(60px, 1fr) auto; align-items: center; gap: 6px; width: 100%; padding: 7px 4px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
 .composition-rank { color: var(--faint); font-size: 11px; font-weight: 800; }
-.composition-list strong { font-size: 13px; }
-.composition-list small { color: var(--muted); font-size: 11px; white-space: nowrap; }
+.composition-list strong { font-size: 12.5px; word-break: keep-all; overflow-wrap: normal; line-height: 1.3; }
+.composition-list small { color: var(--muted); font-size: 10.5px; white-space: nowrap; }
 .composition-bar { height: 8px; overflow: hidden; border-radius: 99px; background: #e5ebf1; }
 .composition-bar > i { display: block; height: 100%; border-radius: inherit; background: #70a6de; }
 .composition-bar b { display: block; height: 100%; border-radius: inherit; background: var(--amber); }
@@ -670,16 +693,43 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     if (fullEnd <= fullStart) return 0;
     return ((year - fullStart) / (fullEnd - fullStart)) * 100;
   };
-  const regionTrendHtml = (region) => {
+  const regionTrendHtml = (region, heading = "지역 출원·등록 추이", subtitle) => {
+    const trendSubtitle = subtitle || `${region.region} 전체 특산품 · 연도별`;
     const applicationTotals = sumYearCounts(region.items, "applicationYearCounts");
     const registrationTotals = sumYearCounts(region.items, "registrationYearCounts");
     const years = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])].map(Number).sort((a, b) => a - b);
-    if (!years.length) return `<section class="trend-chart trend-chart-compact region-trend"><div class="section-heading"><div><h2>지역 출원·등록 추이</h2></div><span>${esc(region.region)}</span></div><p class="empty">이 지역은 아직 연도별 데이터가 없습니다.</p></section>`;
+    if (!years.length) return `<section class="trend-chart trend-chart-compact region-trend"><div class="section-heading"><div><h2>${esc(heading)}</h2></div><span>${esc(region.region)}</span></div><p class="empty">이 지역은 아직 연도별 데이터가 없습니다.</p></section>`;
     const start = years[0], end = years[years.length - 1];
     const max = Math.max(1, ...years.map((year) => Math.max(applicationTotals[year] || 0, registrationTotals[year] || 0)));
     const scale = trendScales(start, end, max);
-    return `<section class="trend-chart trend-chart-compact region-trend"><div class="section-heading"><div><h2>지역 출원·등록 추이</h2></div><span>${esc(region.region)} 전체 특산품 · 연도별</span></div><svg class="trend-svg" viewBox="0 0 ${TREND_CHART.width} ${TREND_CHART.height}" role="img" aria-label="${esc(region.region)} ${start}년부터 ${end}년까지 출원·등록 추이">${[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return `<g><line x1="${TREND_CHART.padLeft}" x2="${TREND_CHART.width - TREND_CHART.padRight}" y1="${yPos}" y2="${yPos}" class="trend-gridline" /><text x="${TREND_CHART.padLeft - 7}" y="${yPos}" class="trend-axis-label trend-axis-y">${number(value)}</text></g>`; }).join("")}<path d="${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z" class="trend-area" /><path d="${trendLinePath(years, registrationTotals, scale)}" class="trend-line trend-line-registered" /><path d="${trendLinePath(years, applicationTotals, scale)}" class="trend-line trend-line-application" />${years.map((year) => `<circle cx="${scale.x(year)}" cy="${scale.y(applicationTotals[year] || 0)}" r="2.8" class="trend-point trend-point-application"><title>${year}년 출원 ${number(applicationTotals[year] || 0)}건</title></circle>`).join("")}${years.map((year) => `<circle cx="${scale.x(year)}" cy="${scale.y(registrationTotals[year] || 0)}" r="2.8" class="trend-point trend-point-registered"><title>${year}년 등록 ${number(registrationTotals[year] || 0)}건</title></circle>`).join("")}${trendYearLabels(years).map((year) => `<text x="${scale.x(year)}" y="${TREND_CHART.height - 5}" class="trend-axis-label trend-axis-x">${year}</text>`).join("")}</svg><p class="trend-legend"><span class="trend-legend-swatch trend-legend-application"></span>출원<span class="trend-legend-swatch trend-legend-registered"></span>등록</p></section>`;
+    return `<section class="trend-chart trend-chart-compact region-trend"><div class="section-heading"><div><h2>${esc(heading)}</h2></div><span>${esc(trendSubtitle)}</span></div><svg class="trend-svg" viewBox="0 0 ${TREND_CHART.width} ${TREND_CHART.height}" role="img" aria-label="${esc(region.region)} ${start}년부터 ${end}년까지 출원·등록 추이">${[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return `<g><line x1="${TREND_CHART.padLeft}" x2="${TREND_CHART.width - TREND_CHART.padRight}" y1="${yPos}" y2="${yPos}" class="trend-gridline" /><text x="${TREND_CHART.padLeft - 7}" y="${yPos}" class="trend-axis-label trend-axis-y">${number(value)}</text></g>`; }).join("")}<path d="${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z" class="trend-area" /><path d="${trendLinePath(years, registrationTotals, scale)}" class="trend-line trend-line-registered" /><path d="${trendLinePath(years, applicationTotals, scale)}" class="trend-line trend-line-application" />${years.map((year) => `<circle cx="${scale.x(year)}" cy="${scale.y(applicationTotals[year] || 0)}" r="2.8" class="trend-point trend-point-application"><title>${year}년 출원 ${number(applicationTotals[year] || 0)}건</title></circle>`).join("")}${years.map((year) => `<circle cx="${scale.x(year)}" cy="${scale.y(registrationTotals[year] || 0)}" r="2.8" class="trend-point trend-point-registered"><title>${year}년 등록 ${number(registrationTotals[year] || 0)}건</title></circle>`).join("")}${trendYearLabels(years).map((year) => `<text x="${scale.x(year)}" y="${TREND_CHART.height - 5}" class="trend-axis-label trend-axis-x">${year}</text>`).join("")}</svg><p class="trend-legend"><span class="trend-legend-swatch trend-legend-application"></span>출원<span class="trend-legend-swatch trend-legend-registered"></span>등록</p></section>`;
   };
+  // 이슈 #116(2026-08-26): 품목별 조회 광역 단위 출원 비중 원그래프 — 상위 4개 광역 + 기타.
+  const SHARE_COLORS = ["#2f6fed", "#12b76a", "#f79009", "#7a5af8", "#98a2b3"];
+  function provinceShareSegments(counts) {
+    const entries = Object.entries(counts).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
+    const total = entries.reduce((sum, [, value]) => sum + value, 0);
+    if (!total) return { segments: [], total: 0 };
+    const top = entries.slice(0, 4);
+    const restTotal = entries.slice(4).reduce((sum, [, value]) => sum + value, 0);
+    const rows = restTotal > 0 ? [...top, ["기타", restTotal]] : top;
+    return { segments: rows.map(([name, value]) => ({ name, value, pct: value / total })), total };
+  }
+  function shareConicGradient(segments) {
+    let acc = 0;
+    const stops = segments.map((segment, index) => {
+      const start = (acc * 360).toFixed(1);
+      acc += segment.pct;
+      return `${SHARE_COLORS[index % SHARE_COLORS.length]} ${start}deg ${(acc * 360).toFixed(1)}deg`;
+    });
+    return `conic-gradient(${stops.join(", ")})`;
+  }
+  function shareDonutHtml(counts, label) {
+    const { segments, total } = provinceShareSegments(counts);
+    if (!total) return '<div class="item-share empty"><p class="empty">아직 지역 확인 출원이 없습니다.</p></div>';
+    const legend = segments.map((segment, index) => `<li><i style="background:${SHARE_COLORS[index % SHARE_COLORS.length]}"></i>${esc(displayRegionName(segment.name))}<b>${percent(segment.pct)}</b></li>`).join("");
+    return `<div class="item-share"><div class="item-share-donut" style="background:${shareConicGradient(segments)}" role="img" aria-label="${esc(label)} 광역 단위 출원 비중"></div><ul class="item-share-legend">${legend}</ul></div>`;
+  }
   // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
   // 그대로 담음 — 04-analyze-brand/lib/analyzer.js entryDimensions 참고). matchingBasis가
   // notice_name_and_nice_class일 때만 실제로 지식재산처 고시상품명칭 사전과 대조해 확정된
@@ -736,6 +786,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
   const kiprisSearchUrl = (applicationNumber) => `https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark&searchKeyword=${encodeURIComponent(`AN=${applicationNumber}`)}`;
+  const GI_MARK_LABELS = { "44": "GI 단체표장", "48": "GI 증명표장" };
+  const giMarkLabel = (applicationNumber) => applicationNumber ? GI_MARK_LABELS[applicationNumber.slice(0, 2)] || null : null;
   // 이슈 #80/#113: 지도 경계는 2026-08-24부터 vuski/admdongkor(2026-07-01 기준,
   // 군위군의 경북→대구 편입 등 최신 행정구역 변경이 반영됨)로 바뀌어 군위군 같은
   // 불일치는 더 이상 발생하지 않는다. 다만 지도 도형은 여전히 제3자가 재배포하는
@@ -913,7 +965,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return `<section class="hero"><div class="hero-note"><span>조사 범위</span><strong>${snapshot.coverage.observedRegionCount}개 지역 · ${snapshot.coverage.regionItemCount}건</strong><p>지속 업데이트 예정</p></div></section>
     <section class="metrics"><article><span>특산품 출원율</span><strong>${percent(nationalSpecialtyCoverage.rate)}</strong><small>전체 ${number(nationalSpecialtyCoverage.total)}개 중 확인 ${number(nationalSpecialtyCoverage.applied)}개</small></article><article><span>전국 검색 고유 상표 후보</span><strong>${pipeline ? number(pipeline.nationwideCandidates.uniqueTrademarkCount) : totals.availableItems ? number(totals.trademarks) : "집계 전"}</strong><small>출원번호 중복 제거</small></article><article><span>출원인 주소 확보율</span><strong>${pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>${pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>${pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>지역×특산품 집계 가능 항목</small></article></section>
     <section class="summary-row" aria-label="특산품 순위·지도·출원 랭킹">
-    <aside class="map-insight"><h2>${esc(displayRegionName(state.municipality || state.province || "전국"))}</h2>${insightHero}${state.province && visibleRegions.some(isUnclassifiedRegion) ? `<p class="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 ${esc(displayRegionName(state.province))} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>` : ""}<div class="mini-list-heading"><strong>${esc(insightListLabel)}</strong><span>최대 5개</span></div><div class="mini-list">${insightList}</div></aside>
+    <aside class="map-insight"><h2>${esc(displayRegionName(state.municipality || state.province || "전국"))} · ${esc(mapLabels[state.mapMetric])}</h2>${insightHero}${state.province && visibleRegions.some(isUnclassifiedRegion) ? `<p class="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 ${esc(displayRegionName(state.province))} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>` : ""}<div class="mini-list-heading"><strong>${esc(insightListLabel)}</strong><span>최대 5개</span></div><div class="mini-list">${insightList}</div></aside>
     <div class="map-card"><div class="map-heading"><div><h2>${state.province ? `${esc(displayRegionName(state.province))} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip" title="${esc(`지도 도형은 ${geometry.boundaryReference.sourceName} 제공 경계(${geometry.boundaryReference.sourceBasis})를 참고용으로 씁니다 — 제3자가 재배포하는 데이터라 향후 행정구역 개편이 지도 도형에 늦게 반영될 수 있으며, 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.`)}">참고 경계 · ${esc(geometry.boundaryReference.sourceBasis.match(/\d{4}-\d{2}-\d{2}/)?.[0] || geometry.boundaryReference.sourceName)}</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map" viewBox="${activeViewBox}" role="img" aria-label="${state.province ? `${esc(displayRegionName(state.province))} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span><span><i class="legend-swatch low"></i>낮음</span><span><i class="legend-swatch high"></i>높음</span><strong>${mapLabels[state.mapMetric]} 기준</strong></div></div>
     <div class="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
       <div class="ranking"><div class="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP ${RANKING_LIMIT}</span></div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>NICE류</th><th>출원 확인</th></tr></thead><tbody>${applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(region.region)}</td><td>${esc(label)}</td><td>${esc(item.noticeName)} · ${esc(item.niceClass)}류</td><td>${number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></div>
@@ -1006,7 +1058,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
       ${item.briefing && item.briefing.sentences.length > 0 ? businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략") : ""}
-      <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
+      <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="출원번호가 클립보드에 복사됩니다 · KIPRIS 상표 검색창에 붙여넣으세요" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;
   }
   function regionsScreen() {
@@ -1033,19 +1085,22 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       return `<section class="province-group"><button type="button" class="province-toggle" data-region-group="${esc(province)}" aria-expanded="${expanded}"><span><strong>${esc(displayRegionName(province))}</strong><small>시군구 ${regions.length}곳 · 특산품 ${coverage.total}개</small></span><b aria-hidden="true">${expanded ? "−" : "+"}</b></button>${municipalities}</section>`;
     }).join("");
     const detail = region ? regionDetail(region, item) : activeProvince ? provinceDetail(activeProvince, activeProvinceRegions) : '<div class="detail-panel"><p class="empty">조회할 광역자치단체를 선택하세요.</p></div>';
-    return `<section class="screen-section"><p class="screen-note">광역자치단체 합계를 기본으로 보여주며, 시군구를 선택하면 품목별 상세로 전환됩니다.</p><section class="workspace"><aside class="region-panel"><div class="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 ${grouped.length}곳 · 시군구 ${rows.length}곳</span></div><label class="search-field"><span class="sr-only">지역 또는 품목 검색</span><input id="region-search" value="${esc(state.query)}" placeholder="지역 또는 품목 검색"></label><div class="province-list">${groupsHtml || '<p class="empty">검색 결과가 없습니다.</p>'}</div></aside>${detail}</section></section>`;
+    const allProvinces = [...new Set(snapshot.regions.map((row) => row.sido || row.region))].sort((a, b) => displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR"));
+    const provinceTabbarHtml = `<nav class="province-tabbar">${allProvinces.map((province) => `<button type="button" data-province-tab="${esc(province)}" class="${activeProvince === province ? "active" : ""}">${esc(displayRegionName(province))}</button>`).join("")}</nav>`;
+    return `<section class="screen-section"><p class="screen-note">광역자치단체 합계를 기본으로 보여주며, 시군구를 선택하면 품목별 상세로 전환됩니다.</p>${provinceTabbarHtml}<section class="workspace"><aside class="region-panel"><div class="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 ${grouped.length}곳 · 시군구 ${rows.length}곳</span></div><label class="search-field"><span class="sr-only">지역 또는 품목 검색</span><input id="region-search" value="${esc(state.query)}" placeholder="지역 또는 품목 검색"></label><div class="province-list">${groupsHtml || '<p class="empty">검색 결과가 없습니다.</p>'}</div></aside>${detail}</section></section>`;
   }
   function itemRows() {
     const rows = new Map();
     snapshot.regions.forEach((region) => region.items.forEach((item) => {
       const name = officialItemLabel(item);
       if (!name) return; // 아직 고시명칭이 확정되지 않은 원물명은 여기서 제외(지역 상세에서는 계속 표시)
-      const row = rows.get(name) || { name, category: item.category || null, searchTerms: [], trademarks: 0, trademarksDisplay: 0, hasProvisional: false, registered: 0, available: 0, availableRegions: [], regions: [], regionCounts: {} };
+      const row = rows.get(name) || { name, category: item.category || null, searchTerms: [], trademarks: 0, trademarksDisplay: 0, hasProvisional: false, registered: 0, available: 0, availableRegions: [], regions: [], regionCounts: {}, provinceCounts: {}, matchedItems: [] };
       row.searchTerms.push(item.itemName, item.noticeName, name);
       const trade = tradeDisplay(item);
       if (trade.value !== null) { row.trademarksDisplay += trade.value; if (trade.provisional) row.hasProvisional = true; }
-      if (item.metrics.uniqueTrademarkCount.availability === "available") { row.available += 1; row.trademarks += item.metrics.uniqueTrademarkCount.value || 0; row.registered += item.metrics.registeredTrademarkCount.value || 0; if (!row.availableRegions.includes(region.region)) row.availableRegions.push(region.region); row.regionCounts[region.region] = (row.regionCounts[region.region] || 0) + (item.metrics.uniqueTrademarkCount.value || 0); }
+      if (item.metrics.uniqueTrademarkCount.availability === "available") { row.available += 1; row.trademarks += item.metrics.uniqueTrademarkCount.value || 0; row.registered += item.metrics.registeredTrademarkCount.value || 0; if (!row.availableRegions.includes(region.region)) row.availableRegions.push(region.region); row.regionCounts[region.region] = (row.regionCounts[region.region] || 0) + (item.metrics.uniqueTrademarkCount.value || 0); const province = region.sido || region.region; row.provinceCounts[province] = (row.provinceCounts[province] || 0) + (item.metrics.uniqueTrademarkCount.value || 0); }
       if (!row.regions.includes(region.region)) row.regions.push(region.region);
+      row.matchedItems.push(item);
       rows.set(name, row);
     }));
     const keyword = state.itemQuery.trim().toLocaleLowerCase("ko-KR");
@@ -1064,7 +1119,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return [...seen.entries()].map(([code, label]) => ({ code, label })).sort((a, b) => a.label.localeCompare(b.label, "ko-KR"));
   }
   function itemsScreen() {
-    const rows = itemRows(); const ITEM_ROW_LIMIT = 100; const visibleRows = rows.slice(0, ITEM_ROW_LIMIT); return `<section class="screen-section"><p class="screen-note">품목마다 확인 지역과 상표 현황을 카드 한 장에 요약했습니다.</p><div class="item-screen"><div class="item-screen-toolbar"><label><span class="sr-only">품목 검색</span><input id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><span>${rows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `검색 결과 ${rows.length}개`}</span></div><div class="item-category-filter" role="group" aria-label="품목 유형 필터"><button type="button" data-category-filter="" class="${state.categoryFilter === "" ? "active" : ""}">전체</button>${availableCategories().map((category) => `<button type="button" data-category-filter="${esc(category.code)}" class="${state.categoryFilter === category.code ? "active" : ""}">${esc(category.label)}</button>`).join("")}</div><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-card-grid">${visibleRows.map((row, index) => { const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const statusClass = pendingRegions === 0 ? "complete" : decidedRegions ? "partial" : "pending"; const statusLabel = pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"; const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return `<article class="item-card"><div class="item-card-head"><div><span class="item-rank">${String(index + 1).padStart(2, "0")}</span><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${(() => { const max = Math.max(1, ...Object.values(row.regionCounts)); return [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; return `<span style="font-size:${wordCloudFontSize(value, max)}px;color:${wordCloudColor(region)}" title="${esc(region)} · 출원 ${number(value)}건">${esc(region)}</span>`; }).join(""); })()}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}</article>`; }).join("") || '<p class="empty item-empty">검색 결과가 없습니다.</p>'}</div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
+    const rows = itemRows(); const ITEM_ROW_LIMIT = 100; const visibleRows = rows.slice(0, ITEM_ROW_LIMIT); return `<section class="screen-section"><p class="screen-note">품목마다 확인 지역과 상표 현황을 카드 한 장에 요약했습니다.</p><div class="item-screen"><div class="item-screen-toolbar"><label><span class="sr-only">품목 검색</span><input id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><span>${rows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `검색 결과 ${rows.length}개`}</span></div><div class="item-category-filter" role="group" aria-label="품목 유형 필터"><button type="button" data-category-filter="" class="${state.categoryFilter === "" ? "active" : ""}">전체</button>${availableCategories().map((category) => `<button type="button" data-category-filter="${esc(category.code)}" class="${state.categoryFilter === category.code ? "active" : ""}">${esc(category.label)}</button>`).join("")}</div><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-card-grid">${visibleRows.map((row, index) => { const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const statusClass = pendingRegions === 0 ? "complete" : decidedRegions ? "partial" : "pending"; const statusLabel = pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"; const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return `<article class="item-card"><div class="item-card-head"><div><span class="item-rank">${String(index + 1).padStart(2, "0")}</span><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${(() => { const max = Math.max(1, ...Object.values(row.regionCounts)); return [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; return `<span style="font-size:${wordCloudFontSize(value, max)}px;color:${wordCloudColor(region)}" title="${esc(region)} · 출원 ${number(value)}건">${esc(region)}</span>`; }).join(""); })()}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${decidedRegions > 0 ? `<div class="item-card-charts">${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원건수", `${row.name} · 전체 지역 합계`)}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div></div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}</article>`; }).join("") || '<p class="empty item-empty">검색 결과가 없습니다.</p>'}</div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
   }
   function dataScreen() {
     if (!pipeline) return '<section class="screen-section"><p class="empty">파이프라인 개요 데이터가 없습니다.</p></section>';
@@ -1194,9 +1249,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 그대로 유지된다.
     document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
     document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { const province = button.dataset.regionGroup; state.selectedRegionProvince = province; state.expandedRegionProvince = state.expandedRegionProvince === province ? null : province; state.regionKey = ""; state.itemId = ""; render(); }; });
+    document.querySelectorAll("[data-province-tab]").forEach((button) => { button.onclick = () => { const province = button.dataset.provinceTab; state.selectedRegionProvince = province; state.expandedRegionProvince = province; state.regionKey = ""; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
-    document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { window.open(kiprisSearchUrl(button.dataset.kiprisApplication), "kipris-search", "width=1100,height=800,noopener,noreferrer"); }; });
+    document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { const applicationNumber = button.dataset.kiprisApplication; navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "width=1100,height=800,noopener,noreferrer"); }; });
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
     document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; render(); }; });
