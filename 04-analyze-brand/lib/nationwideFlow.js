@@ -43,8 +43,12 @@ function hitClasses(hit) {
     .map(normalizeClassCode);
 }
 
+// "미가공"·"무가공"은 "가공하지 않음"이라는 부정 표현인데 "가공"을 부분 문자열로
+// 담고 있어 그대로 두면 원물을 가공품으로 오판정한다(#74 실측 발견 — "미가공 감자"
+// 등 7건). 판정 전에 부정형을 먼저 제거한다.
+const NEGATED_PROCESSED_RE = /(미|무)가공/g;
 function classifyGoodsTitle(title, coreTerm) {
-  const t = title || "";
+  const t = (title || "").replace(NEGATED_PROCESSED_RE, "");
   if (PROCESSED_WORDS.some((kw) => t.includes(kw))) return "processed";
   for (const suf of PROCESSED_SUFFIXES) {
     if (t.includes(coreTerm + suf)) return "processed";

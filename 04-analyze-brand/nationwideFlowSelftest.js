@@ -40,6 +40,14 @@ async function runNationwideFlowTests() {
     ok("가공 지표 단어(막걸리·분말 등)가 있으면 가공품, 없으면 원물");
   }
 
+  console.log("2b) classifyHitStage — \"미가공\"·\"무가공\"은 부정 표현이라 가공품으로 오판정하면 안 됨(#74 실측)");
+  {
+    assert.strictEqual(classifyHitStage(hit({ title: "미가공 감자", classificationCode: "29" }), "감자"), "raw");
+    assert.strictEqual(classifyHitStage(hit({ title: "무가공 옥수수", classificationCode: "29" }), "옥수수"), "raw");
+    assert.strictEqual(classifyHitStage(hit({ title: "미가공 감자로 만든 잼", classificationCode: "29" }), "감자"), "processed");
+    ok("\"가공\"을 담고 있어도 부정형(미가공/무가공)이면 원물, 뒤에 실제 가공 지표가 더 있으면 가공품");
+  }
+
   console.log("3) classifyHitStage — 1글자 접미어는 품목명 바로 옆에 합성어로 붙을 때만 인정");
   {
     // "청정" 안의 "청"이 오탐(false positive)으로 잡히면 안 된다 — 품목명+음절 인접 매칭만 허용.
