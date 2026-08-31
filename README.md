@@ -1,113 +1,85 @@
-# KIIP — AI 기반 지역 특산품 브랜드 비즈니스 전략 플랫폼
+# KIIP — 지역 특산품 상표·사업 확장 분석
 
-지식재산처 상표 빅데이터와 생성형 AI를 결합해, 지역 특산품의 브랜드(상표) 활용 수준을 자동으로
-분석하고 브랜드 공백지역을 발굴해 비즈니스 확장 전략을 제안하는 파이프라인. 전체 기획은
-[`docs/project-plan.md`](docs/project-plan.md) 참고.
+공식 지역 특산품 목록과 상표 데이터를 연결해 지역별 브랜드 활동을 확인하고, 전국 상표의
+원물→가공품→서비스 흐름에서 사업 확장 단서를 찾는 분석 파이프라인이다.
 
-## 현재 산출물
+> 현재 공개본은 수집·검증이 진행 중인 알파 산출물이며 공식 통계가 아니다. 전국 검색 결과를
+> 지역 상표 건수로 간주하지 않고, 출원인 주소 등 지역 귀속 근거가 확인된 값만 지역 지표에 쓴다.
 
-| 공개 결과 | 용도 | 바로가기 |
-|---|---|---|
-| 지역 특산품 상표 분석 | 현재 연결된 데이터와 지역별 지표 확인 | [대시보드 보기](https://omelette-archive.github.io/KIIP-artifacts/latest/) |
-| 변경 이력 | 과거 공개 화면을 버전별로 재현·비교 | [버전 비교](https://omelette-archive.github.io/KIIP-artifacts/versions/) |
-| 검토 의견 | 최신 공개본에 대한 피드백을 한 이슈의 댓글로 기록 | [의견 남기기](https://github.com/omelette-archive/KIIP/issues/76) |
+## 공개 산출물
 
-> **알파 테스트 기반 검토용** — 수집·검증이 진행 중인 지표가 포함되어 있으며 공식 통계가 아니다.
+- [최신 대시보드](https://omelette-archive.github.io/KIIP-artifacts/latest/)
+- [버전별 비교](https://omelette-archive.github.io/KIIP-artifacts/versions/)
+- [원본 HTML](07-dashboard/dashboard.html)
+- [검토 의견](https://github.com/omelette-archive/KIIP/issues/76)
 
-[공개 산출물 홈](https://omelette-archive.github.io/KIIP-artifacts/) · [원본 HTML](07-dashboard/dashboard.html) · [Git 변경 이력](https://github.com/omelette-archive/KIIP/commits/main/07-dashboard/dashboard.html) · [게시 운영 방법](docs/current-artifact.md)
+`main`의 `07-dashboard/dashboard.html`이 바뀌면 공개 산출물 저장소의 최신본과 버전 목록에
+자동 반영된다. 자세한 게시 절차는 [`docs/current-artifact.md`](docs/current-artifact.md)를 따른다.
 
-`main`의 `07-dashboard/dashboard.html`이 변경되면 공개 산출물 저장소
-[`KIIP-artifacts`](https://github.com/omelette-archive/KIIP-artifacts)의 최신본과 버전 목록에 자동 반영된다.
-
-## 파이프라인 (7단계)
+## 현재 워크플로
 
 ```mermaid
 flowchart LR
-    P1["① 특산품 수집"] --> P2["② 품목 표준화"]
-    P2 --> P3["③ 상표 매칭"]
-    P3 --> P4["④ 브랜드 분석"]
-    P4 --> P5["⑤ 브랜드 공백 발굴"]
-    P5 --> P6["⑥ 비즈니스 확장 전략"]
-    P4 --> P7["⑦ 대시보드"]
-    P5 --> P7
-    P6 --> P7
-
-    classDef done fill:#1baf7a,stroke:#199e70,color:#fff
-    classDef partial fill:#eda100,stroke:#c98500,color:#fff
-    classDef todo fill:#e1e0d9,stroke:#c3c2b7,color:#52514e
-    class P1 partial
-    class P2 partial
-    class P3 partial
-    class P4 partial
-    class P5 partial
-    class P6 partial
-    class P7 todo
+    A[공식 특산품·정책 목록] --> B[품목·지역 정규화]
+    B --> C[KIPRIS 상표 검색]
+    C --> D[출원인 주소·등록원부 보강]
+    D --> E[지역 브랜드 활동·공백]
+    C --> F[전국 원물·가공품·서비스 흐름]
+    E --> G[대시보드·전략 후보]
+    F --> G
 ```
 
-🟢 완료 &nbsp;&nbsp; 🟡 진행중(일부 동작) &nbsp;&nbsp; ⚪ 예정
+분석은 서로 섞지 않는 두 트랙으로 운영한다.
 
-## 단계별 현황
+| 트랙 | 질문 | 핵심 근거 |
+|---|---|---|
+| 지역 브랜드 | 이 지역에 실제로 귀속되는 출원·등록 활동이 있는가 | 공식 지역 목록, 출원인 주소, 등록원부 지정상품 |
+| 전국 사업 확장 | 한 품목의 상표가 원물에서 가공품·서비스로 어떻게 확장되는가 | 전국 KIPRIS 후보의 상품류·상표명·출원인 군집 |
 
-| # | 단계 | 폴더 | 상태 | 한 줄 요약 |
-|---|---|---|---|---|
-| ① | 지역 특산품 데이터 자동 구축 | [`01-collect-specialties/`](01-collect-specialties/) | 🟡 진행중 | GI·농사로 실키 검증, 일자별 수집·SQLite 멱등 누적 구현 |
-| ② | 특산품 표준화 및 상품류 매핑 | [`02-normalize-items/`](02-normalize-items/) | 🟡 진행중 | 규칙 기반 정규화 + 감사 이력이 남는 수동 검토 대기열 구현 |
-| ③ | 상표정보 자동 수집 | [`03-match-trademarks/`](03-match-trademarks/) | 🟡 진행중 | KIPRIS 검색 + 출원번호·등록번호 기반 주소 및 지정상품 보강·캐시 구현 |
-| ④ | 지역 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 진행중 | 출원인 주소·지역브랜드·지정상품 근거를 분리 집계, 미보강은 별도 상태 유지 |
-| ⑤ | 브랜드 공백 자동 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟡 진행중 | 결정론적 점수 계산 완료, **대표성·가중치 기준은 예시값**(#29) |
-| ⑥ | AI 비즈니스 확장 전략 제안 생성 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 진행중 | ⑥-1 고정 템플릿 초안 생성(AI 미사용) 완료, ⑥-2 개별 AI 검토는 별도 범위 |
-| ⑦ | 대시보드 서비스 | [`07-dashboard/`](07-dashboard/) | 🟡 운영 경계 보강 | 7개 조회 탭과 참고 지도를 제공하며, 현재 기준 공식 행정경계 연결은 #80에서 관리 |
+현재 구현의 핵심은 다음과 같다.
 
-위 표는 진행 상태 요약일 뿐이다. **각 단계가 실제로 어떤 기준으로 데이터를 뽑고 매칭하고
-확정하는지**는 [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md)에 데이터 분석
-관점으로 정리되어 있다 — ②의 판정 근거(verdictSource) 비중 실측치, ③의 지역 귀속·지정상품
-대조 기준, ④의 지표 게이트, ⑤의 대표성·점수 기준, 그리고 아직 업무 기준이 안 정해진 정책
-이슈 목록까지 한 곳에 모았다.
+- 농사로·지리적표시·지자체 자료와 농촌진흥청 9개 도 69개 지역특화작목 등 공식 목록을
+  출처 범위 그대로 수집한다. 도 단위 자료를 시군구로 임의 배분하지 않는다.
+- 원문 품목은 고시상품명칭·NICE류와 대조해 자동 확정, 승인 별칭, 검토 대기로 구분한다.
+- KIPRIS 검색 뒤 출원번호 기반 주소와 등록번호 기반 등록원부를 보강한다. 등록원부는
+  지정상품 대조, 호출 예산·429 재개, 캐시, 권리존속기간 만료예정일 기반 재검증을 포함한다.
+- 지역 대표 기준은 `지리적표시 등록 또는 지역 귀속 상표 출원 1건 이상`이다. 공백 점수의
+  포화 건수·가중치는 아직 운영 기준 확정 전이므로 버전 필드와 함께 해석한다.
+- 전국 176개 품목은 NICE류와 상표명 규칙으로 원물·가공품·서비스 단계 및 주요 출원인·지역
+  군집을 별도 계산한다. 등록원부 지정상품 대조가 덜 된 분류는 참고 지표이며, 지역 통계나
+  대표성 판정에 합산하지 않는다.
+- 스냅샷 감사가 지역/전국 경계, 근거 필드, 공개 전 계약 위반을 검사한 뒤 단일 HTML을 만든다.
 
-각 폴더의 `README.md`에 해당 단계의 목표·할 일·입출력 스키마가 정리되어 있다.
+세부 판정과 남은 한계는 [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md)에 정리한다.
 
-수집 URL·데이터 구조·정제 기준은 [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md),
-Open API 계정/호출 제한은 [`docs/open-api-limits.md`](docs/open-api-limits.md)를 기준으로 관리한다.
-외부 API 전체 호출 전에는 [`samples/`](samples/)의 고정 소량 데이터로 단계 간 계약을 검증한다.
+## 실행과 검증
 
-## 지속 검증
+전체 실행 계획을 먼저 확인한다.
 
-외부 API 키 없이 JavaScript 구문, ①~⑥ 자체 테스트, ②→③ 샘플 dry-run, ③→④→⑤→⑥ 계약을
-한 번에 검증한다.
+```bash
+node scripts/runOperationalPipeline.js --dry-run --run-id YYYYMMDD-manual
+```
+
+코드·샘플 계약과 현재 대시보드 스냅샷은 각각 다음 명령으로 검사한다.
 
 ```bash
 node scripts/validatePipeline.js
-```
-
-추가 수집 결과를 대시보드에 반영하기 전에는 스냅샷의 확인 특산품과 검토대기 데이터가 섞이지 않는지도 감사한다.
-
-```powershell
 node scripts/auditDashboardSnapshot.js
 ```
 
-판정 기준과 반영 체크리스트는 [대시보드 데이터 품질 감사](docs/dashboard-data-quality-audit.md)에 정리되어 있다.
+실제 API 호출, 재개, 산출물 경로는
+[`docs/operational-pipeline-runner.md`](docs/operational-pipeline-runner.md)를 따른다.
 
-동일한 검증은 모든 push와 pull request에서 GitHub Actions로 자동 실행된다. 실제 API 호출은
-포함하지 않아 키나 호출량을 사용하지 않는다.
+## 문서 길잡이
 
-## 문서
+| 필요할 때 | 기준 문서 |
+|---|---|
+| 현재 분석 흐름과 판정 경계 | [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md) |
+| 운영 실행·재개 | [`docs/operational-pipeline-runner.md`](docs/operational-pipeline-runner.md) |
+| 단계별 입출력 계약 | [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) |
+| 출처와 원본 근거 | [`docs/data-source-provenance.md`](docs/data-source-provenance.md) |
+| 대시보드 데이터 계약 | [`docs/dashboard-data-contract.md`](docs/dashboard-data-contract.md) |
+| 등록원부 보강 운영 | [`docs/applicant-region-recovery-runbook.md`](docs/applicant-region-recovery-runbook.md) |
 
-- [`docs/data-analysis-guide.md`](docs/data-analysis-guide.md) — **데이터 분석 가이드**: 각 단계가 무엇을 어떤 기준으로 뽑고 매칭·확정하는지, 실측 비중과 미해결 정책 이슈 모음
-- [`docs/project-plan.md`](docs/project-plan.md) — 전체 기획 원문 정리 (프로젝트명·목표·7단계 상세·기대효과)
-- [`docs/kipris-api-notes.md`](docs/kipris-api-notes.md) — KIPRIS 상표 Open API 연동 메모 (인증, 엔드포인트, 응답 필드, 지역 매칭 미해결 이슈)
-- [`docs/data-pipeline-contracts.md`](docs/data-pipeline-contracts.md) — 수집 구조·데이터 스키마·정제 기준
-- [`docs/data-source-provenance.md`](docs/data-source-provenance.md) — 원본 제공기관·공식 URL·기준 근거·버전·산출물 계보
-- [`docs/dashboard-data-contract.md`](docs/dashboard-data-contract.md) — ⑦ 지표 정의·준비도·통합 스냅샷·지도/출처 계약
-- [`docs/open-api-limits.md`](docs/open-api-limits.md) — 계정 승인·호출 제한과 운영 체크리스트
-- [`docs/open-api-validation-runbook.md`](docs/open-api-validation-runbook.md) — 키 위치·신청 경로·실호출 명령·결과·worktree 인수인계
-- [`docs/applicant-region-recovery-runbook.md`](docs/applicant-region-recovery-runbook.md) — 출원번호·등록번호 두 주소 보강 경로와 재분석·복구 절차
-- [`docs/api-key-management.md`](docs/api-key-management.md) — 로컬 키 보관 위치와 worktree 복사 방법
-- [`docs/operational-pipeline-runner.md`](docs/operational-pipeline-runner.md) — ①~⑦ 운영 실행기, 영구 상태 경로, dry-run·실패 중단·게시 안전장치
-- [`docs/open-api-onboarding-checklist.md`](docs/open-api-onboarding-checklist.md) — 신규 Open API 소스 연동 시 반복되는 시행착오를 줄이는 체크리스트 (KIPRIS/GI/농사로 실사례 기준)
-- [`docs/decisions/0001-deterministic-normalization-manual-review.md`](docs/decisions/0001-deterministic-normalization-manual-review.md) — ②단계 외부 AI 제거와 수동 검토 결정
-
-## 개발 방법
-
-현재 파이프라인은 의존성 없는 Node.js CLI와 SQLite로 구현한다. 대시보드 기술은 ⑦ 구현 시
-확정하며, 초기 기획안의 Python·Streamlit 표기는 [`docs/project-plan.md`](docs/project-plan.md)에
-원문과 현재 구현을 구분해 보존한다.
+[`docs/project-plan.md`](docs/project-plan.md), 날짜가 붙은 인계·감사 문서, `docs/data-flow/`는
+당시 결정과 실행 결과를 보존하는 기록물이다. 현재 상태 판단에는 위 기준 문서를 우선한다.

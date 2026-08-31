@@ -1,13 +1,13 @@
 # 운영 파이프라인 실행기
 
-`scripts/runOperationalPipeline.js`는 ① 수집부터 ⑦ 스냅샷·후보 HTML까지 기존 CLI를 한 번에
-순서대로 실행하는 #70의 첫 구현 단위다. 외부 API를 새로 감싸지 않고, 각 단계가 이미 사용하는
-환경 변수와 `.env` 로더를 그대로 사용한다. 키 값은 실행 계획·manifest·명령행에 기록하지 않는다.
+`scripts/runOperationalPipeline.js`는 ① 수집부터 ⑦ 스냅샷·후보 HTML까지 핵심 CLI를 한 번에
+재현하는 운영 실행기다. 외부 API를 새로 감싸지 않고, 각 단계가 이미 사용하는 환경 변수와
+`.env` 로더를 그대로 사용한다. 키 값은 실행 계획·manifest·명령행에 기록하지 않는다.
 
 ## 먼저 계획만 확인
 
 ```bash
-node scripts/runOperationalPipeline.js --dry-run --run-id 20260818-manual
+node scripts/runOperationalPipeline.js --dry-run --run-id YYYYMMDD-manual
 ```
 
 `--dry-run`은 API를 호출하지 않고 디렉터리나 파일도 만들지 않는다. 출력 JSON에서 단계 순서,
@@ -29,7 +29,7 @@ node scripts/runOperationalPipeline.js --dry-run --run-id 20260818-manual
 
 ```bash
 node scripts/runOperationalPipeline.js \
-  --run-id 20260818-manual \
+  --run-id YYYYMMDD-manual \
   --max-requests 100 \
   --max-pages 5 \
   --max-hits-per-query 100
@@ -50,15 +50,22 @@ node scripts/runOperationalPipeline.js \
 시험해야 할 때만 `--raw-goods-review <json>`으로 명시적으로 바꾼다. 따라서 현재 공개본의
 `raw_item_goods_matched` 집계를 대시보드 JSON 수동 패치 없이 재현할 수 있다.
 
-## 게시 안전장치와 현재 한계
+## 게시 안전장치와 별도 운영 경로
 
 성공 실행도 저장소의 `07-dashboard/dashboard.html`을 직접 덮어쓰거나 공개하지 않는다. 전체
-회귀 검증이 통과한 뒤 실행 디렉터리에 `dashboard.candidate.html`만 만든다. 실제 반영/게시 정책은
-#70에서 별도로 결정한다.
+회귀 검증이 통과한 뒤 실행 디렉터리에 `dashboard.candidate.html`만 만든다. 후보를 검토한 뒤
+저장소의 공개 HTML에 반영해야 게시 워크플로가 동작한다.
 
-이번 단위는 #73 및 현재 별도 worktree의 출원인 주소 보강 작업과 겹치지 않도록 출원인 주소·
-등록원부 재조회 단계를 연결하지 않았다. 따라서 주소 캐시·등록원부 예산 상태의 운영 연결,
-스케줄, 동시 실행 잠금, 알림, 승인 게시는 아직 남아 있다.
+장시간·증분 수집은 이 실행기에 묶지 않고 각각의 체크포인트와 예산 상태로 운영한다.
+
+- 출원인 주소 재조회와 전후 비율 집계
+- 등록원부 지정상품 보강, 429 재개, 만료예정일 기반 재검증
+- 전국 176개 품목의 원물→가공품→서비스 흐름 수집·갱신
+- 농촌진흥청 특화작목 등 보완 소스의 대시보드 연결
+
+따라서 운영 실행기는 핵심 파이프라인의 재현·검증 도구이지 모든 증분 수집 작업의 스케줄러는
+아니다. 등록원부는 [`applicant-region-recovery-runbook.md`](applicant-region-recovery-runbook.md),
+현재 분석 경계는 [`data-analysis-guide.md`](data-analysis-guide.md)를 따른다.
 
 ## 검증
 
