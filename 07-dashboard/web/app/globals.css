@@ -621,7 +621,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { padding: 18px; }
 .applications-compact-row .map-stage { min-height: 320px; }
 .province-composition { padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); }
-.province-composition .section-heading h2 { font-size: 19px; }
+/* 이슈 #116(2026-08-31): 지역별 상표 출원을 4칸 한 행으로 압축한 뒤 이 칸이 가장 좁아져(약
+   220~280px), 제목과 "TOP N" 라벨을 한 줄에 나란히 두면 flex 자식이 줄바꿈 대신 폭을
+   넘어 글씨가 삐져나왔다 — 세로로 쌓고 폭 안에서 줄바꿈이 되도록 min-width를 없앤다. */
+.province-composition .section-heading { flex-direction: column; align-items: flex-start; gap: 4px; }
+.province-composition .section-heading h2 { min-width: 0; font-size: 16px; word-break: keep-all; overflow-wrap: normal; }
+.province-composition .section-heading > span { font-size: 10px; white-space: normal; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록은 이제 연도별 추이 그래프와 한 행을 나눠 쓰므로
    폭이 좁아져 2열은 겹침이 생긴다 — 1열로 유지. */
 .composition-list { display: grid; grid-template-columns: 1fr; gap: 5px 24px; margin-top: 12px; }
