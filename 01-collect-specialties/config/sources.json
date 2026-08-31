@@ -232,6 +232,36 @@
       }
     },
     {
+      "id": "rda_regional_specialty_crops",
+      "name": "농촌진흥청 2025 지역특화작목",
+      "role": "collector",
+      "dataVersion": "regional-specialty-crops-v1",
+      "lastVerifiedAt": "2026-08-26",
+      "catalogUrl": "https://www.rda.go.kr/board/board.do?mode=view&prgId=day_farmprmninfoEntry&dataNo=100000806736",
+      "providerUrl": "https://www.rda.go.kr/",
+      "formats": ["HWPX", "JSON snapshot"],
+      "geographicScope": {
+        "catalogScope": "province_policy_specialty",
+        "regionalSpecialtyEligible": true,
+        "regionalSpecialtyReason": "농촌진흥청이 도 농업기술원별로 지정한 대표·집중육성·자체육성 작목으로, 도 단위에서만 귀속"
+      },
+      "authentication": {
+        "required": false,
+        "keyEnv": null,
+        "baseUrlEnv": null,
+        "approval": "none"
+      },
+      "quota": {
+        "type": "not_applicable",
+        "value": 69,
+        "verification": "2025년도 지역특화작목 사업 성과 보고회 보도자료 붙임3의 대표 9·집중육성 18·자체육성 42개 전량 구조화"
+      },
+      "implementation": {
+        "status": "official_snapshot_in_default_sources",
+        "adapter": "lib/rdaRegionalSpecialtyCrops.js + 02-normalize-items/data/regional-specialty-crops-2025.json"
+      }
+    },
+    {
       "id": "nongsaro_area_brand",
       "name": "농촌진흥청 지역 브랜드",
       "role": "trademark_validation_reference",

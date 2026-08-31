@@ -396,6 +396,17 @@ async function run() {
       makeBatchQuery({ sido: "경상북도", sigungu: "안동시", itemName: "상큼愛", status: "ok" }).skipReason,
       /고시명칭 미확정/
     );
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "경기도",
+        sigungu: "",
+        itemName: "선인장·다육식물",
+        status: "ok",
+        sourceId: "rda_regional_specialty_crops",
+        sourceScope: "province_policy_specialty",
+      }),
+      { region: "경기도", item: "선인장·다육식물", classCode: null, sourceScope: "province_policy_specialty" }
+    );
     assert.strictEqual(
       countSearchableRows([
         { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", noticeName: "신선한 사과", niceClass: "31", status: "ok" },
@@ -404,7 +415,7 @@ async function run() {
       ]),
       1
     );
-    ok("② 출력의 고시명칭/NICE류를 사용하고 검토필요·오류·제외 행은 건너뜀");
+    ok("② 출력의 고시명칭/NICE류를 사용하고, 공식 지역특화작목은 도 단위 원문명으로 검색함");
   }
 
   console.log("8) buildSearchOutput — 키워드 전체와 현재 페이지 필터 건수 분리");

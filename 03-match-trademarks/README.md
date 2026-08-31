@@ -158,6 +158,10 @@ node 03-match-trademarks/matchTrademarks.js \
 검색어로 쓰지 않는다. `buildAreaBrandValidationInput.js`는 필요하면 지역브랜드 원문의 지역·주요품목·
 브랜드명을 검토하는 `validation_only` 감사표를 만들 뿐, 그 CSV는 분석 검색 입력이 아니다.
 
+농촌진흥청 `rda_regional_specialty_crops`는 정책 원문의 복합 작목명을 그대로
+검색하며 NICE류는 식품 관련류 fallback을 쓴다. 지역 귀속은 공식 지정 범위인
+도 단위로만 판정하고, 원문에 없는 시군구를 추정하지 않는다(#117).
+
 2026-08-10 과거 연결 검증 결과: 입력 3건, 요청 성공 3건, 오류 0건, 출원번호 조인 3건,
 `regionalBrandMatch=inside` 3건이었다. 쿼리 1건은 첫 페이지 상한 때문에 `partial`이며 데이터
 오류가 아니다. 당시 브랜드명 검색 산출물은 연결 가능성 확인용으로만 보존하며 특산품 통계나

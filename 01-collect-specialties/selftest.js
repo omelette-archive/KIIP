@@ -47,6 +47,7 @@ const {
   makeStoredRecords,
   sourceRecordKey,
 } = require("./lib/collectionStore");
+const { collectRegionalSpecialtyCrops } = require("./lib/rdaRegionalSpecialtyCrops");
 
 function ok(label) {
   console.log(`  ok - ${label}`);
@@ -724,6 +725,20 @@ async function run() {
       store.close();
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
+  }
+
+  console.log("\n16) 농촌진흥청 지역특화작목 69개 공식 수집원");
+  {
+    const collected = collectRegionalSpecialtyCrops();
+    assert.strictEqual(collected.rows.length, 69);
+    assert.deepStrictEqual(
+      Object.fromEntries(Object.entries(collected.document.counts).filter(([key]) => key !== "total")),
+      { 대표작목: 9, 집중육성작목: 18, 자체육성작목: 42 }
+    );
+    assert.ok(collected.rows.some((row) => row.sido === "경기도" && row.rawItemName === "선인장·다육식물"));
+    assert.ok(collected.rows.some((row) => row.sido === "제주특별자치도" && row.rawItemName === "키위"));
+    assert.ok(collected.rows.every((row) => row.sigungu === "" && row.sourceScope === "province_policy_specialty"));
+    ok("69개 전량과 도 단위 정책 범위를 보존");
   }
 
   console.log("\n모든 자체 테스트 통과");

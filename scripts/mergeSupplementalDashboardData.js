@@ -6,12 +6,14 @@ const fs = require("fs");
 const path = require("path");
 const { analyzeEntries } = require("../04-analyze-brand/lib/analyzer");
 const { buildDashboardSnapshot } = require("../07-dashboard/lib/snapshot");
+const { attachRegionalSpecialtyCropBadges } = require("./attachRegionalSpecialtyCropBadges");
 
 const SUPPLEMENTAL_SOURCE_IDS = new Set([
   "nfqs_quality_cert",
   "nfqs_geographical_indication",
   "kofpi_forest_product",
   "forest_product_production_survey",
+  "rda_regional_specialty_crops",
 ]);
 
 function readJson(file) {
@@ -307,10 +309,13 @@ function main() {
   const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
   const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r3-enriched.json");
   const nfqsGeoMatchPath = path.join(root, "03-match-trademarks", "output", "nfqs-geo-live-20260826-v2-enriched.json");
+  const rdaCropMatchPath = path.join(root, "03-match-trademarks", "output", "rda-regional-specialty-crops-20260826-enriched.json");
   const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
+  const rdaCropPath = path.join(root, "02-normalize-items", "data", "regional-specialty-crops-2025.json");
   const base = readJson(basePath);
-  const document = combineMatchDocuments([readJson(matchPath), readJson(nfqsGeoMatchPath)]);
+  const document = combineMatchDocuments([readJson(matchPath), readJson(nfqsGeoMatchPath), readJson(rdaCropMatchPath)]);
   const forestRegionEvidence = readJson(forestRegionPath);
+  const rdaCropReference = readJson(rdaCropPath);
   const sourceInputRowCount = document.inputCount;
   const nfqsFacilityRegionItemKeys = collectNfqsFacilityRegionItemKeys(document);
 
@@ -419,6 +424,16 @@ function main() {
       `신규 수산·임산 KIPRIS 검색은 최대 750페이지·필터 통과 3,000건 범위로 재수집하고 출원인 주소 ${document.applicationApplicantEnrichment?.completeApplicationCount || 0}건을 보강했습니다. 범위 상한에 도달한 일반어는 부분 수집으로 계속 표시합니다.`,
     ]),
     regions,
+  };
+  const rdaCropCoverage = attachRegionalSpecialtyCropBadges(merged, rdaCropReference);
+  merged.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops = {
+    officialCount: rdaCropReference.counts.total,
+    representativeCount: rdaCropReference.counts["대표작목"],
+    intensiveCount: rdaCropReference.counts["집중육성작목"],
+    selfDirectedCount: rdaCropReference.counts["자체육성작목"],
+    dashboardBadgeCount: rdaCropCoverage.matched,
+    regionalScope: "province",
+    liveVerifiedAt: "2026-08-26",
   };
   fs.writeFileSync(basePath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
   console.error(`[mergeSupplementalDashboardData] regions=${regionalRegions.length}, regionalItems=${regionalItemCount}, nationwideCatalogItems=${nationwideCatalogItemCount}, snapshot=${merged.snapshotId}`);

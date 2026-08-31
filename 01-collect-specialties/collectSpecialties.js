@@ -17,6 +17,7 @@
  *   seogwipo_grandculture_specialties 디지털서귀포문화대전 특산물 검증 스냅샷
  *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요)
  *   nfqs_geographical_indication 국립수산물품질관리원 지리적표시수산물(NFQS_GEO_API_KEY 필요)
+ *   rda_regional_specialty_crops 농촌진흥청 2025 지역특화작목 69개 공식 목록
  * API 소스는 제공기관 활용신청 승인이 필요하다. 키가 없으면 해당 API 소스만
  * 건너뛰고 경고를 남기며, 공식 검증 스냅샷은 인증 없이 함께 적재한다.
  */
@@ -30,6 +31,7 @@ const { createClient: createNongsaroClient } = require("./lib/nongsaroClient");
 const { createClient: createNfqsClient } = require("./lib/nfqsClient");
 const { createClient: createNfqsGeoClient } = require("./lib/nfqsGeoClient");
 const { createClient: createKofpiClient } = require("./lib/kofpiClient");
+const { collectRegionalSpecialtyCrops } = require("./lib/rdaRegionalSpecialtyCrops");
 const {
   fromGiRegistrations,
   fromNongsaro,
@@ -48,7 +50,7 @@ loadEnv();
 
 function parseArgs(argv) {
   const args = {
-    sources: "gi,nongsaro,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
+    sources: "gi,nongsaro,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,rda_regional_specialty_crops,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -280,6 +282,25 @@ async function collectKofpi(_adminList, warnings, options = {}) {
   }
 }
 
+async function collectRdaRegionalSpecialtyCrops(_adminList, warnings, options = {}) {
+  try {
+    const collected = collectRegionalSpecialtyCrops({ limit: options.limit });
+    const rows = addSourceMetadata(collected.rows, options.sourceDefinition);
+    warnings.push(
+      `rda_regional_specialty_crops: ${rows.length}개 공식 작목을 도 단위 지역 특산품으로 수집`
+    );
+    return {
+      rows,
+      rawRecords: makeStoredRecords("rda_regional_specialty_crops", collected.rawRecords, rows),
+      succeeded: true,
+      requestCount: 0,
+    };
+  } catch (err) {
+    warnings.push(`rda_regional_specialty_crops 소스 건너뜀: ${err.message}`);
+    return { rows: [], rawRecords: [], succeeded: false, requestCount: 0, error: err.message };
+  }
+}
+
 const OFFICIAL_SUPPLEMENT_PATHS = {
   sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
   jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
@@ -317,6 +338,7 @@ const COLLECTORS = {
   nfqs_quality_cert: collectNfqs,
   nfqs_geographical_indication: collectNfqsGeographicalIndications,
   kofpi_forest_product: collectKofpi,
+  rda_regional_specialty_crops: collectRdaRegionalSpecialtyCrops,
 };
 
 async function main() {

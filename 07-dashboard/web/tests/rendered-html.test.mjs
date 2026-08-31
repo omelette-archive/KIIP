@@ -779,15 +779,18 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /지역 출원 미확인|function gapsScreen\(\)|id="gap-search"/);
   assert.match(html, /미출원\(검토중\)/);
   assert.match(html, /특화작목 비교/);
-  assert.match(html, /class="compare-readiness"/);
-  assert.match(html, /비교 기준 원본 확보 전 · 준비 현황만 확인 가능/);
-  assert.match(html, /지역별 특산품 출원 현황/);
-  assert.match(html, /전체 특산품 출원율/);
-  assert.doesNotMatch(html, /판정 완료분 출원율/);
-  assert.match(html, /전체 \$\{coverage\.total\}개 중 출원 확인 \$\{coverage\.applied\}개/);
-  assert.doesNotMatch(html, /\$\{coverage\.applied\}\/\$\{coverage\.decided\}/);
-  assert.match(html, /원본 대기/);
+  assert.doesNotMatch(html, /class="compare-readiness"/);
+  assert.match(html, /공식 원본 반영 완료/);
+  assert.match(html, /등급별 특화작목 출원 현황/);
+  assert.match(html, /대표작목 9 · 집중육성작목 18 · 자체육성작목 42/);
+  assert.match(html, /주소 일치 출원 1건 이상/);
+  assert.match(html, /policyCrops\.length/);
+  assert.doesNotMatch(html, /비교 기준 원본 확보 전|원본 대기/);
   assert.doesNotMatch(html, /class="compare-grid"/);
+  // 이슈 #117(2026-08-26): 대표작목이 실제 등록 상표 TOP5 안에 있는지 대조하는 헤드라인 표.
+  assert.match(html, /class="compare-flagship-section"/);
+  assert.match(html, /도별 대표작목 vs 실제 등록 상표 TOP5/);
+  assert.match(html, /compare-flagship-match|compare-flagship-mismatch/);
   assert.match(html, /데이터 개요/);
   assert.match(html, /수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다\./);
   assert.match(html, /고유 특산품명/);

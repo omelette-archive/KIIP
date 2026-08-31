@@ -171,6 +171,7 @@ function makeBatchQuery(row, options = {}) {
     "nfqs_quality_cert",
     "nfqs_geographical_indication",
     "kofpi_forest_product",
+    "rda_regional_specialty_crops",
   ].includes(row.sourceId)) {
     const item = String(row.itemName || row.rawItemName || "").trim();
     if (!item) return { skipReason: "공식 수집원 품목명 없음" };
