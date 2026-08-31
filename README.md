@@ -20,14 +20,41 @@
 
 ```mermaid
 flowchart LR
-    A[공식 특산품·정책 목록] --> B[품목·지역 정규화]
-    B --> C[KIPRIS 상표 검색]
-    C --> D[출원인 주소·등록원부 보강]
-    D --> E[지역 브랜드 활동·공백]
-    C --> F[전국 원물·가공품·서비스 흐름]
-    E --> G[대시보드·전략 후보]
-    F --> G
+    P1["① 특산품 수집"] --> P2["② 품목 표준화"]
+    P2 --> P3["③ 상표 매칭"]
+    P3 --> P4["④ 브랜드 분석"]
+    P4 --> P5["⑤ 브랜드 공백 발굴"]
+    P5 --> P6["⑥ 비즈니스 전략 제안"]
+    P3 --> P8["전국 원물·가공품·서비스 흐름"]
+    P4 --> P7["⑦ 대시보드"]
+    P5 --> P7
+    P6 --> P7
+    P8 --> P7
+
+    classDef done fill:#1baf7a,stroke:#199e70,color:#fff
+    classDef partial fill:#eda100,stroke:#c98500,color:#fff
+    class P1 done
+    class P2 partial
+    class P3 done
+    class P4 done
+    class P5 done
+    class P6 partial
+    class P7 done
+    class P8 partial
 ```
+
+🟢 핵심 구현 완료 &nbsp;&nbsp; 🟡 진행중(일부 정책·자동화 남음)
+
+| # | 단계 | 폴더 | 상태 | 한 줄 요약 |
+|---|---|---|---|---|
+| ① | 특산품 수집 | [`01-collect-specialties/`](01-collect-specialties/) | 🟢 | GI·농사로·NFQS·지자체·농촌진흥청 지역특화작목(69개) 등 공식 출처 연동. 정기 자동 실행은 미구축([#70](https://github.com/omelette-archive/KIIP/issues/70)) |
+| ② | 품목 표준화 | [`02-normalize-items/`](02-normalize-items/) | 🟡 | 고시상품명칭·NICE류 대조로 자동 확정하고, 애매한 원물명은 검토대기로 남기는 방식을 유지하기로 확정([#51](https://github.com/omelette-archive/KIIP/issues/51)) |
+| ③ | 상표 매칭 | [`03-match-trademarks/`](03-match-trademarks/) | 🟢 | KIPRIS 검색 + 출원번호·등록번호 두 경로 주소·지정상품 보강, 호출 예산·캐시([#52](https://github.com/omelette-archive/KIIP/issues/52)), 권리존속기간 만료예정일 기반 재검증([#81](https://github.com/omelette-archive/KIIP/issues/81)) |
+| ④ | 브랜드 분석 | [`04-analyze-brand/`](04-analyze-brand/) | 🟢 | 지역 귀속이 검증된 상표만 집계하고, 미검증 hit는 지표 자체를 차단 |
+| — | 전국 사업 확장 흐름 | [`04-analyze-brand/`](04-analyze-brand/) | 🟡 | 176개 품목을 원물→가공품→서비스로 분류하고, 원물 단계 출원인이 생산자형으로 확인된 품목만 지역 군집을 노출([#110](https://github.com/omelette-archive/KIIP/issues/110)) |
+| ⑤ | 브랜드 공백 발굴 | [`05-detect-brand-gap/`](05-detect-brand-gap/) | 🟢 | 대표 특산품 인정 기준을 지리적표시 또는 지역 귀속 출원 1건 이상으로 확정([#29](https://github.com/omelette-archive/KIIP/issues/29)). 활동량 포화 건수·가중치는 아직 예시값 |
+| ⑥ | 비즈니스 전략 제안 | [`06-generate-business-strategy/`](06-generate-business-strategy/) | 🟡 | ⑥-1 고정 템플릿 문장 생성 완료(생성형 AI 미사용), ⑥-2 개별 AI 검토는 사람이 승인하기 전까지 자동 반영되지 않는 별도 흐름 |
+| ⑦ | 대시보드 | [`07-dashboard/`](07-dashboard/) | 🟢 | 행정구역 경계 지도 연결([#80](https://github.com/omelette-archive/KIIP/issues/80)), 지역특화작목 대조·전국 사업 확장 흐름 카드 반영 |
 
 분석은 서로 섞지 않는 두 트랙으로 운영한다.
 
