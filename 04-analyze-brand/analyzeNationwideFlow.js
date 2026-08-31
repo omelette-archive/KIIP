@@ -16,6 +16,7 @@ const {
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
+  rawSignalConfidence,
 } = require("./lib/nationwideFlow");
 
 const SCHEMA_VERSION = "nationwide-business-flow-v1-pilot";
@@ -114,6 +115,9 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
     collectionStatus: collected.collectionStatus,
     stopReason: collected.stopReason,
     fetchedAt: new Date().toISOString(),
+    // 176개 파일럿 실측(2026-08-27, #110) 결과 23%만 상위 출원인이 실제 생산자형이었다.
+    // "uncertain"인 품목은 소비 측(대시보드 등)에서 클러스터 서술을 노출하면 안 된다.
+    rawSignalConfidence: mode === "craft" ? "not_applicable" : rawSignalConfidence(stageSummary.raw?.topApplicants),
     stages: stageSummary,
   };
 }

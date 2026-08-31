@@ -72,6 +72,34 @@ function aggregateHits(hits, coreTerm, mode = "agri") {
   return stages;
 }
 
+// 파일럿 176개 품목 실측(2026-08-27) 결과, "원물 단계 상위 출원인 = 그 지역이 산지"라는
+// 해석이 23%(41/176)에서만 신뢰할 만했다. 나머지는 상표 브로커(여러 무관 품목에 걸쳐
+// 다량 출원하는 개인), 대기업의 방어적 다류 출원(예: "감"·"감자"의 주식회사농심),
+// 외국 기업의 우연한 이름 일치(예: "고사리"의 하인즈)가 상위를 차지했다(#110 파일럿
+// 코멘트 참고). 이 휴리스틱은 상위 출원인이 지자체·생산자단체·영농조합법인·협동조합처럼
+// 실제 생산 주체로 보이는지만 걸러낸다 — 대시보드에는 이 신호가 확인된 품목만 클러스터
+// 서술을 노출하고, 나머지는 단계별 건수만 보여주거나 아예 노출하지 않는다.
+const PRODUCER_HINTS = ["영농조합", "농업회사법인", "협동조합", "생산자", "작목반", "축협", "수협", "산림조합", "농협"];
+const ADMIN_BODY_SUFFIX_RE = /(시|군|구|도)$/;
+const CORP_HINTS = ["주식회사", "(주)", "㈜", "컴퍼니", "코퍼레이션", "Inc", "Corp"];
+function isProducerLikeApplicant(name) {
+  if (!name) return false;
+  if (PRODUCER_HINTS.some((h) => name.includes(h))) return true;
+  // 지자체 단독 표기(예: "강화군", "청송군", "경기도 여주시") — 회사명과 헷갈리지 않게
+  // 길이를 짧게 제한하고 "주식회사" 류 표기가 섞이면 제외한다.
+  if (ADMIN_BODY_SUFFIX_RE.test(name) && name.length <= 10 && !CORP_HINTS.some((h) => name.includes(h))) return true;
+  return false;
+}
+
+/**
+ * 품목 하나의 stages(raw/processed/service)를 보고 클러스터 서술을 노출해도 될지 판단한다.
+ * 원물 단계 상위 출원인이 생산자형이면 "producer_confirmed", 아니면 "uncertain".
+ */
+function rawSignalConfidence(rawTopApplicants) {
+  const top = rawTopApplicants?.[0];
+  return top && isProducerLikeApplicant(top.applicant) ? "producer_confirmed" : "uncertain";
+}
+
 function topApplicantsByStage(stageHits, limit = 5) {
   const byApplicant = new Map();
   for (const hit of stageHits) {
@@ -169,6 +197,8 @@ module.exports = {
   classifyGoodsTitle,
   classifyHitStage,
   aggregateHits,
+  isProducerLikeApplicant,
+  rawSignalConfidence,
   topApplicantsByStage,
   collectNationwideHits,
   resolveApplicantRegion,

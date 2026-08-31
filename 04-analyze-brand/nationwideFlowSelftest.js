@@ -12,6 +12,8 @@ const {
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
+  isProducerLikeApplicant,
+  rawSignalConfidence,
 } = require("./lib/nationwideFlow");
 
 function ok(label) {
@@ -184,6 +186,26 @@ async function runNationwideFlowTests() {
     assert.ok(!terms.includes("도자기")); // 공예품은 농수임산물이 아니므로 제외
     assert.ok(!terms.includes("미확정품목")); // matchingBasis 미확정은 제외
     ok("브랜드 수식어 병합, 복합 표시명 분리, 공예품·미확정 품목 제외가 모두 동작함");
+  }
+
+  console.log("11) isProducerLikeApplicant/rawSignalConfidence — 176개 파일럿 실측 기반 신뢰도 필터");
+  {
+    assert.ok(isProducerLikeApplicant("해남고구마생산자협회"));
+    assert.ok(isProducerLikeApplicant("풍기인삼협동조합"));
+    assert.ok(isProducerLikeApplicant("괴산대학찰옥수수영농조합법인"));
+    assert.ok(isProducerLikeApplicant("청송군"));
+    assert.ok(isProducerLikeApplicant("경기도 여주시"));
+    assert.ok(!isProducerLikeApplicant("주식회사농심"));
+    assert.ok(!isProducerLikeApplicant("이랜드리테일"));
+    assert.ok(!isProducerLikeApplicant("이석열")); // 여러 무관 품목에 걸쳐 나타난 개인 다량 출원인(#110 실측)
+    assert.ok(!isProducerLikeApplicant("에취.제이.헤인즈캄파니"));
+    ok("생산자단체·영농조합법인·협동조합·지자체 단독표기만 생산자형으로 인정, 대기업·개인·외국사는 제외");
+
+    assert.strictEqual(rawSignalConfidence([{ applicant: "청송군" }]), "producer_confirmed");
+    assert.strictEqual(rawSignalConfidence([{ applicant: "주식회사농심" }]), "uncertain");
+    assert.strictEqual(rawSignalConfidence([]), "uncertain");
+    assert.strictEqual(rawSignalConfidence(undefined), "uncertain");
+    ok("원물 단계 1위 출원인이 생산자형일 때만 producer_confirmed, 데이터 없으면 보수적으로 uncertain");
   }
 
   console.log("\n모든 nationwideFlow 자체 검증 통과.");
