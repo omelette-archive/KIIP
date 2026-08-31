@@ -203,6 +203,24 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const fillCircle = value === null ? "" : `<circle class="rate-ring-fill" cx="${center}" cy="${center}" r="${radius}" stroke-width="${strokeWidth}" fill="none" stroke-dasharray="${circumference}" stroke-dashoffset="${offset}" stroke-linecap="round" transform="rotate(-90 ${center} ${center})"></circle>`;
     return `<svg class="rate-ring" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" role="img" aria-label="${esc(label)} ${esc(percent(value))}"><circle class="rate-ring-track" cx="${center}" cy="${center}" r="${radius}" stroke-width="${strokeWidth}" fill="none"></circle>${fillCircle}<text class="rate-ring-label" x="50%" y="50%" text-anchor="middle" dominant-baseline="middle">${esc(percent(value))}</text></svg>`;
   };
+  // 이슈 #116/#74/#110(2026-08-27): 품목명을 전국·전류로 검색한 원물→가공품→서비스 단계별
+  // 상표 활동. 지역 통계와 분리된 참고 지표이며, 원물 단계 상위 출원인이 생산자형으로
+  // 확인된 품목에만 attachNationwideBusinessFlow.js가 붙여둔다. Dashboard.tsx의
+  // NationwideFlowCard와 동일 구조 — 화면에는 "AI 판정" 표시를 넣지 않는다(사용자 결정).
+  const FLOW_STAGE_LABELS = { raw: "원물", processed: "가공품", service: "서비스·확장" };
+  const nationwideFlowCardHtml = (flow, itemLabel) => {
+    const { raw, processed, service } = flow.stages;
+    const otherRegion = [processed.topRegion, service.topRegion].filter((region) => region && region !== raw.topRegion)[0];
+    const clusterNote = raw.topRegion && otherRegion
+      ? `<p class="nationwide-flow-note">${esc(raw.topRegion)}에서 원물 활동이 가장 활발하고, ${esc(otherRegion)}에서 가공·서비스 활동이 두드러집니다.</p>`
+      : "";
+    const stagesHtml = ["raw", "processed", "service"].map((key, index) => `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(flow.stages[key].count)}건</strong>${flow.stages[key].topRegion ? `<small>${esc(flow.stages[key].topRegion)}</small>` : ""}</div>`).join("");
+    return `<section class="nationwide-flow-card">
+      <div class="section-heading"><div><h2>${esc(itemLabel)} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
+      <div class="nationwide-flow-stages">${stagesHtml}</div>
+      ${clusterNote}
+    </section>`;
+  };
   // 이슈 #116(2026-08-26) 사용자 재요청: 상태 아이콘·배지, 근거 수치 스탯 줄, 문장별 도트
   // 마커로 가독성을 높였다 — Dashboard.tsx의 BusinessStrategyCard와 동일 구조.
   const businessStrategyCardHtml = (briefing, title, footerHtml = "") => {
@@ -447,6 +465,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
         <article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
+      ${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
       ${item.briefing && item.briefing.sentences.length > 0 ? businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략") : ""}
       <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="출원번호가 클립보드에 복사됩니다 · KIPRIS 상표 검색창에 붙여넣으세요" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;

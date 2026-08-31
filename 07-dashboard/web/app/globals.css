@@ -372,6 +372,18 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .kipris-link:hover { background: var(--green-soft); }
 /* 이슈 #116(2026-08-26): ⑥단계 품목별 비즈니스 확장 전략 브리핑을 지역별 상표 출원 탭의
    품목 상세 카드에 노출한다. 공백 알림(isGapAlert)은 amber 톤으로 강조한다. */
+/* 이슈 #116/#74/#110(2026-08-27): 품목 전국 상표 흐름(원물→가공품→서비스) 참고 카드. */
+.nationwide-flow-card { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); box-shadow: var(--shadow); }
+.nationwide-flow-stages { display: flex; align-items: stretch; gap: 8px; margin-top: 14px; }
+.nationwide-flow-stage { flex: 1; min-width: 0; padding: 14px 12px; border-radius: 12px; background: var(--panel); }
+.nationwide-flow-stage span, .nationwide-flow-stage strong, .nationwide-flow-stage small { display: block; }
+.nationwide-flow-stage span { color: var(--muted); font-size: 11px; font-weight: 800; }
+.nationwide-flow-stage strong { margin-top: 6px; font-size: 18px; letter-spacing: -.01em; }
+.nationwide-flow-stage small { margin-top: 4px; color: var(--faint); font-size: 10.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nationwide-flow-stage-processed { background: var(--amber-soft); }
+.nationwide-flow-stage-service { background: #eef1fb; }
+.nationwide-flow-arrow { flex-shrink: 0; align-self: center; color: var(--faint); font-style: normal; font-size: 16px; }
+.nationwide-flow-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.6; }
 .business-strategy { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
 .business-strategy.alert { border-color: #e2c59b; background: var(--amber-soft); }
 .strategy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }

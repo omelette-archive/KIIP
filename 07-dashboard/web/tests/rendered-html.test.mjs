@@ -807,4 +807,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /source-group/);
   assert.doesNotMatch(html, /data-trend-preset=|추이 그래프 기간 프리셋/);
   assert.match(html, /dashboardClient\(/);
+  // 이슈 #116/#74/#110(2026-08-27): 품목 전국 상표 흐름 카드 — 근사치 caveat는 화면에
+  // "AI 판정" 같은 표시로 노출하지 않는다(사용자 결정, 기존 itemVerdict 칩과는 무관).
+  assert.match(html, /class="nationwide-flow-card"/);
+  assert.match(html, /비즈니스 확장 흐름/);
+  assert.match(html, /nationwideFlowCardHtml/);
 });

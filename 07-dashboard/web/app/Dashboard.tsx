@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { Fragment, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
@@ -11,7 +11,9 @@ type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
-type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null };
+type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
@@ -332,6 +334,35 @@ function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: 
 // 이슈 #116(2026-08-26) 사용자 재요청: 비즈니스 전략 문장이 그냥 줄글이라 가독성이
 // 떨어진다는 지적 — 상태 아이콘·배지, 근거 수치(고유 상표·등록률·지역외 비중)를 문장 위에
 // 먼저 보여주는 요약 스탯 줄, 문장별 도트 마커로 시각적 앵커를 추가했다.
+// 이슈 #116/#74/#110(2026-08-27): 품목명을 전국·전류로 검색해 원물→가공품→서비스 단계별
+// 상표 활동을 보여준다. 지역 통계와는 완전히 분리된 참고 지표이며, 원물 단계 상위 출원인이
+// 생산자형으로 확인된 품목(rawSignalConfidence=producer_confirmed, 37/176)에만 붙어있다
+// (scripts/attachNationwideBusinessFlow.js). 근사치라는 caveat는 GitHub 이슈·코드 주석에만
+// 남기고 화면에는 "AI 판정" 같은 표시를 노출하지 않는다(사용자 결정, 2026-08-27).
+const FLOW_STAGE_LABELS: Record<"raw" | "processed" | "service", string> = { raw: "원물", processed: "가공품", service: "서비스·확장" };
+function NationwideFlowCard({ flow, itemLabel }: { flow: NationwideFlow; itemLabel: string }) {
+  const { raw, processed, service } = flow.stages;
+  const clusterNote = raw.topRegion && (processed.topRegion || service.topRegion) &&
+    (processed.topRegion !== raw.topRegion || service.topRegion !== raw.topRegion)
+    ? `${raw.topRegion}에서 원물 활동이 가장 활발하고, ${[processed.topRegion, service.topRegion].filter((region) => region && region !== raw.topRegion)[0]}에서 가공·서비스 활동이 두드러집니다.`
+    : null;
+  return (
+    <section className="nationwide-flow-card">
+      <div className="section-heading"><div><h2>{itemLabel} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
+      <div className="nationwide-flow-stages">
+        {(["raw", "processed", "service"] as const).map((key, index) => <Fragment key={key}>
+          {index > 0 && <i className="nationwide-flow-arrow" aria-hidden="true">→</i>}
+          <div className={`nationwide-flow-stage nationwide-flow-stage-${key}`}>
+            <span>{FLOW_STAGE_LABELS[key]}</span>
+            <strong>{number(flow.stages[key].count)}건</strong>
+            {flow.stages[key].topRegion && <small>{flow.stages[key].topRegion}</small>}
+          </div>
+        </Fragment>)}
+      </div>
+      {clusterNote && <p className="nationwide-flow-note">{clusterNote}</p>}
+    </section>
+  );
+}
 function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBriefing; title: string; footer?: ReactNode }) {
   const evidence = briefing.evidence;
   const hasStats = evidence && (
@@ -886,6 +917,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
       <article><span>등록 건수</span><strong>{regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
+    {item.businessFlow && <NationwideFlowCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
     {item.briefing && item.briefing.sentences.length > 0 && <BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" />}
     <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{giMarkLabel(example.applicationNumber) && <span className="gi-mark-chip">{giMarkLabel(example.applicationNumber)}</span>}{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" title="출원번호가 클립보드에 복사됩니다 · KIPRIS 상표 검색창에 붙여넣으세요" onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;
