@@ -183,11 +183,13 @@ test("uses every collected region-item specialty as the application-rate denomin
     .reduce((sum, region) => sum + region.items.length, 0);
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
   assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
-  assert.equal(coverage.total, 1736);
-  assert.equal(coverage.decided, 1648);
-  assert.equal(coverage.applied, 1027);
-  assert.equal(coverage.pending, 88);
-  assert.equal(Math.round(coverage.rate * 100), 59);
+  // 2026-08-31(#117): 농촌진흥청 지역특화작목 69개(대표작목 포함)를 도 단위 공식
+  // 특산품으로 병합(scripts/mergeSupplementalDashboardData.js)해 분모가 1736->1805로 늘었다.
+  assert.equal(coverage.total, 1805);
+  assert.equal(coverage.decided, 1688);
+  assert.equal(coverage.applied, 1042);
+  assert.equal(coverage.pending, 117);
+  assert.equal(Math.round(coverage.rate * 100), 58);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   assert.match(visibleTextHtml, new RegExp(`전체 ${localeNumber(coverage.total)}개 중 확인 ${localeNumber(coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
@@ -295,7 +297,14 @@ test("renders tab navigation and separate application/registration ranking table
   // 조인 검증용일 뿐 대표 특산품이 아니다. 각 랭킹이 실제로 해당 지표(출원 확인 건수 /
   // 등록 완료 건수) 내림차순으로 정렬되는지 확인한다. 단, 지역 귀속이 막힌 스냅샷이면
   // 전국 검색 후보로 억지 순위를 만들지 않고 빈 랭킹을 유지해야 한다(#50).
-  const rankingCandidates = snapshot.regions.flatMap((region) => region.items.map((item) => ({ region, item })));
+  // Dashboard.tsx의 랭킹은 officialItemLabel(item)이 있는 행만 후보로 쓴다(matchingBasis가
+  // notice_name_and_nice_class 또는 raw_item_goods_matched인 확정 품목만) — 고시명칭이
+  // 미확정인 raw_item_name_unclassified 행(예: 지역특화작목 도 단위 원물명 검색, #117)은
+  // 상표 건수가 커도 화면 랭킹에서 제외되므로 테스트도 같은 조건으로 걸러야 한다.
+  const OFFICIAL_MATCHING_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
+  const rankingCandidates = snapshot.regions
+    .flatMap((region) => region.items.map((item) => ({ region, item })))
+    .filter(({ item }) => OFFICIAL_MATCHING_BASES.has(item.matchingBasis));
   const checkFirstRow = (firstRow, ranking) => {
     if (ranking) {
       assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
@@ -371,7 +380,9 @@ test("ships a valid dashboard snapshot", async () => {
   // 1,617 -> 1,761. 지역 정보가 없는 KOFPI 90건("전국" 의사 지역)은 지역별 통계
   // 성격의 이 필드에서 제외한다 — scripts/auditDashboardSnapshot.js가 정확히 이
   // "전국 제외" 기준으로 검증한다(catalogItemCount는 전국 포함 원본 전체). #114)
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1648);
+  // 2026-08-31(#117): 농촌진흥청 지역특화작목 69개를 도 단위 공식 특산품으로 병합해
+  // 1648->1688, catalogItemCount 1868->1937로 늘었다.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1688);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -382,24 +393,34 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_geographical_indication"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
-  assert.equal(snapshot.coverage.catalogItemCount, 1868);
+  assert.equal(snapshot.coverage.catalogItemCount, 1937);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 132);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 155);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 127);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 28);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 3234);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 68435);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 68435);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 217);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 166);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 51);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 4730);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 106516);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 106516);
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.nfqsGeographicalIndication, {
     registeredCount: 24,
     regionalizedCount: 23,
     regionReviewCount: 1,
     liveVerifiedAt: "2026-08-26",
   });
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 10);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 37713);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 13);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 56487);
+  // 이슈 #117(2026-08-31): 농촌진흥청 지역특화작목 69개 공식 수집원 병합 메타데이터.
+  assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops, {
+    officialCount: 69,
+    representativeCount: 9,
+    intensiveCount: 18,
+    selfDirectedCount: 42,
+    dashboardBadgeCount: 170,
+    regionalScope: "province",
+    liveVerifiedAt: "2026-08-26",
+  });
   const nationwideCatalogItems = snapshot.regions.filter((region) => region.sido === "전국")
     .flatMap((region) => region.items);
   assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
@@ -451,7 +472,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1675, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1715, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
