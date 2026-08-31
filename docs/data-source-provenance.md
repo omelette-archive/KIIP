@@ -47,7 +47,8 @@
 | `kipris-trademark-applicant-region-v2-aliases` | 출원 속보 `applicantAddress`를 법정동코드 마스터와 승인된 행정구역 별칭으로 정규화 | 등록번호가 없는 출원도 출원번호로 조회. 복수·미매칭은 `unverified`; 캐시에는 전체 주소가 아닌 정규화 지역만 저장 |
 | `ip-registry-designated-goods-v0-review` | 지정상품과 검색 품목을 문자 정규화 후 exact/contains/class-only/mismatch로 분리 | exact만 확정 근거. contains/class-only는 #12 확정 전 검토 후보이며 합계에서 자동 제외하지 않음 |
 | `brand-analysis-v2-regional-brand-separated` | 출원인 주소와 지역브랜드 연관성을 별도 집계 | `localApplicantShare`에는 출원인 주소만 사용. 농사로 근거는 `regionalBrand*` 지표로만 제공 |
-| `gap-score-v1-representative-gi-or-count3` | 대표 특산품: GI 출처 또는 상표 출원 3건 이상(OR). 활동량 0.7·등록률 0.3 | 대표 특산품 판정은 #29에서 확정(2026-08-11). 활동량 포화 건수·가중치는 아직 파이프라인 검증용 예시이며 #29 잔여 범위에서 확정 예정 |
+| `gap-score-v1-representative-gi-or-count3` | 대표 특산품: GI 출처 또는 상표 출원 3건 이상(OR). 활동량 0.7·등록률 0.3 | 대표 특산품 판정은 #29에서 확정(2026-08-11, 이후 v3에서 1건으로 완화). 활동량 포화 건수·가중치는 아직 파이프라인 검증용 예시이며 #29 잔여 범위에서 확정 예정 |
+| `gap-score-v3-representative-count1` | 대표 특산품: GI 출처 또는 상표 출원 **1건 이상**(OR, 3건에서 완화). 활동량 0.7·등록률 0.3 | 2026-08-26 `scripts/compareRepresentativeThresholds.js` 실측(3건 639개 vs 1건 1,027개 대표 특산품, 신규 388개 중 237개가 단발 1건 표본)을 근거로 2026-08-31 완화 확정 |
 | `strategy-template-v0-example` | ⑤ 근거 수치만 고정 템플릿으로 문장화 | AI가 사실·점수를 만들지 않게 재현 가능한 초안을 먼저 생성. 개별 AI 검토는 #16의 별도 기록 |
 | `review-selection-v1` | ⑥-2 검토 대상: `collectionPartial` 또는 `regionMatchVerified=false`(OR), 상한 `limit`(기본 20)건 | #16에서 확정(2026-08-11). 근거가 이미 검증된 briefing은 사람이 다시 볼 필요가 없다는 판단. `gapScore` 내림차순으로 결정론적으로 자름 |
 

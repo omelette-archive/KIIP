@@ -3,16 +3,19 @@
  * ④의 지역×품목 집계만 입력으로 받는 결정론적 브랜드 공백 점수 계산. 생성형 AI를 쓰지
  * 않으며(이슈 #16), 동일 입력에는 항상 동일 점수를 낸다.
  *
- * "대표 특산품" 판정 기준은 2026-08-11 #29에서 확정됐다: GI 출처 등록 또는 상표 출원
- * 3건 이상(OR) — GI 미등록이어도 출원 활동이 활발한 품목을 놓치지 않기 위함이다. 활용도
- * 포화 건수·가중치는 아직 업무 확정 전 예시값이며, 실제 기준이 정해지면 이 파일만 바꾸면
- * 된다. 산출물의 scoreVersion을 보면 어떤 기준으로 나온 점수인지 항상 구분할 수 있다.
+ * "대표 특산품" 판정 기준은 2026-08-11 #29에서 GI 출처 등록 또는 상표 출원 3건 이상(OR)으로
+ * 처음 확정됐고, 2026-08-26 `compareRepresentativeThresholds.js` 실측(전체 카탈로그 1,868개
+ * 지역×품목 기준: 3건 639개 vs 1건 1,027개, 신규 388개 중 237개가 단발 1건 표본)을 근거로
+ * 2026-08-31 **1건 이상으로 완화 확정**했다 — 대표성 조건을 낮춰 공백 후보를 더 넓게 잡는
+ * 쪽을 택함(단발 표본이 늘어나는 트레이드오프는 감수). 활용도 포화 건수·가중치는 아직 업무
+ * 확정 전 예시값이며, 실제 기준이 정해지면 이 파일만 바꾸면 된다. 산출물의 scoreVersion을
+ * 보면 어떤 기준으로 나온 점수인지 항상 구분할 수 있다.
  */
 
-// 2026-08-11 #29에서 확정: ①단계 수집 출처가 지리적표시(GI) 등록이거나(OR),
+// 2026-08-31 #29에서 1건으로 완화 확정: ①단계 수집 출처가 지리적표시(GI) 등록이거나(OR),
 // REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD 이상의 상표 출원이 있으면 대표 특산품으로 본다.
 const REPRESENTATIVE_SOURCES = ["지리적표시"];
-const REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD = 3;
+const REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD = 1;
 
 // 예시 기준 — 상표 5건(고유 출원 기준) 이상이면 "활용도 충분"으로 간주해 activityScore가
 // 1(포화)에 도달하게 하는 임의 상한. 실측 근거 없는 잠정값이다.
@@ -23,7 +26,7 @@ const ACTIVITY_SATURATION_COUNT = 5;
 const ACTIVITY_WEIGHT = 0.7;
 const REGISTRATION_WEIGHT = 0.3;
 
-const GAP_SCORE_VERSION = "gap-score-v2-regional-address-gate";
+const GAP_SCORE_VERSION = "gap-score-v3-representative-count1";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();

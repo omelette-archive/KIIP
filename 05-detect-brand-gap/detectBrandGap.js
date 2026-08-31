@@ -43,7 +43,7 @@ function printUsageAndExit(message) {
       "",
       "옵션:",
       "  --out <path>   결과 JSON 저장 경로 (기본: 05-detect-brand-gap/output/gap.json)",
-      "  --representative-threshold <n>  대표 특산품 인정 최소 상표 건수(기본 3, #29 후속 비교 실험용)",
+      "  --representative-threshold <n>  대표 특산품 인정 최소 상표 건수(기본 1, #29 2026-08-31 확정 — 실험용으로 다른 값도 지정 가능)",
     ].join("\n")
   );
   process.exit(message ? 1 : 0);
@@ -51,9 +51,9 @@ function printUsageAndExit(message) {
 
 /**
  * @param {object} analysis ④단계 analyzeEntries() 출력
- * @param {{representativeThreshold?: number}} [options] #29 후속 비교 실험용 — 생략하면
- *   확정 기준(3건) 그대로다. 다른 값을 넘기면 scoreVersion에 값이 드러나 결과를 절대
- *   혼동하지 않는다(안전조건).
+ * @param {{representativeThreshold?: number}} [options] #29 2026-08-31 확정: 기본 1건.
+ *   생략하면 확정 기준(1건) 그대로다. 다른 값을 넘기면 scoreVersion에 값이 드러나 결과를
+ *   절대 혼동하지 않는다(안전조건, #29 후속 비교 실험 재현용으로 계속 지원).
  */
 function detectGaps(analysis, options = {}) {
   if (!analysis || !Array.isArray(analysis.regionItems)) {
@@ -106,8 +106,8 @@ function detectGaps(analysis, options = {}) {
     );
 
   const warnings = [
-    "대표 특산품 판정 기준(GI 출처 또는 상표 출원 3건 이상)은 #29에서 확정됐지만, 활용도 " +
-      "포화 건수·가중치는 아직 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 " +
+    "대표 특산품 판정 기준(GI 출처 또는 상표 출원 1건 이상)은 #29에서 2026-08-31 완화 확정됐다. " +
+      "활용도 포화 건수·가중치는 아직 예시값이다(scoreVersion 참고) — 실제 기준 확정 후 " +
       "05-detect-brand-gap/lib/scorer.js만 교체하면 된다.",
     "지역 상표 건수·등록률·공백 점수는 ③단계 --enrich-registry 주소 귀속과 검색 수집이 모두 " +
       "완료된 행만 계산한다. 미검증 전국 검색 hit는 nationwideSearchTrademarkCount 참고값으로만 보존한다.",
@@ -139,7 +139,7 @@ function detectGaps(analysis, options = {}) {
     methodology: {
       representativeBasis:
         `sources에 지리적표시가 포함되었거나 고유 상표 출원이 ${threshold}건 ` +
-        `이상인 지역×품목을 대표 특산품으로 인정(${isDefaultThreshold ? "#29 확정, 2026-08-11" : "#29 후속 비교 실험, 확정 기준 아님"})`,
+        `이상인 지역×품목을 대표 특산품으로 인정(${isDefaultThreshold ? "#29 확정, 2026-08-31" : "#29 후속 비교 실험, 확정 기준 아님"})`,
       activityBasis: "고유 상표 5건을 포화 1.0으로 정규화(예시 기준, 미확정)",
       weights: { activity: 0.7, registration: 0.3 },
       weightsConfirmed: false,
@@ -151,7 +151,7 @@ function detectGaps(analysis, options = {}) {
       designatedGoodsCriteriaIssue: "#12",
       rationale: "전국 검색 결과를 지역 활동량으로 오인하지 않도록 미검증 행의 점수를 차단",
       criteriaIssue: "#29",
-      lastUpdatedAt: "2026-08-11",
+      lastUpdatedAt: "2026-08-31",
     },
     warnings,
     rows,

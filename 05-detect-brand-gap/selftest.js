@@ -17,7 +17,7 @@ function ok(label) {
   console.log(`  ok - ${label}`);
 }
 
-console.log("1) isRepresentative — GI 출처 또는 상표 3건 이상(OR, #29 확정 기준)");
+console.log("1) isRepresentative — GI 출처 또는 상표 1건 이상(OR, #29 2026-08-31 확정 기준)");
 {
   assert.strictEqual(isRepresentative({ sources: ["지리적표시"] }), true, "GI 출처만으로도 대표");
   assert.strictEqual(isRepresentative({ sources: ["농사로"] }), false, "GI도 없고 상표도 없으면 비대표");
@@ -40,7 +40,7 @@ console.log("1) isRepresentative — GI 출처 또는 상표 3건 이상(OR, #29
     true,
     "GI 출처가 아예 없어도 상표 건수만으로 대표 판정 가능"
   );
-  ok("GI 출처가 있거나(OR) 고유 상표 출원이 3건 이상이면 대표 특산품으로 판정됨(#29 확정)");
+  ok("GI 출처가 있거나(OR) 고유 상표 출원이 1건 이상이면 대표 특산품으로 판정됨(#29 확정)");
 }
 
 console.log("2) activityScore/registrationScore — 0~1 정규화");
@@ -115,26 +115,26 @@ console.log("5) detectGaps — ④ 출력 -> 랭킹, 비대표 제외, 결정론
   ok("랭킹은 대표 품목만 공백 점수 내림차순, 비대표는 사유와 함께 보존, 동일 입력은 동일 출력");
 }
 
-console.log("5-1) detectGaps — GI 미등록이어도 상표 3건 이상이면 랭킹에 포함(#29 확정 OR 조건)");
+console.log("5-1) detectGaps — GI 미등록이어도 상표 1건 이상이면 랭킹에 포함(#29 2026-08-31 완화 확정 OR 조건)");
 {
   const analysis = {
-    generatedAt: "2026-08-11T00:00:00.000Z",
+    generatedAt: "2026-08-31T00:00:00.000Z",
     regionItems: [
       { region: "경상남도 합천군", sido: "경상남도", sigungu: "합천군", itemName: "딸기", noticeName: "신선한 딸기", niceClass: "31",
-        sources: ["농사로"], uniqueTrademarkCount: 3, registrationRate: 0.2, regionVerificationRate: 1 },
+        sources: ["농사로"], uniqueTrademarkCount: 1, registrationRate: 0.2, regionVerificationRate: 1 },
       { region: "충청북도 제천시", sido: "충청북도", sigungu: "제천시", itemName: "인삼", noticeName: "인삼", niceClass: "5",
-        sources: ["농사로"], uniqueTrademarkCount: 2, registrationRate: 0, regionVerificationRate: 1 },
+        sources: ["농사로"], uniqueTrademarkCount: 0, registrationRate: 0, regionVerificationRate: 1 },
     ],
   };
   const result = detectGaps(analysis);
   const strawberry = result.rows.find((row) => row.itemName === "딸기");
   const ginseng = result.rows.find((row) => row.itemName === "인삼");
-  assert.strictEqual(strawberry.representative, true, "GI가 없어도 상표 3건이면 대표로 랭킹에 포함");
+  assert.strictEqual(strawberry.representative, true, "GI가 없어도 상표 1건이면 대표로 랭킹에 포함(완화된 기준)");
   assert.strictEqual(typeof strawberry.gapScore, "number");
-  assert.strictEqual(ginseng.representative, false, "상표 2건은 임계값(3건) 미만이라 여전히 비대표");
-  assert.ok(result.methodology.representativeBasis.includes("3건"));
+  assert.strictEqual(ginseng.representative, false, "상표 0건이고 GI도 없으면 여전히 비대표");
+  assert.ok(result.methodology.representativeBasis.includes("1건"));
   assert.strictEqual(result.methodology.weightsConfirmed, false, "가중치는 아직 미확정임을 산출물에 명시");
-  ok("대표 특산품 판정에서 GI 출처와 상표 3건 이상 OR 조건이 실제 랭킹까지 정확히 반영됨");
+  ok("대표 특산품 판정에서 GI 출처와 상표 1건 이상 OR 조건이 실제 랭킹까지 정확히 반영됨");
 }
 
 console.log("5-2) 전국 검색 hit는 지역 귀속 전 대표성·공백 점수에 사용 금지");
@@ -168,7 +168,7 @@ console.log("6) detectGaps — 입력 계약 위반 시 명확한 오류");
   ok("④ 출력 형태가 아니면 즉시 실패");
 }
 
-console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 실험)");
+console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 실험, 기본은 1건으로 완화 확정됨)");
 {
   const analysis = {
     regionItems: [{
@@ -183,25 +183,28 @@ console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 
     }],
   };
   const defaultResult = detectGaps(analysis);
-  assert.strictEqual(defaultResult.scoreVersion, "gap-score-v2-regional-address-gate");
-  assert.strictEqual(defaultResult.ranking.length, 0, "기본 3건 기준으로는 1건짜리가 대표성 미충족이어야 함");
+  assert.strictEqual(defaultResult.scoreVersion, "gap-score-v3-representative-count1");
+  assert.strictEqual(defaultResult.ranking.length, 1, "기본 1건 기준에서는 1건짜리도 대표 특산품으로 인정됨(#29 2026-08-31 완화 확정)");
 
-  const relaxed = detectGaps(analysis, { representativeThreshold: 1 });
+  // 실험용으로 예전 기준(3건)을 다시 돌려볼 때도 안전조건이 지켜지는지 확인한다.
+  const stricter = detectGaps(analysis, { representativeThreshold: 3 });
   assert.strictEqual(
-    relaxed.scoreVersion,
-    "gap-score-v2-regional-address-gate-threshold1-experiment",
+    stricter.scoreVersion,
+    "gap-score-v3-representative-count1-threshold3-experiment",
     "기본값과 다른 기준을 쓰면 scoreVersion에 드러나 결과를 절대 혼동하지 않아야 함(안전조건)"
   );
-  assert.strictEqual(relaxed.ranking.length, 1, "1건 기준에서는 같은 행이 대표 특산품으로 인정돼야 함");
-  assert.match(relaxed.methodology.representativeBasis, /1건/);
-  assert.match(relaxed.methodology.representativeBasis, /확정 기준 아님/);
+  assert.strictEqual(stricter.ranking.length, 0, "3건 기준으로 되돌리면 1건짜리는 다시 대표성 미충족");
+  assert.match(stricter.methodology.representativeBasis, /3건/);
+  assert.match(stricter.methodology.representativeBasis, /확정 기준 아님/);
 
+  assert.strictEqual(typeof defaultResult.rows[0].gapScore, "number", "기본(1건) 결과는 대표 특산품이라 점수가 계산되어 있어야 함");
+  const defaultResultAgain = detectGaps(analysis);
   assert.strictEqual(
+    defaultResultAgain.rows[0].gapScore,
     defaultResult.rows[0].gapScore,
-    null,
-    "기준을 바꿔도 기본 3건 결과 자체가 조용히 달라지면 안 됨(원본 재호출로 재확인)"
+    "다른 기준으로 호출한 뒤에도 기본 호출 결과 자체가 조용히 달라지면 안 됨(순수 함수 재확인)"
   );
-  ok("threshold를 생략하면 확정 기준(3건) 그대로, 다른 값을 주면 scoreVersion에 반영되어 결과가 섞이지 않음");
+  ok("threshold를 생략하면 확정 기준(1건) 그대로, 다른 값을 주면 scoreVersion에 반영되어 결과가 섞이지 않음");
 }
 
 console.log("\n모든 자체 테스트 통과");
