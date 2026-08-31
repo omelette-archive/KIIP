@@ -51,6 +51,7 @@ const { KiprisApiError } = require("./lib/errors");
 const { runIpRegistryTests } = require("./ipRegistrySelftest");
 const { runApplicantRegionRefreshTests } = require("./applicantRegionRefreshSelftest");
 const { runRegistryStalenessTests } = require("./registryStalenessSelftest");
+const { runRegionMatchCoverageTests } = require("./regionMatchCoverageSelftest");
 const {
   parseCsvLine,
   readNormalizedCsv,
@@ -142,6 +143,7 @@ async function run() {
   await runIpRegistryTests();
   await runApplicantRegionRefreshTests();
   await runRegistryStalenessTests();
+  await runRegionMatchCoverageTests();
 
   console.log("1) xmlLite.parseTrademarkResponse");
   {
@@ -962,9 +964,11 @@ async function run() {
     assert.strictEqual(metadata.enabled, true);
     assert.deepStrictEqual(metadata.matchCounts, {
       inside: 1, outside: 1, unverified: 0, referenced: 2, goodsReferenced: 2,
+      bySource: { ip_registry_applicant_address: 2, kipris_trademark_applicant: 0, unknown: 0 },
+      unverifiedByReason: {},
     });
     assert.strictEqual(ipRegistryValidationMetadata(null).enabled, false);
-    ok("활성화 여부·기준·요약 통계를 함께 보존해 감사 가능함");
+    ok("활성화 여부·기준·요약 통계(경로 A·B 출처별·미확인 사유별 포함)를 함께 보존해 감사 가능함(#73)");
   }
 
   console.log("12-2b) registryNumbers/enrichDocument — storageMode=query_facts 저장 방식 호환");

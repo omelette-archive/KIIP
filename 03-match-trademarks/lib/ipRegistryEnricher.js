@@ -433,16 +433,37 @@ async function enrichHitsWithIpRegistry(hits, queryInput, context) {
   });
 }
 
+// #73(2026-08-31): 이전에는 hit.ipRegistryStatus === "complete"(경로 B, 등록번호 기반)만
+// 세서, applicantRegionMatch가 있어도 경로 A(출원번호 기반, kipris_trademark_applicant)로만
+// 평가된 hit는 referenced에서 조용히 빠졌다 — 등록번호가 아직 없는 출원중 건은 경로 A가
+// 유일한 지역 판정 경로라 실제로는 상당수가 여기 해당한다. 두 경로 모두 hit에
+// applicantRegionMatch를 남기므로, 그 필드 유무로 "지역 판정을 시도한 hit"를 정의한다.
 function summarizeIpRegistryMatches(results) {
-  const counts = { inside: 0, outside: 0, unverified: 0, referenced: 0, goodsReferenced: 0 };
+  const counts = {
+    inside: 0,
+    outside: 0,
+    unverified: 0,
+    referenced: 0,
+    goodsReferenced: 0,
+    bySource: { ip_registry_applicant_address: 0, kipris_trademark_applicant: 0, unknown: 0 },
+    unverifiedByReason: {},
+  };
   for (const entry of results || []) {
     for (const hit of entry.hits || []) {
-      if (hit.ipRegistryStatus === "complete") {
+      const match = hit.applicantRegionMatch;
+      if (match !== undefined && match !== null) {
         counts.referenced++;
-        const match = hit.applicantRegionMatch;
+        const sourceKey = counts.bySource[hit.applicantRegionMatchSource] !== undefined
+          ? hit.applicantRegionMatchSource
+          : "unknown";
+        counts.bySource[sourceKey]++;
         if (match === "inside" || match === true) counts.inside++;
         else if (match === "outside" || match === false) counts.outside++;
-        else counts.unverified++;
+        else {
+          counts.unverified++;
+          const reason = hit.applicantRegionMatchConfidence || "unknown";
+          counts.unverifiedByReason[reason] = (counts.unverifiedByReason[reason] || 0) + 1;
+        }
       }
       if (hit.designatedGoodsEvidence) counts.goodsReferenced++;
     }
@@ -714,6 +735,7 @@ module.exports = {
   normalizeGoodsText,
   isRateLimitError,
   ipRegistryValidationMetadata,
+  factHitSources,
   registryNumbers,
   sanitizeRegistryRecordForCache,
   summarizeIpRegistryMatches,
