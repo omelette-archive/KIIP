@@ -86,6 +86,17 @@ GET https://plus.kipris.or.kr/kipo-api/kipi/trademarkInfoSearchService/getWordSe
 - 특허 쪽에는 서지상세(`getBibliographyDetailInfoSearch`)가 있지만 상표용 서지상세는 레퍼런스
   리포에 구현되어 있지 않음 — 다만 위 등록원부 API가 사실상 이 역할을 대신한다.
 
+- **등록 상태 변경 감지(#81)**: `getMarkHistory` 응답에는 `right[]`(설정등록·존속기간
+  갱신등록·소멸등록·이전등록 등 공식 처분 이력, 사유·일자만 있고 개인정보 없음)와
+  `cndrtExptnDate`(권리존속기간만료예정일)도 있음을 2026-08-31 실키로 확인했다 —
+  이전까지는 파싱하지 않고 버려지고 있었다. 실측: 만료예정일 `20241020`인 건이
+  실제로 `20250429`에 소멸등록됐다(예정일과 실제 처분일은 다를 수 있지만, 예정일이
+  지났다는 사실 자체가 재검증 가치를 신뢰성 있게 알려준다). 이 신호로 통계적 TTL
+  추정 없이 "만료예정일이 지났는데 캐시엔 아직 그 이후 이력이 없는" 건만 정확히
+  골라 재검증한다 — 구현은 `03-match-trademarks/lib/registryStaleness.js` +
+  `refreshStaleRegistryEntries.js`, 사용법은
+  [`applicant-region-recovery-runbook.md`](applicant-region-recovery-runbook.md) 4.5절.
+
 → 구현: `enrichApplicantRegions.js`가 모든 hit의 출원번호를 기준으로 주소를 누적 보강하고,
 `enrichIpRegistry.js`는 등록번호가 있는 hit의 주소·지정상품을 보강한다. 두 주소 모두 법정동코드
 마스터와 대조해 `applicantRegionMatch`로 정규화하고 `localApplicantShare` 본류에 반영한다.

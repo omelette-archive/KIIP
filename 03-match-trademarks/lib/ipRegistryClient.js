@@ -73,6 +73,17 @@ function parseMarkHistoryResponse(parsed) {
       designatedProductName: clean(row?.desProduct) || null,
     }))
     .filter((row) => row.classCode || row.designatedProductName);
+  // #81: right[](설정등록·존속기간갱신등록·소멸등록·이전등록 등 공식 처분 이력)와
+  // cndrtExptnDate(권리존속기간만료예정일)는 개인정보 없이(사유·일자만) 등록 상태 변경을
+  // 감지할 수 있는 공식 신호다 — 2026-08-31 실키로 필드 존재를 확인했다. 이전에는
+  // 파싱하지 않고 버려졌다.
+  const rightHistory = asArray(item.right)
+    .map((row) => ({
+      name: clean(row?.rgstCsName) || null,
+      date: clean(row?.rgstCsDate) || null,
+      reason: clean(row?.rgstCsReason) || null,
+    }))
+    .filter((row) => row.name || row.date);
   return withCompatibilityFields({
     found: true,
     resultCode,
@@ -81,6 +92,8 @@ function parseMarkHistoryResponse(parsed) {
     applicationNumber: clean(item.applNo) || null,
     registrationNumber: clean(item.rgstNo) || null,
     registrationDate: clean(item.rgstDate) || null,
+    expectedRightExpiryDate: clean(item.cndrtExptnDate) || null,
+    rightHistory,
     applicants,
     products,
   }, item);

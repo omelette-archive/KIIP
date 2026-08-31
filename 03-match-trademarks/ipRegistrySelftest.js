@@ -41,6 +41,10 @@ const RESPONSE = {
     applNo: "4020250000001",
     rgstNo: "4012345670000",
     rgstDate: "20260101",
+    cndrtExptnDate: "20360101",
+    right: [
+      { rgstCsName: "상표설정등록", rgstCsDate: "20260101", rgstCsReason: null },
+    ],
     applicant: [
       {
         applicantAddr: "경상북도 안동시 나머지주소 비공개",
@@ -72,6 +76,12 @@ async function runIpRegistryTests() {
     assert.strictEqual(parsed.applicants.length, 1);
     assert.strictEqual(parsed.products.length, 2);
     assert.strictEqual(parsed.products[0].designatedProductName, "신선한사과");
+    // #81: right[](처분 이력)·cndrtExptnDate(권리존속기간만료예정일)는 개인정보 없이
+    // 재검증 신호로 쓰인다 — 이전 파서는 두 필드를 버리고 있었다.
+    assert.strictEqual(parsed.expectedRightExpiryDate, "20360101");
+    assert.strictEqual(parsed.rightHistory.length, 1);
+    assert.strictEqual(parsed.rightHistory[0].name, "상표설정등록");
+    assert.strictEqual(parsed.rightHistory[0].date, "20260101");
     let requestedUrl;
     const client = createClient({
       apiKey: "test-key",

@@ -228,6 +228,14 @@ function sanitizeRegistryRecordForCache(record, adminList = loadAdminCodes()) {
     applicationNumber: record?.applicationNumber || null,
     registrationNumber: record?.registrationNumber || null,
     registrationDate: record?.registrationDate || null,
+    // #81: 권리존속기간만료예정일·설정등록/갱신등록/소멸등록 등 처분 이력 — 개인정보
+    // 없이(사유·일자만) 캐시가 최신 상태를 반영하는지 판단하는 재검증 신호로 쓴다.
+    expectedRightExpiryDate: record?.expectedRightExpiryDate || null,
+    rightHistory: (record?.rightHistory || []).map((row) => ({
+      name: row.name || null,
+      date: row.date || null,
+      reason: row.reason || null,
+    })),
     applicants,
     products: (record?.products || []).map((product) => ({
       classCode: product.classCode || null,

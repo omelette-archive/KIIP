@@ -156,6 +156,45 @@ node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
 `matched`로 바뀐 건수다. `--merged-out` 결과를 검증한 뒤에만 사람이 기준 캐시
 파일을 교체한다 — 이 CLI가 기준 캐시를 자동으로 덮어쓰지 않는다.
 
+### 4.5 이미 complete인 등록번호 재검증(#81)
+
+4.4는 "아직 못 찾은" 건을 다시 찾는 재조회다. 이 절은 반대로 "이미 찾았지만 그 뒤
+등록 상태가 바뀌었을 수 있는" 경로 B(등록번호, `ip-registry-cache.json`) 캐시를
+다룬다. getMarkHistory 응답에는 `right[]`(설정등록·존속기간갱신등록·소멸등록·
+이전등록 등 공식 처분 이력, 사유·일자만 있고 개인정보 없음)와 `cndrtExptnDate`
+(권리존속기간만료예정일)가 있다 — 2026-08-31 실키로 필드 존재를 확인했다(이전
+파서는 두 필드를 버리고 있었다). 이 신호 덕분에 통계적 TTL을 실측할 필요 없이,
+**공식 만료예정일이 이미 지났는데 캐시에는 아직 그 이후 처분 이력이 없는** 건만
+정확히 골라 재검증한다(정책명 `expiry_only`, 사용자 결정 2026-08-31 — 대신 만료
+전 이전등록처럼 예정일과 무관한 변경은 이 정책으로 못 잡는다는 트레이드오프를
+받아들임).
+
+```powershell
+# 1) 후보 규모부터 확인(호출 없음)
+node 03-match-trademarks/refreshStaleRegistryEntries.js `
+  --cache 03-match-trademarks/output/ip-registry-cache-marine-forest.json `
+  --dry-run `
+  --manifest-out 03-match-trademarks/output/registry-staleness-manifest.json
+
+# 2) 실제 재검증 — 기준 캐시는 그대로 두고 별도 캐시에만 기록
+node 03-match-trademarks/refreshStaleRegistryEntries.js `
+  --cache 03-match-trademarks/output/ip-registry-cache-marine-forest.json `
+  --refresh-cache 03-match-trademarks/output/ip-registry-staleness-refresh-cache.json `
+  --limit 200 --concurrency 2 --checkpoint-every 50 `
+  --daily-budget 1000 --budget-state 03-match-trademarks/output/registry-staleness-daily-budget.json `
+  --merged-out 03-match-trademarks/output/ip-registry-cache-marine-forest.merged.json `
+  --report-out 03-match-trademarks/output/registry-staleness-report.json
+```
+
+`registry-staleness-report.json`의 `byCategory`가 `no_change`/`address_changed`/
+`goods_changed`/`status_changed`/`multiple_changed`/`fetch_failed`로 분리된 전후
+변경 건수다. `fetch_failed`는 병합에서 제외되어 이전에 확보한 값을 그대로
+지킨다(검증 후에만 병합). **부트스트랩 한계**: 이 정책은 캐시 항목에
+`expectedRightExpiryDate`가 있어야만 동작하는데, 이 필드는 2026-08-31 파서
+수정 이후에 (재)수집된 항목에만 있다 — 그 전에 수집된 기존 complete 캐시는
+전부 `no_expiry_date`로 집계되고(재검증 대상 아님) 정상 동작 4.1/4.2/4.4 경로로
+언젠가 다시 조회되기 전까지는 이 절의 재검증 대상이 될 수 없다.
+
 ## 5. 상황별 재분석·복구
 
 | 상황 | API 재호출 | 조치 |
@@ -214,6 +253,12 @@ node 03-match-trademarks/refreshUnverifiedApplicantRegions.js `
   구현됐다([#73](https://github.com/omelette-archive/KIIP/issues/73), 2026-08-26). 남은
   범위는 재조회 후 ④→⑦ 재생성을 한 단계로 묶는 자동화(현재 4.3절 수동 명령만 문서화)와
   ③ 검색 스냅샷 기준 inside/outside/unverified 전후 비율 자동 집계다.
+- 이미 complete인 등록번호의 변경 감지(4.5절, [#81](https://github.com/omelette-archive/KIIP/issues/81),
+  2026-08-31)는 공식 만료예정일 기반 정책(`expiry_only`)으로 구현됐다. 신규 번호 증분
+  (4.1)과 기존 번호 재검증(4.5)은 완전히 분리된 CLI라 서로 섞이지 않는다. 아직 없는
+  범위: 만료 전 이전등록(양도)처럼 예정일과 무관한 변경 감지, 경로 A(출원번호 기반
+  캐시)에 대한 동일한 재검증 — 경로 A 응답에는 아직 이런 처분 이력 필드가 확인되지
+  않았다.
 - 두 경로의 결과가 모두 있을 때 근거 우선순위는 실행 순서로 구현돼 있다. 후속으로
   A·B 근거를 동시 보존하고 명시적 우선순위를 기록하는 계약이 필요하다.
 - **(2026-08-20 결정)** 경로 B가 아직 전체 모집단을 다 돌지 못한 진행 중 상태이므로,
