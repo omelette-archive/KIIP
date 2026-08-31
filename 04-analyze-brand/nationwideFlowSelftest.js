@@ -207,6 +207,11 @@ async function runNationwideFlowTests() {
     assert.ok(!isProducerLikeApplicant("이랜드리테일"));
     assert.ok(!isProducerLikeApplicant("이석열")); // 여러 무관 품목에 걸쳐 나타난 개인 다량 출원인(#110 실측)
     assert.ok(!isProducerLikeApplicant("에취.제이.헤인즈캄파니"));
+    // 2026-08-31 uncertain 재검토 확장: 지역 연계 공공 농업기관("~연구소"·"~기술센터")도 인정.
+    assert.ok(isProducerLikeApplicant("고양시농업기술센터"));
+    assert.ok(isProducerLikeApplicant("(재)남해마늘연구소"));
+    // 단, 전국 단위 기관("~진흥원")은 주소가 실제 산지가 아닐 수 있어 여전히 제외.
+    assert.ok(!isProducerLikeApplicant("한국임업진흥원"));
     ok("생산자단체·영농조합법인·협동조합·지자체 단독표기만 생산자형으로 인정, 대기업·개인·외국사는 제외");
 
     assert.strictEqual(rawSignalConfidence([{ applicant: "청송군" }]), "producer_confirmed");

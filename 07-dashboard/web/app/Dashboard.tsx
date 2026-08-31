@@ -334,11 +334,13 @@ function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: 
 // 이슈 #116(2026-08-26) 사용자 재요청: 비즈니스 전략 문장이 그냥 줄글이라 가독성이
 // 떨어진다는 지적 — 상태 아이콘·배지, 근거 수치(고유 상표·등록률·지역외 비중)를 문장 위에
 // 먼저 보여주는 요약 스탯 줄, 문장별 도트 마커로 시각적 앵커를 추가했다.
-// 이슈 #116/#74/#110(2026-08-27): 품목명을 전국·전류로 검색해 원물→가공품→서비스 단계별
-// 상표 활동을 보여준다. 지역 통계와는 완전히 분리된 참고 지표이며, 원물 단계 상위 출원인이
-// 생산자형으로 확인된 품목(rawSignalConfidence=producer_confirmed, 37/176)에만 붙어있다
-// (scripts/attachNationwideBusinessFlow.js). 근사치라는 caveat는 GitHub 이슈·코드 주석에만
-// 남기고 화면에는 "AI 판정" 같은 표시를 노출하지 않는다(사용자 결정, 2026-08-27).
+// 이슈 #116/#74/#110(2026-08-31 확대): 품목명을 전국·전류로 검색해 원물→가공품→서비스 단계별
+// 상표 활동을 보여준다. 지역 통계와는 완전히 분리된 참고 지표이며, 단계별 "건수"는 176개
+// 품목 전부에 붙지만 topRegion/topApplicant(지역 관련 필드)는 원물 단계 상위 출원인이
+// 생산자형으로 확인된 품목(rawSignalConfidence=producer_confirmed, 39/176)에서만 값이 채워지고
+// 나머지는 null이라 화면에 지역 클러스터 문장이 뜨지 않는다(scripts/attachNationwideBusinessFlow.js).
+// 근사치라는 caveat는 GitHub 이슈·코드 주석에만 남기고 화면에는 "AI 판정" 같은 표시를
+// 노출하지 않는다(사용자 결정, 2026-08-27).
 const FLOW_STAGE_LABELS: Record<"raw" | "processed" | "service", string> = { raw: "원물", processed: "가공품", service: "서비스·확장" };
 function NationwideFlowCard({ flow, itemLabel }: { flow: NationwideFlow; itemLabel: string }) {
   const { raw, processed, service } = flow.stages;

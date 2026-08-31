@@ -1,9 +1,14 @@
 "use strict";
 // 품목별 원물→가공품→서비스 전국 상표 흐름(04-analyze-brand/output/nationwide-flow.json)을
 // 대시보드 품목에 참고 정보로 붙인다(#116 #74 #110). 지역 통계 분모·분자에는 섞지 않는다.
-// 원물 단계 상위 출원인이 생산자형으로 확인된 품목(rawSignalConfidence=producer_confirmed)만
-// 붙인다 — 나머지는 상표 브로커·대기업 방어출원·우연한 이름 일치가 섞여 있어 화면에
-// 노출하면 사실과 다른 정보가 된다(2026-08-27 176개 파일럿 실측, #110 참고).
+//
+// 2026-08-31(#110 확대): 단계별 "건수"는 NICE류+상표명 텍스트 판정만으로 나오는 값이라
+// 176개 품목 전부에 붙여도 된다 — 신뢰도 문제는 "이 지역이 산지다"라는 지역 클러스터
+// 주장에만 있다(원물 단계 상위 출원인이 상표 브로커·대기업 방어출원·우연한 이름 일치일 수
+// 있음, 2026-08-27 실측). 그래서 rawSignalConfidence=producer_confirmed(현재 39/176)인
+// 품목만 topRegion/topApplicant(지역 관련 필드)를 붙이고, 나머지(uncertain)는 단계별
+// 건수만 보여주고 지역 필드는 아예 넣지 않는다 — 화면에 "AI 판정"류 표시 없이도 조용히
+// 안전한 부분만 노출하는 방식.
 const fs = require("fs");
 const path = require("path");
 
@@ -22,31 +27,39 @@ function officialItemLabel(item) {
   return name;
 }
 
-function stageSummary(stage) {
+function stageSummary(stage, includeRegion) {
   const top = stage.topApplicants?.[0];
-  return { count: stage.count, topRegion: top?.region || null, topApplicant: top?.applicant || null };
+  return {
+    count: stage.count,
+    topRegion: includeRegion ? top?.region || null : null,
+    topApplicant: includeRegion ? top?.applicant || null : null,
+  };
 }
 
 function attachNationwideBusinessFlow(snap, flow) {
-  const confirmedByTerm = new Map();
+  const flowByTerm = new Map();
   for (const [term, item] of Object.entries(flow.items)) {
-    if (item.rawSignalConfidence !== "producer_confirmed") continue;
-    confirmedByTerm.set(term, item);
+    if (item.mode === "craft") continue; // 공예품 등은 원물/가공품 구분 자체가 안 맞음
+    flowByTerm.set(term, item);
   }
 
   let matched = 0;
+  let confirmedCount = 0;
   for (const region of snap.regions) {
     for (const item of region.items) {
       const name = officialItemLabel(item);
       if (!name) continue;
-      const flowItem = confirmedByTerm.get(name);
+      const flowItem = flowByTerm.get(name);
       if (!flowItem) continue;
+      const includeRegion = flowItem.rawSignalConfidence === "producer_confirmed";
+      if (includeRegion) confirmedCount++;
       item.businessFlow = {
         totalCount: flowItem.totalCount,
+        hasRegionalSignal: includeRegion,
         stages: {
-          raw: stageSummary(flowItem.stages.raw),
-          processed: stageSummary(flowItem.stages.processed),
-          service: stageSummary(flowItem.stages.service),
+          raw: stageSummary(flowItem.stages.raw, includeRegion),
+          processed: stageSummary(flowItem.stages.processed, includeRegion),
+          service: stageSummary(flowItem.stages.service, includeRegion),
         },
       };
       matched++;
@@ -67,10 +80,10 @@ function attachNationwideBusinessFlow(snap, flow) {
   }
   snap.warnings = [...new Set([
     ...snap.warnings,
-    `품목별 전국 상표 흐름(원물·가공품·서비스) 참고 지표를 ${matched}개 품목에 연결했습니다 — 지역 통계와는 분리된 전국 단위 참고 정보입니다.`,
+    `품목별 전국 상표 흐름(원물·가공품·서비스) 참고 지표를 ${matched}개 품목에 연결했습니다(그중 ${confirmedCount}개는 지역 신호까지 포함) — 지역 통계와는 분리된 전국 단위 참고 정보입니다.`,
   ])];
 
-  return { matched, confirmedCount: confirmedByTerm.size };
+  return { matched, confirmedCount };
 }
 
 function main() {
