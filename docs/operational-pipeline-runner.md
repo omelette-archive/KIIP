@@ -15,7 +15,9 @@ node scripts/runOperationalPipeline.js --dry-run --run-id YYYYMMDD-manual
 
 실행 계획은 다음 순서다.
 
-1. GI·농사로 수집과 누적 SQLite 갱신
+0. 프리플라이트 — 필수 시크릿 5종·영구 상태 디렉터리·Node 버전 확인(외부 호출 전 실패)
+0b. 저장소 `output/` 아래 3일 지난 실행 산출물 정리
+1. GI·농사로·세종·제주·서귀포 핵심 특산품 수집과 누적 SQLite 갱신(소스 명시 고정)
 2. 결정론적 품목 정규화
 3. KIPRIS 검색과 영구 체크포인트 재개
 3b. 출원번호 기반 출원인 주소 보강(경로 A) — 영구 캐시에 증분
@@ -68,6 +70,8 @@ node scripts/runOperationalPipeline.js \
 덮어쓰지 않는다.
 
 ### 주간 워크플로 (#70)
+
+러너 등록·시크릿·변수·첫 실행 절차는 [`operational-runner-setup.md`](operational-runner-setup.md)를 따른다.
 
 `operational-pipeline.yml`은 매주 월요일 02:00 KST(+수동 `workflow_dispatch`)에 자체 호스트
 러너(`[self-hosted, kiip-operational]`)에서 `runOperationalPipeline.js --promote`를 실행한다.

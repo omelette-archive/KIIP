@@ -28,6 +28,7 @@ try {
     maxHitsPerQuery: 11,
   });
   assert.deepStrictEqual(plan.stages.map((stage) => stage.id), [
+    "00_preflight",
     "00_cleanup_outputs",
     "01_collect",
     "02_normalize",
@@ -41,6 +42,11 @@ try {
     "validate",
     "render_candidate",
   ]);
+  // #70: ① 수집은 소스를 명시 고정한다(collectSpecialties 기본값 변동과 무관하게 결정론적)
+  const collectStage = plan.stages.find((stage) => stage.id === "01_collect");
+  assert.ok(collectStage.args.includes("--sources"));
+  const preflightStage = plan.stages.find((stage) => stage.id === "00_preflight");
+  assert.strictEqual(preflightStage.args[preflightStage.args.indexOf("--state-dir") + 1], plan.stateDir);
   assert.strictEqual(path.dirname(plan.state.specialtiesDb), plan.stateDir);
   assert.strictEqual(path.dirname(plan.state.trademarkCheckpoint), plan.stateDir);
   // #70: 보강 캐시·일별 예산 상태도 실행 디렉터리가 아니라 영구 stateDir에 있어야 함
@@ -118,12 +124,12 @@ try {
   });
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.failedStage, "02_normalize");
-  assert.deepStrictEqual(invoked, ["00_cleanup_outputs", "01_collect", "02_normalize"]);
+  assert.deepStrictEqual(invoked, ["00_preflight", "00_cleanup_outputs", "01_collect", "02_normalize"]);
   assert.strictEqual(result.manifest.status, "failed");
   assert.strictEqual(result.manifest.stages[0].status, "succeeded");
-  assert.strictEqual(result.manifest.stages[1].status, "succeeded");
-  assert.strictEqual(result.manifest.stages[2].status, "failed");
-  assert.strictEqual(result.manifest.stages[3].status, "pending");
+  assert.strictEqual(result.manifest.stages[2].status, "succeeded");
+  assert.strictEqual(result.manifest.stages[3].status, "failed");
+  assert.strictEqual(result.manifest.stages[4].status, "pending");
   assert.strictEqual(fs.existsSync(plan.files.dashboardCandidate), false);
   assert.strictEqual(JSON.parse(fs.readFileSync(plan.files.manifest, "utf8")).status, "failed");
 

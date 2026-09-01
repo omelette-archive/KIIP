@@ -63,6 +63,10 @@ jobs:
         shell: bash
         run: echo "value=$(date -u +%Y%m%d)-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
 
+      - name: Preflight — required secrets, persistent state dir, node version
+        shell: bash
+        run: node scripts/checkOperationalEnv.js --state-dir "${KIIP_OPERATIONAL_ROOT}/state"
+
       - name: Run operational pipeline and promote on validation pass
         id: pipeline
         shell: bash

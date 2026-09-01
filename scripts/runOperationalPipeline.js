@@ -175,6 +175,13 @@ function buildPlan(options = {}) {
 
   const stages = [
     nodeStage(
+      "00_preflight",
+      "필수 환경변수·영구 상태 디렉터리·Node 버전 확인(외부 호출 전)",
+      "scripts/checkOperationalEnv.js",
+      ["--state-dir", stateDir, "--write-heartbeat"],
+      []
+    ),
+    nodeStage(
       "00_cleanup_outputs",
       "①~⑦ output/ 아래 3일 지난 실행 산출물 정리(등록원부 캐시·일일 예산 상태 파일은 제외)",
       "scripts/cleanupPipelineOutputs.js",
@@ -183,9 +190,19 @@ function buildPlan(options = {}) {
     ),
     nodeStage(
       "01_collect",
-      "GI·농사로 특산품 수집과 누적 SQLite 갱신",
+      "핵심 특산품 수집과 누적 SQLite 갱신(GI·농사로·세종·제주·서귀포)",
       "01-collect-specialties/collectSpecialties.js",
-      ["--out", files.collected, "--db", state.specialtiesDb],
+      [
+        "--out",
+        files.collected,
+        "--db",
+        state.specialtiesDb,
+        // 소스를 명시 고정한다 — NFQS·KOFPI·RDA는 지역 스코프 특수 처리(mergeSupplementalDashboardData.js)가
+        // 파이프라인에 접히기 전까지 이 실행기 범위 밖이다. collectSpecialties.js의 기본
+        // 소스 목록이 바뀌어도 운영 실행은 결정론적으로 유지된다.
+        "--sources",
+        "gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
+      ],
       [files.collected, state.specialtiesDb]
     ),
     nodeStage(
