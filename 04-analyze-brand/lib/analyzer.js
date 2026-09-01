@@ -2,7 +2,7 @@
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
-const ANALYSIS_VERSION = "brand-analysis-v4-regional-metric-gate";
+const ANALYSIS_VERSION = "brand-analysis-v5-partial-verified-subset";
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -481,11 +481,26 @@ function finalizeBucket(bucket, options) {
   // 출원인 주소 확보율은 참고 지표로만 보존한다. 주소가 일부 없더라도
   // 수집이 완료된 지역·품목은 확보된 값 그대로 표시하며, 지역 귀속 확정값으로
   // 과해석되지 않도록 대시보드에서 확보율과 주의 문구를 함께 노출한다.
+  //
+  // #116(2026-09-01 사용자 결정): 흔한 작물명(감자·옥수수·쌀 등)은 전국 단어검색이
+  // 항상 상한에 걸려 collectionComplete가 절대 안 되지만, 그 지역×품목의 출원인 주소가
+  // inside로 검증된 고유 출원 수(regionCounts.inside)는 상한과 무관하게 정의돼 있다.
+  // 오류·건너뜀 없이 상한만이 원인이면 그 검증 부분집합을 "부분 수집(partial)" 카운트로
+  // 인정한다 — 상한 너머에 더 있을 수 있으므로 최소 확인값이라는 플래그를 함께 남긴다.
+  const regionalMetricCapOnly =
+    isRegionalBucket &&
+    regionalMetricBlockingReasons.length === 1 &&
+    regionalMetricBlockingReasons[0] === "collection_incomplete" &&
+    bucket.successfulQueryCount > 0 &&
+    bucket.erroredQueryCount === 0 &&
+    bucket.skippedQueryCount === 0;
   const regionalMetricAvailability = !isRegionalBucket
     ? null
     : regionalMetricBlockingReasons.length === 0
       ? "available"
-      : "blocked";
+      : regionalMetricCapOnly
+        ? "partial"
+        : "blocked";
   const goodsConfirmedHitCount =
     goodsMatchCounts.normalized_exact + goodsMatchCounts.normalized_contains;
   const goodsReviewRequiredHitCount = goodsMatchCounts.class_only;

@@ -577,6 +577,39 @@ console.log("5-1) 지역 상표 지표는 수집 완료를 기준으로 공개�
   ok("전국 검색 후보 2건과 지역 inside 확정 1건을 분리하고 완전 검증 여부를 명시");
 }
 
+console.log("5-2) 전국 검색 상한만이 원인이면 주소 검증 부분집합을 partial 카운트로 인정(#116)");
+{
+  // 오류·건너뜀 없이 partial(상한)만 걸린 지역×품목 — inside 검증 고유 출원은 확정이므로
+  // "부분 수집" 카운트로 노출한다.
+  const capOnly = analyzeEntries([{
+    status: "ok",
+    collectionStatus: "partial",
+    stopReason: "max_pages",
+    query: { region: "강원특별자치도 홍천군", item: "쌀", classCode: "30" },
+    hits: [
+      hit("P-1", "홍천쌀", "20250101", "등록", "inside"),
+      hit("P-2", "서울쌀", "20250102", "출원중", "outside"),
+    ],
+  }], { asOfYear: 2026, regionalCoverageThreshold: 0.6 });
+  const capRow = capOnly.regionItems[0];
+  assert.strictEqual(capRow.regionalMetricAvailability, "partial");
+  assert.strictEqual(capRow.regionalUniqueTrademarkCount, 1, "inside 검증 부분집합은 상한과 무관하게 확정");
+  assert.deepStrictEqual(capRow.regionalMetricBlockingReasons, ["collection_incomplete"]);
+
+  // 오류가 하나라도 섞이면 partial이 아니라 blocked(부분집합도 못 믿음)
+  const withError = analyzeEntries([
+    {
+      status: "ok",
+      collectionStatus: "partial",
+      query: { region: "강원특별자치도 홍천군", item: "쌀", classCode: "30" },
+      hits: [hit("E-1", "홍천쌀", "20250101", "등록", "inside")],
+    },
+    { query: { region: "강원특별자치도 홍천군", item: "쌀", classCode: "30" }, error: "검색 오류" },
+  ], { asOfYear: 2026, regionalCoverageThreshold: 0.6 });
+  assert.strictEqual(withError.regionItems[0].regionalMetricAvailability, "blocked");
+  ok("상한만이면 partial(부분집합 인정), 오류가 섞이면 blocked");
+}
+
 console.log("9) ②단계 품목 판정 근거(verdictSource)를 지역×품목 행까지 전파(#51)");
 {
   const r = analyzeEntries([

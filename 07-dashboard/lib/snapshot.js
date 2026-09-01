@@ -153,6 +153,7 @@ function makeMetric(value, row, options) {
   return {
     value,
     availability: options.availability || "available",
+    ...(options.partial ? { partial: true } : {}),
     status: options.status || metricStatus(state),
     sourceIds: options.sourceIds || rowSourceIds(row),
     calculatedAt: options.calculatedAt || null,
@@ -328,8 +329,12 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     const regionalMethodVersion = rawGoodsMatched
       ? clean(row.rawGoodsReview?.methodVersion) || "raw-item-goods-match-ai-review-v1"
       : analysis.analysisVersion || null;
+    // #116(2026-09-01): "partial"은 전국 검색 상한만이 원인이라 주소 검증 부분집합을
+    // 최소 확인값으로 노출한다 — 지표는 available로 보여주되 metric.partial=true를 남긴다.
+    const regionalMetricPartial = row.regionalMetricAvailability === "partial";
     const regionalMetricAvailable =
       row.regionalMetricAvailability === "available" ||
+      regionalMetricPartial ||
       (!row.regionalMetricAvailability && row.regionVerificationRate === 1);
     const regionalTrademarkCount = regionalMetricAvailable
       ? count(row, "regionalUniqueTrademarkCount") || count(row.regionCounts, "inside")
@@ -337,6 +342,9 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     const regionalRegisteredCount = regionalMetricAvailable
       ? count(row.regionalStatusCounts, "registered")
       : null;
+    const partialNote = regionalMetricPartial
+      ? " (전국 검색이 상한에 도달해 최소 확인값입니다)"
+      : "";
     const scoreAvailability =
       typeof gapRow?.gapScore === "number" ? "preview" : "blocked";
     const scoreBlockingIssue =
@@ -391,11 +399,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           state,
           sourceIds: baseMetricSourceIds,
           availability: regionalMetricAvailable ? "available" : "blocked",
+          partial: regionalMetricPartial,
           calculatedAt: reviewedAt,
           methodVersion: regionalMethodVersion,
-          rationale: rawGoodsMatched
-            ? "검토 승인된 지정상품 exact/contains 및 지역 일치 고유 출원만 집계"
-            : "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계",
+          rationale:
+            (rawGoodsMatched
+              ? "검토 승인된 지정상품 exact/contains 및 지역 일치 고유 출원만 집계"
+              : "출원인 주소가 해당 지역 inside로 검증된 고유 출원만 집계") + partialNote,
           blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
         nationwideSearchTrademarkCount: makeMetric(
@@ -415,11 +425,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
           state,
           sourceIds: registryMetricSourceIds,
           availability: regionalMetricAvailable ? "available" : "blocked",
+          partial: regionalMetricPartial,
           calculatedAt: reviewedAt,
           methodVersion: regionalMethodVersion,
-          rationale: rawGoodsMatched
-            ? "검토 승인된 지정상품·지역 일치 출원 중 등록 상태"
-            : "지역 inside 검증 출원 중 등록 상태",
+          rationale:
+            (rawGoodsMatched
+              ? "검토 승인된 지정상품·지역 일치 출원 중 등록 상태"
+              : "지역 inside 검증 출원 중 등록 상태") + partialNote,
           blockingIssue: regionalMetricAvailable ? null : "#50",
         }),
         registrationRate: makeMetric(
@@ -429,11 +441,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             state,
             sourceIds: registryMetricSourceIds,
             availability: regionalMetricAvailable ? "available" : "blocked",
+            partial: regionalMetricPartial,
             calculatedAt: reviewedAt,
             methodVersion: regionalMethodVersion,
-            rationale: rawGoodsMatched
-              ? "등록 출원 / 검토 승인된 지정상품·지역 일치 고유 출원"
-              : "지역 inside 등록 출원 / 지역 inside 고유 출원",
+            rationale:
+              (rawGoodsMatched
+                ? "등록 출원 / 검토 승인된 지정상품·지역 일치 고유 출원"
+                : "지역 inside 등록 출원 / 지역 inside 고유 출원") + partialNote,
             blockingIssue: regionalMetricAvailable ? null : "#50",
           }
         ),
@@ -444,9 +458,10 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             state,
             sourceIds: registryMetricSourceIds,
             availability: regionalMetricAvailable ? "available" : "blocked",
+            partial: regionalMetricPartial,
             calculatedAt,
             methodVersion: analysis.analysisVersion || null,
-            rationale: "출원인 주소가 검증된 hit만 사용",
+            rationale: "출원인 주소가 검증된 hit만 사용" + partialNote,
             blockingIssue: regionalMetricAvailable ? null : "#50",
           }
         ),
@@ -628,8 +643,15 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     unit: "region_item_input_rows",
   };
 
+  // #116(2026-09-01): "partial"(전국 검색 상한만 원인, 주소 검증 부분집합은 확정)도
+  // 지역 상표 수를 표시하므로 "표시 가능"에 포함한다. 그중 부분 수집분은 따로 센다.
+  const partialRegionItemCount = analysis.regionItems.filter(
+    (row) => row.regionalMetricAvailability === "partial"
+  ).length;
   const availableRegionItemCount = analysis.regionItems.filter(
-    (row) => row.regionalMetricAvailability === "available"
+    (row) =>
+      row.regionalMetricAvailability === "available" ||
+      row.regionalMetricAvailability === "partial"
   ).length;
   const regionalAttributionCounts = analysis.regionItems.reduce(
     (counts, row) => {
@@ -686,6 +708,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     },
     regionalMetricGate: {
       availableRegionItemCount,
+      partialRegionItemCount,
       blockedRegionItemCount: Math.max(0, analysis.regionItems.length - availableRegionItemCount),
       coverageThreshold: Number.isFinite(regionalCoverageThreshold)
         ? regionalCoverageThreshold

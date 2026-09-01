@@ -3,7 +3,7 @@
 import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
-type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
+type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; partial?: boolean; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
 type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicant?: string | null; applicationStatus: string | null; statusCategory?: string | null; applicantRegionMatch?: string | null; niceClass?: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
 type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string; sourceUrl: string; entries: { region: string; specialtyId: string | null; itemName: string; query: string; examples: TrademarkExample[] }[] };
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
@@ -416,9 +416,10 @@ function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBrief
 // 단정하면 안 되므로 별도로 "구분 정보 없음"으로 표시한다(지역명을 못 찾은 것과
 // 실제 출원이 없는 것을 구분해 달라는 요청).
 function specialtyFilingStatus(item: Item): { label: string; filed: boolean } {
-  const value = item.metrics.uniqueTrademarkCount.value || 0;
-  if (item.metrics.uniqueTrademarkCount.availability === "available" && value > 0) {
-    return { label: `출원 확인 · ${number(value)}건`, filed: true };
+  const metric = item.metrics.uniqueTrademarkCount;
+  const value = metric.value || 0;
+  if (metric.availability === "available" && value > 0) {
+    return { label: `출원 확인 · ${number(value)}건${metric.partial ? "+" : ""}`, filed: true };
   }
   return { label: "미출원(검토중)", filed: false };
 }
@@ -934,6 +935,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     return registered && local;
   }).slice(0, 10);
   const regionalAvailable = item.metrics.uniqueTrademarkCount.availability === "available";
+  const regionalPartial = Boolean(item.metrics.uniqueTrademarkCount.partial);
   const localCount = item.metrics.uniqueTrademarkCount.value || 0;
   const registeredCount = item.metrics.registeredTrademarkCount.value || 0;
   const pendingReason = regionalMetricPendingReason(item);
@@ -946,7 +948,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     <div className="metric-reading-note"><strong>출원 건수 기준</strong><p><b>{region.sigungu || region.region} {itemName(item)} 출원</b>은 출원인 주소가 {region.region}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
     {item.regionalEvidence?.length ? <div className="metric-reading-note"><strong>공식 생산 주산지 근거</strong><p>{item.regionalEvidence.map((evidence) => `${evidence.region} (${evidence.referenceYear})`).join(", ")} · 임산물생산조사 기준입니다. {item.regionalEvidence.some((evidence) => evidence.regionalMetricEligible) ? "출원인 주소를 주산지와 대조해 지역 상표 통계에 반영했습니다." : "검색 범위가 완료된 뒤 지역 상표 통계에 반영합니다."}</p></div> : null}
     <div className="detail-grid">
-      <article><span>{region.sigungu || region.region} {itemName(item)} 출원</span><strong>{regionalAvailable ? `${number(localCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? `출원인 주소가 ${region.region}으로 확인된 고유 출원` : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${pendingReason}`}</small></article>
+      <article><span>{region.sigungu || region.region} {itemName(item)} 출원</span><strong>{regionalAvailable ? `${number(localCount)}건${regionalPartial ? "+" : ""}` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? (regionalPartial ? `출원인 주소가 ${region.region}으로 확인된 최소값 — 전국 검색이 상한에 도달해 더 있을 수 있습니다` : `출원인 주소가 ${region.region}으로 확인된 고유 출원`) : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${pendingReason}`}</small></article>
       <article><span>등록 건수</span><strong>{regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
