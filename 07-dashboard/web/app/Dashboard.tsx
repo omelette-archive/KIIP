@@ -295,6 +295,18 @@ const NATIONAL_LABEL_OFFSETS: Record<string, { x: number; y: number }> = {
 function displayRegionName(name: string) {
   return name.replace("전남광주통합특별시", "전남·광주 통합권역");
 }
+// 이슈 #116(2026-09-01): 화면의 광역자치단체 나열 순서를 가나다순이 아니라 행정표준코드
+// 순서(서울→…→제주)로 통일한다. 통합권역은 전라남도 다음, "전국" 의사 지역은 맨 끝.
+const PROVINCE_ORDER = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기", "강원", "충청북", "충청남", "전북", "전라남", "경상북", "경상남", "제주"];
+function provinceRank(name: string) {
+  if (/전남.*광주|광주.*전남/.test(name)) return PROVINCE_ORDER.indexOf("전라남") + 0.5;
+  if (name === "전국" || name.startsWith("전국 ")) return 99;
+  const index = PROVINCE_ORDER.findIndex((prefix) => name.startsWith(prefix));
+  return index === -1 ? 50 : index;
+}
+function compareProvince(a: string, b: string) {
+  return provinceRank(a) - provinceRank(b) || displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR");
+}
 function positionedMapLabels(shapes: (ProvinceShape | MunicipalityShape)[], municipality: boolean): PositionedMapLabel[] {
   return shapes.map((shape) => {
     const offset = municipality ? undefined : NATIONAL_LABEL_OFFSETS[shape.name];
@@ -432,7 +444,7 @@ function regionalMetricPendingReason(item: Item) {
 }
 
 export default function Dashboard({ snapshot, geometry, registrationExamples }: { snapshot: Snapshot; geometry: MapGeometry; registrationExamples: VerifiedRegistrationExamples }) {
-  const defaultRegionProvince = snapshot.regions.find((region) => region.sido && region.sido !== "전국")?.sido || null;
+  const defaultRegionProvince = [...new Set(snapshot.regions.map((region) => region.sido).filter((sido): sido is string => Boolean(sido) && sido !== "전국"))].sort(compareProvince)[0] || null;
   const [tab, setTab] = useState<Tab>("summary");
   useEffect(() => {
     let saved: string | null = null;
@@ -499,7 +511,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     });
     return [...groups.entries()]
       .map(([province, regions]) => ({ province, regions: regions.sort((a, b) => (a.sigungu || a.region).localeCompare(b.sigungu || b.region, "ko-KR")) }))
-      .sort((a, b) => displayRegionName(a.province).localeCompare(displayRegionName(b.province), "ko-KR"));
+      .sort((a, b) => compareProvince(a.province, b.province));
   }, [filteredRegions]);
   const selectedRegion = snapshot.regions.find((region) => regionKey(region) === selectedRegionCode);
   // 고시명칭 매칭 여부는 판정 기준의 하나일 뿐이라, 특정 품목(specialtyId)이 지정된
@@ -510,7 +522,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const selectedItem = selectedRegionItems.find((item) => item.specialtyId === selectedItemId) || selectedRegionOfficialItems[0] || selectedRegionItems[0];
   // 이슈 #116(2026-08-26): 지자체별 조회 화면 좌측 아코디언과 별개로, 광역자치단체를
   // 상단 탭으로도 바로 고를 수 있게 해달라는 요청 — 검색어와 무관하게 항상 전체 광역 목록을 보여준다.
-  const allProvinces = useMemo(() => [...new Set(snapshot.regions.map((region) => region.sido || region.region))].sort((a, b) => displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR")), [snapshot.regions]);
+  const allProvinces = useMemo(() => [...new Set(snapshot.regions.map((region) => region.sido || region.region))].sort(compareProvince), [snapshot.regions]);
   const activeRegionProvince = groupedRegions.some((group) => group.province === selectedRegionProvince) ? selectedRegionProvince : groupedRegions[0]?.province || null;
   const activeProvinceRegions = groupedRegions.find((group) => group.province === activeRegionProvince)?.regions || [];
   const itemRows = useMemo(() => {

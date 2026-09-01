@@ -712,7 +712,9 @@ test("shows an adjustable year-range application/registration trend chart", asyn
 
 test("defaults municipality lookup to a responsive province overview with cleaned item labels", async () => {
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
-  assert.match(standaloneHtml, /const firstRegionProvince = snapshot\.regions\.find/);
+  assert.match(standaloneHtml, /const firstRegionProvince = \[\.\.\.new Set\(snapshot\.regions\.map/);
+  // 이슈 #116(2026-09-01): 기본 광역은 가나다순 첫 번째가 아니라 행정표준코드 순서 첫 번째
+  assert.match(standaloneHtml, /\.sort\(compareProvince\)\[0\] \|\| null/);
   assert.match(standaloneHtml, /regionKey: ""/, "초기 지자체 선택은 특정 시군구가 아니어야 함");
   assert.match(standaloneHtml, /function provinceDetail\(province, regions\)/);
   assert.match(standaloneHtml, /광역 기본 보기/);

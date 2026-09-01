@@ -9,7 +9,17 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     coverage: "현재 스냅샷에 수집된 지역×특산품 수입니다.",
     applicationCoverage: "이 지역에서 수집된 전체 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 아직 지역별 집계가 안 끝난 품목도 전체 분모에 포함하므로, 데이터가 쌓일수록 값이 올라갈 수 있습니다.",
   };
-  const firstRegionProvince = snapshot.regions.find((region) => region.sido && region.sido !== "전국")?.sido || null;
+  const displayRegionName = (name) => name.replace("전남광주통합특별시", "전남·광주 통합권역");
+  // 이슈 #116(2026-09-01): 광역자치단체 나열 순서를 행정표준코드 순서(서울→…→제주)로 통일.
+  const PROVINCE_ORDER = ["서울", "부산", "대구", "인천", "광주", "대전", "울산", "세종", "경기", "강원", "충청북", "충청남", "전북", "전라남", "경상북", "경상남", "제주"];
+  const provinceRank = (name) => {
+    if (/전남.*광주|광주.*전남/.test(name)) return PROVINCE_ORDER.indexOf("전라남") + 0.5;
+    if (name === "전국" || name.startsWith("전국 ")) return 99;
+    const index = PROVINCE_ORDER.findIndex((prefix) => name.startsWith(prefix));
+    return index === -1 ? 50 : index;
+  };
+  const compareProvince = (a, b) => provinceRank(a) - provinceRank(b) || displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR");
+  const firstRegionProvince = [...new Set(snapshot.regions.map((region) => region.sido).filter((sido) => sido && sido !== "전국"))].sort(compareProvince)[0] || null;
   const state = { tab: "summary", query: "", itemQuery: "", categoryFilter: "", selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
@@ -245,7 +255,6 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 보여줬는데, 오히려 경기도 라벨이 서울 자리와 겹쳐 어색하다는 지적(사용자) — 화살표
   // 없이 경기도 라벨만 살짝 우측 아래로 옮기고, 서울·세종은 제자리에 그대로 표시한다.
   const nationalLabelOffsets = { 경기도: { x: 20, y: 38 } };
-  const displayRegionName = (name) => name.replace("전남광주통합특별시", "전남·광주 통합권역");
   const mapLabelMarkup = (shapes, municipality) => shapes.map((shape) => {
     const offset = municipality ? null : nationalLabelOffsets[shape.name];
     const x = shape.labelX + (offset?.x || 0);
@@ -490,7 +499,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     });
     const grouped = [...groups.entries()]
       .map(([province, regions]) => ({ province, regions: regions.sort((a, b) => (a.sigungu || a.region).localeCompare(b.sigungu || b.region, "ko-KR")) }))
-      .sort((a, b) => displayRegionName(a.province).localeCompare(displayRegionName(b.province), "ko-KR"));
+      .sort((a, b) => compareProvince(a.province, b.province));
     const activeProvince = grouped.some((group) => group.province === state.selectedRegionProvince) ? state.selectedRegionProvince : grouped[0]?.province || null;
     const activeProvinceRegions = grouped.find((group) => group.province === activeProvince)?.regions || [];
     const region = rows.find((row) => regionKey(row) === state.regionKey) || null;
@@ -502,7 +511,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       return `<section class="province-group"><button type="button" class="province-toggle" data-region-group="${esc(province)}" aria-expanded="${expanded}"><span><strong>${esc(displayRegionName(province))}</strong><small>시군구 ${regions.length}곳 · 특산품 ${coverage.total}개</small></span><b aria-hidden="true">${expanded ? "−" : "+"}</b></button>${municipalities}</section>`;
     }).join("");
     const detail = region ? regionDetail(region, item) : activeProvince ? provinceDetail(activeProvince, activeProvinceRegions) : '<div class="detail-panel"><p class="empty">조회할 광역자치단체를 선택하세요.</p></div>';
-    const allProvinces = [...new Set(snapshot.regions.map((row) => row.sido || row.region))].sort((a, b) => displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR"));
+    const allProvinces = [...new Set(snapshot.regions.map((row) => row.sido || row.region))].sort(compareProvince);
     const provinceTabbarHtml = `<nav class="province-tabbar">${allProvinces.map((province) => `<button type="button" data-province-tab="${esc(province)}" class="${activeProvince === province ? "active" : ""}">${esc(displayRegionName(province))}</button>`).join("")}</nav>`;
     return `<section class="screen-section"><p class="screen-note">광역자치단체 합계를 기본으로 보여주며, 시군구를 선택하면 품목별 상세로 전환됩니다.</p>${provinceTabbarHtml}<section class="workspace"><aside class="region-panel"><div class="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 ${grouped.length}곳 · 시군구 ${rows.length}곳</span></div><label class="search-field"><span class="sr-only">지역 또는 품목 검색</span><input id="region-search" value="${esc(state.query)}" placeholder="지역 또는 품목 검색"></label><div class="province-list">${groupsHtml || '<p class="empty">검색 결과가 없습니다.</p>'}</div></aside>${detail}</section></section>`;
   }
