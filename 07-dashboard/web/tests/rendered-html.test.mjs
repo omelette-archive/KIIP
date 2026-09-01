@@ -94,8 +94,8 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
-  assert.match(html, /지역별 상표 출원/);
-  assert.match(html, /지자체별 조회/);
+  assert.match(html, /전국 지역 비교/);
+  assert.match(html, /지역 상세/);
   assert.match(html, /품목별 조회/);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
@@ -280,9 +280,9 @@ test("renders tab navigation and separate application/registration ranking table
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지역별 상표 출원/지자체별/품목별/특화작목/데이터 개요 6개 탭이 있어야 함");
-  assert.match(html, /지역별 상표 출원/);
-  assert.match(html, /지자체별 조회/);
+  assert.match(html, /class="primary-tabs"/, "요약/전국 지역 비교/지역 상세/품목별/특화작목/데이터 개요 탭이 있어야 함");
+  assert.match(html, /전국 지역 비교/);
+  assert.match(html, /지역 상세/);
   assert.match(html, /품목별 조회/);
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.

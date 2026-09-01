@@ -27,7 +27,7 @@ type SpecialtyCoverage = { total: number; decided: number; applied: number; pend
 type PositionedMapLabel = { name: string; displayName: string; x: number; y: number; targetX: number; targetY: number; leader: boolean };
 
 const STATE_LABELS: Record<string, string> = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "검토중", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
-const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "지역별 상표 출원", regions: "지자체별 조회", items: "품목별 조회", strategy: "비즈니스 전략", compare: "특화작목 비교", data: "데이터 개요" };
+const TAB_LABELS: Record<Tab, string> = { summary: "요약", applications: "전국 지역 비교", regions: "지역 상세", items: "품목별 조회", strategy: "비즈니스 전략", compare: "특화작목 비교", data: "데이터 개요" };
 const MAP_LABELS: Record<MapMetric, string> = { coverage: "특산품 수", trademarks: "상표 건수", applicationCoverage: "출원율", registration: "등록률" };
 const MAP_DESCRIPTIONS: Record<MapMetric, string> = {
   trademarks: "검색 수집이 완료된 항목에서, 출원인 주소가 해당 지역으로 확인된 고유 상표 출원 건수입니다.",
@@ -760,7 +760,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
-      <p className="screen-note">시도별 출원율을 비교하고, 선택한 시도의 시군구별 현황을 확인할 수 있습니다.</p>
+      <p className="screen-note">전국 17개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 특정 지역·품목을 자세히 보려면 <b>지역 상세</b> 탭으로 이동하세요.</p>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
       <div className={selectedProvince ? "applications-compact-row solo" : "applications-compact-row"}>
       {!selectedProvince && <section className="province-composition"><div className="section-heading"><div><h2>광역별 상표 출원·등록 구성</h2></div><span>지역 주소 일치 출원 상위 10개</span></div><div className="composition-list">{provinceCompositionRows.map(([province, stat], index) => <button type="button" key={province} onClick={() => openProvince(province)}><span className="composition-rank">{index + 1}</span><strong>{displayRegionName(province)}</strong><span className="composition-bar"><i style={{ width: `${stat.trademarks / provinceCompositionMax * 100}%` }}><b style={{ width: `${stat.trademarks ? stat.registered / stat.trademarks * 100 : 0}%` }} /></i></span><small>출원 {number(stat.trademarks)} · 등록 {number(stat.registered)}</small></button>)}</div><p className="composition-legend"><i />출원 <b />등록</p></section>}
@@ -807,7 +807,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </section>}
 
     {tab === "regions" && <section className="screen-section">
-      <p className="screen-note">광역자치단체 합계를 기본으로 보여주며, 시군구를 선택하면 품목별 상세로 전환됩니다.</p>
+      <p className="screen-note">지역을 골라 그 지역의 특산품·상표를 파고듭니다(시도 → 시군구 → 품목). 전국 비교는 <b>전국 지역 비교</b> 탭에 있습니다.</p>
       <nav className="province-tabbar" aria-label="광역자치단체 바로가기">{allProvinces.map((province) => <button type="button" key={province} className={activeRegionProvince === province ? "active" : ""} onClick={() => { setSelectedRegionProvince(province); setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); }}>{displayRegionName(province)}</button>)}</nav>
       <section className="workspace" aria-label="지역별 상세 조회">
         <aside className="region-panel">
