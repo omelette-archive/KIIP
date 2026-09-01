@@ -692,13 +692,15 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   assert.match(standaloneHtml, /id="trend-start-input"/, "시작 연도를 직접 입력할 수 있어야 함");
   assert.match(standaloneHtml, /id="trend-end-input"/, "끝 연도를 직접 입력할 수 있어야 함");
   // 참고 이미지의 양 끝 드래그 핸들 구간 조절 바도 추가했다(사용자가 프리셋 버튼만 있던
-  // 이전 결정을 뒤집고 요청) — 지도보다 위쪽에 배치된다(coverage-workspace 앞).
+  // 이전 결정을 뒤집고 요청).
   assert.match(standaloneHtml, /class="trend-range-track"/, "양 끝 드래그 핸들 구간 조절 바가 있어야 함");
   assert.match(standaloneHtml, /id="trend-range-handle-start"/);
   assert.match(standaloneHtml, /id="trend-range-handle-end"/);
+  // 2026-09-01(#116): 광역 구성·추이는 왼쪽 열, 지도·요약은 오른쪽 열의 2단 레이아웃.
+  // 추이 그래프는 소스 순서상 지도 카드보다 먼저 나온다(왼쪽 열이 먼저 렌더).
   assert.ok(
-    standaloneHtml.indexOf('class="trend-chart"') < standaloneHtml.indexOf('class="coverage-workspace"'),
-    "연도별 추이 그래프 섹션은 지도(coverage-workspace)보다 위쪽에 있어야 함",
+    standaloneHtml.indexOf('class="trend-chart"') < standaloneHtml.indexOf('class="coverage-map-card"'),
+    "연도별 추이 그래프 섹션은 지도 카드보다 소스 순서상 먼저 와야 함",
   );
   assert.match(
     standaloneHtml,
