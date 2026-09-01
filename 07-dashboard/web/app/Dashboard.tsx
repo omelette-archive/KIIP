@@ -726,7 +726,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }, [regionalRegions]);
   return <main className="shell">
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
-    <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).map((key) => <button type="button" key={key} className={tab === key ? "active" : ""} aria-current={tab === key ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>)}</nav>
+    <nav className="primary-tabs" aria-label="대시보드 화면">{(Object.keys(TAB_LABELS) as Tab[]).filter((key) => key !== "regions").map((key) => { const active = tab === key || (key === "applications" && tab === "regions"); return <button type="button" key={key} className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={() => setTab(key)}>{TAB_LABELS[key]}</button>; })}</nav>
 
     {tab === "summary" && <>
       {/* 이슈 #116(2026-08-26): 요약 첫 칸을 "전국 특산품 수"로. 중복되던 hero 큰 글씨 제거. */}
@@ -753,14 +753,16 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div>
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
+         <div className="ranking-stack">
           <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
           <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+         </div>
         </div>
       </section>
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
-      <p className="screen-note">전국 17개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 특정 지역·품목을 자세히 보려면 <b>지역 상세</b> 탭으로 이동하세요.</p>
+      <p className="screen-note">전국 17개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 아래 목록·지도에서 특정 지역이나 품목을 누르면 그 지역 상세 화면으로 들어갑니다.</p>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
       <div className={selectedProvince ? "applications-compact-row solo" : "applications-compact-row"}>
       {!selectedProvince && <section className="province-composition"><div className="section-heading"><div><h2>광역별 상표 출원·등록 구성</h2></div><span>지역 주소 일치 출원 상위 10개</span></div><div className="composition-list">{provinceCompositionRows.map(([province, stat], index) => <button type="button" key={province} onClick={() => openProvince(province)}><span className="composition-rank">{index + 1}</span><strong>{displayRegionName(province)}</strong><span className="composition-bar"><i style={{ width: `${stat.trademarks / provinceCompositionMax * 100}%` }}><b style={{ width: `${stat.trademarks ? stat.registered / stat.trademarks * 100 : 0}%` }} /></i></span><small>출원 {number(stat.trademarks)} · 등록 {number(stat.registered)}</small></button>)}</div><p className="composition-legend"><i />출원 <b />등록</p></section>}
@@ -806,8 +808,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>
     </section>}
 
-    {tab === "regions" && <section className="screen-section">
-      <p className="screen-note">지역을 골라 그 지역의 특산품·상표를 파고듭니다(시도 → 시군구 → 품목). 전국 비교는 <b>전국 지역 비교</b> 탭에 있습니다.</p>
+    {tab === "regions" && <section className="screen-section region-detail-screen">
+      <button type="button" className="drill-back" onClick={() => setTab("applications")}>← 전국 지역 비교</button>
+      <p className="screen-note">선택한 지역의 특산품·상표를 시도 → 시군구 → 품목 순으로 파고듭니다. 다른 시도를 눌러 바로 이동할 수도 있습니다.</p>
       <nav className="province-tabbar" aria-label="광역자치단체 바로가기">{allProvinces.map((province) => <button type="button" key={province} className={activeRegionProvince === province ? "active" : ""} onClick={() => { setSelectedRegionProvince(province); setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); }}>{displayRegionName(province)}</button>)}</nav>
       <section className="workspace" aria-label="지역별 상세 조회">
         <aside className="region-panel">

@@ -89,16 +89,20 @@ a { color: inherit; text-decoration: none; }
 .tab-button:hover { color: var(--ink); }
 .tab-button.active { border-color: var(--line); border-bottom-color: var(--surface); background: var(--surface); color: var(--green-dark); }
 
-/* 이슈 #116(2026-08-26): 요약 화면 랭킹 두 표를 .summary-row 3번째 칸에 세로로 쌓아
-   특산품 순위·지도와 한 행(row)에 컴팩트하게 들어가게 한다(2단→1행 요청).
-   2026-09-01: 지도 카드와 아래 끝선이 안 맞아 어색하다는 재지적 — 3번째 칸이 행 높이를
-   꽉 채우고(stretch), 두 랭킹 카드가 그 높이를 반씩 나눠 갖게 해서 오른쪽 열 끝선을
-   지도 카드와 맞춘다. 표가 길면 카드 안에서 세로 스크롤한다. */
-/* .summary-row가 align-items:stretch라 이 열은 지도 카드 높이만큼 늘어난다. 예전엔
-   height:100%를 걸었는데, auto-height 그리드 행에서 height:100%는 stretch를 오히려
-   무력화(내용 높이로 축소)해서 랭킹 열만 짧아 튀었다(#116). height:100% 제거하고
-   grid stretch에 맡긴다. */
-.ranking-columns { display: flex; flex-direction: column; gap: 16px; min-height: 0; }
+/* 이슈 #116: 요약 화면 랭킹 두 표를 .summary-row 3번째 칸에 세로로 쌓아 지도와 한 행에 넣는다.
+   2026-09-01(3차 재수정): align-items:stretch로 3번째 칸(.ranking-columns)은 지도 카드
+   높이만큼 늘어나지만, 그 안의 flex 자식(.ranking)이 "grid로 stretch된 부모"의 높이를
+   확정 크기로 못 읽어 flex:1이 안 먹고 두 카드가 내용 높이(≈940px)에 머물러, 넓은 화면에서
+   지도 카드(≈1,060px)보다 100px+ 짧게 끝나 튀었다(사용자 3회 재지적).
+   해결: 넓은 레이아웃에서 .ranking-stack을 position:absolute; inset:0으로 그리드 칸을
+   꽉 채운다. absolute 요소 높이는 확정 크기라 내부 flex:1이 정상 동작 → 두 랭킹 카드가
+   칸 높이를 정확히 반씩 나눠 갖고 아래 끝선이 지도 카드와 맞는다. 표가 길면 카드 안에서
+   세로 스크롤(.ranking-table-wrap). 좁은 화면(≤980px 1단 적층)에서는 static 흐름 배치. */
+.ranking-columns { position: relative; min-height: 0; }
+.ranking-stack { display: flex; flex-direction: column; gap: 16px; }
+@media (min-width: 981px) {
+  .ranking-stack { position: absolute; inset: 0; }
+}
 .ranking { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; padding: 22px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .ranking .section-heading { flex-wrap: nowrap; }
 .ranking .section-heading h2 { word-break: keep-all; overflow-wrap: normal; }
@@ -202,7 +206,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); grid-auto-flow: row;
+  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); grid-auto-flow: row;
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
@@ -439,6 +443,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 
 .screen-section { padding-top: 28px; }
 .screen-note { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+/* 이슈 #119: "지역 상세"는 탭 바에서 빼고 "전국 지역 비교"에서 지역을 클릭해 들어오는
+   하위 화면으로 합쳤다. 돌아가는 경로를 화면 상단에 항상 노출한다. */
+.drill-back { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--green-dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+.drill-back:hover { border-color: var(--green); background: var(--green-soft); }
 .item-screen { margin-top: 25px; padding: 25px; }
 .item-screen-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
 .item-screen-toolbar label { flex: 1; }.item-screen-toolbar input { width: min(100%, 430px); padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #f4f6f9; outline: none; }.item-screen-toolbar input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,109,86,.12); }.item-screen-toolbar span { color: var(--muted); font-size: 12px; }
@@ -543,7 +551,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media (min-width: 1500px) {
   .applications-compact-row { gap: 22px; }
   .item-card-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .ranking-columns { gap: 28px; }
+  .ranking-stack { gap: 28px; }
 }
 
 /* 이슈 #116(2026-09-01, 재수정): "지역별 상표 출원" 4단 행(구성비·추이·지도·인사이트)은
@@ -701,5 +709,5 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media (max-width: 900px) { .composition-list { grid-template-columns: 1fr; } }
 @media (min-width: 1280px) {
   .map-stage { min-height: 360px; }
-  .ranking-columns { margin-top: 14px; gap: 14px; }
+  .ranking-stack { gap: 14px; }
 }
