@@ -130,7 +130,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   function shareDonutHtml(counts, label) {
     const { segments, total } = provinceShareSegments(counts);
     if (!total) return '<div class="item-share empty"><p class="empty">아직 지역 확인 출원이 없습니다.</p></div>';
-    const legend = segments.map((segment, index) => `<li><i style="background:${SHARE_COLORS[index % SHARE_COLORS.length]}"></i>${esc(displayRegionName(segment.name))}<b>${percent(segment.pct)}</b></li>`).join("");
+    const legend = segments.map((segment, index) => `<li><i style="background:${SHARE_COLORS[index % SHARE_COLORS.length]}"></i><span class="item-share-region">${esc(displayRegionName(segment.name))}</span><b>${percent(segment.pct)}</b></li>`).join("");
     return `<div class="item-share"><div class="item-share-donut" style="background:${shareConicGradient(segments)}" role="img" aria-label="${esc(label)} 광역 단위 출원 비중"></div><ul class="item-share-legend">${legend}</ul></div>`;
   }
   // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를

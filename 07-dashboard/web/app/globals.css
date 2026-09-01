@@ -460,6 +460,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* 이슈 #116(2026-08-26): 품목별 조회 카드에 연도별 출원건수 그래프·광역 단위 출원 비중
    원그래프 추가 요청 — 카드마다 컴팩트 추이 그래프와 도넛+범례를 나란히 붙인다. */
 .item-card-charts { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr); gap: 12px; margin-top: 14px; align-items: start; }
+/* 카드가 좁아지면 추이·비중 그래프를 세로로 쌓아 비중 숫자가 안 잘리게 한다(#116). */
+@media (max-width: 1360px) { .item-card-charts { grid-template-columns: 1fr; } }
 .item-card-charts .trend-chart-compact { margin: 0; padding: 12px 14px 8px; }
 .item-card-charts .trend-chart-compact .section-heading h2 { font-size: 13px; }
 .item-card-charts .trend-chart-compact .section-heading > span { font-size: 9.5px; }
@@ -469,9 +471,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-share.empty { display: block; margin-top: 4px; }
 .item-share-donut { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; }
 .item-share-legend { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: 0; }
-.item-share-legend li { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.item-share-legend li { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10.5px; }
 .item-share-legend li i { flex-shrink: 0; width: 8px; height: 8px; border-radius: 999px; }
-.item-share-legend li b { margin-left: auto; padding-left: 6px; color: var(--ink); font-weight: 800; }
+/* 이슈 #116(2026-09-01): 창이 좁아져도 비중 숫자(%)는 절대 잘리면 안 된다 — 지역명만
+   말줄임 처리하고 숫자는 flex-shrink:0으로 항상 표시. */
+.item-share-region { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-share-legend li b { flex-shrink: 0; margin-left: auto; padding-left: 6px; color: var(--ink); font-weight: 800; white-space: nowrap; }
 .provisional-note { margin: 11px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); font-size: 11px; line-height: 1.5; }
 .item-empty { grid-column: 1 / -1; }.method-note { margin-top: 15px; padding: 14px 16px; box-shadow: none; background: #eef2f7; }.method-note summary { cursor: pointer; font-size: 12px; font-weight: 800; }.method-note p { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
 

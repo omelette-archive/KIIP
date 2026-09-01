@@ -189,7 +189,7 @@ function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>;
   if (!total) return <div className="item-share empty"><p className="empty">아직 지역 확인 출원이 없습니다.</p></div>;
   return <div className="item-share">
     <div className="item-share-donut" style={{ background: shareConicGradient(segments) }} role="img" aria-label={`${label} 광역 단위 출원 비중`} />
-    <ul className="item-share-legend">{segments.map((segment, index) => <li key={segment.name}><i style={{ background: SHARE_COLORS[index % SHARE_COLORS.length] }} />{displayRegionName(segment.name)}<b>{percent(segment.pct)}</b></li>)}</ul>
+    <ul className="item-share-legend">{segments.map((segment, index) => <li key={segment.name}><i style={{ background: SHARE_COLORS[index % SHARE_COLORS.length] }} /><span className="item-share-region">{displayRegionName(segment.name)}</span><b>{percent(segment.pct)}</b></li>)}</ul>
   </div>;
 }
 // 이슈 #116(2026-09-01): 지자체별 조회에서 추이 그래프 크기를 사용자가 조절하고
