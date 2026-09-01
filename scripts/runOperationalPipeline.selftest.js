@@ -35,10 +35,12 @@ try {
     "03_match",
     "03b_applicant_region",
     "03c_ip_registry",
+    "03d_supplemental_scopes",
     "04_analyze",
     "05_gap",
     "06_strategy",
     "07_snapshot",
+    "07b_supplemental_attach",
     "validate",
     "render_candidate",
   ]);
@@ -65,8 +67,19 @@ try {
     analyzeStage.args[analyzeStage.args.indexOf("--raw-goods-review") + 1],
     plan.inputs.rawGoodsReview
   );
-  // ④는 ③ 원본이 아니라 ③c 등록원부 보강 결과를 입력으로 받아야 함
-  assert.strictEqual(analyzeStage.args[analyzeStage.args.indexOf("--input") + 1], plan.files.registryEnriched);
+  // ④는 03d 보완 스코프 정규화 결과를 입력으로 받아야 함(③c → 03d → ④)
+  assert.strictEqual(analyzeStage.args[analyzeStage.args.indexOf("--input") + 1], plan.files.scopedSearch);
+  const scopeStage = plan.stages.find((stage) => stage.id === "03d_supplemental_scopes");
+  assert.strictEqual(scopeStage.args[scopeStage.args.indexOf("--input") + 1], plan.files.registryEnriched);
+  const attachStage = plan.stages.find((stage) => stage.id === "07b_supplemental_attach");
+  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--input") + 1], plan.files.snapshotRaw);
+  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--out") + 1], plan.files.snapshot);
+  const collectSources = collectStage.args[collectStage.args.indexOf("--sources") + 1];
+  assert.ok(collectSources.includes("kofpi_forest_product") && collectSources.includes("nfqs_quality_cert"));
+  // --include-review-required 옵션
+  assert.ok(!plan.stages.find((s) => s.id === "03_match").args.includes("--include-review-required"));
+  const reviewPlan = buildPlan({ runId: "review-plan", runsDir: path.join(tempDir, "runs"), stateDir: path.join(tempDir, "state"), includeReviewRequired: true });
+  assert.ok(reviewPlan.stages.find((s) => s.id === "03_match").args.includes("--include-review-required"));
   const serialized = JSON.stringify(publicPlan(plan));
   assert.ok(!serialized.includes("API_KEY"));
   assert.ok(!serialized.includes("--apiKey"));

@@ -23,6 +23,7 @@ function parseArgs(argv) {
   const options = {
     dryRun: false,
     promote: false,
+    includeReviewRequired: false,
     maxRequests: 100,
     maxPages: 5,
     maxHitsPerQuery: 100,
@@ -35,6 +36,8 @@ function parseArgs(argv) {
     ["--runs-dir", "runsDir"],
     ["--state-dir", "stateDir"],
     ["--raw-goods-review", "rawGoodsReview"],
+    ["--forest-regions", "forestRegions"],
+    ["--rda-crops", "rdaCrops"],
     ["--max-requests", "maxRequests"],
     ["--max-pages", "maxPages"],
     ["--max-hits-per-query", "maxHitsPerQuery"],
@@ -46,6 +49,7 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === "--dry-run") options.dryRun = true;
     else if (arg === "--promote") options.promote = true;
+    else if (arg === "--include-review-required") options.includeReviewRequired = true;
     else if (arg === "--help" || arg === "-h") options.help = true;
     else if (valueFlags.has(arg)) {
       const next = argv[index + 1];
@@ -85,6 +89,9 @@ function printUsage() {
       "옵션:",
       "  --dry-run                    API 호출·파일 변경 없이 실행 계획만 출력",
       "  --promote                    검증 통과 시 저장소 웹 스냅샷·dashboard.html 교체 단계 포함",
+      "  --include-review-required     ③ 검색에 검토대기(고시명칭 미확정) 원물명 행도 포함",
+      "  --forest-regions <json>      KOFPI 주산지 근거 파일(기본: 저장소 임산물생산조사)",
+      "  --rda-crops <json>           농촌진흥청 지역특화작목 참조 파일(기본: 저장소본)",
       "  --run-id <id>                실행 식별자(영문/숫자/._-)",
       "  --runs-dir <path>            실행별 산출물·로그 디렉터리",
       "  --state-dir <path>           SQLite·검색 체크포인트·보강 캐시·예산 상태 영구 디렉터리",
@@ -137,13 +144,21 @@ function buildPlan(options = {}) {
     trademarks: path.join(runDir, "03-trademarks.json"),
     applicantEnriched: path.join(runDir, "03b-applicant-enriched.json"),
     registryEnriched: path.join(runDir, "03c-registry-enriched.json"),
+    scopedSearch: path.join(runDir, "03d-supplemental-scoped.json"),
     analysis: path.join(runDir, "04-analysis.json"),
     gap: path.join(runDir, "05-gap.json"),
     strategy: path.join(runDir, "06-strategy.json"),
+    snapshotRaw: path.join(runDir, "07-dashboard-snapshot.raw.json"),
     snapshot: path.join(runDir, "07-dashboard-snapshot.json"),
     dashboardCandidate: path.join(runDir, "dashboard.candidate.html"),
     manifest: path.join(runDir, "run-manifest.json"),
   };
+  const forestRegions = path.resolve(
+    options.forestRegions || path.join(ROOT, "02-normalize-items", "data", "kofpi-primary-regions-2024.json")
+  );
+  const rdaCrops = path.resolve(
+    options.rdaCrops || path.join(ROOT, "02-normalize-items", "data", "regional-specialty-crops-2025.json")
+  );
   const state = {
     specialtiesDb: path.join(stateDir, "specialties.sqlite"),
     trademarkCheckpoint: path.join(stateDir, "kipris-search-checkpoint.json"),
@@ -173,6 +188,7 @@ function buildPlan(options = {}) {
     "--max-hits-per-query",
     String(options.maxHitsPerQuery ?? 100),
   ];
+  if (options.includeReviewRequired) matchArgs.push("--include-review-required");
   if (fs.existsSync(state.trademarkCheckpoint)) matchArgs.push("--resume");
 
   const stages = [
@@ -192,18 +208,18 @@ function buildPlan(options = {}) {
     ),
     nodeStage(
       "01_collect",
-      "핵심 특산품 수집과 누적 SQLite 갱신(GI·농사로·세종·제주·서귀포)",
+      "특산품 수집과 누적 SQLite 갱신(GI·농사로·세종·제주·서귀포 + NFQS·KOFPI·RDA 보완)",
       "01-collect-specialties/collectSpecialties.js",
       [
         "--out",
         files.collected,
         "--db",
         state.specialtiesDb,
-        // 소스를 명시 고정한다 — NFQS·KOFPI·RDA는 지역 스코프 특수 처리(mergeSupplementalDashboardData.js)가
-        // 파이프라인에 접히기 전까지 이 실행기 범위 밖이다. collectSpecialties.js의 기본
-        // 소스 목록이 바뀌어도 운영 실행은 결정론적으로 유지된다.
+        // 소스를 명시 고정한다 — collectSpecialties.js의 기본 목록이 바뀌어도 운영
+        // 실행은 결정론적으로 유지된다. NFQS·KOFPI·RDA는 03d_supplemental_scopes에서
+        // 지역 스코프를 정규화한다.
         "--sources",
-        "gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
+        "gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,rda_regional_specialty_crops",
       ],
       [files.collected, state.specialtiesDb]
     ),
@@ -266,12 +282,26 @@ function buildPlan(options = {}) {
       [files.registryEnriched, state.ipRegistryCache, state.ipRegistryBudget]
     ),
     nodeStage(
+      "03d_supplemental_scopes",
+      "NFQS·KOFPI 보완 소스 지역 스코프 정규화(인증사업장→전국, 임산물→주산지 확장)",
+      "scripts/applySupplementalScopes.js",
+      [
+        "--input",
+        files.registryEnriched,
+        "--out",
+        files.scopedSearch,
+        "--forest-regions",
+        forestRegions,
+      ],
+      [files.scopedSearch]
+    ),
+    nodeStage(
       "04_analyze",
       "지역×품목 상표 분석",
       "04-analyze-brand/analyzeBrands.js",
       [
         "--input",
-        files.registryEnriched,
+        files.scopedSearch,
         "--out",
         files.analysis,
         "--raw-goods-review",
@@ -311,7 +341,23 @@ function buildPlan(options = {}) {
         "--geometry",
         path.join(ROOT, "07-dashboard/web/public/data/map-geometry.json"),
         "--out",
+        files.snapshotRaw,
+      ],
+      [files.snapshotRaw]
+    ),
+    nodeStage(
+      "07b_supplemental_attach",
+      "KOFPI 주산지 근거·농촌진흥청 특화작목 배지를 스냅샷에 연결",
+      "scripts/attachSupplementalEvidence.js",
+      [
+        "--input",
+        files.snapshotRaw,
+        "--out",
         files.snapshot,
+        "--forest-regions",
+        forestRegions,
+        "--rda-crops",
+        rdaCrops,
       ],
       [files.snapshot]
     ),

@@ -27,6 +27,8 @@ const REQUIRED_ENV = [
   "NONGSARO_LOCAL_BRAND_API_KEY",
   "KIPRIS_API_KEY",
   "IP_REGISTRY_API_KEY",
+  "NFQS_QUALITY_API_KEY",
+  "NFQS_GEO_API_KEY",
 ];
 
 function parseArgs(argv) {

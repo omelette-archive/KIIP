@@ -48,6 +48,8 @@ jobs:
       NONGSARO_LOCAL_BRAND_API_KEY: ${{ secrets.NONGSARO_LOCAL_BRAND_API_KEY }}
       KIPRIS_API_KEY: ${{ secrets.KIPRIS_API_KEY }}
       IP_REGISTRY_API_KEY: ${{ secrets.IP_REGISTRY_API_KEY }}
+      NFQS_QUALITY_API_KEY: ${{ secrets.NFQS_QUALITY_API_KEY }}
+      NFQS_GEO_API_KEY: ${{ secrets.NFQS_GEO_API_KEY }}
 
     steps:
       - name: Check out repository
@@ -76,6 +78,7 @@ jobs:
         run: |
           node scripts/runOperationalPipeline.js \
             --promote \
+            --include-review-required \
             --run-id "${{ steps.runid.outputs.value }}" \
             --runs-dir "${KIIP_OPERATIONAL_ROOT}/runs" \
             --state-dir "${KIIP_OPERATIONAL_ROOT}/state" \
