@@ -1,0 +1,124 @@
+name: Operational data pipeline
+
+# #70: 실데이터 수집(①)부터 대시보드 게시(⑦)까지 주 1회 정기 실행.
+# 자체 호스트 러너(고정 IP·영구 디스크)에서만 동작한다 — GitHub 호스티드 러너는
+# 매 실행 워크스페이스를 비워 KIPRIS 검색 체크포인트·등록원부 캐시·일별 예산 상태를
+# 이어갈 수 없다. 러너에는 `self-hosted` + `kiip-operational` 라벨을 붙이고,
+# 영구 디스크 경로를 KIIP_OPERATIONAL_ROOT 환경변수로 지정한다(러너 환경 설정).
+
+on:
+  schedule:
+    # 매주 월요일 02:00 KST (일요일 17:00 UTC)
+    - cron: "0 17 * * 0"
+  workflow_dispatch:
+    inputs:
+      max_requests:
+        description: "③ 검색 요청 상한"
+        required: false
+        default: "400"
+      applicant_limit:
+        description: "③b 출원인 주소 보강 신규 호출 상한"
+        required: false
+        default: "5000"
+      ip_registry_daily_budget:
+        description: "③c 등록원부 하루 누적 호출 상한"
+        required: false
+        default: "100"
+
+# 전역 잠금: 같은 시점에 두 번 실행되지 않는다. 진행 중 실행을 취소하지 않는다
+# (외부 API 호출·체크포인트 정합성 보호).
+concurrency:
+  group: operational-pipeline
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  run:
+    runs-on: [self-hosted, kiip-operational]
+    timeout-minutes: 720
+
+    env:
+      KIIP_OPERATIONAL_ROOT: ${{ vars.KIIP_OPERATIONAL_ROOT || format('{0}/kiip-operational', runner.temp) }}
+      GI_API_KEY: ${{ secrets.GI_API_KEY }}
+      NONGSARO_API_KEY: ${{ secrets.NONGSARO_API_KEY }}
+      NONGSARO_LOCAL_BRAND_API_KEY: ${{ secrets.NONGSARO_LOCAL_BRAND_API_KEY }}
+      KIPRIS_API_KEY: ${{ secrets.KIPRIS_API_KEY }}
+      IP_REGISTRY_API_KEY: ${{ secrets.IP_REGISTRY_API_KEY }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          package-manager-cache: false
+
+      - name: Resolve run id
+        id: runid
+        shell: bash
+        run: echo "value=$(date -u +%Y%m%d)-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+
+      - name: Run operational pipeline and promote on validation pass
+        id: pipeline
+        shell: bash
+        run: |
+          node scripts/runOperationalPipeline.js \
+            --promote \
+            --run-id "${{ steps.runid.outputs.value }}" \
+            --runs-dir "${KIIP_OPERATIONAL_ROOT}/runs" \
+            --state-dir "${KIIP_OPERATIONAL_ROOT}/state" \
+            --max-requests "${{ github.event.inputs.max_requests || '400' }}" \
+            --applicant-limit "${{ github.event.inputs.applicant_limit || '5000' }}" \
+            --ip-registry-daily-budget "${{ github.event.inputs.ip_registry_daily_budget || '100' }}"
+
+      - name: Commit and push promoted dashboard
+        if: success()
+        shell: bash
+        run: |
+          if git diff --quiet -- 07-dashboard/dashboard.html 07-dashboard/web/public/data/dashboard-snapshot.json; then
+            echo "게시할 변경 없음(스냅샷 동일)."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add 07-dashboard/dashboard.html 07-dashboard/web/public/data/dashboard-snapshot.json
+          git commit -m "chore(pipeline): 운영 실행 ${{ steps.runid.outputs.value }} 스냅샷 게시"
+          git push origin HEAD:${GITHUB_REF_NAME}
+
+      - name: Open failure issue
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const runId = "${{ steps.runid.outputs.value }}";
+            const url = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            const title = `운영 파이프라인 실패: ${runId}`;
+            const body = [
+              `주간 운영 파이프라인 실행이 실패했습니다.`,
+              ``,
+              `- run-id: \`${runId}\``,
+              `- Actions 로그: ${url}`,
+              `- 트리거: ${context.eventName}`,
+              ``,
+              `체크포인트·보강 캐시는 러너의 영구 디스크(\`KIIP_OPERATIONAL_ROOT\`)에 보존됩니다. 원인을 확인한 뒤 같은 워크플로를 재실행하면 미완료 지점부터 이어집니다.`,
+            ].join("\n");
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner, repo: context.repo.repo,
+              state: "open", labels: "operational-pipeline-failure",
+            });
+            if (existing.data.length > 0) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner, repo: context.repo.repo,
+                issue_number: existing.data[0].number, body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner, repo: context.repo.repo,
+                title, body, labels: ["operational-pipeline-failure"],
+              });
+            }

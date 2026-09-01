@@ -18,7 +18,7 @@ const ROOT = path.resolve(__dirname, "..");
 const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-operational-runner-"));
 
 try {
-  console.log("1) 계획은 ①~⑦→검증→후보 HTML 순서와 영구 상태 경로를 고정한다");
+  console.log("1) 계획은 ①~③·③b·③c~⑦→검증→후보 HTML 순서와 영구 상태 경로를 고정한다");
   const plan = buildPlan({
     runId: "test-plan",
     runsDir: path.join(tempDir, "runs"),
@@ -32,6 +32,8 @@ try {
     "01_collect",
     "02_normalize",
     "03_match",
+    "03b_applicant_region",
+    "03c_ip_registry",
     "04_analyze",
     "05_gap",
     "06_strategy",
@@ -41,6 +43,15 @@ try {
   ]);
   assert.strictEqual(path.dirname(plan.state.specialtiesDb), plan.stateDir);
   assert.strictEqual(path.dirname(plan.state.trademarkCheckpoint), plan.stateDir);
+  // #70: 보강 캐시·일별 예산 상태도 실행 디렉터리가 아니라 영구 stateDir에 있어야 함
+  assert.strictEqual(path.dirname(plan.state.applicantRegionCache), plan.stateDir);
+  assert.strictEqual(path.dirname(plan.state.ipRegistryCache), plan.stateDir);
+  assert.strictEqual(path.dirname(plan.state.ipRegistryBudget), plan.stateDir);
+  const applicantStage = plan.stages.find((stage) => stage.id === "03b_applicant_region");
+  assert.strictEqual(applicantStage.args[applicantStage.args.indexOf("--cache") + 1], plan.state.applicantRegionCache);
+  const registryStage = plan.stages.find((stage) => stage.id === "03c_ip_registry");
+  assert.strictEqual(registryStage.args[registryStage.args.indexOf("--budget-state") + 1], plan.state.ipRegistryBudget);
+  assert.ok(registryStage.args.includes("--daily-budget"));
   assert.ok(plan.publication.automatic === false);
   const analyzeStage = plan.stages.find((stage) => stage.id === "04_analyze");
   assert.ok(analyzeStage.args.includes("--raw-goods-review"));
@@ -48,9 +59,26 @@ try {
     analyzeStage.args[analyzeStage.args.indexOf("--raw-goods-review") + 1],
     plan.inputs.rawGoodsReview
   );
+  // ④는 ③ 원본이 아니라 ③c 등록원부 보강 결과를 입력으로 받아야 함
+  assert.strictEqual(analyzeStage.args[analyzeStage.args.indexOf("--input") + 1], plan.files.registryEnriched);
   const serialized = JSON.stringify(publicPlan(plan));
   assert.ok(!serialized.includes("API_KEY"));
   assert.ok(!serialized.includes("--apiKey"));
+
+  console.log("1b) --promote는 검증·후보 HTML 뒤에 게시 승격 단계를 붙인다");
+  const promotePlan = buildPlan({
+    runId: "promote-plan",
+    runsDir: path.join(tempDir, "runs"),
+    stateDir: path.join(tempDir, "state"),
+    promote: true,
+  });
+  assert.deepStrictEqual(promotePlan.stages.slice(-3).map((stage) => stage.id), [
+    "promote_snapshot",
+    "promote_html",
+    "promote_audit",
+  ]);
+  assert.strictEqual(promotePlan.publication.automatic, true);
+  assert.ok(promotePlan.stages.findIndex((s) => s.id === "validate") < promotePlan.stages.findIndex((s) => s.id === "promote_snapshot"));
 
   console.log("2) --dry-run은 API 호출이나 실행/상태 디렉터리 생성을 하지 않는다");
   const dryRunsDir = path.join(tempDir, "dry-runs");
