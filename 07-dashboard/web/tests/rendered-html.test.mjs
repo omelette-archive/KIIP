@@ -793,6 +793,14 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /상표 출원 건수 상위/);
   assert.match(html, /class="item-regions-detail"/);
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
+  // 이슈 #119: KIPRIS 링크는 검색창 호출(searchKeyword=AN=…)이 아니라 결과가 바로 뜨는
+  // queryText 딥링크를 쓴다. 브라우저 뒤로가기가 페이지를 벗어나지 않게 history도 쌓는다.
+  assert.match(html, /searchResult\.do\?tab=trademark&queryText=/);
+  assert.doesNotMatch(html, /searchKeyword=\$\{encodeURIComponent\(`AN=/);
+  assert.match(html, /popstate/);
+  assert.match(html, /kiipTab/);
+  // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
+  assert.match(html, /const PROVINCE_COLORS = \{/);
   // 2026-08-21 사용자 재확인: 분모는 확인 완료분이 아니라 수집된 지역×특산품 전체다.
   assert.match(html, /지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수/);
   assert.doesNotMatch(html, /if \(!officialItemLabel\(item\)\) return;\s*total \+= 1/);

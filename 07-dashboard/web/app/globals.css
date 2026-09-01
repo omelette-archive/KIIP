@@ -496,20 +496,21 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-card-metrics strong.rate-high { color: var(--green); }
 /* 이슈 #116(2026-08-26): 품목별 조회 카드에 연도별 출원건수 그래프·광역 단위 출원 비중
    원그래프 추가 요청 — 카드마다 컴팩트 추이 그래프와 도넛+범례를 나란히 붙인다. */
-.item-card-charts { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(150px, 1fr); gap: 12px; margin-top: 14px; align-items: start; }
-/* 카드가 좁아지면 추이·비중 그래프를 세로로 쌓아 비중 숫자가 안 잘리게 한다(#116). */
-@media (max-width: 1360px) { .item-card-charts { grid-template-columns: 1fr; } }
-.item-card-charts .trend-chart-compact { margin: 0; padding: 12px 14px 8px; }
-.item-card-charts .trend-chart-compact .section-heading h2 { font-size: 13px; }
-.item-card-charts .trend-chart-compact .section-heading > span { font-size: 9.5px; }
-.item-share-block { padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
-.item-share-block .section-heading h2 { font-size: 13px; }
-.item-share { display: flex; align-items: center; gap: 12px; margin-top: 8px; }
-.item-share.empty { display: block; margin-top: 4px; }
-.item-share-donut { flex-shrink: 0; width: 64px; height: 64px; border-radius: 50%; }
-.item-share-legend { display: grid; gap: 4px; margin: 0; padding: 0; list-style: none; min-width: 0; }
-.item-share-legend li { display: flex; align-items: center; gap: 5px; color: var(--muted); font-size: 10.5px; }
-.item-share-legend li i { flex-shrink: 0; width: 8px; height: 8px; border-radius: 999px; }
+/* 이슈 #119: 품목별 조회를 마스터-디테일로 바꿔 상세 패널이 전체 폭을 쓰므로, 추이 그래프와
+   광역 비중 도넛을 같은 높이(align-items:stretch)로 맞추고 도넛·범례를 키운다. */
+.item-card-charts { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: 14px; margin-top: 16px; align-items: stretch; }
+@media (max-width: 1000px) { .item-card-charts { grid-template-columns: 1fr; } }
+.item-card-charts .trend-chart-compact { margin: 0; padding: 14px 16px 10px; }
+.item-card-charts .trend-chart-compact .section-heading h2 { font-size: 14px; }
+.item-card-charts .trend-chart-compact .section-heading > span { font-size: 10px; }
+.item-share-block { display: flex; flex-direction: column; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
+.item-share-block .section-heading h2 { font-size: 14px; }
+.item-share { flex: 1; display: flex; align-items: center; gap: 20px; margin-top: 14px; }
+.item-share.empty { display: block; margin-top: 6px; }
+.item-share-donut { flex-shrink: 0; width: 124px; height: 124px; border-radius: 50%; }
+.item-share-legend { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.item-share-legend li { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+.item-share-legend li i { flex-shrink: 0; width: 11px; height: 11px; border-radius: 999px; }
 /* 이슈 #116(2026-09-01): 창이 좁아져도 비중 숫자(%)는 절대 잘리면 안 된다 — 지역명만
    말줄임 처리하고 숫자는 flex-shrink:0으로 항상 표시. */
 .item-share-region { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

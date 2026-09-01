@@ -165,7 +165,6 @@ function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: numb
 
 // 이슈 #116(2026-08-26): 품목별 조회에 광역 단위 출원 비중 원그래프 추가 요청 — 상위 4개 광역 +
 // "기타"로 묶어 conic-gradient 도넛을 그리고, 색상만으로 구분하지 않도록 범례에 지역명·비율을 함께 적는다.
-const SHARE_COLORS = ["#2f6fed", "#12b76a", "#f79009", "#7a5af8", "#98a2b3"];
 function provinceShareSegments(counts: Record<string, number>) {
   const entries = Object.entries(counts).filter(([, value]) => value > 0).sort((a, b) => b[1] - a[1]);
   const total = entries.reduce((sum, [, value]) => sum + value, 0);
@@ -175,12 +174,13 @@ function provinceShareSegments(counts: Record<string, number>) {
   const rows: [string, number][] = restTotal > 0 ? [...top, ["기타", restTotal]] : top;
   return { segments: rows.map(([name, value]) => ({ name, value, pct: value / total })), total };
 }
-function shareConicGradient(segments: { pct: number }[]) {
+function shareSegmentColor(name: string) { return name === "기타" ? PROVINCE_ETC_COLOR : provinceColor(name); }
+function shareConicGradient(segments: { name: string; pct: number }[]) {
   let acc = 0;
-  const stops = segments.map((segment, index) => {
+  const stops = segments.map((segment) => {
     const start = (acc * 360).toFixed(1);
     acc += segment.pct;
-    return `${SHARE_COLORS[index % SHARE_COLORS.length]} ${start}deg ${(acc * 360).toFixed(1)}deg`;
+    return `${shareSegmentColor(segment.name)} ${start}deg ${(acc * 360).toFixed(1)}deg`;
   });
   return `conic-gradient(${stops.join(", ")})`;
 }
@@ -189,7 +189,7 @@ function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>;
   if (!total) return <div className="item-share empty"><p className="empty">아직 지역 확인 출원이 없습니다.</p></div>;
   return <div className="item-share">
     <div className="item-share-donut" style={{ background: shareConicGradient(segments) }} role="img" aria-label={`${label} 광역 단위 출원 비중`} />
-    <ul className="item-share-legend">{segments.map((segment, index) => <li key={segment.name}><i style={{ background: SHARE_COLORS[index % SHARE_COLORS.length] }} /><span className="item-share-region">{displayRegionName(segment.name)}</span><b>{percent(segment.pct)}</b></li>)}</ul>
+    <ul className="item-share-legend">{segments.map((segment) => <li key={segment.name}><i style={{ background: shareSegmentColor(segment.name) }} /><span className="item-share-region">{displayRegionName(segment.name)}</span><b>{percent(segment.pct)}</b></li>)}</ul>
   </div>;
 }
 // 이슈 #116(2026-09-01): 지자체별 조회에서 추이 그래프 크기를 사용자가 조절하고
@@ -304,6 +304,20 @@ function provinceRank(name: string) {
   const index = PROVINCE_ORDER.findIndex((prefix) => name.startsWith(prefix));
   return index === -1 ? 50 : index;
 }
+// 이슈 #119: 광역 단위 출원 비중 도넛 등에서 차트마다 같은 지역이 다른 색으로 나와
+// 헷갈린다는 지적 — 광역자치단체별 색을 고정 배정해 모든 차트에서 동일하게 쓴다.
+const PROVINCE_COLORS: Record<string, string> = {
+  서울: "#2f6fed", 부산: "#e8590c", 대구: "#c2255c", 인천: "#0ca678", 광주: "#7048e8",
+  대전: "#1098ad", 울산: "#f59f00", 세종: "#66a80f", 경기: "#1c7ed6", 강원: "#37b24d",
+  충청북: "#f76707", 충청남: "#9c36b5", 전북: "#d6336c", 전라남: "#0c8599",
+  경상북: "#5c940d", 경상남: "#e64980", 제주: "#4263eb",
+};
+const PROVINCE_ETC_COLOR = "#98a2b3";
+function provinceColor(name: string) {
+  if (/전남.*광주|광주.*전남/.test(name)) return "#087f5b";
+  const key = PROVINCE_ORDER.find((prefix) => name.startsWith(prefix));
+  return (key && PROVINCE_COLORS[key]) || PROVINCE_ETC_COLOR;
+}
 function compareProvince(a: string, b: string) {
   return provinceRank(a) - provinceRank(b) || displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR");
 }
@@ -334,13 +348,13 @@ function tradeDisplay(item: Item): { value: number | null; provisional: boolean 
 }
 function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`; }
 function regionKey(region: Region) { return region.regionCode || region.region; }
-// 이슈 #116(2026-08-26): 등록 사례에서 KIPRIS로 바로 넘어가고 싶다는 요청. KIPRIS 상표검색은
-// 결과를 JS로 그리는 페이지라 출원번호를 넣은 URL이 실제로 결과를 띄우는지 자동 검증은
-// 못 했지만, 팝업으로 띄워달라는 사용자 확인을 받아 그대로 적용한다.
-function kiprisSearchUrl(applicationNumber: string) { return `https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark&searchKeyword=${encodeURIComponent(`AN=${applicationNumber}`)}`; }
-// KIPRIS 공개 검색 화면은 클라이언트 렌더링 SPA라 URL 파라미터만으로 검색을 실행한 결과 화면으로
-// 바로 진입시킬 수 없다(실제 접속 확인: 상표 탭까지는 열리지만 상세검색 팝업에서 멈춤) — 대신
-// 출원번호를 클립보드에 복사해 검색창에 바로 붙여넣기만 하면 되도록 돕는다.
+// 이슈 #116/#119: 등록 사례에서 KIPRIS로 "검색된 결과"를 바로 보고 싶다는 요청.
+// KIPRIS khome 검색 페이지는 queryText GET 파라미터를 읽어 로드 시 검색을 실행하고
+// 결과 목록을 그린다(구글이 `searchResult.do?queryText=…`를 검색어 포함 제목으로 색인 —
+// KIPRIS가 공유용으로 지원하는 형식). 출원번호를 queryText로 넘겨 그 상표 결과 화면으로
+// 바로 들어가게 한다. 클립보드 복사는 KIPRIS가 형식을 바꿔도 붙여넣기로 이어갈 수 있게
+// 남겨두는 보조 장치다.
+function kiprisSearchUrl(applicationNumber: string) { return `https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark&queryText=${encodeURIComponent(applicationNumber)}`; }
 function openKiprisPopup(applicationNumber: string) { navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "width=1100,height=800,noopener,noreferrer"); }
 // 이슈 #116(2026-08-26): 출원번호 앞 2자리로 지리적표시 단체표장(44)·증명표장(48)을 구분해달라는 요청.
 const GI_MARK_LABELS: Record<string, string> = { "44": "GI 단체표장", "48": "GI 증명표장" };
@@ -451,6 +465,18 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     try { saved = localStorage.getItem("kiip-trend-size"); } catch { /* private mode 등 */ }
     if (saved && TREND_SIZES.some((size) => size.key === saved)) document.documentElement.dataset.trendSize = saved;
   }, []);
+  // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
+  // 탭 전환마다 history 항목을 쌓아 뒤로가기가 직전 탭(없으면 요약)으로 돌아가게 한다.
+  useEffect(() => {
+    try { window.history.replaceState({ kiipTab: "summary" }, ""); } catch { /* noop */ }
+    const onPop = (event: PopStateEvent) => setTab(((event.state as { kiipTab?: Tab } | null)?.kiipTab) || "summary");
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, []);
+  useEffect(() => {
+    const current = (window.history.state as { kiipTab?: Tab } | null)?.kiipTab || "summary";
+    if (current !== tab) { try { window.history.pushState({ kiipTab: tab }, ""); } catch { /* noop */ } }
+  }, [tab]);
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -863,7 +889,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="item-detail-panel">{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return <>
             <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
             <details className="item-regions-detail"><summary>전체 {row.regions.length}개 지역 보기</summary><div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return <span key={region} style={{ fontSize: `${wordCloudFontSize(value, max)}px`, color: wordCloudColor(region) }} title={`${region} · 출원 ${number(value)}건`}>{region}</span>; })}</div></details>
-            <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
+            <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
             {decidedRegions > 0 && <div className="item-card-charts"><RegionTrend region={{ region: row.name, items: row.matchedItems }} heading="연도별 출원건수" subtitle={`${row.name} · 전체 지역 합계`} /><div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div></div>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
@@ -989,6 +1015,6 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     </div>
     {item.businessFlow && <NationwideFlowCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
     {item.briefing && item.briefing.sentences.length > 0 && <BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" />}
-    <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{giMarkLabel(example.applicationNumber) && <span className="gi-mark-chip">{giMarkLabel(example.applicationNumber)}</span>}{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" title="출원번호가 클립보드에 복사됩니다 · KIPRIS 상표 검색창에 붙여넣으세요" onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
+    <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{giMarkLabel(example.applicationNumber) && <span className="gi-mark-chip">{giMarkLabel(example.applicationNumber)}</span>}{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" title={`KIPRIS에서 이 상표(출원번호 ${example.applicationNumber})의 검색 결과를 새 창으로 엽니다`} onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 결과 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;
 }
