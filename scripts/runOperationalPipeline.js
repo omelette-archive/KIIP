@@ -70,6 +70,8 @@ function parseArgs(argv) {
       throw new Error(`${key}는 1 이상의 정수여야 합니다.`);
     }
   }
+  // enrichIpRegistry.js의 --limit 상한이 100이라 그 이상은 그대로 넘기면 실패한다.
+  if (options.ipRegistryLimit > 100) options.ipRegistryLimit = 100;
   return options;
 }
 
