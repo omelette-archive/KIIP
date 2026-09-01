@@ -537,13 +537,21 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking-columns { gap: 28px; }
 }
 
-/* 이슈 #116(2026-09-01): "지역별 상표 출원" 4단 행은 열 최소폭 합(약 1,050px)보다 창이
-   좁아지면 열이 minmax 최소폭 아래로 못 줄어 내용이 겹쳐 엉킨다. 1,240px 이하에서 먼저
-   2단, 980px 이하에서 1단으로 접어 겹침을 막는다. */
-@media (max-width: 1240px) {
-  .applications-compact-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+/* 이슈 #116(2026-09-01, 재수정): "지역별 상표 출원" 4단 행(구성비·추이·지도·인사이트)은
+   열 최소폭 합이 ~1,050px이라 그 아래에서 SVG 차트·지도 내부 글자와 순위 표가 겹쳐 엉킨다.
+   2단 중간 단계도 각 열이 ~450px라 여전히 좁아 겹침 → 1,280px 이하에서는 바로 1단으로 펴서
+   각 요소가 전체 폭을 쓰게 한다. 그리드 자식은 min-width:0으로 축소 허용, 차트/지도는
+   넘치면 가로 스크롤. */
+.applications-compact-row > * { min-width: 0; }
+@media (max-width: 1280px) {
+  .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
-  .applications-compact-row .map-stage { min-height: 300px; }
+  .applications-compact-row .map-stage { min-height: 0; }
+  .composition-list button { grid-template-columns: 20px minmax(0, 1fr); align-items: start; row-gap: 3px; }
+  .composition-list .composition-rank { grid-row: 1 / span 3; }
+  .composition-list strong,
+  .composition-list .composition-bar,
+  .composition-list small { grid-column: 2; }
   .composition-list small { white-space: normal; }
 }
 
