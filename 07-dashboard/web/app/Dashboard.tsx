@@ -616,7 +616,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 특정 구를 클릭해도 이 "미분류" 행까지 걸러버리면 실제로 있는 데이터가 빈 화면으로
   // 보인다 — 어떤 구를 눌러도 시 전체 미분류 항목은 계속 보여준다(사용자 요청).
   const isUnclassifiedRegion = (region: Region) => region.sigungu === region.sido;
-  const visibleRegions = selectedProvince ? snapshot.regions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : snapshot.regions;
+  // 이슈 #116(2026-09-01): 전국 단위 카탈로그(sido="전국", 지역 없는 인증 수산물·임산물
+  // 132건)를 지도·요약의 "특산품 수" 모집단에 넣지 않는다 — hero·데이터 개요는 이미
+  // regionItemCount(지역 귀속 행)를 쓰는데 이 지도 카운터만 snapshot.regions 전체를 세서
+  // 1,937 대 1,805로 어긋나 있었다. 모집단을 regionalRegions 하나로 통일한다.
+  const visibleRegions = selectedProvince ? regionalRegions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : regionalRegions;
   const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와

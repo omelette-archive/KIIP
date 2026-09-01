@@ -330,7 +330,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   }
 
   function summaryScreen() {
-    const visibleRegions = state.province ? snapshot.regions.filter((region) => (region.sido || region.region) === state.province && (!state.municipality || region.sigungu === state.municipality || isUnclassifiedRegion(region))) : snapshot.regions;
+    // 이슈 #116(2026-09-01): 전국 단위 카탈로그(sido="전국")를 지도·요약 "특산품 수"
+    // 모집단에서 제외해 hero·데이터 개요(regionItemCount)와 숫자를 통일한다.
+    const visibleRegions = state.province ? regionalRegions.filter((region) => (region.sido || region.region) === state.province && (!state.municipality || region.sigungu === state.municipality || isUnclassifiedRegion(region))) : regionalRegions;
     const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
     // 지도 옆 미리보기는 상표명(예: 등록 브랜드 "임금님표쌀")이나 아직 고시명칭이 확정 안 된
     // 원문 표기가 아니라, 확정된 특산물 고시명칭만 보여준다. 개별 상표명은 지역 상세에서
