@@ -219,13 +219,20 @@ function expandForestRegionalResults(document, evidenceDocument) {
       expanded.push(result);
       continue;
     }
-    const nationwide = structuredClone(result);
-    nationwide.input.sido = "전국";
-    nationwide.input.sigungu = "지역 미제공";
-    nationwide.query = { ...(nationwide.query || {}), region: "전국 지역 미제공", regionMatch: "not_applicable" };
-    expanded.push(nationwide);
+    // #116(2026-09-01): 임산물생산조사 주산지 근거가 있는 품목은 지역 행만 만들고
+    // 전국 카탈로그 중복 행을 만들지 않는다(26건). 주산지 근거가 없는 자생 채취류만
+    // 전국 카탈로그 행으로 남긴다.
+    const primaryRegionEvidence = evidenceDocument.items?.[result.input.itemName] || [];
+    if (primaryRegionEvidence.length === 0) {
+      const nationwide = structuredClone(result);
+      nationwide.input.sido = "전국";
+      nationwide.input.sigungu = "지역 미제공";
+      nationwide.query = { ...(nationwide.query || {}), region: "전국 지역 미제공", regionMatch: "not_applicable" };
+      expanded.push(nationwide);
+      continue;
+    }
 
-    for (const evidence of evidenceDocument.items?.[result.input.itemName] || []) {
+    for (const evidence of primaryRegionEvidence) {
       const regional = structuredClone(result);
       regional.inputIndex = `forest-region-${evidence.tableNumber}-${result.inputIndex}`;
       regional.input = {
@@ -276,7 +283,9 @@ function mergeRegions(baseRegions, extraRegions) {
 }
 
 function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
-  let matchedItems = 0;
+  // #116(2026-09-01): 주산지 근거가 있는 임산물은 이제 지역 행만 생기므로 근거 연결
+  // 품목 수는 지역 행 기준(품목명 중복 제거)으로 센다.
+  const matchedItemNames = new Set();
   let evidenceRows = 0;
   for (const region of regions) {
     for (const item of region.items) {
@@ -295,23 +304,64 @@ function attachForestPrimaryRegionEvidence(regions, evidenceDocument) {
           : null,
       }));
       item.sources = union([...(item.sources || []), "forest_product_production_survey"]);
-      if (region.sido === "전국") {
-        matchedItems += 1;
-        evidenceRows += evidence.length;
-      }
+      matchedItemNames.add(item.itemName);
+      evidenceRows += evidence.length;
     }
   }
-  return { matchedItems, evidenceRows };
+  return { matchedItems: matchedItemNames.size, evidenceRows };
+}
+
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i++) {
+    const value = argv[i];
+    if (!value.startsWith("--")) continue;
+    const key = value.slice(2);
+    const next = argv[i + 1];
+    if (next !== undefined && !next.startsWith("--")) {
+      args[key] = next;
+      i++;
+    } else args[key] = true;
+  }
+  return args;
+}
+
+// #70(2026-09-01): 경로를 인자로 받도록 파라미터화. 기본값은 기존 동작(라이브 스냅샷
+// in-place 갱신)과 동일하다. --base/--out으로 실행별 스냅샷에 적용하면 라이브를
+// 건드리지 않고 운영 파이프라인 산출물에도 보완 소스를 병합할 수 있다.
+// (아직 파이프라인 단계로 접히지는 않았다 — 러너에 보완 ③ 산출물이 있어야 동작.)
+function resolveInputs(args) {
+  const root = path.resolve(__dirname, "..");
+  const d = (...parts) => path.join(root, ...parts);
+  const basePath = path.resolve(args.base || d("07-dashboard", "web", "public", "data", "dashboard-snapshot.json"));
+  return {
+    basePath,
+    outPath: path.resolve(args.out || basePath),
+    matchPaths: args["match-paths"]
+      ? String(args["match-paths"]).split(",").map((p) => path.resolve(p.trim()))
+      : [
+          d("03-match-trademarks", "output", "marine-forest-live-20260825-r3-enriched.json"),
+          d("03-match-trademarks", "output", "nfqs-geo-live-20260826-v2-enriched.json"),
+          d("03-match-trademarks", "output", "rda-regional-specialty-crops-20260826-enriched.json"),
+        ],
+    forestRegionPath: path.resolve(args["forest-regions"] || d("02-normalize-items", "data", "kofpi-primary-regions-2024.json")),
+    rdaCropPath: path.resolve(args["rda-crops"] || d("02-normalize-items", "data", "regional-specialty-crops-2025.json")),
+  };
 }
 
 function main() {
-  const root = path.resolve(__dirname, "..");
-  const basePath = path.join(root, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
-  const matchPath = path.join(root, "03-match-trademarks", "output", "marine-forest-live-20260825-r3-enriched.json");
-  const nfqsGeoMatchPath = path.join(root, "03-match-trademarks", "output", "nfqs-geo-live-20260826-v2-enriched.json");
-  const rdaCropMatchPath = path.join(root, "03-match-trademarks", "output", "rda-regional-specialty-crops-20260826-enriched.json");
-  const forestRegionPath = path.join(root, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
-  const rdaCropPath = path.join(root, "02-normalize-items", "data", "regional-specialty-crops-2025.json");
+  const args = parseArgs(process.argv.slice(2));
+  if (args.help || args.h) {
+    console.error(
+      "사용법: node scripts/mergeSupplementalDashboardData.js [--base <스냅샷>] [--out <경로>] " +
+        "[--match-paths a.json,b.json,c.json] [--forest-regions <json>] [--rda-crops <json>]"
+    );
+    process.exit(0);
+  }
+  const { basePath, outPath, matchPaths, forestRegionPath, rdaCropPath } = resolveInputs(args);
+  const matchPath = matchPaths[0];
+  const nfqsGeoMatchPath = matchPaths[1];
+  const rdaCropMatchPath = matchPaths[2];
   const base = readJson(basePath);
   const document = combineMatchDocuments([readJson(matchPath), readJson(nfqsGeoMatchPath), readJson(rdaCropMatchPath)]);
   const forestRegionEvidence = readJson(forestRegionPath);
@@ -435,8 +485,16 @@ function main() {
     regionalScope: "province",
     liveVerifiedAt: "2026-08-26",
   };
-  fs.writeFileSync(basePath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
-  console.error(`[mergeSupplementalDashboardData] regions=${regionalRegions.length}, regionalItems=${regionalItemCount}, nationwideCatalogItems=${nationwideCatalogItemCount}, snapshot=${merged.snapshotId}`);
+  fs.mkdirSync(path.dirname(outPath), { recursive: true });
+  fs.writeFileSync(outPath, `${JSON.stringify(merged, null, 2)}\n`, "utf8");
+  console.error(
+    `[mergeSupplementalDashboardData] regions=${regionalRegions.length}, regionalItems=${regionalItemCount}, ` +
+      `nationwideCatalogItems=${nationwideCatalogItemCount}, snapshot=${merged.snapshotId} -> ${outPath}`
+  );
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = { parseArgs, resolveInputs, combineMatchDocuments, expandForestRegionalResults };
