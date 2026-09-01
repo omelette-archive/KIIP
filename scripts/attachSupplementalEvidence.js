@@ -64,8 +64,16 @@ function main() {
     rdaMatched = attachRegionalSpecialtyCropBadges(snapshot, readJson(rdaPath)).matched;
   }
 
+  const regionalItemCount = snapshot.regions
+    .filter((region) => region.sido !== "전국")
+    .reduce((sum, region) => sum + region.items.length, 0);
+  const nationwideCatalogItemCount = snapshot.regions
+    .filter((region) => region.sido === "전국")
+    .reduce((sum, region) => sum + region.items.length, 0);
   snapshot.coverage = {
     ...snapshot.coverage,
+    catalogItemCount: regionalItemCount + nationwideCatalogItemCount,
+    nationwideCatalogItemCount,
     nationwideCatalogItemsWithRegionalEvidence: forestCoverage.matchedItems,
     regionalEvidenceRows: forestCoverage.evidenceRows,
   };

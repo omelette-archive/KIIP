@@ -44,6 +44,7 @@ function parseArgs(argv) {
     ["--applicant-limit", "applicantLimit"],
     ["--ip-registry-daily-budget", "ipRegistryDailyBudget"],
     ["--ip-registry-limit", "ipRegistryLimit"],
+    ["--regional-coverage-threshold", "regionalCoverageThreshold"],
   ]);
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -76,6 +77,11 @@ function parseArgs(argv) {
   }
   // enrichIpRegistry.js의 --limit 상한이 100이라 그 이상은 그대로 넘기면 실패한다.
   if (options.ipRegistryLimit > 100) options.ipRegistryLimit = 100;
+  if (options.regionalCoverageThreshold !== undefined) {
+    const t = Number(options.regionalCoverageThreshold);
+    if (!(t >= 0 && t <= 1)) throw new Error("regional-coverage-threshold는 0~1 사이여야 합니다.");
+    options.regionalCoverageThreshold = t;
+  }
   return options;
 }
 
@@ -312,6 +318,10 @@ function buildPlan(options = {}) {
         files.analysis,
         "--raw-goods-review",
         rawGoodsReview,
+        // 알파 수집 단계 정책 — 100% 수집 전에도 임계치 이상이면 지역 지표 노출.
+        // partial 게이트(#116)가 상한만 걸린 건은 최소 확인값으로 별도 노출한다.
+        "--regionalCoverageThreshold",
+        String(options.regionalCoverageThreshold ?? 0.6),
       ],
       [files.analysis]
     ),
