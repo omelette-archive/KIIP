@@ -121,13 +121,16 @@ function validateRunId(value) {
   return runId;
 }
 
-function nodeStage(id, description, script, args, outputs = []) {
+function nodeStage(id, description, script, args, outputs = [], acceptExitCodes = [0]) {
   return {
     id,
     description,
     executable: process.execPath,
     args: [path.join(ROOT, script), ...args],
     outputs,
+    // 일부 CLI는 "완료했으나 일부 오류"를 0이 아닌 코드로 알린다(예: matchTrademarks
+    // errorCount>0 → 2). 산출물은 정상 생성됐고 후속 단계가 오류 건을 걸러내므로 허용한다.
+    acceptExitCodes,
   };
 }
 
@@ -235,7 +238,10 @@ function buildPlan(options = {}) {
       "KIPRIS 상표 검색(기존 체크포인트가 있으면 재개)",
       "03-match-trademarks/matchTrademarks.js",
       matchArgs,
-      [files.trademarks, state.trademarkCheckpoint]
+      [files.trademarks, state.trademarkCheckpoint],
+      // matchTrademarks는 배치 완료 후 errorCount>0이면 exit 2. 산출물은 정상이고
+      // ④가 오류 쿼리를 걸러내므로 허용한다.
+      [0, 2]
     ),
     nodeStage(
       "03b_applicant_region",
@@ -524,12 +530,19 @@ function executePlan(plan, options = {}) {
     fs.writeFileSync(record.logFile, log, "utf8");
     record.completedAt = new Date().toISOString();
     record.exitCode = Number.isInteger(result.status) ? result.status : 1;
-    if (record.exitCode !== 0) {
+    const accepted = stage.acceptExitCodes || [0];
+    if (!accepted.includes(record.exitCode)) {
       record.status = "failed";
       manifest.status = "failed";
       manifest.completedAt = record.completedAt;
       writeManifest(plan.files.manifest, manifest);
       return { ok: false, failedStage: stage.id, manifest };
+    }
+    if (record.exitCode !== 0) {
+      record.status = "succeeded_with_warnings";
+      record.note = `exit ${record.exitCode} 허용(완료·일부 오류)`;
+      writeManifest(plan.files.manifest, manifest);
+      continue;
     }
     record.status = "succeeded";
     writeManifest(plan.files.manifest, manifest);
