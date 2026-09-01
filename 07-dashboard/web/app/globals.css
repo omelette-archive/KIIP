@@ -202,7 +202,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
-.primary-tabs button { min-height: 46px; padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; }
+.primary-tabs button { min-height: 46px; padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
 

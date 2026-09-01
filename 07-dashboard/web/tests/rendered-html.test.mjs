@@ -88,7 +88,10 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf(">출원율</button>") < html.indexOf(">등록률</button>"),
     "지도 지표는 특산품 수, 상표 건수, 출원율, 등록률 순서여야 함",
   );
-  assert.match(html, new RegExp(snapshot.pipelineStatus.nationwideCandidates.uniqueTrademarkCount.toLocaleString("ko-KR")));
+  // 2026-09-01(#116): "전국 검색 고유 상표 후보 174,078" 지표 칸을 요약에서 제거하고
+  // 첫 칸을 "전국 특산품 수"로 교체(스테이크홀더 요청). 그 원시 수치는 데이터 개요 탭에만 둔다.
+  assert.match(html, /전국 특산품 수/);
+  assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
   assert.match(html, /지역별 상표 출원/);
@@ -191,7 +194,10 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(coverage.pending, 117);
   assert.equal(Math.round(coverage.rate * 100), 58);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  assert.match(visibleTextHtml, new RegExp(`전체 ${localeNumber(coverage.total)}개 중 확인 ${localeNumber(coverage.applied)}개`));
+  // 2026-09-01(#116): 요약 첫 칸을 "전국 특산품 수"로 바꿈. 분모(1,805)와 출원 확인(1,042)이
+  // 모두 요약 탭에 노출돼야 한다.
+  assert.match(visibleTextHtml, new RegExp(`전국 특산품 수[\\s\\S]{0,60}${localeNumber(coverage.total)}`));
+  assert.match(visibleTextHtml, new RegExp(`출원 확인 ${localeNumber(coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
   // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
   assert.doesNotMatch(html, /출원율 계산/);
