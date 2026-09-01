@@ -644,18 +644,29 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .state { font-size: 11px; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록과 연도별 추이 그래프가 각각 별도 행으로 쌓이던 걸
    한 행에 나란히 넣어달라는 요청 — 지역을 좁혀 구성 목록이 없을 때는 그래프가 전체 폭을 쓴다. */
-/* 이슈 #116(2026-09-01): 4개 패널(광역 구성·추이·지도·요약)을 4열로 우겨넣으니 좁은
-   열들이 허전하고 내용이 삐져나왔다. 두 열로 정리한다 — 왼쪽에 광역 구성 + 추이 그래프,
-   오른쪽에 지도 + 요약. 각 열은 세로로 쌓이고 폭을 꽉 채운다. */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: 18px; align-items: start; margin-bottom: 20px; }
-.applications-compact-row.solo { grid-template-columns: minmax(0, .95fr) minmax(0, 1.15fr); }
-.applications-compact-row .ac-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.applications-compact-row .province-composition, .applications-compact-row .trend-chart, .applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { margin: 0; }
-.applications-compact-row .trend-chart { padding: 18px 20px 14px; }
-.applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { padding: 22px; }
-.applications-compact-row .coverage-map-stage { min-height: 0; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 560px; }
-.province-composition { min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+/* 이슈 #116(2026-09-01): 4개 패널(광역 구성·추이·지도·요약)을 2×2 그리드로 배치한다.
+   행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. align-items:stretch로 같은 행의
+   두 박스 높이가 정확히 일치하고, 행1/행2 경계가 양 열에서 한 줄로 맞는다(높이 규격
+   어긋남 방지). 열 간격·행 간격 모두 18px로 통일. */
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
+.applications-compact-row > * { min-width: 0; margin: 0; }
+.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; }
+.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
+.applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1; }
+.applications-compact-row.solo .coverage-insight { grid-column: 2; grid-row: 2; }
+.applications-compact-row .coverage-map-stage { min-height: 0; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 440px; }
+.applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: space-between; }
+@media (max-width: 1000px) {
+  .applications-compact-row,
+  .applications-compact-row.solo { grid-template-columns: 1fr; }
+  .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
+  .applications-compact-row .coverage-map { max-height: 520px; }
+}
+.province-composition { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 /* 이슈 #116(2026-08-31): 지역별 상표 출원을 4칸 한 행으로 압축한 뒤 이 칸이 가장 좁아져(약
    220~280px), 제목과 "TOP N" 라벨을 한 줄에 나란히 두면 flex 자식이 줄바꿈 대신 폭을
    넘어 글씨가 삐져나왔다 — 세로로 쌓고 폭 안에서 줄바꿈이 되도록 min-width를 없앤다. */
@@ -1117,14 +1128,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return `<section class="screen-section coverage-screen"><p class="screen-note">시도별 출원율을 비교하고, 선택한 시도의 시군구별 현황을 확인할 수 있습니다.</p>
       ${state.province && areaRegions.some(isUnclassifiedRegion) ? `<p class="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 ${esc(displayRegionName(state.province))} 전체로만 집계됩니다.</p>` : ""}
       <div class="${state.province ? "applications-compact-row solo" : "applications-compact-row"}">
-      <div class="ac-col">
       ${compositionHtml}
       <section class="trend-chart"><div class="section-heading"><div><h2>연도별 출원·등록 추이</h2></div><span>${esc(areaName)} · 실제 출원일자·등록일자 기준</span></div>${trendChartHtml}</section>
-      </div>
-      <div class="ac-col">
       <section class="coverage-map-card"><div class="map-heading"><div><h2>${state.province ? `${esc(state.province)} 시군구 출원율` : "전국 시도별 출원율"}</h2></div><div class="coverage-map-actions">${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div></div><p class="map-metric-description"><strong>특산품 출원율</strong><span>지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수 · 명칭 확인·집계 대기도 분모에 포함합니다.</span></p><div class="map-stage coverage-map-stage"><svg class="korea-map coverage-map" viewBox="${activeViewBox}" role="img" aria-label="${state.province ? `${esc(state.province)} 시군구별 특산품 출원율 지도` : "대한민국 시도별 특산품 출원율 지도"}">${shapePaths}${mapLabelsHtml}</svg></div><div class="coverage-legend"><span>0%</span><i></i><span>25%</span><span>50%</span><span>75%</span><span>100%</span><b>회색은 데이터 없음</b></div><p class="map-warning">${state.province ? "특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "특산품·상표 데이터가 없는 시도도 지명은 표시하며 회색으로 구분합니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p></section>
       <aside class="coverage-insight"><h2>${esc(areaName)}</h2><div class="rate-hero">${rateRing(area.rate)}<div class="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 ${number(area.total)}개 중 출원 확인 ${number(area.applied)}개${area.pending ? ` · 집계 대기 ${number(area.pending)}개` : ""}</small></div></div><dl class="coverage-insight-stats"><div><dt>선택 범위</dt><dd>${state.municipality ? `${esc(state.province)} 내 시군구` : state.province ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>${number(area.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>${number(area.applied)}개</dd></div></dl></aside>
-      </div>
       </div>
       <section class="coverage-directory"><div class="section-heading coverage-directory-heading"><div><span class="coverage-directory-region">${esc(areaName)}</span><h2>특산품별 출원 현황</h2></div><span>특산품 ${number(listedItemCount)}개 · 출원 확인 ${number(area.applied)}개 · 출원율 ${percent(area.rate)}</span></div><div class="coverage-region-grid">${breakdown.map((row) => `<article class="coverage-region-card ${state.municipality && row.label === state.municipality ? "selected" : ""}"><div class="coverage-region-head"><div><strong>${esc(row.label)}</strong><small>특산품 ${number(row.coverage.total)}개</small></div><div class="coverage-region-summary"><span>출원 확인 특산품 ${number(row.coverage.applied)}개</span><b>${percent(row.coverage.rate)}</b></div>${!state.province ? `<button type="button" data-province="${esc(row.label)}">지도에서 보기</button>` : ""}</div><div class="coverage-specialty-list">${row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span>${esc(state.province ? label : `${region.sigungu || region.region} / ${label}`)}</span><small class="specialty-status ${status.filed ? "filed" : "unfiled"}">${esc(status.label)}</small></button>`; }).join("")}</div></article>`).join("")}</div></section></section>`;
   }

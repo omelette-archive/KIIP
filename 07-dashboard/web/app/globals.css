@@ -644,18 +644,29 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .state { font-size: 11px; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록과 연도별 추이 그래프가 각각 별도 행으로 쌓이던 걸
    한 행에 나란히 넣어달라는 요청 — 지역을 좁혀 구성 목록이 없을 때는 그래프가 전체 폭을 쓴다. */
-/* 이슈 #116(2026-09-01): 4개 패널(광역 구성·추이·지도·요약)을 4열로 우겨넣으니 좁은
-   열들이 허전하고 내용이 삐져나왔다. 두 열로 정리한다 — 왼쪽에 광역 구성 + 추이 그래프,
-   오른쪽에 지도 + 요약. 각 열은 세로로 쌓이고 폭을 꽉 채운다. */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.12fr); gap: 18px; align-items: start; margin-bottom: 20px; }
-.applications-compact-row.solo { grid-template-columns: minmax(0, .95fr) minmax(0, 1.15fr); }
-.applications-compact-row .ac-col { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
-.applications-compact-row .province-composition, .applications-compact-row .trend-chart, .applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { margin: 0; }
-.applications-compact-row .trend-chart { padding: 18px 20px 14px; }
-.applications-compact-row .coverage-map-card, .applications-compact-row .coverage-insight { padding: 22px; }
-.applications-compact-row .coverage-map-stage { min-height: 0; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 560px; }
-.province-composition { min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
+/* 이슈 #116(2026-09-01): 4개 패널(광역 구성·추이·지도·요약)을 2×2 그리드로 배치한다.
+   행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. align-items:stretch로 같은 행의
+   두 박스 높이가 정확히 일치하고, 행1/행2 경계가 양 열에서 한 줄로 맞는다(높이 규격
+   어긋남 방지). 열 간격·행 간격 모두 18px로 통일. */
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
+.applications-compact-row > * { min-width: 0; margin: 0; }
+.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; }
+.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
+.applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1; }
+.applications-compact-row.solo .coverage-insight { grid-column: 2; grid-row: 2; }
+.applications-compact-row .coverage-map-stage { min-height: 0; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 440px; }
+.applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: space-between; }
+@media (max-width: 1000px) {
+  .applications-compact-row,
+  .applications-compact-row.solo { grid-template-columns: 1fr; }
+  .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
+  .applications-compact-row .coverage-map { max-height: 520px; }
+}
+.province-composition { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 /* 이슈 #116(2026-08-31): 지역별 상표 출원을 4칸 한 행으로 압축한 뒤 이 칸이 가장 좁아져(약
    220~280px), 제목과 "TOP N" 라벨을 한 줄에 나란히 두면 flex 자식이 줄바꿈 대신 폭을
    넘어 글씨가 삐져나왔다 — 세로로 쌓고 폭 안에서 줄바꿈이 되도록 min-width를 없앤다. */
