@@ -785,7 +785,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /등록 건수/);
   assert.doesNotMatch(html, /그중 등록/);
   assert.match(html, /지역별 집계 대기/);
-  assert.match(html, /class="item-card-grid"/);
+  // 이슈 #119: 품목별 조회를 마스터-디테일(목록에서 선택 → 상세)로 개편.
+  assert.match(html, /class="item-explorer"/);
+  assert.match(html, /data-select-item=/);
   assert.match(html, /지역 확인 전 전국 검색 후보/);
   assert.match(html, /ITEM_ROW_LIMIT = 100/);
   assert.match(html, /상표 출원 건수 상위/);

@@ -454,6 +454,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [selectedItemName, setSelectedItemName] = useState("");
   const [selectedRegionProvince, setSelectedRegionProvince] = useState<string | null>(defaultRegionProvince);
   const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState("");
@@ -601,6 +602,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 순으로 상위 100개만 우선 보여준다(2026-08-19 결정).
   const ITEM_ROW_LIMIT = 100;
   const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
+  // 이슈 #119(품목별 조회 개편): 한 화면에 여러 품목 상세를 펼치지 않고, 왼쪽 목록에서
+  // 하나를 고르면 오른쪽에 그 품목만 상세로 보여준다. 선택이 현재 목록에서 빠지면
+  // 목록 첫 항목으로 되돌린다.
+  const selectedItemRow = visibleItemRows.find((row) => row.name === selectedItemName) || visibleItemRows[0] || null;
   // 이슈 #112: 요약 탭에서 특정 지역/품목을 클릭해 "지자체별 조회"로 이동하면, 그
   // 지역의 시/도 아코디언이 자동으로 펼쳐지면서 사실상 그 지역만 디폴트로 보이는
   // 것처럼 느껴진다는 지적 — 이동 시에는 자동으로 펼치지 않고 전체 시/도 목록이
@@ -841,13 +846,28 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         <div className="item-screen-toolbar"><label><span className="sr-only">품목 검색</span><input value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label><span>{itemRows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${itemRows.length}개` : `검색 결과 ${itemRows.length}개`}</span></div>
         <div className="item-category-filter" role="group" aria-label="품목 유형 필터"><button type="button" className={categoryFilter === "" ? "active" : ""} onClick={() => setCategoryFilter("")}>전체</button>{availableCategories.map((category) => <button type="button" key={category.code} className={categoryFilter === category.code ? "active" : ""} onClick={() => setCategoryFilter(category.code)}>{category.label}</button>)}</div>
         <div className="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div>
-        <div className="item-card-grid">{visibleItemRows.map((row, index) => { const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return <article className="item-card" key={row.name}>
-          <div className="item-card-head"><div><span className="item-rank">{String(index + 1).padStart(2, "0")}</span><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
-          <details className="item-regions-detail"><summary>전체 {row.regions.length}개 지역 보기</summary><div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return <span key={region} style={{ fontSize: `${wordCloudFontSize(value, max)}px`, color: wordCloudColor(region) }} title={`${region} · 출원 ${number(value)}건`}>{region}</span>; })}</div></details>
-          <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
-          {decidedRegions > 0 && <div className="item-card-charts"><RegionTrend region={{ region: row.name, items: row.matchedItems }} heading="연도별 출원건수" subtitle={`${row.name} · 전체 지역 합계`} /><div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div></div>}
-          {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
-        </article>; })}{itemRows.length === 0 && <p className="empty item-empty">검색 결과가 없습니다.</p>}</div>
+        <div className="item-explorer">
+          <aside className="item-list-panel">
+            <div className="item-list-head"><strong>{categoryFilter ? (availableCategories.find((category) => category.code === categoryFilter)?.label || "품목") : "전체 품목"}</strong><span>{itemRows.length}개</span></div>
+            <ul className="item-list">
+              {visibleItemRows.map((row) => { const decidedRegions = row.availableRegions.length; return <li key={row.name}>
+                <button type="button" className={selectedItemRow?.name === row.name ? "active" : ""} onClick={() => setSelectedItemName(row.name)}>
+                  <span className="item-list-name">{row.name}</span>
+                  <span className="item-list-meta">{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역</span>
+                  <b>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</b>
+                </button>
+              </li>; })}
+              {visibleItemRows.length === 0 && <li className="empty">검색 결과가 없습니다.</li>}
+            </ul>
+          </aside>
+          <div className="item-detail-panel">{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null; return <>
+            <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
+            <details className="item-regions-detail"><summary>전체 {row.regions.length}개 지역 보기</summary><div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return <span key={region} style={{ fontSize: `${wordCloudFontSize(value, max)}px`, color: wordCloudColor(region) }} title={`${region} · 출원 ${number(value)}건`}>{region}</span>; })}</div></details>
+            <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)} ÷ ${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
+            {decidedRegions > 0 && <div className="item-card-charts"><RegionTrend region={{ region: row.name, items: row.matchedItems }} heading="연도별 출원건수" subtitle={`${row.name} · 전체 지역 합계`} /><div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div></div>}
+            {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
+          </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
+        </div>
         <details className="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details>
       </div>
     </section>}
