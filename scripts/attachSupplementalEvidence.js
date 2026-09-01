@@ -64,19 +64,35 @@ function main() {
     rdaMatched = attachRegionalSpecialtyCropBadges(snapshot, readJson(rdaPath)).matched;
   }
 
-  const regionalItemCount = snapshot.regions
-    .filter((region) => region.sido !== "전국")
-    .reduce((sum, region) => sum + region.items.length, 0);
-  const nationwideCatalogItemCount = snapshot.regions
-    .filter((region) => region.sido === "전국")
-    .reduce((sum, region) => sum + region.items.length, 0);
+  // #70: buildDashboardSnapshot는 "전국" 의사 지역(NFQS 인증사업장·주산지 근거 없는 KOFPI)까지
+  // regionItemCount·gate에 포함한다. 대시보드·감사는 "전국 제외" 지역 통계를 쓰므로
+  // auditDashboardSnapshot 계약(regionItemCount = 실지역 행 수 등)에 맞춰 다시 계산한다.
+  const regionalRegions = snapshot.regions.filter((region) => region.sido !== "전국");
+  const nationwideRegions = snapshot.regions.filter((region) => region.sido === "전국");
+  const regionalItems = regionalRegions.flatMap((region) => region.items);
+  const regionalItemCount = regionalItems.length;
+  const nationwideCatalogItemCount = nationwideRegions.reduce((sum, region) => sum + region.items.length, 0);
+  const isAvailable = (item) => item.metrics?.uniqueTrademarkCount?.availability === "available";
+  const availableRegionItemCount = regionalItems.filter(isAvailable).length;
+  const partialRegionItemCount = regionalItems.filter((item) => item.metrics?.uniqueTrademarkCount?.partial).length;
+
   snapshot.coverage = {
     ...snapshot.coverage,
+    observedRegionCount: regionalRegions.filter((region) => region.items.length > 0).length,
+    regionItemCount: regionalItemCount,
     catalogItemCount: regionalItemCount + nationwideCatalogItemCount,
     nationwideCatalogItemCount,
     nationwideCatalogItemsWithRegionalEvidence: forestCoverage.matchedItems,
     regionalEvidenceRows: forestCoverage.evidenceRows,
   };
+  if (snapshot.pipelineStatus?.regionalMetricGate) {
+    snapshot.pipelineStatus.regionalMetricGate = {
+      ...snapshot.pipelineStatus.regionalMetricGate,
+      availableRegionItemCount,
+      partialRegionItemCount,
+      blockedRegionItemCount: Math.max(0, regionalItemCount - availableRegionItemCount),
+    };
+  }
   if (snapshot.pipelineStatus) {
     snapshot.pipelineStatus.supplementalEvidence = {
       forestPrimaryRegionItems: forestCoverage.matchedItems,
