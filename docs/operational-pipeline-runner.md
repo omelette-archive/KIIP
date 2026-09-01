@@ -18,12 +18,20 @@ node scripts/runOperationalPipeline.js --dry-run --run-id YYYYMMDD-manual
 1. GI·농사로 수집과 누적 SQLite 갱신
 2. 결정론적 품목 정규화
 3. KIPRIS 검색과 영구 체크포인트 재개
+3b. 출원번호 기반 출원인 주소 보강(경로 A) — 영구 캐시에 증분
+3c. 등록번호 기반 등록원부 보강(경로 B) — 일별 예산·429 재개 상태 영구 보관
 4. 분석과 승인된 원물명 지정상품 검토 결과 재적용
 5. 브랜드 공백 탐지
 6. 결정론적 전략 초안 생성
 7. `mode=full`, `stage=alpha` 스냅샷 생성
 8. 외부 호출 없는 전체 회귀 검증
 9. 게시 전 후보 HTML 생성
+10~12. (`--promote` 시) 검증 통과 스냅샷을 저장소 웹 입력·`dashboard.html`로 교체하고 계약 감사
+
+`--state-dir`에는 SQLite·검색 체크포인트뿐 아니라 출원인 주소 캐시
+(`trademark-applicant-region-cache.json`), 등록원부 캐시(`ip-registry-cache.json`),
+일별 호출 예산·429 재개 상태(`ip-registry-daily-budget.json`)가 함께 쌓인다 — 자체
+호스트 러너의 영구 디스크를 가리켜야 한다.
 
 ## 실제 실행
 
@@ -52,16 +60,28 @@ node scripts/runOperationalPipeline.js \
 
 ## 게시 안전장치와 별도 운영 경로
 
-성공 실행도 저장소의 `07-dashboard/dashboard.html`을 직접 덮어쓰거나 공개하지 않는다. 전체
-회귀 검증이 통과한 뒤 실행 디렉터리에 `dashboard.candidate.html`만 만든다. 후보를 검토한 뒤
-저장소의 공개 HTML에 반영해야 게시 워크플로가 동작한다.
+`--promote` 없이 실행하면 성공해도 저장소의 `07-dashboard/dashboard.html`을 덮어쓰지 않고
+`dashboard.candidate.html`만 만든다. `--promote`(주간 워크플로 기본)는 전체 회귀 검증이
+통과한 뒤에만 웹 입력 스냅샷과 커밋용 `dashboard.html`을 교체한다 — git add·commit·push와
+공개 페이지 배포는 실행기가 아니라 `.github/workflows/operational-pipeline.yml`이 맡는다.
+한 단계라도 실패하면 후속 단계(게시 승격 포함)를 건너뛰므로 실패 실행이 정상 공개본을
+덮어쓰지 않는다.
 
-장시간·증분 수집은 이 실행기에 묶지 않고 각각의 체크포인트와 예산 상태로 운영한다.
+### 주간 워크플로 (#70)
 
-- 출원인 주소 재조회와 전후 비율 집계
-- 등록원부 지정상품 보강, 429 재개, 만료예정일 기반 재검증
+`operational-pipeline.yml`은 매주 월요일 02:00 KST(+수동 `workflow_dispatch`)에 자체 호스트
+러너(`[self-hosted, kiip-operational]`)에서 `runOperationalPipeline.js --promote`를 실행한다.
+`concurrency: operational-pipeline`로 동시 실행을 막고, 진행 중 실행은 취소하지 않는다.
+실패하면 `operational-pipeline-failure` 라벨 이슈를 새로 열거나 기존 이슈에 코멘트한다.
+러너 영구 디스크 경로는 `vars.KIIP_OPERATIONAL_ROOT`로 지정한다.
+
+### 이 실행기에 묶지 않는 증분 작업
+
+- 출원인 주소 **재조회**(미확인 건 선별)와 전후 비율 집계 — `refreshUnverified*` CLI(#73)
+- 등록원부 만료예정일 기반 **재검증** — `refreshStaleRegistryEntries.js`(#81)
 - 전국 176개 품목의 원물→가공품→서비스 흐름 수집·갱신
-- 농촌진흥청 특화작목 등 보완 소스의 대시보드 연결
+- 보완 소스(NFQS·KOFPI·RDA)의 대시보드 병합 — `mergeSupplementalDashboardData.js`
+  (아직 파이프라인 밖 패치 스크립트. 이걸 ⑦에 접기 전까지 라이브 스냅샷은 패치 누적본이다)
 
 따라서 운영 실행기는 핵심 파이프라인의 재현·검증 도구이지 모든 증분 수집 작업의 스케줄러는
 아니다. 등록원부는 [`applicant-region-recovery-runbook.md`](applicant-region-recovery-runbook.md),
