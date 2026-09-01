@@ -654,9 +654,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
 .applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
 .applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1 / span 2; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1; }
-.applications-compact-row.solo .coverage-insight { grid-column: 2; grid-row: 2; }
+/* solo(지역 선택): 왼쪽 열에 추이 그래프 + 요약을 세로로, 오른쪽 열에 시군구 지도 */
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; }
 .applications-compact-row .coverage-map-stage { min-height: 0; display: flex; align-items: center; justify-content: center; }
 .applications-compact-row .coverage-map { width: 100%; max-height: 440px; }
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: space-between; }
