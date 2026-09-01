@@ -52,6 +52,7 @@ const { runIpRegistryTests } = require("./ipRegistrySelftest");
 const { runApplicantRegionRefreshTests } = require("./applicantRegionRefreshSelftest");
 const { runRegistryStalenessTests } = require("./registryStalenessSelftest");
 const { runRegionMatchCoverageTests } = require("./regionMatchCoverageSelftest");
+const { runGoodsMatchCoverageTests } = require("./goodsMatchCoverageSelftest");
 const {
   parseCsvLine,
   readNormalizedCsv,
@@ -144,6 +145,7 @@ async function run() {
   await runApplicantRegionRefreshTests();
   await runRegistryStalenessTests();
   await runRegionMatchCoverageTests();
+  await runGoodsMatchCoverageTests();
 
   console.log("1) xmlLite.parseTrademarkResponse");
   {

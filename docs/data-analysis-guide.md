@@ -52,6 +52,10 @@ KIPRIS 단어검색은 전국 후보를 찾는 단계다. 검색 건수만으로
 
 세 분포는 `analysis.summary.goodsMatchCounts`에 그대로 남긴다. 경로 A의 AI 검토 승인(`rawGoodsReview`)도 `normalized_exact`만 확정으로 승격해 두 경로가 일치한다.
 
+저장된 ③ 산출물의 지정상품 대조 분포와 등록원부 보강 전후 변화는
+`node 03-match-trademarks/summarizeGoodsMatchCoverage.js --input <③ JSON>`
+(또는 `--before`/`--after`)로 API 호출 없이 집계한다.
+
 등록원부 수집은 장기 실행을 전제로 한다.
 
 - 성공 응답과 미완료 상태를 캐시·체크포인트에 저장한다.
