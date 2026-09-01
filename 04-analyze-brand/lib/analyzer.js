@@ -501,9 +501,12 @@ function finalizeBucket(bucket, options) {
       : regionalMetricCapOnly
         ? "partial"
         : "blocked";
-  const goodsConfirmedHitCount =
-    goodsMatchCounts.normalized_exact + goodsMatchCounts.normalized_contains;
-  const goodsReviewRequiredHitCount = goodsMatchCounts.class_only;
+  // #12(2026-09-01 결정): 지정상품 확정은 정규화 완전일치(normalized_exact)만 인정한다.
+  // 품목명을 "포함"만 한 normalized_contains는 NICE류만 일치한 class_only와 함께 사람
+  // 검토 후보로 둔다(rawGoodsReview 경로와 일치).
+  const goodsConfirmedHitCount = goodsMatchCounts.normalized_exact;
+  const goodsReviewRequiredHitCount =
+    goodsMatchCounts.normalized_contains + goodsMatchCounts.class_only;
   const goodsEvaluatedHitCount =
     goodsConfirmedHitCount + goodsReviewRequiredHitCount + goodsMatchCounts.mismatch;
   const applicationYearCounts = {};
@@ -784,8 +787,11 @@ function analyzeEntries(parsed, providedOptions = {}) {
       );
     }
     if (summary.goodsReviewRequiredHitCount > 0) {
+      const containsCount = summary.goodsMatchCounts?.normalized_contains || 0;
+      const classOnlyCount = summary.goodsMatchCounts?.class_only || 0;
       warnings.push(
-        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품명이 확인되지 않고 NICE류만 일치한 class_only 검토 후보입니다.`
+        `${summary.goodsReviewRequiredHitCount}개 상표는 지정상품 검토 후보입니다` +
+          `(품목명 포함 normalized_contains ${containsCount}개, NICE류만 일치 class_only ${classOnlyCount}개) — 확정 집계에는 넣지 않습니다.`
       );
     }
     const notApplicableCount = registry.counts?.noRegistrationHitCount ?? summary.ipRegistryStatusCounts?.not_applicable ?? 0;
@@ -854,7 +860,7 @@ function analyzeEntries(parsed, providedOptions = {}) {
         inputDocument?.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion,
       ].filter(Boolean),
       designatedGoodsPolicy:
-        "normalized_exact 또는 normalized_contains는 특산품 활용 출원으로 인정하고, class_only만 사람 검토 후보로 유지",
+        "normalized_exact(정규화 완전일치)만 특산품 활용 출원으로 인정하고, normalized_contains(품목명 포함)와 class_only(NICE류만 일치)는 사람 검토 후보로 유지(#12, 2026-09-01)",
       designatedGoodsMatchVersion:
         inputDocument?.ipRegistryEnrichment?.policy?.goodsMatchVersion || null,
       currentYearPolicy: "진행 중인 현재 연도는 최근/직전 기간 비교에서 제외",

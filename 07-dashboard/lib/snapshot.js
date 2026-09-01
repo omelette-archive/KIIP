@@ -486,7 +486,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             : "ip-registry-designated-goods-v0-review",
           rationale: rawGoodsMatched
             ? "지정상품명이 원물명과 정규화 완전일치(normalized_exact)한 출원 수"
-            : "등록원부 지정상품과 정규화 완전일치한 상표만 집계",
+            : "등록원부 지정상품명이 품목명과 정규화 완전일치(normalized_exact)한 상표만 집계",
           blockingIssue: rawGoodsMatched ? null : "#12",
         }),
         goodsReviewCandidateCount: makeMetric(row.goodsReviewRequiredHitCount ?? 0, row, {
@@ -501,7 +501,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             : "ip-registry-designated-goods-v0-review",
           rationale: rawGoodsMatched
             ? "지정상품명에 원물명이 포함(normalized_contains)된 출원 수"
-            : "normalized_contains 또는 class_only 후보",
+            : "지정상품명이 품목명을 포함(normalized_contains)하거나 NICE류만 일치(class_only)한 검토 후보 — 확정 집계 제외",
           blockingIssue: rawGoodsMatched ? null : "#12",
         }),
         gapScore: makeMetric(gapRow?.gapScore ?? null, row, {

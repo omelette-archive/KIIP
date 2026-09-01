@@ -187,7 +187,8 @@ async function runIpRegistryTests() {
         [{ classCode: "31", designatedProductName: "미가공사과(강원도양양군에서생산된사과에한함)" }]
       );
     assert.strictEqual(containsResult.method, "normalized_contains");
-    assert.strictEqual(containsResult.reviewRequired, false);
+    // #12(2026-09-01): 포함만 한 경우는 확정이 아니라 검토 후보(reviewRequired=true)
+    assert.strictEqual(containsResult.reviewRequired, true);
     assert.strictEqual(
       evaluateGoods(
         { item: "배", classCode: "31" },

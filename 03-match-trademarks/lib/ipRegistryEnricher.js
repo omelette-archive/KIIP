@@ -10,7 +10,7 @@ const {
 } = require("./ipRegistryClient");
 
 const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v2-aliases";
-const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v0-review";
+const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v1-exact-only-confirmed";
 
 function isRateLimitError(error) {
   return /(?:\b429\b|rate[ _-]?limit|요청\s*(?:횟수|건수).*초과|일일.*초과)/i.test(
@@ -146,8 +146,10 @@ function evaluateGoods(query, products) {
   } else if (contains.length > 0) {
     method = "normalized_contains";
     confidence = "high_contains";
-    // 지정상품명에 고시상품명칭이 포함되면 특산품 활용 출원으로 인정한다.
-    reviewRequired = false;
+    // #12(2026-09-01 결정): 지정상품명이 품목명을 "포함"만 한 경우는 특산품 활용 출원으로
+    // 자동 인정하지 않고 사람 검토 후보로 둔다(확정은 normalized_exact만). rawGoodsReview
+    // 경로도 exact만 confirmed로 승격하므로 두 경로가 일치한다.
+    reviewRequired = true;
   } else if (classMatched.length > 0) {
     method = "class_only";
     confidence = "candidate_only";

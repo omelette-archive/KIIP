@@ -457,6 +457,38 @@ console.log("7) 등록원부 출원인 주소·지정상품 근거 집계");
   ok("진짜 출원인 주소와 지정상품 후보를 분리 집계하고 부분 보강 경고를 전파");
 }
 
+console.log("5-4) #12 결정: normalized_contains는 확정이 아니라 검토 후보(2026-09-01)");
+{
+  const r = analyzeEntries({
+    ipRegistryEnrichment: { enabled: true, status: "complete", completeRegistrationCount: 3 },
+    results: [{
+      status: "ok",
+      collectionStatus: "complete",
+      query: { region: "경상북도 안동시", item: "신선한 사과", classCode: "31" },
+      hits: [
+        { ...hit("C-1", "안동사과A", "20250101", "등록", "inside"), goodsMatchMethod: "normalized_exact", goodsReviewRequired: false },
+        { ...hit("C-2", "안동사과B", "20250102", "등록", "inside"), goodsMatchMethod: "normalized_contains", goodsReviewRequired: true },
+        { ...hit("C-3", "안동사과C", "20250103", "등록", "inside"), goodsMatchMethod: "class_only", goodsReviewRequired: true },
+      ],
+    }],
+  }, { asOfYear: 2026 });
+  const row = r.regionItems[0];
+  assert.strictEqual(row.goodsMatchCounts.normalized_exact, 1);
+  assert.strictEqual(row.goodsMatchCounts.normalized_contains, 1);
+  assert.strictEqual(row.goodsMatchCounts.class_only, 1);
+  assert.strictEqual(row.goodsConfirmedHitCount, 1, "확정은 normalized_exact만");
+  assert.strictEqual(row.goodsReviewRequiredHitCount, 2, "contains + class_only는 검토 후보");
+  assert.ok(
+    r.methodology.designatedGoodsPolicy.includes("normalized_exact(정규화 완전일치)만"),
+    "정책 문자열이 exact-only 확정을 명시해야 함"
+  );
+  assert.ok(
+    r.warnings.some((w) => w.includes("normalized_contains") && w.includes("검토 후보")),
+    "contains 검토 후보 건수를 경고에 분리 표기"
+  );
+  ok("정규화 완전일치만 확정, 포함·NICE류만 일치는 검토 후보로 통일(경로 무관)");
+}
+
 console.log("7-1) 등록원부 일별 예산 소진·429 재개 시점을 경고로 노출(#52)");
 {
   const r = analyzeEntries({
