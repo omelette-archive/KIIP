@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
@@ -190,6 +190,25 @@ function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>;
   return <div className="item-share">
     <div className="item-share-donut" style={{ background: shareConicGradient(segments) }} role="img" aria-label={`${label} 광역 단위 출원 비중`} />
     <ul className="item-share-legend">{segments.map((segment, index) => <li key={segment.name}><i style={{ background: SHARE_COLORS[index % SHARE_COLORS.length] }} />{displayRegionName(segment.name)}<b>{percent(segment.pct)}</b></li>)}</ul>
+  </div>;
+}
+// 이슈 #116(2026-09-01): 지자체별 조회에서 추이 그래프 크기를 사용자가 조절하고
+// 싶다는 요청. 세 단계(작게/보통/크게)를 :root의 data-trend-size로 저장하고 CSS가
+// province-detail-cols 그리드 비율을 바꾼다. localStorage에 남겨 새로고침에도 유지.
+const TREND_SIZES: { key: string; label: string }[] = [
+  { key: "s", label: "작게" },
+  { key: "m", label: "보통" },
+  { key: "l", label: "크게" },
+];
+function applyTrendSize(key: string) {
+  if (typeof document === "undefined") return;
+  document.documentElement.dataset.trendSize = key;
+  try { localStorage.setItem("kiip-trend-size", key); } catch { /* private mode 등 */ }
+}
+function TrendSizeControl() {
+  return <div className="trend-size-control" role="group" aria-label="추이 그래프 크기">
+    <span>그래프 크기</span>
+    {TREND_SIZES.map((size) => <button type="button" key={size.key} data-trend-size={size.key} onClick={() => applyTrendSize(size.key)}>{size.label}</button>)}
   </div>;
 }
 function RegionTrend({ region, heading = "지역 출원·등록 추이", subtitle }: { region: Pick<Region, "region" | "items">; heading?: string; subtitle?: string }) {
@@ -414,6 +433,11 @@ function regionalMetricPendingReason(item: Item) {
 export default function Dashboard({ snapshot, geometry, registrationExamples }: { snapshot: Snapshot; geometry: MapGeometry; registrationExamples: VerifiedRegistrationExamples }) {
   const defaultRegionProvince = snapshot.regions.find((region) => region.sido && region.sido !== "전국")?.sido || null;
   const [tab, setTab] = useState<Tab>("summary");
+  useEffect(() => {
+    let saved: string | null = null;
+    try { saved = localStorage.getItem("kiip-trend-size"); } catch { /* private mode 등 */ }
+    if (saved && TREND_SIZES.some((size) => size.key === saved)) document.documentElement.dataset.trendSize = saved;
+  }, []);
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -712,8 +736,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div>
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>NICE류</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>NICE류</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td>{label}</td><td>{item.noticeName} · {item.niceClass}류</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
         </div>
       </section>
     </>}
@@ -874,11 +898,14 @@ function ProvinceDetail({ province, regions, onRegion }: { province: string; reg
   const registrations = availableItems.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0);
   return <div className="detail-panel province-detail">
     <div className="detail-heading"><div><p className="eyebrow">광역 기본 보기</p><h2>{displayRegionName(province)}</h2><p>시군구 {regions.length}곳의 특산품·상표 현황 합계</p></div><span className="state">광역 집계</span></div>
-    <RegionTrend region={{ region: province, items }} />
-    <div className="detail-grid province-summary-grid">
-      <article><span>전체 수집 특산품</span><strong>{number(coverage.total)}개</strong><small>시군구별 지역×품목 합계</small></article>
-      <article><span>출원 확인 특산품</span><strong>{number(coverage.applied)}개</strong><small>전체 특산품 출원율 {percent(coverage.rate)}</small></article>
-      <article><span>지역 주소 일치 출원</span><strong>{number(applications)}건</strong><small>등록 완료 {number(registrations)}건</small></article>
+    <TrendSizeControl />
+    <div className="province-detail-cols">
+      <RegionTrend region={{ region: province, items }} />
+      <div className="detail-grid province-summary-grid">
+        <article><span>전체 수집 특산품</span><strong>{number(coverage.total)}개</strong><small>시군구별 지역×품목 합계</small></article>
+        <article><span>출원 확인 특산품</span><strong>{number(coverage.applied)}개</strong><small>전체 특산품 출원율 {percent(coverage.rate)}</small></article>
+        <article><span>지역 주소 일치 출원</span><strong>{number(applications)}건</strong><small>등록 완료 {number(registrations)}건</small></article>
+      </div>
     </div>
     <section className="province-municipalities"><div className="section-heading"><div><h2>시군구 상세</h2></div><span>지역을 선택하면 품목별 상세로 전환</span></div><div>{regions.map((region) => { const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} onClick={() => onRegion(region)}><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개</small></button>; })}</div></section>
   </div>;
