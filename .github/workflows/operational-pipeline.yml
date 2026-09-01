@@ -41,7 +41,8 @@ jobs:
     timeout-minutes: 720
 
     env:
-      KIIP_OPERATIONAL_ROOT: ${{ vars.KIIP_OPERATIONAL_ROOT || format('{0}/kiip-operational', runner.temp) }}
+      # runner 컨텍스트는 job-level env에서 못 쓴다 — 기본값은 아래 스텝에서 셸로 채운다.
+      KIIP_OPERATIONAL_ROOT: ${{ vars.KIIP_OPERATIONAL_ROOT }}
       GI_API_KEY: ${{ secrets.GI_API_KEY }}
       NONGSARO_API_KEY: ${{ secrets.NONGSARO_API_KEY }}
       NONGSARO_LOCAL_BRAND_API_KEY: ${{ secrets.NONGSARO_LOCAL_BRAND_API_KEY }}
@@ -58,12 +59,14 @@ jobs:
           node-version: "22"
           package-manager-cache: false
 
-      - name: Resolve run id
+      - name: Resolve run id and operational root
         id: runid
         shell: bash
-        run: echo "value=$(date -u +%Y%m%d)-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+        run: |
+          echo "value=$(date -u +%Y%m%d)-${GITHUB_RUN_ID}" >> "$GITHUB_OUTPUT"
+          echo "KIIP_OPERATIONAL_ROOT=${KIIP_OPERATIONAL_ROOT:-$HOME/kiip-operational}" >> "$GITHUB_ENV"
 
-      - name: Preflight — required secrets, persistent state dir, node version
+      - name: Preflight - required secrets, persistent state dir, node version
         shell: bash
         run: node scripts/checkOperationalEnv.js --state-dir "${KIIP_OPERATIONAL_ROOT}/state"
 
