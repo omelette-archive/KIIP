@@ -537,6 +537,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking-columns { gap: 28px; }
 }
 
+/* 이슈 #116(2026-09-01): "지역별 상표 출원" 4단 행은 열 최소폭 합(약 1,050px)보다 창이
+   좁아지면 열이 minmax 최소폭 아래로 못 줄어 내용이 겹쳐 엉킨다. 1,240px 이하에서 먼저
+   2단, 980px 이하에서 1단으로 접어 겹침을 막는다. */
+@media (max-width: 1240px) {
+  .applications-compact-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .applications-compact-row.solo { grid-template-columns: 1fr; }
+  .applications-compact-row .map-stage { min-height: 300px; }
+  .composition-list small { white-space: normal; }
+}
+
 @media (max-width: 980px) {
   .primary-tabs button { padding: 8px 6px; font-size: 12px; }
   .metrics { grid-template-columns: repeat(2, 1fr); }
