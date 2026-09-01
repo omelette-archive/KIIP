@@ -6,15 +6,17 @@
  * `docs/applicant-region-recovery-runbook.md` 6절 "재분석 전·후 검증표"의
  * 이 항목을 사람이 두 스냅샷을 열어 손으로 비교해야 했다.
  *
- * API 호출 없이 이미 저장된 ③ 산출물 JSON만 읽는다 — storageMode가 query_facts든
- * results든 lib/ipRegistryEnricher.js의 factHitSources()로 동일하게 처리한다.
- * summarizeIpRegistryMatches()도 이번에 경로 A(출원번호)·경로 B(등록번호) 둘 다
- * 세도록 넓혔다 — 이전에는 경로 B(등록번호 기반)만 세고 있었다.
+ * API 호출 없이 이미 저장된 ③ 산출물 JSON만 읽는다. storageMode=query_facts는
+ * hit이 지역행마다 복제되지 않고 queryFact에 한 번만 저장되며 그 저장값은 빈 지역
+ * 기준이다 — regionEvaluatedHitSources()가 results를 펼쳐 각 entry.query.region에
+ * 대해 저장된 applicantRegionEvidence로 관계를 다시 판정한다(expanded 저장 방식과
+ * 동일한 지역×검색행 모집단). summarizeIpRegistryMatches()도 경로 A(출원번호)·경로 B
+ * (등록번호) 둘 다 세도록 넓혔다 — 이전에는 경로 B만 세고 있었다.
  */
 
 const fs = require("fs");
 const path = require("path");
-const { factHitSources, summarizeIpRegistryMatches } = require("./lib/ipRegistryEnricher");
+const { regionEvaluatedHitSources, summarizeIpRegistryMatches } = require("./lib/ipRegistryEnricher");
 
 function parseArgs(argv) {
   const args = {};
@@ -58,7 +60,7 @@ function ratio(part, total) {
  * @param {object} document ③ 산출물(storageMode 무관)
  */
 function summarizeDocument(document) {
-  const counts = summarizeIpRegistryMatches(factHitSources(document));
+  const counts = summarizeIpRegistryMatches(regionEvaluatedHitSources(document));
   return {
     ...counts,
     ratios: {

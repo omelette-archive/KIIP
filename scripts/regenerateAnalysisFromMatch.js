@@ -10,10 +10,14 @@
  * CLI를 그대로 부른다. runOperationalPipeline.js의 실행기(원자적 runDir 잠금,
  * 단계 실패 시 후속 중단, manifest 기록)를 재사용한다.
  *
+ * 스냅샷 감사(audit_snapshot)는 계약 위반(errors)만 차단한다. 라이브 스냅샷에 이미
+ * 있는 알려진 warnings(review 행 지역지표 노출, 미해결 행정코드 등)는 --strict로
+ * 막으면 실제 데이터에서 항상 중단되므로, warnings는 regen-metadata.json에 기록만 한다.
+ *
  * 함께 남기는 것(완료 조건: "④→⑦ 재생성 경로와 실행 메타데이터 기록"):
  * - region-match-coverage.json: ③ 스냅샷 기준 inside/outside/unverified 비율.
  *   --before를 주면 전후 델타까지.
- * - regen-metadata.json: 입력 파일 해시·계약/규칙 버전·실행시각·출력 경로.
+ * - regen-metadata.json: 입력 파일 해시·계약/규칙 버전·실행시각·출력 경로·감사 결과.
  *
  * 사용법:
  *   node scripts/regenerateAnalysisFromMatch.js --input <③ 최종 보강 JSON> [옵션]
@@ -120,6 +124,7 @@ function buildPlan(options = {}) {
     gap: path.join(runDir, "05-gap.json"),
     strategy: path.join(runDir, "06-strategy.json"),
     snapshot: path.join(runDir, "07-dashboard-snapshot.json"),
+    auditReport: path.join(runDir, "audit-report.json"),
     coverage: path.join(runDir, "region-match-coverage.json"),
     dashboardCandidate: path.join(runDir, "dashboard.candidate.html"),
     metadata: path.join(runDir, "regen-metadata.json"),
@@ -192,10 +197,10 @@ function buildPlan(options = {}) {
     ),
     nodeStage(
       "audit_snapshot",
-      "재생성 스냅샷 내부 정합성 감사(경고도 실패로 취급)",
+      "재생성 스냅샷 계약 감사 — errors(exit 1)만 차단, 전체 리포트를 audit-report.json으로 저장",
       "scripts/auditDashboardSnapshot.js",
-      ["--input", files.snapshot, "--strict"],
-      []
+      ["--input", files.snapshot, "--out", files.auditReport],
+      [files.auditReport]
     ),
     nodeStage(
       "render_candidate",
@@ -247,6 +252,19 @@ function writeMetadata(plan) {
   const strategy = readJsonSafe(plan.files.strategy) || {};
   const snapshot = readJsonSafe(plan.files.snapshot) || {};
   const coverage = readJsonSafe(plan.files.coverage);
+  // audit_snapshot 단계가 --out으로 이미 파일을 썼다. 여기서 다시 감사하지 않고 그 파일을 읽어
+  // 요약만 뽑는다(단계 산출물과 메타데이터가 같은 실행 결과를 가리키도록).
+  const auditReport = readJsonSafe(plan.files.auditReport);
+  const audit = auditReport
+    ? {
+        reportPath: plan.files.auditReport,
+        ok: auditReport.ok,
+        errorCount: (auditReport.errors || []).length,
+        warningCount: (auditReport.warnings || []).length,
+        errors: (auditReport.errors || []).map((item) => item.code),
+        warnings: (auditReport.warnings || []).map((item) => item.code),
+      }
+    : null;
 
   const metadata = {
     schemaVersion: "regen-from-match-metadata-v1",
@@ -255,8 +273,18 @@ function writeMetadata(plan) {
     input: {
       path: plan.inputs.input,
       sha256: sha256(plan.inputs.input),
-      searchContractVersion: input.schemaVersion || input.contractVersion || null,
       storageMode: input.storageMode || "results",
+      // #73 완료조건: ③ 입력이 어떤 계약/규칙 버전으로 만들어졌는지 명시적으로 남긴다.
+      contractVersions: {
+        searchSchemaVersion: input.schemaVersion || null,
+        trademarkSourceContractVersion: input.trademarkSourceMetadata?.contractVersion || null,
+        applicantRegionMatchVersion:
+          input.applicationApplicantEnrichment?.policy?.applicantRegionMatchVersion || null,
+        ipRegistryApplicantRegionMatchVersion:
+          input.ipRegistryEnrichment?.policy?.applicantRegionMatchVersion || null,
+        ipRegistryGoodsMatchVersion:
+          input.ipRegistryEnrichment?.policy?.goodsMatchVersion || null,
+      },
     },
     before: plan.inputs.before
       ? { path: plan.inputs.before, sha256: sha256(plan.inputs.before) }
@@ -279,11 +307,13 @@ function writeMetadata(plan) {
       stage: snapshot.stage || null,
     },
     regionMatchCoverage: coverage,
+    snapshotAudit: audit,
     outputs: {
       analysis: plan.files.analysis,
       gap: plan.files.gap,
       strategy: plan.files.strategy,
       snapshot: plan.files.snapshot,
+      auditReport: plan.files.auditReport,
       coverage: plan.files.coverage,
       dashboardCandidate: plan.files.dashboardCandidate,
     },

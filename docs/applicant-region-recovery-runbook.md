@@ -268,13 +268,23 @@ node 03-match-trademarks/refreshStaleRegistryEntries.js `
   API 호출 없이 저장된 ③ 산출물만 읽고, `--before`/`--after`로 전후 델타·비율 변화를
   자동 계산한다. `summarizeIpRegistryMatches()`가 경로 A(출원번호)로만 평가된 hit도
   세도록 넓혀졌고 출처별(`bySource`)·미확인 사유별(`unverifiedByReason`) 분리를 포함한다.
+  storageMode=query_facts에서는 compactBatchOutput이 queryFact의 `query.region`을 비우고
+  보강 단계가 그 빈 지역 기준으로 `applicantRegionMatch`를 한 번만 저장하므로,
+  `regionEvaluatedHitSources()`가 `results`를 펼쳐 저장된 `applicantRegionEvidence`로
+  각 `entry.query.region`에 대해 관계를 다시 판정한다. `entry.query.region`이 없는
+  전국 카탈로그 행은 지역 귀속 모집단에서 제외한다(안 그러면 그 hit이 전부 unverified로
+  들어가 비율을 압도).
 - 재조회·캐시 재적용을 마친 ③ 산출물 하나로 ④→⑦ 재생성을 한 번에 수행하는 실행기도
   구현됐다(`scripts/regenerateAnalysisFromMatch.js`, 2026-09-01, [#73](https://github.com/omelette-archive/KIIP/issues/73)).
   `--input <③ 최종 보강 JSON> [--before <기준선 ③ JSON>]`으로 부르면 지역매칭 비율 집계 →
-  ④ 분석 → ⑤ 공백 → ⑥ 전략 → ⑦ 스냅샷 → 스냅샷 감사 → 게시 전 후보 HTML을 순서대로
-  실행하고, 입력 파일 해시·계약/규칙 버전·실행시각·출력 경로·지역매칭 델타를
-  `regen-metadata.json`에 남긴다. 4.3절의 수동 명령은 개별 단계를 따로 실행할 때
-  참고용으로 유지한다.
+  ④ 분석 → ⑤ 공백 → ⑥ 전략 → ⑦ 스냅샷 → 스냅샷 계약 감사(errors만 차단, 알려진 warning은
+  `audit-report.json`에 기록) → 게시 전 후보 HTML을 순서대로 실행하고, 입력 파일 sha256·
+  ③ 계약/규칙 버전(검색 스키마·`trademarkSourceMetadata.contractVersion`·경로 A/B
+  `applicantRegionMatchVersion`·`goodsMatchVersion`)·실행시각·출력 경로·감사 결과·
+  지역매칭 전후 델타를 `regen-metadata.json`에 남긴다. 4.3절의 수동 명령은 개별 단계를
+  따로 실행할 때 참고용으로 유지한다. storageMode=query_facts 입력은 `results`를 펼쳐
+  각 지역행의 `query.region`으로 관계를 다시 판정하며, 지역이 없는 전국 카탈로그 행은
+  지역 귀속 집계에서 제외한다.
 - 이미 complete인 등록번호의 변경 감지(4.5절, [#81](https://github.com/omelette-archive/KIIP/issues/81),
   2026-08-31)는 공식 만료예정일 기반 정책(`expiry_only`)으로 구현됐다. 신규 번호 증분
   (4.1)과 기존 번호 재검증(4.5)은 완전히 분리된 CLI라 서로 섞이지 않는다. 아직 없는

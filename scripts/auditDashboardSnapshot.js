@@ -18,6 +18,7 @@ function parseArgs(argv) {
     input: path.resolve("07-dashboard/web/public/data/dashboard-snapshot.json"),
     json: false,
     strict: false,
+    out: null,
   };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
@@ -26,6 +27,9 @@ function parseArgs(argv) {
     else if (arg === "--input") {
       if (!argv[i + 1]) throw new Error("--input requires a file path");
       args.input = path.resolve(argv[++i]);
+    } else if (arg === "--out") {
+      if (!argv[i + 1]) throw new Error("--out requires a file path");
+      args.out = path.resolve(argv[++i]);
     } else if (arg === "--help" || arg === "-h") {
       args.help = true;
     } else {
@@ -289,6 +293,7 @@ function usage() {
       "Options:",
       "  --input <path>  Snapshot to audit (default: dashboard public snapshot)",
       "  --json          Print the complete machine-readable report",
+      "  --out <path>    Write the full report JSON to a file (independent of exit code)",
       "  --strict        Treat warnings as a non-zero result",
     ].join("\n")
   );
@@ -299,6 +304,10 @@ function main() {
   if (args.help) return usage();
   const snapshot = JSON.parse(fs.readFileSync(args.input, "utf8"));
   const report = auditSnapshot(snapshot);
+  if (args.out) {
+    fs.mkdirSync(path.dirname(args.out), { recursive: true });
+    fs.writeFileSync(args.out, `${JSON.stringify({ input: args.input, ...report }, null, 2)}\n`, "utf8");
+  }
   if (args.json) console.log(JSON.stringify(report, null, 2));
   else printHuman(report, args.input);
   if (!report.ok) process.exitCode = 1;

@@ -254,6 +254,66 @@ function factHitSources(document) {
   return document.results || [];
 }
 
+// #73 검토 피드백(2026-09-01): storageMode=query_facts에서는 compactBatchOutput이
+// queryFact의 query.region을 null로 지우고, 보강 단계는 그 빈 지역 기준으로
+// applicantRegionMatch를 hit에 한 번만 저장한다(그래서 저장값은 사실상 늘 unverified).
+// 실제 지역은 document.results의 각 entry.query.region에 있으므로, 지역×검색행 단위
+// inside/outside/unverified를 집계하려면 results를 펼쳐 저장된 applicantRegionEvidence
+// (출원인 측 정규화 시도·시군구, 지역 무관)로 각 entry.query.region에 대해 관계를
+// 다시 판정해야 한다. 같은 queryKey가 서로 다른 두 지역에서 재사용되면 각각 따로 센다
+// (expanded 저장 방식과 동일한 모집단). entry.query.region이 없는 행(전국 카탈로그
+// 검색, nationwide_catalog)은 지역 귀속 평가 대상이 아니므로 모집단에서 제외한다 —
+// 넣으면 그 hit이 전부 unverified로 들어가 지역 비율을 압도한다.
+function regionEvaluatedHitSources(document, adminList = loadAdminCodes()) {
+  if (document?.storageMode !== "query_facts" || !document.queryFacts) {
+    // expanded 저장 방식: hit이 이미 지역행별로 복제·판정돼 있다. 지역 없는 행은
+    // expanded에서도 여기서 걸러 같은 모집단을 유지한다.
+    return (document?.results || []).filter((entry) => entry.query?.region);
+  }
+  const queryRegionCache = new Map();
+  const normalizedQueryRegion = (text) => {
+    const key = text || "";
+    if (!queryRegionCache.has(key)) {
+      queryRegionCache.set(key, normalizeAreaBrandRegion(key, adminList));
+    }
+    return queryRegionCache.get(key);
+  };
+  const sources = [];
+  for (const entry of document.results || []) {
+    if (!entry.query?.region) continue; // 전국 카탈로그 행 — 지역 귀속 평가 제외
+    const fact = document.queryFacts[entry.queryKey];
+    if (!fact) continue;
+    const queryRegion = normalizedQueryRegion(entry.query.region);
+    const hits = (fact.hits || []).map((hit) => {
+      const match = hit.applicantRegionMatch;
+      if (match === undefined || match === null) return hit; // not_collected 등 — 판정 시도 안 함
+      const evidence = hit.applicantRegionEvidence;
+      if (!Array.isArray(evidence) || evidence.length === 0) return hit; // 주소 없음 — 지역 무관 unverified
+      const rows = evidence.map((row) =>
+        classifyApplicantRegionMatch(queryRegion, {
+          status: row.regionStatus,
+          sido: row.sido,
+          sigungu: row.sigungu,
+          level: row.regionLevel,
+        })
+      );
+      const matches = [...new Set(rows.map((row) => row.match))];
+      const confidences = [...new Set(rows.map((row) => row.confidence))];
+      const reevaluated =
+        matches.length !== 1 || confidences.length !== 1
+          ? { match: "unverified", confidence: "multiple_conflicting_applicant_addresses" }
+          : { match: matches[0], confidence: confidences[0] };
+      return {
+        ...hit,
+        applicantRegionMatch: reevaluated.match,
+        applicantRegionMatchConfidence: reevaluated.confidence,
+      };
+    });
+    sources.push({ hits });
+  }
+  return sources;
+}
+
 function registryNumbers(document) {
   const result = [];
   const seen = new Set();
@@ -736,6 +796,7 @@ module.exports = {
   isRateLimitError,
   ipRegistryValidationMetadata,
   factHitSources,
+  regionEvaluatedHitSources,
   registryNumbers,
   sanitizeRegistryRecordForCache,
   summarizeIpRegistryMatches,

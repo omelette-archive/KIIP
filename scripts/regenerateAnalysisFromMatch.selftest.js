@@ -18,7 +18,19 @@ function writeStage3Fixture(filePath, overrides = {}) {
     mode: "batch",
     schemaVersion: "1.1",
     storageMode: "results",
-    ipRegistryEnrichment: { enabled: true, status: "complete" },
+    trademarkSourceMetadata: { sourceId: "kipris_trademark", contractVersion: "kipris-trademark-word-search-v1" },
+    applicationApplicantEnrichment: {
+      enabled: true,
+      policy: { applicantRegionMatchVersion: "kipris-trademark-applicant-region-v2-aliases" },
+    },
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "complete",
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+    },
     inputCount: 1,
     successCount: 1,
     errorCount: 0,
@@ -99,7 +111,11 @@ try {
   const analyzeStage = plan.stages.find((s) => s.id === "04_analyze");
   assert.ok(analyzeStage.args.includes("--raw-goods-review"));
   const auditStage = plan.stages.find((s) => s.id === "audit_snapshot");
-  assert.ok(auditStage.args.includes("--strict"), "감사는 경고도 실패로 취급");
+  assert.ok(!auditStage.args.includes("--strict"), "감사는 errors만 차단(경고로 중단하지 않음)");
+  assert.ok(auditStage.args.includes("--out"), "감사 단계가 직접 리포트 파일을 씀(--out)");
+  assert.ok(auditStage.outputs.some((o) => o.endsWith("audit-report.json")), "감사 리포트를 산출물로 선언");
+  const auditOutIdx = auditStage.args.indexOf("--out");
+  assert.ok(auditStage.outputs.includes(auditStage.args[auditOutIdx + 1]), "--out 경로와 선언된 산출물이 일치");
   const serialized = JSON.stringify(publicPlan(plan));
   assert.ok(!serialized.includes("API_KEY"));
 
@@ -196,6 +212,7 @@ try {
     "05-gap.json",
     "06-strategy.json",
     "07-dashboard-snapshot.json",
+    "audit-report.json",
     "region-match-coverage.json",
     "regen-metadata.json",
     "dashboard.candidate.html",
@@ -206,10 +223,25 @@ try {
   const metadata = JSON.parse(fs.readFileSync(path.join(runDir, "regen-metadata.json"), "utf8"));
   assert.strictEqual(metadata.schemaVersion, "regen-from-match-metadata-v1");
   assert.match(metadata.input.sha256, /^[0-9a-f]{64}$/);
+  assert.deepStrictEqual(
+    metadata.input.contractVersions,
+    {
+      searchSchemaVersion: "1.1",
+      trademarkSourceContractVersion: "kipris-trademark-word-search-v1",
+      applicantRegionMatchVersion: "kipris-trademark-applicant-region-v2-aliases",
+      ipRegistryApplicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+      ipRegistryGoodsMatchVersion: "ip-registry-designated-goods-v0-review",
+    },
+    "③ 입력의 계약/규칙 버전을 이름·값 일치하게 명시 기록"
+  );
   assert.ok(metadata.before && metadata.before.sha256, "--before 해시가 기록돼야 함");
   assert.ok(metadata.ruleVersions.analysisVersion, "④ 계약 버전이 메타데이터에 남아야 함");
   assert.ok(metadata.ruleVersions.gapScoreVersion, "⑤ 계약 버전이 남아야 함");
   assert.ok(metadata.ruleVersions.snapshotSchemaVersion, "⑦ 계약 버전이 남아야 함");
+  assert.ok(metadata.snapshotAudit, "스냅샷 감사 결과가 메타데이터에 있어야 함");
+  assert.strictEqual(typeof metadata.snapshotAudit.warningCount, "number");
+  assert.ok(Array.isArray(metadata.snapshotAudit.warnings), "warnings 코드 목록이 있어야 함");
+  assert.strictEqual(metadata.snapshotAudit.errorCount, 0, "정상 재생성은 계약 errors 0");
   assert.ok(metadata.regionMatchCoverage, "지역매칭 집계가 메타데이터에 인라인돼야 함");
   assert.ok(metadata.regionMatchCoverage.delta, "--before가 있으면 전후 델타가 있어야 함");
   assert.strictEqual(
@@ -230,6 +262,50 @@ try {
       ),
     /같은 run-id 실행 디렉터리가 이미 있습니다/
   );
+
+  console.log("8) 실데이터 스모크 — 라이브 스냅샷은 --strict 없이 감사 통과(exit 0)해야 한다");
+  {
+    // audit_snapshot 단계가 --strict였다면 라이브 스냅샷의 알려진 warning 3건 때문에
+    // 항상 exit 2로 중단됐다. --strict를 뺀 현재 정책이 실데이터에서 통과하는지 고정.
+    const livePath = path.join(ROOT, "07-dashboard/web/public/data/dashboard-snapshot.json");
+    if (fs.existsSync(livePath)) {
+      const live = spawnSync(
+        process.execPath,
+        [path.join(ROOT, "scripts/auditDashboardSnapshot.js"), "--input", livePath],
+        { cwd: ROOT, encoding: "utf8" }
+      );
+      assert.strictEqual(live.status, 0, `라이브 스냅샷 감사는 errors 없이 통과해야 함:\n${live.stdout}`);
+      const strict = spawnSync(
+        process.execPath,
+        [path.join(ROOT, "scripts/auditDashboardSnapshot.js"), "--input", livePath, "--strict"],
+        { cwd: ROOT, encoding: "utf8" }
+      );
+      assert.strictEqual(strict.status, 2, "--strict였다면 실제로 exit 2로 파이프라인이 막혔을 것(회귀 근거)");
+
+      const outPath = path.join(tempDir, "live-audit.json");
+      const withOut = spawnSync(
+        process.execPath,
+        [path.join(ROOT, "scripts/auditDashboardSnapshot.js"), "--input", livePath, "--out", outPath],
+        { cwd: ROOT, encoding: "utf8" }
+      );
+      assert.strictEqual(withOut.status, 0);
+      assert.ok(fs.existsSync(outPath), "--out은 감사 단계가 직접 리포트 파일을 쓴다");
+      const liveReport = JSON.parse(fs.readFileSync(outPath, "utf8"));
+      assert.strictEqual(typeof liveReport.ok, "boolean");
+      assert.ok(Array.isArray(liveReport.warnings));
+    } else {
+      console.log("  (라이브 스냅샷 파일 없음 — 스킵)");
+    }
+  }
+
+  console.log("9) e2e에서 audit-report.json은 감사 단계가 쓰고 metadata가 그 파일을 가리킨다");
+  {
+    const reportPath = path.join(runDir, "audit-report.json");
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    assert.strictEqual(report.ok, true, "픽스처 재생성 스냅샷은 계약 위반 없음");
+    assert.strictEqual(path.resolve(metadata.snapshotAudit.reportPath), path.resolve(reportPath));
+    assert.strictEqual(metadata.snapshotAudit.errorCount, report.errors.length);
+  }
 
   // writeMetadata가 직접 호출돼도 동작(단위)
   void writeMetadata;
