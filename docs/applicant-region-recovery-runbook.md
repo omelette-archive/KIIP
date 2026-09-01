@@ -130,6 +130,18 @@ node 05-detect-brand-gap/detectBrandGap.js `
 
 ⑥·⑦도 같은 `replay` 접두사로 새 경로에 생성한 뒤 기존 산출물과 비교한다.
 
+위 ④~⑦를 한 번에 실행하려면(재조회·캐시 재적용을 마친 ③ 산출물이 준비된 경우):
+
+```powershell
+node scripts/regenerateAnalysisFromMatch.js `
+  --input 03-match-trademarks/output/replay-02-final.json `
+  --before 03-match-trademarks/output/search-result.json `
+  --run-id 20260901-refresh-replay
+```
+
+실행별 산출물은 `.kiip-operations/regen/runs/<run-id>/`에 모이고, `regen-metadata.json`에
+입력 해시·계약 버전·지역매칭 전후 델타가 남는다. 저장소 `dashboard.html`은 덮어쓰지 않는다.
+
 ### 4.4 미확인 건 선별 재조회(#73)
 
 시도·시군구 별칭 규칙만 바뀌었고 새 검색은 없을 때, 기준 캐시 전체를 다시
@@ -250,9 +262,19 @@ node 03-match-trademarks/refreshStaleRegistryEntries.js `
 ## 7. 현재 한계와 후속 구현
 
 - 경로 A(출원번호)·경로 B(등록번호) 둘 다 미확인 캐시 선별 재조회와 대상 manifest가
-  구현됐다([#73](https://github.com/omelette-archive/KIIP/issues/73), 2026-08-26). 남은
-  범위는 재조회 후 ④→⑦ 재생성을 한 단계로 묶는 자동화(현재 4.3절 수동 명령만 문서화)와
-  ③ 검색 스냅샷 기준 inside/outside/unverified 전후 비율 자동 집계다.
+  구현됐다([#73](https://github.com/omelette-archive/KIIP/issues/73), 2026-08-26).
+- ③ 검색 스냅샷 기준 inside/outside/unverified 전후 비율 자동 집계도 구현됐다
+  (`03-match-trademarks/summarizeRegionMatchCoverage.js`, 2026-08-31, [#73](https://github.com/omelette-archive/KIIP/issues/73)).
+  API 호출 없이 저장된 ③ 산출물만 읽고, `--before`/`--after`로 전후 델타·비율 변화를
+  자동 계산한다. `summarizeIpRegistryMatches()`가 경로 A(출원번호)로만 평가된 hit도
+  세도록 넓혀졌고 출처별(`bySource`)·미확인 사유별(`unverifiedByReason`) 분리를 포함한다.
+- 재조회·캐시 재적용을 마친 ③ 산출물 하나로 ④→⑦ 재생성을 한 번에 수행하는 실행기도
+  구현됐다(`scripts/regenerateAnalysisFromMatch.js`, 2026-09-01, [#73](https://github.com/omelette-archive/KIIP/issues/73)).
+  `--input <③ 최종 보강 JSON> [--before <기준선 ③ JSON>]`으로 부르면 지역매칭 비율 집계 →
+  ④ 분석 → ⑤ 공백 → ⑥ 전략 → ⑦ 스냅샷 → 스냅샷 감사 → 게시 전 후보 HTML을 순서대로
+  실행하고, 입력 파일 해시·계약/규칙 버전·실행시각·출력 경로·지역매칭 델타를
+  `regen-metadata.json`에 남긴다. 4.3절의 수동 명령은 개별 단계를 따로 실행할 때
+  참고용으로 유지한다.
 - 이미 complete인 등록번호의 변경 감지(4.5절, [#81](https://github.com/omelette-archive/KIIP/issues/81),
   2026-08-31)는 공식 만료예정일 기반 정책(`expiry_only`)으로 구현됐다. 신규 번호 증분
   (4.1)과 기존 번호 재검증(4.5)은 완전히 분리된 CLI라 서로 섞이지 않는다. 아직 없는

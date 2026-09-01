@@ -389,10 +389,14 @@ if (require.main === module) {
 }
 
 module.exports = {
+  ROOT,
   buildPlan,
   defaultRunId,
   executePlan,
+  nodeStage,
   parseArgs,
   publicPlan,
+  runStageCommand,
   validateRunId,
+  writeManifest,
 };
