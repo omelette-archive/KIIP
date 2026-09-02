@@ -689,7 +689,17 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // (비즈니스 흐름·등록 사례 등 하단)에 남아, 특히 데이터가 없는 품목은 빈 화면 하단만
   // 보인다. 선택할 때마다 화면 최상단으로 올려 "이 지역의 대표 특산품"부터 보이게 한다.
   const scrollTop = () => { if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
-  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); scrollTop(); }
+  // 지역을 드릴다운할 때 좌측 아코디언·광역 탭바가 실제 선택 지역의 시도를 가리키도록
+  // selectedRegionProvince/expandedRegionProvince도 함께 맞춘다(요약 mini-list·지도·
+  // 특산품별 목록에서 바로 들어올 때 엉뚱한 시도가 활성으로 남던 문제).
+  function chooseRegion(region: Region) {
+    const province = region.sido || region.region;
+    setSelectedRegionProvince(province);
+    setExpandedRegionProvince(province);
+    setSelectedRegionCode(regionKey(region));
+    setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || "");
+    scrollTop();
+  }
   function chooseRegionItem(id: string) { setSelectedItemId(id); scrollTop(); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
   function regionMapValue(region: Region | undefined, metric: MapMetric = mapMetric) { if (!region) return null; const available = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((metric === "trademarks" || metric === "registration") && available.length === 0) return null; if (metric === "trademarks") return trademarks; if (metric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (metric === "coverage") return coverage.total; return coverage.rate; }

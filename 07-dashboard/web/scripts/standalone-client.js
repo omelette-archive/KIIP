@@ -780,10 +780,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return `<section class="provenance"><div class="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>${esc(snapshot.schemaVersion)}</span></div><div class="source-table-wrap"><table class="source-table"><caption class="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>그룹</th><th>데이터명</th><th>수집 항목</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>${rows}<tr><td><span class="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href="${esc(geometry.boundaryReference.sourceUrl)}" target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>${esc(geometry.boundaryReference.sourceName)}</td><td>경계 파일 생성·코드 조인</td><td>${esc(boundaryDate)}</td></tr></tbody></table></div></section>`;
   }
   function bind() {
+    const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+    // 지역 드릴다운 시 좌측 아코디언·광역 탭바가 그 지역의 시도를 가리키도록 맞춘다.
+    const syncRegionProvince = (key) => { const r = snapshot.regions.find((row) => regionKey(row) === key); if (r) { const p = r.sido || r.region; state.selectedRegionProvince = p; state.expandedRegionProvince = p; } };
     document.querySelectorAll("[data-map-metric]").forEach((button) => { button.onclick = () => { state.mapMetric = button.dataset.mapMetric; render(); }; });
     document.querySelectorAll("[data-trend-size]").forEach((button) => { button.onclick = () => { const size = button.dataset.trendSize; document.documentElement.dataset.trendSize = size; try { localStorage.setItem("kiip-trend-size", size); } catch (error) { /* private mode 등 */ } }; });
     document.querySelectorAll("[data-province]").forEach((shape) => { const open = () => { state.province = shape.dataset.province; state.municipality = null; render(); }; shape.onclick = open; shape.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) open(); }; });
-    document.querySelectorAll("[data-municipality]").forEach((shape) => { const open = () => { state.municipality = shape.dataset.municipality; const region = findMunicipalityRegion(state.province, state.municipality); if (region) state.regionKey = regionKey(region); render(); }; shape.onclick = open; shape.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) open(); }; });
+    document.querySelectorAll("[data-municipality]").forEach((shape) => { const open = () => { state.municipality = shape.dataset.municipality; const region = findMunicipalityRegion(state.province, state.municipality); if (region) { state.regionKey = regionKey(region); syncRegionProvince(state.regionKey); } render(); }; shape.onclick = open; shape.onkeydown = (event) => { if (["Enter", " "].includes(event.key)) open(); }; });
     const back = document.querySelector("#map-back"); if (back) back.onclick = () => { state.province = null; state.municipality = null; render(); };
     document.querySelectorAll("[data-trend-preset]").forEach((button) => { button.onclick = () => { const preset = button.dataset.trendPreset; if (preset === "all") { state.trendStartYear = null; state.trendEndYear = null; } else { const fullEnd = Number(button.dataset.trendFullEnd); state.trendStartYear = fullEnd - (Number(preset) - 1); state.trendEndYear = fullEnd; } render(); }; });
     const trendStartInput = document.querySelector("#trend-start-input"); if (trendStartInput) trendStartInput.onchange = (event) => { state.trendStartYear = Number(event.currentTarget.value) || null; render(); };
@@ -827,15 +830,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 그대로 유지된다.
     document.querySelectorAll("[data-goto-tab]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.gotoTab; render(); }; });
     document.querySelectorAll("[data-explore-mode]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.exploreMode === "item" ? "items" : "applications"; state.regionKey = ""; state.itemId = ""; render(); }; });
-    // 이슈 #116: 지역·품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리
-    // (비즈니스 흐름·등록 사례 등 하단)에 남는다. 특히 데이터 없는 품목은 빈 화면 하단만
-    // 보이므로, 선택할 때마다 화면 최상단으로 올린다.
-    const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
-    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); scrollTop(); }; });
+    // 이슈 #116: 지역·품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리에
+    // 남는다(특히 데이터 없는 품목은 빈 화면 하단만). 선택 시 화면 최상단으로 올린다.
+    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; syncRegionProvince(state.regionKey); render(); scrollTop(); }; });
     document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { const province = button.dataset.regionGroup; state.selectedRegionProvince = province; state.expandedRegionProvince = state.expandedRegionProvince === province ? null : province; state.regionKey = ""; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-province-tab]").forEach((button) => { button.onclick = () => { const province = button.dataset.provinceTab; state.selectedRegionProvince = province; state.expandedRegionProvince = province; state.regionKey = ""; state.itemId = ""; render(); scrollTop(); }; });
     document.querySelectorAll("[data-province-filter]").forEach((button) => { button.onclick = () => { state.province = button.dataset.provinceFilter || null; state.municipality = null; render(); scrollTop(); }; });
-    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); scrollTop(); }; });
+    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; syncRegionProvince(state.regionKey); render(); scrollTop(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); scrollTop(); }; });
     document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { const applicationNumber = button.dataset.kiprisApplication; navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "popup,width=1180,height=900,noopener"); }; });
     bindSearchInput("#region-search", "query");
