@@ -356,10 +356,11 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .province-municipalities button small { color: var(--muted); font-size: 10px; }
 .coverage-insight h2 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
 .coverage-insight-stats { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
-.coverage-insight-stats div { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.coverage-insight-stats dt { margin: 0; color: var(--muted); font-size: 11px; }
-.coverage-insight-stats dd { margin: 0; font-weight: 800; font-size: 13px; }
+.coverage-insight-stats div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
+.coverage-insight-stats dt { margin: 0; flex: 0 0 auto; color: var(--muted); font-size: 11px; }
+.coverage-insight-stats dd { margin: 0; min-width: 0; font-weight: 800; font-size: 13px; text-align: right; overflow-wrap: anywhere; }
 .rate-hero { display: flex; align-items: center; gap: 18px; margin: 14px 0 4px; }
+.rate-hero-detail { min-width: 0; }
 .rate-hero-detail span { display: block; color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .02em; }
 .rate-hero-detail small { display: block; margin-top: 6px; color: var(--faint); font-size: 10.5px; line-height: 1.55; }
 .rate-ring { flex: none; }
@@ -609,6 +610,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    각 요소가 전체 폭을 쓰게 한다. 그리드 자식은 min-width:0으로 축소 허용, 차트/지도는
    넘치면 가로 스크롤. */
 .applications-compact-row > * { min-width: 0; }
+/* #116(2026-09-02): 전체 폭 요약 바가 좁아질 때 선택 범위·특산품 개수 텍스트가 칸 밖으로
+   튀어나오던 문제 — 넓은 화면에서만 가로로 두고, 1280px 이하는 세로로 쌓는다. */
+@media (max-width: 1280px) {
+  .applications-compact-row .coverage-insight { flex-direction: column; align-items: stretch; }
+  .applications-compact-row .coverage-insight-stats { flex: 1 1 auto; }
+}
 @media (max-width: 1000px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
@@ -722,9 +729,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .applications-compact-row .province-composition { grid-column: 1; grid-row: 1; }
 .applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
 .applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; padding: 22px; }
-.applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; padding: 20px 24px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 22px; }
+.applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; padding: 20px 24px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 18px 28px; }
 .applications-compact-row .coverage-insight h2 { flex: 0 0 100%; }
-.applications-compact-row .coverage-insight-stats { flex: 1; margin-top: 0; padding-top: 0; border-top: 0; grid-template-columns: repeat(3, 1fr); }
+.applications-compact-row .coverage-insight .rate-hero { flex: 0 1 auto; min-width: 0; }
+/* 창이 좁아질 때 선택 범위·특산품 개수 텍스트가 칸 밖으로 튀어나오던 문제(#116):
+   3열 그리드를 없애고 세로 목록으로 두되, 좁아지면 통째로 다음 줄로 내린다. */
+.applications-compact-row .coverage-insight-stats { flex: 1 1 300px; min-width: 0; margin-top: 0; padding-top: 0; border-top: 0; grid-template-columns: 1fr; }
 /* solo(지역 선택): 왼쪽 열에 추이 그래프 + 요약을 세로로, 오른쪽 열에 시군구 지도 */
 .applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
 .applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; flex-direction: column; align-items: stretch; }
