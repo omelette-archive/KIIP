@@ -440,6 +440,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .nationwide-flow-hint { margin-top: 3px; color: var(--faint); font-size: 9.5px; line-height: 1.4; white-space: normal; }
 .nationwide-flow-region { margin-top: 4px; color: var(--faint); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .nationwide-flow-caveat { margin: 10px 0 0; color: var(--faint); font-size: 10px; line-height: 1.55; }
+.nationwide-flow-origins { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; line-height: 1.6; }
+.nationwide-flow-origins strong { color: var(--green-dark); margin-right: 6px; }
 .nationwide-flow-eg { margin-top: 5px; color: var(--muted); font-size: 10px; line-height: 1.4; white-space: normal; }
 .nationwide-flow-eg b { display: inline-block; margin-right: 4px; padding: 0 5px; border-radius: 4px; background: rgba(16,25,43,.08); color: var(--ink); font-size: 8.5px; font-weight: 800; vertical-align: 1px; }
 .business-strategy { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
@@ -1042,7 +1044,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // NationwideFlowCard와 동일 구조 — 화면에는 "AI 판정" 표시를 넣지 않는다(사용자 결정).
   const FLOW_STAGE_LABELS = { raw: "원물", processed: "가공품", service: "서비스·확장" };
   const FLOW_STAGE_HINTS = { raw: "산지·1차 생산 단계 상표", processed: "가공식품·음료·화장품 등", service: "유통·체험·관광·식음 서비스류" };
-  const nationwideFlowCardHtml = (flow, itemLabel) => {
+  // 이슈 #119: 단계별 주요 상품류 이름(자주 나오는 NICE 13판 대분류만).
+  const NICE_CLASS_LABELS = { "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "35": "도소매·광고(35)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
+  const niceClassLabel = (code) => NICE_CLASS_LABELS[code] || `${code}류`;
+  const nationwideFlowCardHtml = (flow, itemLabel, origins) => {
     const { raw, processed, service } = flow.stages;
     const classified = raw.count + processed.count + service.count;
     const flowPct = (value) => classified ? `${Math.round(value / classified * 100)}%` : "—";
@@ -1055,13 +1060,22 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 없어 별도 등록원부 수집이 끝난 뒤 붙인다(analyzeNationwideFlow.js 재실행 필요).
     const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
     const hasExamples = ["raw", "processed", "service"].some((key) => { const eg = flow.stages[key].examples; return eg && ((eg.representative || []).length || (eg.unusual || []).length); });
-    const stagesHtml = ["raw", "processed", "service"].map((key, index) => { const stage = flow.stages[key]; const eg = stage.examples; return `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(stage.count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(stage.count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${stage.topRegion ? `<small class="nationwide-flow-region">${esc(stage.topRegion)}</small>` : ""}${eg && (eg.representative || []).length ? `<small class="nationwide-flow-eg"><b>대표</b> ${esc(eg.representative.join(", "))}</small>` : ""}${eg && (eg.unusual || []).length ? `<small class="nationwide-flow-eg"><b>이색</b> ${esc(eg.unusual.join(", "))}</small>` : ""}</div>`; }).join("");
+    const stagesHtml = ["raw", "processed", "service"].map((key, index) => {
+      const stage = flow.stages[key]; const eg = stage.examples;
+      const classesHtml = Array.isArray(stage.classes) && stage.classes.length ? `<small class="nationwide-flow-eg"><b>주요 상품류</b> ${esc(stage.classes.slice(0, 3).map((row) => `${niceClassLabel(row.classCode)} ${Math.round(row.share * 100)}%`).join(" · "))}</small>` : "";
+      const regionsHtml = Array.isArray(stage.topRegions) && stage.topRegions.length
+        ? `<small class="nationwide-flow-eg"><b>상위 지역</b> ${esc(stage.topRegions.slice(0, 3).map((row) => `${row.region} ${Math.round(row.share * 100)}%`).join(" · "))}</small>`
+        : (stage.topRegion ? `<small class="nationwide-flow-region">${esc(stage.topRegion)}</small>` : "");
+      return `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(stage.count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(stage.count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${classesHtml}${regionsHtml}${eg && (eg.representative || []).length ? `<small class="nationwide-flow-eg"><b>대표</b> ${esc(eg.representative.join(", "))}</small>` : ""}${eg && (eg.unusual || []).length ? `<small class="nationwide-flow-eg"><b>이색</b> ${esc(eg.unusual.join(", "))}</small>` : ""}</div>`;
+    }).join("");
+    const originsHtml = Array.isArray(origins) && origins.length ? `<p class="nationwide-flow-origins"><strong>주요 원산지</strong> ${esc(origins.map(displayRegionName).join(", "))}</p>` : "";
     return `<section class="nationwide-flow-card">
       <div class="section-heading"><div><h2>${esc(itemLabel)} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
       <p class="nationwide-flow-reach">현재 <strong>${furthestStage}</strong> 상표 활동이 확인됩니다 · 전체 ${number(flow.totalCount)}건 중 단계 분류 가능 ${number(classified)}건</p>
       <div class="nationwide-flow-stages">${stagesHtml}</div>
+      ${originsHtml}
       ${clusterNote}
-      <p class="nationwide-flow-caveat">${hasExamples ? "예시는 각 단계에서 실제 출원된 상표명입니다(지정상품 텍스트가 아님). 지정상품 대조는 등록원부 보강 후 반영됩니다." : "단계별 상표명·지정상품 예시는 전국 흐름 재수집 후 추가됩니다."}</p>
+      <p class="nationwide-flow-caveat">${hasExamples ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 텍스트 대조는 등록원부 보강 후 반영됩니다." : "단계별 상품류·상위 지역·상표명 예시는 전국 흐름 재수집 후 채워집니다."}</p>
     </section>`;
   };
   // 이슈 #116(2026-08-26) 사용자 재요청: 상태 아이콘·배지, 근거 수치 스탯 줄, 문장별 도트
@@ -1395,7 +1409,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const flowItem = row.matchedItems.find((entry) => entry.businessFlow);
     const briefingItem = row.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences?.length)
       || row.matchedItems.find((entry) => entry.briefing?.sentences?.length);
-    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name) : "";
+    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) : "";
     const briefingHtml = briefingItem ? businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`) : "";
     return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${flowHtml}${briefingHtml}`;
   }
@@ -1445,13 +1459,21 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       for (const item of region.items) {
         const name = officialItemLabel(item);
         if (!name) continue;
-        const group = groups.get(name) || { name, flow: null, briefings: [] };
+        const group = groups.get(name) || { name, flow: null, briefings: [], originRows: [] };
         if (!group.flow && item.businessFlow) group.flow = item.businessFlow;
         if (item.briefing?.sentences?.length) group.briefings.push({ region, item });
+        // 이슈 #119: "주요 원산지" — 이 품목을 특산품으로 수집한 지역(지리적표시·특화작목
+        // 배지 또는 지역 출원 많은 순).
+        const apps = item.metrics.uniqueTrademarkCount.availability === "available" ? item.metrics.uniqueTrademarkCount.value || 0 : 0;
+        const badge = Boolean(item.regionalSpecialtyCropBadge) || Boolean(item.regionalEvidence?.some((e) => e.regionalMetricEligible));
+        group.originRows.push({ region: region.region, apps, badge });
         groups.set(name, group);
       }
     }
-    return [...groups.values()].sort((a, b) => b.briefings.length - a.briefings.length || a.name.localeCompare(b.name, "ko-KR"));
+    return [...groups.values()].map((group) => ({
+      ...group,
+      origins: [...group.originRows].sort((a, b) => Number(b.badge) - Number(a.badge) || b.apps - a.apps || a.region.localeCompare(b.region, "ko-KR")).slice(0, 3).map((row) => row.region),
+    })).sort((a, b) => b.briefings.length - a.briefings.length || a.name.localeCompare(b.name, "ko-KR"));
   }
   function strategyScreen() {
     const groups = strategyItemGroups();
@@ -1466,7 +1488,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       const oks = selected.briefings.filter(({ item }) => !item.briefing.isGapAlert);
       const ordered = [...alerts, ...oks].slice(0, 6);
       const emptyNote = !selected.flow && selected.briefings.length === 0 ? '<p class="empty">이 품목은 아직 비즈니스 확장 흐름·브리핑 데이터가 없습니다.</p>' : "";
-      bodyHtml = `${emptyNote}${selected.flow ? nationwideFlowCardHtml(selected.flow, selected.name) : ""}<div class="strategy-sample-list">${ordered.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${region.region} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("") || (selected.flow ? '<p class="screen-note">이 품목은 지역별 브리핑이 아직 없습니다.</p>' : "")}</div>${selected.briefings.length > 6 ? `<p class="screen-note">지역별 브리핑 ${selected.briefings.length}건 중 6건 표시.</p>` : ""}`;
+      bodyHtml = `${emptyNote}${selected.flow ? nationwideFlowCardHtml(selected.flow, selected.name, selected.origins) : ""}<div class="strategy-sample-list">${ordered.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${region.region} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("") || (selected.flow ? '<p class="screen-note">이 품목은 지역별 브리핑이 아직 없습니다.</p>' : "")}</div>${selected.briefings.length > 6 ? `<p class="screen-note">지역별 브리핑 ${selected.briefings.length}건 중 6건 표시.</p>` : ""}`;
     } else {
       // 이슈 #119(2026-09-02): 대표 샘플을 1+1건 → 공백 알림·양호 각 5건씩 최대 10건.
       const alertRows = [];

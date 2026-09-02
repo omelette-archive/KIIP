@@ -14,6 +14,8 @@ const {
   aggregateHits,
   topApplicantsByStage,
   stageExamples,
+  stageClassDistribution,
+  stageTopRegions,
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
@@ -112,6 +114,9 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
       // 이슈 #116(2026-09-01): 단계별 상표명 예시(대표/이색). 지정상품 텍스트가 아니라
       // 실제 출원된 상표명이며 지역 귀속과 무관하다.
       examples: stageExamples(stages[key], term),
+      // 이슈 #119(2026-09-02): 단계별 주요 상품류(NICE), 상위 지역·점유율.
+      classes: stageClassDistribution(stages[key]),
+      topRegions: stageTopRegions(withRegion),
     };
   }
   return {
