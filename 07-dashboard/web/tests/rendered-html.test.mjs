@@ -94,11 +94,10 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
   assert.match(html, /출원인 주소 확보율/);
   assert.match(html, /전국 지역 브랜드 지도/);
-  assert.match(html, /전국 지역 비교/);
-  // 이슈 #119: "지역 상세"는 탭 바에서 빼고 "전국 지역 비교"에서 지역 클릭으로 진입하는
-  // 하위 화면으로 합쳤다 — 상단 탭 목록(nav)에는 더 이상 없다.
-  assert.doesNotMatch(html.split("</nav>")[0], /지역 상세/);
-  assert.match(html, /품목별 조회/);
+  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
+  // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
+  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
+  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
   assert.match(html, /특화작목 비교/);
   assert.match(html, /데이터 개요/);
   assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
@@ -111,13 +110,15 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsightStart = html.indexOf('class="map-insight"');
   const mapInsightEnd = html.indexOf("</aside>", mapInsightStart);
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
-  assert.match(mapInsight, /class="metric-count-hero"/, "기본 특산품 수 지표는 원형 비율 대신 큰 숫자로 보여야 함");
-  assert.doesNotMatch(mapInsight, /class="rate-ring"/, "특산품 수를 비율 원형 게이지로 표시하면 안 됨");
-  assert.doesNotMatch(mapInsight, /<em>개<\/em>|<em>건<\/em>/, "큰 숫자 옆 개·건 단위는 설명과 중복되므로 표시하지 않음");
+  // 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮겼다. 특산품 수·
+  // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
+  assert.match(mapInsight, /class="metrics metrics-inset"/, "요약 핵심 지표 바는 지도 옆 왼쪽 열로 이동해야 함");
+  assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
+  assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
-  assert.match(standaloneHtml, /metric-count-hero[\s\S]*특산품 수[\s\S]*상표 건수/);
+  assert.match(standaloneHtml, /class="metrics metrics-inset"><article><span>전국 특산품 수/);
   assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
   assert.match(standaloneHtml, /dashboardUpdatedAt = latestDate\([\s\S]*metric\.calculatedAt/);
   assert.match(standaloneHtml, /dateOnly\(latestDate\(source\.sourceFetchedAt, source\.sourceLastVerifiedAt\)\)/);
@@ -282,11 +283,10 @@ test("renders tab navigation and separate application/registration ranking table
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/전국 지역 비교/품목별/비즈니스 전략/특화작목/데이터 개요 6개 탭이 있어야 함");
-  assert.match(html, /전국 지역 비교/);
-  // 이슈 #119: "지역 상세" 탭은 탭 바에서 제거(전국 지역 비교에서 드릴다운으로 진입).
-  assert.doesNotMatch(html.split("</nav>")[0], /지역 상세/);
-  assert.match(html, /품목별 조회/);
+  assert.match(html, /class="primary-tabs"/, "요약/지역·품목별 조회/비즈니스 전략/특화작목/데이터 개요 5개 탭이 있어야 함");
+  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 "지역·품목별 조회" 하나로 병합.
+  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
+  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
   assert.match(html, /지역·대표 특산품 출원 랭킹/, "출원 랭킹 섹션이 있어야 함");
