@@ -222,19 +222,22 @@ function TrendSizeControl() {
     {TREND_SIZES.map((size) => <button type="button" key={size.key} data-trend-size={size.key} onClick={() => applyTrendSize(size.key)}>{size.label}</button>)}
   </div>;
 }
-function RegionTrend({ region, heading = "지역 출원·등록 추이", subtitle }: { region: Pick<Region, "region" | "items">; heading?: string; subtitle?: string }) {
+// 이슈 #118: 요약·지역·품목 화면에서 출원·등록 추이 그래프를 같은 모양으로 부각한다.
+// prominent=true면 -compact 축소를 빼고 큰 카드로 그린다.
+function RegionTrend({ region, heading = "연도별 출원·등록 추이", subtitle, prominent = false, emptyLabel = "이 지역은 아직 연도별 데이터가 없습니다." }: { region: Pick<Region, "region" | "items">; heading?: string; subtitle?: string; prominent?: boolean; emptyLabel?: string }) {
+  const wrapClass = prominent ? "trend-chart trend-chart-prominent region-trend" : "trend-chart trend-chart-compact region-trend";
   const trendSubtitle = subtitle || `${region.region} 전체 특산품 · 연도별`;
   const applicationTotals = sumYearCounts(region.items, "applicationYearCounts");
   const registrationTotals = sumYearCounts(region.items, "registrationYearCounts");
   const years = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])]
     .map(Number)
     .sort((a, b) => a - b);
-  if (years.length === 0) return <section className="trend-chart trend-chart-compact region-trend"><div className="section-heading"><div><h2>{heading}</h2></div><span>{region.region}</span></div><p className="empty">이 지역은 아직 연도별 데이터가 없습니다.</p></section>;
+  if (years.length === 0) return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{region.region}</span></div><p className="empty">{emptyLabel}</p></section>;
   const start = years[0];
   const end = years[years.length - 1];
   const max = Math.max(1, ...years.map((year) => Math.max(applicationTotals[year] || 0, registrationTotals[year] || 0)));
   const scale = trendScales(start, end, max);
-  return <section className="trend-chart trend-chart-compact region-trend"><div className="section-heading"><div><h2>{heading}</h2></div><span>{trendSubtitle}</span></div>
+  return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{trendSubtitle}</span></div>
     <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${region.region} ${start}년부터 ${end}년까지 출원·등록 추이`}>
       {[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 7} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
       <path d={`${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
@@ -710,6 +713,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 1,937 대 1,805로 어긋나 있었다. 모집단을 regionalRegions 하나로 통일한다.
   const visibleRegions = selectedProvince ? regionalRegions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : regionalRegions;
   const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
+  const nationalTrendItems = useMemo(() => regionalRegions.flatMap((region) => region.items), [regionalRegions]);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
   // 미리보기에 뜨는 개수(예: 2개)가 안 맞아 보인다는 지적. 고시명칭 매칭은 판정 기준의
@@ -865,6 +869,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
          </div>
         </div>
       </section>
+      {/* 이슈 #118: 요약 화면에 전국 출원·등록 추이 그래프를 부각한다. */}
+      <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
@@ -978,7 +984,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
             <details className="item-regions-detail"><summary>전체 {row.regions.length}개 지역 보기</summary><div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return <span key={region} style={{ fontSize: `${wordCloudFontSize(value, max)}px`, color: wordCloudColor(region) }} title={`${region} · 출원 ${number(value)}건`}>{region}</span>; })}</div></details>
             <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
-            {decidedRegions > 0 && <div className="item-card-charts"><RegionTrend region={{ region: row.name, items: row.matchedItems }} heading="연도별 출원건수" subtitle={`${row.name} · 전체 지역 합계`} /><div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div></div>}
+            {decidedRegions > 0 && <>
+              <RegionTrend region={{ region: row.name, items: row.matchedItems }} heading="연도별 출원·등록 추이" subtitle={`${row.name} · 전체 지역 합계`} prominent emptyLabel="이 품목은 아직 연도별 데이터가 없습니다." />
+              <div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div>
+            </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
             {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} />}
             {briefingItem?.briefing && <BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} />}
@@ -1134,7 +1143,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
   const itemTabsMaxTrademarks = Math.max(1, ...region.items.map((row) => row.metrics.uniqueTrademarkCount.value || 0));
   return <div className="detail-panel">
     {heading}
-    <RegionTrend region={region} />
+    <RegionTrend region={region} heading="지역 연도별 출원·등록 추이" subtitle={`${region.region} 전체 특산품 · 연도별`} prominent />
     <div className="item-tabs word-cloud" role="tablist" aria-label={`${region.region} 특산품 · 출원건수 기준 글자 크기`}>{region.items.map((row) => { const value = row.metrics.uniqueTrademarkCount.value || 0; return <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")} style={{ fontSize: `${wordCloudFontSize(value, itemTabsMaxTrademarks)}px`, color: item.specialtyId === row.specialtyId ? undefined : wordCloudColor(row.specialtyId || itemName(row)) }} title={`${itemName(row)} · 출원 ${number(value)}건`}>{itemName(row)}</button>; })}</div>
     <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier} · {item.regionalSpecialtyCropBadge.referenceYear}</em>}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span>{item.itemVerdict?.source === "algorithm" && <span className="verdict-chip" title={verdictTitle(item.itemVerdict)}>AI 판정</span>}</div>
     <div className="metric-reading-note"><strong>출원 건수 기준</strong><p><b>{region.sigungu || region.region} {itemName(item)} 출원</b>은 출원인 주소가 {region.region}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>

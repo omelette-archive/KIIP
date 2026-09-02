@@ -675,18 +675,15 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   assert.match(
     standaloneHtml,
-    /const regionTrendHtml = \(region, heading = "지역 출원·등록 추이", subtitle\) => \{/,
+    /const regionTrendHtml = \(region, heading = "연도별 출원·등록 추이", subtitle, options = \{\}\) => \{/,
     "선택한 지자체(또는 품목)의 연도별 추이를 집계하는 공용 렌더러가 있어야 함",
   );
+  // 이슈 #118: 요약·지역·품목 화면에서 추이 그래프를 같은 모양으로 부각(prominent).
+  assert.match(standaloneHtml, /options\.prominent \? "trend-chart trend-chart-prominent region-trend"/);
+  assert.match(standaloneHtml, /전국 연도별 출원·등록 추이/);
   assert.match(
     standaloneHtml,
-    /class="trend-chart trend-chart-compact region-trend"/,
-    "지자체 상세에는 별도의 컴팩트 추이 그래프가 있어야 함",
-  );
-  assert.match(standaloneHtml, /지역 출원·등록 추이/);
-  assert.match(
-    standaloneHtml,
-    /\$\{regionTrendHtml\(region\)\}[\s\S]*class="item-tabs word-cloud"/,
+    /\$\{regionTrendHtml\(region, "지역 연도별 출원·등록 추이"[\s\S]*class="item-tabs word-cloud"/,
     "지역 추이 그래프는 선택한 지자체의 품목 탭보다 위에 표시되어야 함",
   );
   assert.match(standaloneHtml, /class="trend-point trend-point-application"><title>/, "지자체 그래프의 점에도 정확한 건수 툴팁이 있어야 함");
