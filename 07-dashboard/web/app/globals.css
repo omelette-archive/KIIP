@@ -129,6 +129,8 @@ a { color: inherit; text-decoration: none; }
 .panel-heading h2 { font-size: 21px; }
 .panel-heading > span, .section-heading > span { color: var(--faint); font-size: 11px; }
 .search-field { display: block; margin: 20px 0 12px; }
+/* 이슈 #119: 지역·품목별 조회의 칩 아래 검색창 — 두 모드 동일 위치 */
+.explore-search { margin: 0 0 12px; }
 .search-field input { width: 100%; padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #f4f6f9; color: var(--ink); outline: none; }
 .search-field input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(15, 95, 166, 0.14); }
 .province-list { display: flex; flex-direction: column; gap: 9px; }
