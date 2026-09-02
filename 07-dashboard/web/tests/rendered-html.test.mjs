@@ -252,7 +252,7 @@ test("tags official items with a category and lets the items tab filter by it", 
   // "items" 탭은 기본 탭(summary)이 아니라 클라이언트 상태 전환 후에만 렌더링되므로,
   // 정적 HTML에는 필터 버튼의 실제 값이 아니라 이를 만드는 JS 소스만 들어있다.
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
-  assert.match(standaloneHtml, /class="item-category-filter"/, "품목별 조회에 유형 필터가 있어야 함");
+  assert.match(standaloneHtml, /class="item-category-filter region-quick-filter"/, "품목별 조회에 유형 필터가 있어야 함");
   assert.match(standaloneHtml, /data-category-filter="\$\{esc\(category\.code\)\}"/, "실제 유형 코드로 필터 버튼을 만들어야 함");
   assert.match(standaloneHtml, /function availableCategories\(\)/, "실제 데이터에 등장하는 유형만 필터로 노출해야 함");
 });
