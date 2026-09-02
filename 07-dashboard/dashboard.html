@@ -610,16 +610,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    각 요소가 전체 폭을 쓰게 한다. 그리드 자식은 min-width:0으로 축소 허용, 차트/지도는
    넘치면 가로 스크롤. */
 .applications-compact-row > * { min-width: 0; }
-/* #116(2026-09-02): 전체 폭 요약 바가 좁아질 때 선택 범위·특산품 개수 텍스트가 칸 밖으로
-   튀어나오던 문제 — 넓은 화면에서만 가로로 두고, 1280px 이하는 세로로 쌓는다. */
-@media (max-width: 1280px) {
-  .applications-compact-row .coverage-insight { flex-direction: column; align-items: stretch; }
-  .applications-compact-row .coverage-insight-stats { flex: 1 1 auto; }
-}
-@media (max-width: 1000px) {
-  .applications-compact-row,
-  .applications-compact-row.solo { grid-template-columns: 1fr; }
-}
 
 @media (max-width: 980px) {
   .primary-tabs button { padding: 8px 6px; font-size: 12px; }
@@ -721,33 +711,37 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. align-items:stretch로 같은 행의
    두 박스 높이가 정확히 일치하고, 행1/행2 경계가 양 열에서 한 줄로 맞는다(높이 규격
    어긋남 방지). 열 간격·행 간격 모두 18px로 통일. */
-/* 이슈 #116(2026-09-02): "전국 시도별 출원율" 지도가 너무 작다는 지적 — 왼쪽 열(구성·추이)을
-   좁히고, 지도 카드를 오른쪽에서 두 행에 걸쳐 크게 띄운다. 요약(coverage-insight)은 아래
-   전체 폭 한 줄로 내린다. */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.55fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
+/* 이슈 #116(2026-09-02): "전국 시도별 출원율" 지도가 너무 작다는 지적 — 지도를 맨 위 전체
+   폭으로 크게 두고, 그 아래에 광역 구성·추이·요약 3패널을 한 행으로 컴팩트하게 배치한다.
+   (2×2 그리드에서 지도를 한 칸에 넣거나 행을 span하면, 왼쪽 열이 길어질 때 지도가 요약
+   위로 삐져나오거나 텍스트가 지도 옆까지 튀어나오는 문제가 있었음.) */
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 0.92fr); gap: 18px; align-items: start; margin-bottom: 20px; }
 .applications-compact-row > * { min-width: 0; margin: 0; }
-.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; }
-.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
-.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; padding: 22px; }
-.applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; padding: 20px 24px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 18px 28px; }
-.applications-compact-row .coverage-insight h2 { flex: 0 0 100%; }
-.applications-compact-row .coverage-insight .rate-hero { flex: 0 1 auto; min-width: 0; }
-/* 창이 좁아질 때 선택 범위·특산품 개수 텍스트가 칸 밖으로 튀어나오던 문제(#116):
-   3열 그리드를 없애고 세로 목록으로 두되, 좁아지면 통째로 다음 줄로 내린다. */
-.applications-compact-row .coverage-insight-stats { flex: 1 1 300px; min-width: 0; margin-top: 0; padding-top: 0; border-top: 0; grid-template-columns: 1fr; }
-/* solo(지역 선택): 왼쪽 열에 추이 그래프 + 요약을 세로로, 오른쪽 열에 시군구 지도 */
-.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; flex-direction: column; align-items: stretch; }
-.applications-compact-row.solo .coverage-insight-stats { grid-template-columns: 1fr; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
-.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; }
-.applications-compact-row .coverage-map-stage { min-height: 520px; display: flex; align-items: center; justify-content: center; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 720px; }
-.applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: space-between; }
+.applications-compact-row .coverage-map-card { grid-column: 1 / -1; grid-row: 1; padding: 24px; }
+.applications-compact-row .province-composition { grid-column: 1; grid-row: 2; }
+.applications-compact-row .trend-chart { grid-column: 2; grid-row: 2; padding: 18px 20px 14px; }
+.applications-compact-row .coverage-insight { grid-column: 3; grid-row: 2; padding: 20px 22px; display: flex; flex-direction: column; align-items: stretch; }
+.applications-compact-row .coverage-insight-stats { grid-template-columns: 1fr; }
+.applications-compact-row .coverage-map-stage { min-height: 560px; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 780px; }
+.applications-compact-row .province-composition { max-height: 520px; }
+.applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
+/* solo(지역 선택): 광역 구성 없음 → 지도 위, 추이·요약 아래 2열 */
+.applications-compact-row.solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 2; }
+.applications-compact-row.solo .coverage-insight { grid-column: 2; grid-row: 2; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 1 / -1; grid-row: 1; }
+/* 중간 폭: 3패널을 2열로(구성 | 추이) + 요약은 아래 전체 폭. 지도는 계속 맨 위 전체 폭. */
+@media (max-width: 1180px) {
+  .applications-compact-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+  .applications-compact-row .province-composition { grid-column: 1; grid-row: 2; }
+  .applications-compact-row .trend-chart { grid-column: 2; grid-row: 2; }
+  .applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; }
+}
 @media (max-width: 1000px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
   .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
-  .applications-compact-row .coverage-insight { flex-direction: column; align-items: stretch; }
   .applications-compact-row .coverage-map-stage { min-height: 420px; }
   .applications-compact-row .coverage-map { max-height: 520px; }
 }
