@@ -669,7 +669,12 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 것처럼 느껴진다는 지적 — 이동 시에는 자동으로 펼치지 않고 전체 시/도 목록이
   // 평소 상태(접힘) 그대로 보이게 한다. 좌측 목록에서 직접 아코디언을 펼치는 클릭은
   // 그대로 유지된다(province-toggle의 별도 onClick).
-  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); }
+  // 이슈 #116: 지역·품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리
+  // (비즈니스 흐름·등록 사례 등 하단)에 남아, 특히 데이터가 없는 품목은 빈 화면 하단만
+  // 보인다. 선택할 때마다 화면 최상단으로 올려 "이 지역의 대표 특산품"부터 보이게 한다.
+  const scrollTop = () => { if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
+  function chooseRegion(region: Region) { setSelectedRegionCode(regionKey(region)); setSelectedItemId(officialRegionItems(region)[0]?.specialtyId || ""); scrollTop(); }
+  function chooseRegionItem(id: string) { setSelectedItemId(id); scrollTop(); }
   function regionTrademarkValue(region: Region | undefined) { if (!region) return null; const verified = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); return verified.length ? verified.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0) : null; }
   function regionMapValue(region: Region | undefined, metric: MapMetric = mapMetric) { if (!region) return null; const available = region.items.filter((item) => officialItemLabel(item) && item.metrics.uniqueTrademarkCount.availability === "available"); const trademarks = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0); const registered = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0); if ((metric === "trademarks" || metric === "registration") && available.length === 0) return null; if (metric === "trademarks") return trademarks; if (metric === "registration") return trademarks ? registered / trademarks : 0; const coverage = specialtyCoverage([region]); if (metric === "coverage") return coverage.total; return coverage.rate; }
   function mapValue(name: string, metric: MapMetric = mapMetric) { const stat = provinceStats.get(name); if (!stat) return null; if (metric === "trademarks") return stat.verified ? stat.trademarks : null; if (metric === "registration") return stat.verified && stat.trademarks ? stat.registered / stat.trademarks : null; if (metric === "coverage") return stat.totalItems; return stat.totalItems ? stat.appliedItems / stat.totalItems : null; }
@@ -900,7 +905,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       {exploreSubnav("region")}
       <button type="button" className="drill-back" onClick={() => setTab("applications")}>← 전국 시도 비교로</button>
       <p className="screen-note">선택한 지역의 특산품·상표를 시도 → 시군구 → 품목 순으로 파고듭니다. 다른 시도를 눌러 바로 이동할 수도 있습니다.</p>
-      <nav className="province-tabbar" aria-label="광역자치단체 바로가기">{allProvinces.map((province) => <button type="button" key={province} className={activeRegionProvince === province ? "active" : ""} onClick={() => { setSelectedRegionProvince(province); setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); }}>{displayRegionName(province)}</button>)}</nav>
+      <nav className="province-tabbar" aria-label="광역자치단체 바로가기">{allProvinces.map((province) => <button type="button" key={province} className={activeRegionProvince === province ? "active" : ""} onClick={() => { setSelectedRegionProvince(province); setExpandedRegionProvince(province); setSelectedRegionCode(""); setSelectedItemId(""); scrollTop(); }}>{displayRegionName(province)}</button>)}</nav>
       <section className="workspace" aria-label="지역별 상세 조회">
         <aside className="region-panel">
           <div className="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 {groupedRegions.length}곳 · 시군구 {filteredRegions.length}곳</span></div>
@@ -917,7 +922,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           })}{groupedRegions.length === 0 && <p className="empty">검색 결과가 없습니다.</p>}</div>
         </aside>
         {selectedRegion
-          ? <RegionDetail region={selectedRegion} item={selectedItem} onItem={setSelectedItemId} verifiedExamples={registrationExamples.entries.find((entry) => entry.region === selectedRegion.region && entry.specialtyId === selectedItem?.specialtyId)?.examples || []} />
+          ? <RegionDetail region={selectedRegion} item={selectedItem} onItem={chooseRegionItem} verifiedExamples={registrationExamples.entries.find((entry) => entry.region === selectedRegion.region && entry.specialtyId === selectedItem?.specialtyId)?.examples || []} />
           : activeRegionProvince
             ? <ProvinceDetail province={activeRegionProvince} regions={activeProvinceRegions} onRegion={chooseRegion} />
             : <div className="detail-panel"><p className="empty">조회할 광역자치단체를 선택하세요.</p></div>}

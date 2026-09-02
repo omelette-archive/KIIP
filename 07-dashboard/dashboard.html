@@ -1567,19 +1567,20 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 그대로 유지된다.
     document.querySelectorAll("[data-goto-tab]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.gotoTab; render(); }; });
     document.querySelectorAll("[data-explore-mode]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.exploreMode === "item" ? "items" : "applications"; state.regionKey = ""; state.itemId = ""; render(); }; });
-    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); }; });
+    // 이슈 #116: 지역·품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리
+    // (비즈니스 흐름·등록 사례 등 하단)에 남는다. 특히 데이터 없는 품목은 빈 화면 하단만
+    // 보이므로, 선택할 때마다 화면 최상단으로 올린다.
+    const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+    document.querySelectorAll("[data-open-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.openRegion; state.itemId = button.dataset.openItem; state.tab = "regions"; render(); scrollTop(); }; });
     document.querySelectorAll("[data-region-group]").forEach((button) => { button.onclick = () => { const province = button.dataset.regionGroup; state.selectedRegionProvince = province; state.expandedRegionProvince = state.expandedRegionProvince === province ? null : province; state.regionKey = ""; state.itemId = ""; render(); }; });
-    document.querySelectorAll("[data-province-tab]").forEach((button) => { button.onclick = () => { const province = button.dataset.provinceTab; state.selectedRegionProvince = province; state.expandedRegionProvince = province; state.regionKey = ""; state.itemId = ""; render(); }; });
-    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
-    document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
+    document.querySelectorAll("[data-province-tab]").forEach((button) => { button.onclick = () => { const province = button.dataset.provinceTab; state.selectedRegionProvince = province; state.expandedRegionProvince = province; state.regionKey = ""; state.itemId = ""; render(); scrollTop(); }; });
+    document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); scrollTop(); }; });
+    document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); scrollTop(); }; });
     document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { const applicationNumber = button.dataset.kiprisApplication; navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "popup,width=1180,height=900,noopener"); }; });
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
     document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; render(); }; });
-    // 이슈 #116: 품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리에
-    // 남아 새 상세 맨 위가 안 보인다. 상세 패널로 scrollIntoView는 짧은 상세일 때 스크롤
-    // 여유가 없어 패널이 화면 하단에 걸리므로, 화면 최상단으로 올린다.
-    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }; });
+    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); scrollTop(); }; });
     const strategyItemSelect = document.querySelector("#strategy-item"); if (strategyItemSelect) strategyItemSelect.onchange = (event) => { state.strategyItem = event.currentTarget.value; render(); };
   }
   // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
