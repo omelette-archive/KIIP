@@ -84,6 +84,7 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
       sigungu: region.sigungu || null,
       nationality: applicant.nationality || null,
       representative: applicant.representative || null,
+      producerOrg: Boolean(applicant.producerOrg),
       normalizationMethod: applicant.regionNormalizationMethod || region.method || null,
       normalizationReason: applicant.regionNormalizationReason || region.reason || null,
       match: result.match,
@@ -96,6 +97,17 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
   const matches = [...new Set(evidence.map((row) => row.match))];
   const confidences = [...new Set(evidence.map((row) => row.confidence))];
   if (matches.length !== 1 || confidences.length !== 1) {
+    // #118(hyojeonglim-blip, 2026-09-02): 공동출원인·공동권리자 주소가 서로 달라도,
+    // 그중 지역 생산 주체형(영농조합·협동조합·지자체 등)이 해당 지역(inside)이면 그
+    // 지역에 출원이 있는 것으로 인정한다 — 전원 일치가 아니라고 무조건 빼지 않는다.
+    const producerInside = evidence.find((row) => row.producerOrg && row.match === "inside");
+    if (producerInside) {
+      return {
+        match: "inside",
+        confidence: "producer_org_coapplicant_inside",
+        evidence,
+      };
+    }
     return {
       match: "unverified",
       confidence: "multiple_conflicting_applicant_addresses",
@@ -216,6 +228,7 @@ function sanitizeRegistryRecordForCache(record, adminList = loadAdminCodes()) {
         address: region.normalizedRegion || null,
         nationality: applicant.nationality || null,
         representative: applicant.representative || null,
+        producerOrg: Boolean(applicant.producerOrg),
         regionNormalizationMethod: region.method || null,
         regionNormalizationReason: region.reason || null,
         hasSourceAddress: Boolean(clean(applicant.address)),

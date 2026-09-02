@@ -60,8 +60,12 @@ flowchart LR
    `normalizationMethod`, `normalizationReason`을 만든다.
 3. 검색 버킷의 지역과 출원인 지역을 비교해 `applicantRegionMatch` =
    `inside|outside|unverified`를 결정한다.
-4. 복수 출원인이 모두 같은 결과일 때만 그 결과를 사용한다. 지역이 서로 다르면
-   `multiple_conflicting_applicant_addresses`로 보류한다.
+4. 복수 출원인이 모두 같은 결과일 때 그 결과를 사용한다. 지역이 서로 다르면
+   기본은 `multiple_conflicting_applicant_addresses`로 보류하되, **공동출원인 중
+   지역 생산 주체형(영농조합·협동조합·생산자단체·지자체 단독표기 등 —
+   `03-match-trademarks/lib/producerApplicant.js`)이 해당 지역(`inside`)이면**
+   `producer_org_coapplicant_inside`로 그 지역 출원으로 인정한다(#118, 2026-09-02).
+   판정은 이름 문자열만 쓰고 이름 자체는 저장하지 않으며 불리언 `producerOrg`만 남는다.
 5. ④은 `applicantRegionEvidence` 안의 `regionStatus=matched` 근거만 지역 통계에 사용한다.
    `regionalBrandEvidence`는 농사로 지역브랜드 연관성이며 출원인 주소로 승격하지 않는다.
 

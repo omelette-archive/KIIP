@@ -1,6 +1,7 @@
 "use strict";
 
 const { fetchWithRetry } = require("./fetchWithRetry");
+const { isProducerLikeApplicant } = require("./producerApplicant");
 
 const DEFAULT_ENDPOINT =
   "https://plus.kipris.or.kr/openapi/rest/trademarkInfoSearchService/trademarkApplicantInfo";
@@ -55,6 +56,8 @@ function parseApplicantResponse(xml) {
       nationality: tagValue(match[1], "nationalCode") || null,
       applicantCode: tagValue(match[1], "applicantCode") || null,
       sequence: tagValue(match[1], "seq") || null,
+      // #118: 이름은 저장하지 않고 지역 생산 주체형 여부만 불리언으로.
+      producerOrg: isProducerLikeApplicant(tagValue(match[1], "applicantName")),
     }))
     .filter((row) => row.address || row.nationality || row.applicantCode);
   return {
