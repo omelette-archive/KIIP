@@ -829,7 +829,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /공식 원본 반영 완료/);
   assert.match(html, /등급별 특화작목 출원 현황/);
   assert.match(html, /대표작목 9 · 집중육성작목 18 · 자체육성작목 42/);
-  assert.match(html, /주소 일치 출원 1건 이상/);
+  // 이슈 #117(2026-09-02): 표 컬럼을 지역/대표/자체육성/집중육성/출원건수/비율/상태로 재구성.
+  assert.match(html, /<span>대표작목<\/span><span>자체육성작목<\/span><span>집중육성작목<\/span>/);
+  assert.match(html, /출원이 1건 이상 확인된 작목 비율/);
   assert.match(html, /policyCrops\.length/);
   assert.doesNotMatch(html, /비교 기준 원본 확보 전|원본 대기/);
   assert.doesNotMatch(html, /class="compare-grid"/);
