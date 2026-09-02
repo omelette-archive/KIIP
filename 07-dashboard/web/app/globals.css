@@ -455,9 +455,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-sample-list { display: grid; gap: 16px; margin-top: 16px; }
 .strategy-sample-list .business-strategy { margin-top: 0; }
 /* 이슈 #116(2026-09-01): 비즈니스 전략 탭에서 품목을 골라 조회 */
-.strategy-item-selector { display: inline-flex; align-items: center; gap: 10px; margin: 4px 0 18px; }
-.strategy-item-selector span { color: var(--muted); font-size: 12px; font-weight: 700; }
-.strategy-item-selector select { min-width: 220px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: 13px; }
+.strategy-item-selector { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 18px; margin: 4px 0 18px; }
+.strategy-item-selector label { display: inline-flex; align-items: center; gap: 8px; }
+.strategy-item-selector span { color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
+.strategy-item-selector select, .strategy-item-selector input { min-width: 200px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: 13px; }
 .strategy-jump-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--green); font-size: 9px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 8px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
@@ -480,6 +481,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .province-tabbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 18px; }
 .province-tabbar button { padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .province-tabbar button.active { border-color: var(--green); background: var(--green); color: #fff; }
+/* 이슈 #119: 지역별 모드의 17개 시도 빠른 선택 — 품목별 카테고리 칩과 같은 위치·모양 */
+.region-quick-filter { margin: 0 0 12px; }
 .item-reading-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 16px; padding: 13px 15px; border-radius: 11px; background: var(--green-soft); color: #445164; font-size: 12px; line-height: 1.5; }
 .item-reading-guide > strong { color: var(--green-dark); font-size: 12px; }.item-reading-guide span { display: inline-flex; gap: 5px; }.item-reading-guide b { color: var(--green-dark); }
 .item-card-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }

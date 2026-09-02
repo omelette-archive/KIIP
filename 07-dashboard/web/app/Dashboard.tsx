@@ -582,6 +582,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 이슈 #116(2026-08-26): 지자체별 조회 화면 좌측 아코디언과 별개로, 광역자치단체를
   // 상단 탭으로도 바로 고를 수 있게 해달라는 요청 — 검색어와 무관하게 항상 전체 광역 목록을 보여준다.
   const allProvinces = useMemo(() => [...new Set(snapshot.regions.map((region) => region.sido || region.region))].sort(compareProvince), [snapshot.regions]);
+  // 이슈 #119: 지역별 모드에서도 품목별 모드의 카테고리 칩처럼 17개 시도를 바로 고를 수
+  // 있는 목록을 보여준다("지역을 누르면 16대 행정구역명칭이 아래 나오던 게 안나와").
+  const provinceFilterList = useMemo(() => allProvinces.filter((province) => province !== "전국"), [allProvinces]);
   const activeRegionProvince = groupedRegions.some((group) => group.province === selectedRegionProvince) ? selectedRegionProvince : groupedRegions[0]?.province || null;
   const activeProvinceRegions = groupedRegions.find((group) => group.province === activeRegionProvince)?.regions || [];
   const itemRows = useMemo(() => {
@@ -798,15 +801,15 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     <button type="button" role="tab" aria-selected={mode === "region"} className={mode === "region" ? "active" : ""} onClick={() => goExplore("region")}>지역별</button>
     <button type="button" role="tab" aria-selected={mode === "item"} className={mode === "item" ? "active" : ""} onClick={() => goExplore("item")}>품목별</button>
   </div>;
-  // 이슈 #116(2026-09-01): "비즈니스 전략에서 주요 품목별로 조회" — 브리핑이나 전국 확장
-  // 흐름이 있는 품목을 골라 그 품목의 흐름 + 지역별 브리핑을 함께 본다.
+  // 이슈 #116(2026-09-01)·#119: "비즈니스 전략에서 주요 품목별로 조회" — 드롭다운의 주요
+  // 샘플 외에 나머지 품목도 이름을 직접 입력해 찾을 수 있게, 브리핑·흐름이 없는 품목도
+  // 그룹을 만들어 둔다(화면에서 "데이터 없음"으로 안내).
   const strategyItemGroups = useMemo(() => {
     const groups = new Map<string, { name: string; flow: NationwideFlow | null; briefings: { region: Region; item: Item }[] }>();
     for (const region of regionalRegions) {
       for (const item of region.items) {
         const name = officialItemLabel(item);
         if (!name) continue;
-        if (!item.briefing?.sentences.length && !item.businessFlow) continue;
         const group = groups.get(name) || { name, flow: null, briefings: [] };
         if (!group.flow && item.businessFlow) group.flow = item.businessFlow;
         if (item.briefing?.sentences.length) group.briefings.push({ region, item });
@@ -815,6 +818,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     }
     return [...groups.values()].sort((a, b) => b.briefings.length - a.briefings.length || a.name.localeCompare(b.name, "ko-KR"));
   }, [regionalRegions]);
+  // 드롭다운은 브리핑·흐름이 있는 "주요 샘플"만, 직접 입력(datalist)은 전체 품목.
+  const strategySampleGroups = useMemo(() => strategyItemGroups.filter((group) => group.flow || group.briefings.length), [strategyItemGroups]);
   const selectedStrategyGroup = strategyItemGroups.find((group) => group.name === strategyItem) || null;
   return <main className="shell">
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
@@ -855,7 +860,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     {tab === "applications" && <section className="screen-section coverage-screen">
       {exploreSubnav("region")}
-      <p className="screen-note">전국 17개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 아래 목록·지도에서 특정 지역이나 품목을 누르면 그 지역 상세 화면으로 들어갑니다.</p>
+      <div className="province-tabbar region-quick-filter" role="group" aria-label="시도 바로가기">
+        <button type="button" className={!selectedProvince ? "active" : ""} onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>전국</button>
+        {provinceFilterList.map((name) => <button type="button" key={name} className={selectedProvince === name ? "active" : ""} onClick={() => openProvince(name)}>{displayRegionName(name)}</button>)}
+      </div>
+      <p className="screen-note">전국 17개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 위 시도 목록·지도·아래 목록에서 지역이나 품목을 누르면 그 지역 상세로 들어갑니다.</p>
       {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
       <div className={selectedProvince ? "applications-compact-row solo" : "applications-compact-row"}>
       {!selectedProvince && <section className="province-composition"><div className="section-heading"><div><h2>광역별 상표 출원·등록 구성</h2></div><span>지역 주소 일치 출원 상위 10개</span></div><div className="composition-list">{provinceCompositionRows.map(([province, stat], index) => <button type="button" key={province} onClick={() => openProvince(province)}><span className="composition-rank">{index + 1}</span><strong>{displayRegionName(province)}</strong><span className="composition-bar"><i style={{ width: `${stat.trademarks / provinceCompositionMax * 100}%` }}><b style={{ width: `${stat.trademarks ? stat.registered / stat.trademarks * 100 : 0}%` }} /></i></span><small>출원 {number(stat.trademarks)} · 등록 {number(stat.registered)}</small></button>)}</div><p className="composition-legend"><i />출원 <b />등록</p></section>}
@@ -971,14 +980,22 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </section>}
 
     {tab === "strategy" && <section className="screen-section strategy-screen">
-      <p className="screen-note">⑤·⑥단계 분석에서 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 품목을 고르면 그 품목의 전국 확장 흐름과 지역별 브리핑을 함께 봅니다.</p>
-      <label className="strategy-item-selector"><span>품목 선택</span>
-        <select value={strategyItem} onChange={(event) => setStrategyItem(event.target.value)}>
-          <option value="">대표 샘플 보기</option>
-          {strategyItemGroups.map((group) => <option key={group.name} value={group.name}>{group.name}{group.briefings.length ? ` (지역 ${group.briefings.length})` : ""}</option>)}
-        </select>
-      </label>
+      <p className="screen-note">⑤·⑥단계 분석에서 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>
+      <div className="strategy-item-selector">
+        <label><span>주요 샘플</span>
+          <select value={strategySampleGroups.some((group) => group.name === strategyItem) ? strategyItem : ""} onChange={(event) => setStrategyItem(event.target.value)}>
+            <option value="">대표 샘플 보기</option>
+            {strategySampleGroups.map((group) => <option key={group.name} value={group.name}>{group.name}{group.briefings.length ? ` (지역 ${group.briefings.length})` : ""}</option>)}
+          </select>
+        </label>
+        <label><span>품목 직접 입력</span>
+          <input type="search" list="strategy-item-list" value={strategyItem} placeholder="품목명 입력" onChange={(event) => setStrategyItem(event.target.value)} />
+          <datalist id="strategy-item-list">{strategyItemGroups.map((group) => <option key={group.name} value={group.name} />)}</datalist>
+        </label>
+      </div>
+      {strategyItem && !selectedStrategyGroup && <p className="empty">&ldquo;{strategyItem}&rdquo; 품목을 찾지 못했습니다. 고시명칭이 확정된 품목명으로 입력해 주세요.</p>}
       {selectedStrategyGroup ? <>
+        {!selectedStrategyGroup.flow && selectedStrategyGroup.briefings.length === 0 && <p className="empty">이 품목은 아직 비즈니스 확장 흐름·브리핑 데이터가 없습니다.</p>}
         {selectedStrategyGroup.flow && <NationwideFlowCard flow={selectedStrategyGroup.flow} itemLabel={selectedStrategyGroup.name} />}
         <div className="strategy-sample-list">{[...selectedStrategyGroup.briefings.filter(({ item }) => item.briefing?.isGapAlert), ...selectedStrategyGroup.briefings.filter(({ item }) => !item.briefing?.isGapAlert)].slice(0, 6).map(({ region, item }) => item.briefing && <BusinessStrategyCard
           key={`${regionKey(region)}-${item.specialtyId}`}
