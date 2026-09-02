@@ -499,7 +499,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-list-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
 .item-list-meta { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10.5px; }
 .item-list button b { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--green-dark); font-size: 12px; white-space: nowrap; }
-.item-detail-panel { min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; scroll-margin-top: 64px; }
+.item-detail-panel { min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .item-detail-panel > .empty { color: var(--muted); font-size: 13px; }
 .item-detail-panel .item-card-head > div { display: block; }
 .item-detail-panel .item-card-head h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 800; }
@@ -714,23 +714,31 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. align-items:stretch로 같은 행의
    두 박스 높이가 정확히 일치하고, 행1/행2 경계가 양 열에서 한 줄로 맞는다(높이 규격
    어긋남 방지). 열 간격·행 간격 모두 18px로 통일. */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
+/* 이슈 #116(2026-09-02): "전국 시도별 출원율" 지도가 너무 작다는 지적 — 왼쪽 열(구성·추이)을
+   좁히고, 지도 카드를 오른쪽에서 두 행에 걸쳐 크게 띄운다. 요약(coverage-insight)은 아래
+   전체 폭 한 줄로 내린다. */
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 0.82fr) minmax(0, 1.55fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
 .applications-compact-row > * { min-width: 0; margin: 0; }
 .applications-compact-row .province-composition { grid-column: 1; grid-row: 1; }
 .applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
-.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
-.applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; padding: 22px; }
+.applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; padding: 20px 24px; display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 22px; }
+.applications-compact-row .coverage-insight h2 { flex: 0 0 100%; }
+.applications-compact-row .coverage-insight-stats { flex: 1; margin-top: 0; padding-top: 0; border-top: 0; grid-template-columns: repeat(3, 1fr); }
 /* solo(지역 선택): 왼쪽 열에 추이 그래프 + 요약을 세로로, 오른쪽 열에 시군구 지도 */
 .applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; }
+.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; flex-direction: column; align-items: stretch; }
+.applications-compact-row.solo .coverage-insight-stats { grid-template-columns: 1fr; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; }
-.applications-compact-row .coverage-map-stage { min-height: 0; display: flex; align-items: center; justify-content: center; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 440px; }
+.applications-compact-row .coverage-map-stage { min-height: 520px; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 720px; }
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: space-between; }
 @media (max-width: 1000px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
   .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
+  .applications-compact-row .coverage-insight { flex-direction: column; align-items: stretch; }
+  .applications-compact-row .coverage-map-stage { min-height: 420px; }
   .applications-compact-row .coverage-map { max-height: 520px; }
 }
 .province-composition { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
@@ -1558,9 +1566,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
     document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; render(); }; });
-    // 이슈 #116: 품목을 새로 고르면 오른쪽 상세가 이전 상세의 맨 아래 스크롤 위치에
-    // 머물러 있어 새 상세 맨 위가 안 보인다 — 선택 시 상세 패널 상단으로 스크롤.
-    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); document.querySelector(".item-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; });
+    // 이슈 #116: 품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리에
+    // 남아 새 상세 맨 위가 안 보인다. 상세 패널로 scrollIntoView는 짧은 상세일 때 스크롤
+    // 여유가 없어 패널이 화면 하단에 걸리므로, 화면 최상단으로 올린다.
+    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }; });
     const strategyItemSelect = document.querySelector("#strategy-item"); if (strategyItemSelect) strategyItemSelect.onchange = (event) => { state.strategyItem = event.currentTarget.value; render(); };
   }
   // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —

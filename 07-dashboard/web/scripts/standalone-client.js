@@ -794,9 +794,10 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
     document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; render(); }; });
-    // 이슈 #116: 품목을 새로 고르면 오른쪽 상세가 이전 상세의 맨 아래 스크롤 위치에
-    // 머물러 있어 새 상세 맨 위가 안 보인다 — 선택 시 상세 패널 상단으로 스크롤.
-    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); document.querySelector(".item-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; });
+    // 이슈 #116: 품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리에
+    // 남아 새 상세 맨 위가 안 보인다. 상세 패널로 scrollIntoView는 짧은 상세일 때 스크롤
+    // 여유가 없어 패널이 화면 하단에 걸리므로, 화면 최상단으로 올린다.
+    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); window.scrollTo({ top: 0, behavior: "smooth" }); }; });
     const strategyItemSelect = document.querySelector("#strategy-item"); if (strategyItemSelect) strategyItemSelect.onchange = (event) => { state.strategyItem = event.currentTarget.value; render(); };
   }
   // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
