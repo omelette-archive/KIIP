@@ -138,6 +138,36 @@ async function runIpRegistryTests() {
     assert.strictEqual(outside.match, "outside");
     assert.strictEqual(outside.confidence, "exact_registry_address_sido");
 
+    // #118: 공동출원인 주소가 서로 다르면 기본은 unverified지만, 생산자 주체형(producerOrg)이
+    // 해당 지역(inside)이면 지역 출원으로 인정한다(제외하지 않음).
+    const coApplicantPlain = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [{ address: "경상북도 안동시 비공개" }, { address: "서울특별시 중구 비공개" }],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantPlain.match, "unverified");
+    assert.strictEqual(coApplicantPlain.confidence, "multiple_conflicting_applicant_addresses");
+    const coApplicantProducerInside = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [
+        { address: "경상북도 안동시 비공개", producerOrg: true },
+        { address: "서울특별시 중구 비공개" },
+      ],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantProducerInside.match, "inside");
+    assert.strictEqual(coApplicantProducerInside.confidence, "producer_org_coapplicant_inside");
+    // 생산자 주체형이 지역 밖이면 인정하지 않는다.
+    const coApplicantProducerOutside = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [
+        { address: "서울특별시 중구 비공개", producerOrg: true },
+        { address: "경상남도 사천시 비공개" },
+      ],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantProducerOutside.match, "unverified");
+
     const aliasAdminList = [
       { code: "1114000000", sido: "서울특별시", sigungu: "중구" },
       { code: "2611000000", sido: "부산광역시", sigungu: "중구" },

@@ -38,6 +38,7 @@ function sanitizeApplicants(applicants, adminList) {
       return {
         address: region.normalizedRegion || null,
         nationality: applicant.nationality || null,
+        producerOrg: Boolean(applicant.producerOrg),
         regionNormalizationMethod: region.method || null,
         regionNormalizationReason: region.reason || null,
         hasSourceAddress: Boolean(String(applicant.address || "").trim()),

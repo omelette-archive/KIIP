@@ -1083,8 +1083,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <article><span>품목 관련성 확인</span><strong>지정상품명에서 품목명 확인</strong><small>등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다. NICE류만 일치하거나 검색어로만 포착된 후보는 확인 사례에 포함하지 않습니다. 대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다.</small></article>
           <article><span>지역 매칭</span><strong>법정동코드 완전일치</strong><small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small></article>
           <article><span>상표 검색</span><strong>KIPRIS 단어검색(고시명칭 기준)</strong><small>검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음. 현재 수치는 각 특산품에 매핑된 고시상품 NICE류 기준입니다. 음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다.</small></article>
-          <article><span>지역 주소 일치 출원 / 등록 완료</span><strong>출원인 주소가 해당 지역으로 확인된 출원만</strong><small>등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수입니다. 전국 검색 후보와 주소 미확보 건은 제외합니다.</small></article>
-          <article><span>출원인 지역 매칭</span><strong>주소 확보율은 참고 지표</strong><small>주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 부분 수집은 별도 상태로 구분합니다.</small></article>
+          <article><span>지역 주소 일치 출원 / 등록 완료</span><strong>출원인·권리자 주소가 해당 지역으로 확인된 출원만</strong><small>등록 완료 건은 등록원부의 권리자 소재지, 출원만 된 건은 출원인정보 API의 출원인 소재지 기준입니다. 등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수이며, 전국 검색 후보와 주소 미확보 건은 제외합니다.</small></article>
+          <article><span>출원인 지역 매칭</span><strong>주소 확보율은 참고 지표</strong><small>주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 공동출원인은 전원 일치가 원칙이나, 그중 영농조합·협동조합·지자체 등 지역 생산 주체가 해당 지역이면 인정합니다.</small></article>
         </div>
       </section>
       <p className="screen-note">수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다.</p>

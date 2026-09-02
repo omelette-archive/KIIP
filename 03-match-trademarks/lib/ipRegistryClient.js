@@ -1,6 +1,7 @@
 "use strict";
 
 const { fetchWithRetry } = require("./fetchWithRetry");
+const { isProducerLikeApplicant } = require("./producerApplicant");
 
 const DEFAULT_BASE_URL = "https://apis.data.go.kr/1430000/PttRgstRtInfoInqSvc";
 const IP_REGISTRY_CONTRACT_VERSION = "ip-registry-mark-history-v1";
@@ -65,6 +66,8 @@ function parseMarkHistoryResponse(parsed) {
       address: clean(row?.applicantAddr) || null,
       nationality: clean(row?.applicantNatl) || null,
       representative: clean(row?.rpstrYn) || null,
+      // #118: 이름 자체는 저장하지 않고 "지역 생산 주체형인가"만 불리언으로 남긴다.
+      producerOrg: isProducerLikeApplicant(clean(row?.applicantName)),
     }))
     .filter((row) => row.address || row.nationality);
   const products = asArray(item.productList)
