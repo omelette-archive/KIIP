@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { ReactNode } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; partial?: boolean; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
@@ -358,13 +358,16 @@ function tradeDisplay(item: Item): { value: number | null; provisional: boolean 
 function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`; }
 function regionKey(region: Region) { return region.regionCode || region.region; }
 // 이슈 #116/#119: 등록 사례에서 KIPRIS로 "검색된 결과"를 바로 보고 싶다는 요청.
-// KIPRIS khome 검색 페이지는 queryText GET 파라미터를 읽어 로드 시 검색을 실행하고
-// 결과 목록을 그린다(구글이 `searchResult.do?queryText=…`를 검색어 포함 제목으로 색인 —
-// KIPRIS가 공유용으로 지원하는 형식). 출원번호를 queryText로 넘겨 그 상표 결과 화면으로
-// 바로 들어가게 한다. 클립보드 복사는 KIPRIS가 형식을 바꿔도 붙여넣기로 이어갈 수 있게
-// 남겨두는 보조 장치다.
-function kiprisSearchUrl(applicationNumber: string) { return `https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark&queryText=${encodeURIComponent(applicationNumber)}`; }
-function openKiprisPopup(applicationNumber: string) { navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "width=1100,height=800,noopener,noreferrer"); }
+// searchResult.do는 tab·queryText만 주면 검색을 실행하지 않고 상세검색 창만 연다(#116
+// 재지적 "검색창만 나온다"). searchResult.js의 온로드 로직을 보면, tab 파라미터 없이
+// searchKind=keywordSearch(2025-05-20 추가된 지식재산처 연계용)일 때만 queryText를
+// 검색식(expression)으로 넣어 doSearch를 실행한다. searchRight=ktm(국내상표), 검색식은
+// 출원번호 필드 AN=[번호] 완전일치. 클립보드 복사는 형식이 또 바뀔 때를 위한 보조 장치.
+function kiprisSearchUrl(applicationNumber: string) {
+  const digits = String(applicationNumber).replace(/\D/g, "");
+  return `https://www.kipris.or.kr/khome/search/searchResult.do?searchKind=keywordSearch&searchRight=ktm&queryText=${encodeURIComponent(`AN=[${digits}]`)}`;
+}
+function openKiprisPopup(applicationNumber: string) { navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "popup,width=1180,height=900,noopener"); }
 // 이슈 #116(2026-08-26): 출원번호 앞 2자리로 지리적표시 단체표장(44)·증명표장(48)을 구분해달라는 요청.
 const GI_MARK_LABELS: Record<string, string> = { "44": "GI 단체표장", "48": "GI 증명표장" };
 function giMarkLabel(applicationNumber?: string | null) { return applicationNumber ? GI_MARK_LABELS[applicationNumber.slice(0, 2)] || null : null; }
@@ -505,6 +508,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [categoryFilter, setCategoryFilter] = useState("");
   const [selectedItemName, setSelectedItemName] = useState("");
   const [strategyItem, setStrategyItem] = useState("");
+  // 이슈 #116: 품목별 조회에서 목록의 다른 품목을 고르면 오른쪽 상세가 바뀌는데,
+  // 스크롤 위치가 이전 상세의 맨 아래에 머물러 있어 새 상세의 맨 위가 안 보인다.
+  // 선택할 때마다 상세 패널 상단을 화면 위로 스크롤한다.
+  const itemDetailRef = useRef<HTMLDivElement>(null);
+  const selectItemAndScroll = (name: string) => { setSelectedItemName(name); itemDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
   const [selectedRegionProvince, setSelectedRegionProvince] = useState<string | null>(defaultRegionProvince);
   const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState("");
@@ -928,7 +936,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             <div className="item-list-head"><strong>{categoryFilter ? (availableCategories.find((category) => category.code === categoryFilter)?.label || "품목") : "전체 품목"}</strong><span>{itemRows.length}개</span></div>
             <ul className="item-list">
               {visibleItemRows.map((row) => { const decidedRegions = row.availableRegions.length; return <li key={row.name}>
-                <button type="button" className={selectedItemRow?.name === row.name ? "active" : ""} onClick={() => setSelectedItemName(row.name)}>
+                <button type="button" className={selectedItemRow?.name === row.name ? "active" : ""} onClick={() => selectItemAndScroll(row.name)}>
                   <span className="item-list-name">{row.name}</span>
                   <span className="item-list-meta">{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역</span>
                   <b>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</b>
@@ -937,7 +945,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               {visibleItemRows.length === 0 && <li className="empty">검색 결과가 없습니다.</li>}
             </ul>
           </aside>
-          <div className="item-detail-panel">{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
+          <div className="item-detail-panel" ref={itemDetailRef}>{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
             // 이슈 #116(2026-09-01): 마스터-디테일 개편(29fb843) 때 빠진 비즈니스 확장 흐름·전략
             // 카드를 되살린다. 흐름은 품목 단위 전국 지표라 대표 항목 하나에서, 브리핑은 공백
             // 알림을 우선해 뽑는다.

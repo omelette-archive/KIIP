@@ -793,9 +793,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /상표 출원 건수 상위/);
   assert.match(html, /class="item-regions-detail"/);
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
-  // 이슈 #119: KIPRIS 링크는 검색창 호출(searchKeyword=AN=…)이 아니라 결과가 바로 뜨는
-  // queryText 딥링크를 쓴다. 브라우저 뒤로가기가 페이지를 벗어나지 않게 history도 쌓는다.
-  assert.match(html, /searchResult\.do\?tab=trademark&queryText=/);
+  // 이슈 #116: KIPRIS 링크는 tab=trademark&queryText(상세검색 창만 열림)가 아니라
+  // searchKind=keywordSearch&searchRight=ktm + AN=[출원번호] 검색식으로 실제 doSearch를
+  // 실행시킨다. 브라우저 뒤로가기가 페이지를 벗어나지 않게 history도 쌓는다.
+  assert.match(html, /searchResult\.do\?searchKind=keywordSearch&searchRight=ktm&queryText=\$\{encodeURIComponent\(`AN=\[/);
+  assert.doesNotMatch(html, /searchResult\.do\?tab=trademark&queryText=/);
   assert.doesNotMatch(html, /searchKeyword=\$\{encodeURIComponent\(`AN=/);
   assert.match(html, /popstate/);
   assert.match(html, /kiipTab/);
