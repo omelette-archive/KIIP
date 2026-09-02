@@ -711,34 +711,32 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. align-items:stretch로 같은 행의
    두 박스 높이가 정확히 일치하고, 행1/행2 경계가 양 열에서 한 줄로 맞는다(높이 규격
    어긋남 방지). 열 간격·행 간격 모두 18px로 통일. */
-/* 이슈 #116(2026-09-02): "전국 시도별 출원율" 지도가 너무 작다는 지적 — 지도를 맨 위 전체
-   폭으로 크게 두고, 그 아래에 광역 구성·추이·요약 3패널을 한 행으로 컴팩트하게 배치한다.
-   (2×2 그리드에서 지도를 한 칸에 넣거나 행을 span하면, 왼쪽 열이 길어질 때 지도가 요약
-   위로 삐져나오거나 텍스트가 지도 옆까지 튀어나오는 문제가 있었음.) */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.55fr); gap: 18px; align-items: start; margin-bottom: 20px; }
+/* 이슈 #116(2026-09-01): 4개 패널(광역 구성·추이·지도·요약)을 2×2 그리드로 배치.
+   행1 = [광역 구성 | 지도], 행2 = [추이 그래프 | 요약]. 요약은 늘 추이 그래프 옆이다.
+   (2026-09-02: 지도를 키우려고 행을 span하거나 전체 폭으로 뺐다가 텍스트가 지도 옆까지
+   늘어나는 문제가 있었음 — 2×2를 유지하되, 지도 stage에 최소 높이를 줘서 행1을 늘리고
+   광역 구성 목록은 그 안에서 스크롤하게 해 지도를 조금 더 크게 한다.) */
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
 .applications-compact-row > * { min-width: 0; margin: 0; }
-.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; max-height: 560px; }
+.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; max-height: 720px; }
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
 .applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
-.applications-compact-row .coverage-insight { grid-column: 1; grid-row: 3; padding: 20px 22px; display: flex; flex-direction: column; align-items: stretch; }
+.applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
 .applications-compact-row .coverage-insight-stats { grid-template-columns: 1fr; }
-/* 지도는 오른쪽 열에서 왼쪽 3패널(구성·추이·요약) 전체 높이를 차지해 크게 보인다.
-   요약(coverage-insight)은 왼쪽 좁은 열의 일반 세로 카드라 어느 폭에서도 글자가
-   칸 밖으로 나가거나 지도 옆까지 늘어나지 않는다(#116 재수정 — 전체 폭 가로 배치 폐기). */
-.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1 / -1; align-self: start; padding: 22px; }
-.applications-compact-row .coverage-map-stage { min-height: 520px; display: flex; align-items: center; justify-content: center; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 760px; }
+.applications-compact-row .coverage-map-stage { min-height: 480px; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 560px; }
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
-/* solo(지역 선택): 광역 구성 없음 → 왼쪽 열에 추이·요약, 오른쪽 열에 시군구 지도 */
-.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; }
+/* solo(지역 선택): 광역 구성 없음 → 왼쪽에 추이·요약, 오른쪽에 시군구 지도(두 행) */
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
 .applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; }
-.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / -1; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; }
 @media (max-width: 1040px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
   .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
   .applications-compact-row .province-composition { max-height: none; }
-  .applications-compact-row .coverage-map-stage { min-height: 420px; }
-  .applications-compact-row .coverage-map { max-height: 560px; }
+  .applications-compact-row .coverage-map-stage { min-height: 380px; }
+  .applications-compact-row .coverage-map { max-height: 520px; }
 }
 .province-composition { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 /* 이슈 #116(2026-08-31): 지역별 상표 출원을 4칸 한 행으로 압축한 뒤 이 칸이 가장 좁아져(약
