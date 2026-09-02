@@ -499,7 +499,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-list-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
 .item-list-meta { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10.5px; }
 .item-list button b { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--green-dark); font-size: 12px; white-space: nowrap; }
-.item-detail-panel { min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+.item-detail-panel { min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; scroll-margin-top: 64px; }
 .item-detail-panel > .empty { color: var(--muted); font-size: 13px; }
 .item-detail-panel .item-card-head > div { display: block; }
 .item-detail-panel .item-card-head h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 800; }

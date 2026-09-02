@@ -205,10 +205,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
-  // 이슈 #119: KIPRIS khome 검색 페이지는 queryText GET 파라미터를 읽어 로드 시 검색을
-  // 실행하고 결과 목록을 그린다(KIPRIS가 공유용으로 지원하는 형식). 출원번호를 queryText로
-  // 넘겨 그 상표의 검색 결과 화면으로 바로 들어가게 한다.
-  const kiprisSearchUrl = (applicationNumber) => `https://www.kipris.or.kr/khome/search/searchResult.do?tab=trademark&queryText=${encodeURIComponent(applicationNumber)}`;
+  // 이슈 #116/#119: searchResult.do는 tab·queryText만으로는 검색을 실행하지 않고 상세검색
+  // 창만 연다("검색창만 나온다" 재지적). tab 없이 searchKind=keywordSearch(지식재산처
+  // 연계용)일 때만 queryText가 검색식(expression)으로 들어가 doSearch가 실행된다.
+  // searchRight=ktm(국내상표), 검색식은 출원번호 완전일치 AN=[번호].
+  const kiprisSearchUrl = (applicationNumber) => `https://www.kipris.or.kr/khome/search/searchResult.do?searchKind=keywordSearch&searchRight=ktm&queryText=${encodeURIComponent(`AN=[${String(applicationNumber).replace(/\D/g, "")}]`)}`;
   const GI_MARK_LABELS = { "44": "GI 단체표장", "48": "GI 증명표장" };
   const giMarkLabel = (applicationNumber) => applicationNumber ? GI_MARK_LABELS[applicationNumber.slice(0, 2)] || null : null;
   // 이슈 #80/#113: 지도 경계는 2026-08-24부터 vuski/admdongkor(2026-07-01 기준,
@@ -789,11 +790,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     document.querySelectorAll("[data-province-tab]").forEach((button) => { button.onclick = () => { const province = button.dataset.provinceTab; state.selectedRegionProvince = province; state.expandedRegionProvince = province; state.regionKey = ""; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region]").forEach((button) => { button.onclick = () => { state.regionKey = button.dataset.region; state.itemId = ""; render(); }; });
     document.querySelectorAll("[data-region-item]").forEach((button) => { button.onclick = () => { state.itemId = button.dataset.regionItem; render(); }; });
-    document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { const applicationNumber = button.dataset.kiprisApplication; navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "width=1100,height=800,noopener,noreferrer"); }; });
+    document.querySelectorAll("[data-kipris-application]").forEach((button) => { button.onclick = () => { const applicationNumber = button.dataset.kiprisApplication; navigator.clipboard?.writeText(applicationNumber).catch(() => {}); window.open(kiprisSearchUrl(applicationNumber), "kipris-search", "popup,width=1180,height=900,noopener"); }; });
     bindSearchInput("#region-search", "query");
     bindSearchInput("#item-search", "itemQuery");
     document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; render(); }; });
-    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); }; });
+    // 이슈 #116: 품목을 새로 고르면 오른쪽 상세가 이전 상세의 맨 아래 스크롤 위치에
+    // 머물러 있어 새 상세 맨 위가 안 보인다 — 선택 시 상세 패널 상단으로 스크롤.
+    document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); document.querySelector(".item-detail-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }); }; });
     const strategyItemSelect = document.querySelector("#strategy-item"); if (strategyItemSelect) strategyItemSelect.onchange = (event) => { state.strategyItem = event.currentTarget.value; render(); };
   }
   // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
