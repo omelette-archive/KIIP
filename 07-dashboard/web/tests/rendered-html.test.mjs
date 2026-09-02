@@ -699,8 +699,8 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   assert.match(standaloneHtml, /class="trend-range-track"/, "양 끝 드래그 핸들 구간 조절 바가 있어야 함");
   assert.match(standaloneHtml, /id="trend-range-handle-start"/);
   assert.match(standaloneHtml, /id="trend-range-handle-end"/);
-  // 2026-09-01(#116): 광역 구성·추이는 왼쪽 열, 지도·요약은 오른쪽 열의 2단 레이아웃.
-  // 추이 그래프는 소스 순서상 지도 카드보다 먼저 나온다(왼쪽 열이 먼저 렌더).
+  // 2026-09-02(#116): 광역 구성·추이는 왼쪽 열(좁게), 지도는 오른쪽 열에 두 행 걸쳐 크게,
+  // 요약은 아래 전체 폭. 추이 그래프는 소스 순서상 지도 카드보다 먼저 나온다.
   assert.ok(
     standaloneHtml.indexOf('class="trend-chart"') < standaloneHtml.indexOf('class="coverage-map-card"'),
     "연도별 추이 그래프 섹션은 지도 카드보다 소스 순서상 먼저 와야 함",

@@ -1,6 +1,6 @@
 "use client";
 
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 
 type Metric = { value: number | null; availability: "available" | "preview" | "blocked"; partial?: boolean; status: string; rationale?: string | null; blockingIssue?: string | null; calculatedAt?: string | null };
@@ -509,10 +509,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [selectedItemName, setSelectedItemName] = useState("");
   const [strategyItem, setStrategyItem] = useState("");
   // 이슈 #116: 품목별 조회에서 목록의 다른 품목을 고르면 오른쪽 상세가 바뀌는데,
-  // 스크롤 위치가 이전 상세의 맨 아래에 머물러 있어 새 상세의 맨 위가 안 보인다.
-  // 선택할 때마다 상세 패널 상단을 화면 위로 스크롤한다.
-  const itemDetailRef = useRef<HTMLDivElement>(null);
-  const selectItemAndScroll = (name: string) => { setSelectedItemName(name); itemDetailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }); };
+  // 스크롤 위치가 이전 상세를 읽던 자리(중간·하단)에 그대로 남아 새 상세의 맨 위가
+  // 안 보인다. 상세 패널로 scrollIntoView는 짧은 상세일 때 스크롤 여유가 없어 오히려
+  // 패널이 화면 하단에 걸리므로, 화면 최상단으로 올려 새 상세를 처음부터 보게 한다.
+  const selectItemAndScroll = (name: string) => { setSelectedItemName(name); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   const [selectedRegionProvince, setSelectedRegionProvince] = useState<string | null>(defaultRegionProvince);
   const [expandedRegionProvince, setExpandedRegionProvince] = useState<string | null>(null);
   const [selectedRegionCode, setSelectedRegionCode] = useState("");
@@ -945,7 +945,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               {visibleItemRows.length === 0 && <li className="empty">검색 결과가 없습니다.</li>}
             </ul>
           </aside>
-          <div className="item-detail-panel" ref={itemDetailRef}>{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
+          <div className="item-detail-panel">{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
             // 이슈 #116(2026-09-01): 마스터-디테일 개편(29fb843) 때 빠진 비즈니스 확장 흐름·전략
             // 카드를 되살린다. 흐름은 품목 단위 전국 지표라 대표 항목 하나에서, 브리핑은 공백
             // 알림을 우선해 뽑는다.
