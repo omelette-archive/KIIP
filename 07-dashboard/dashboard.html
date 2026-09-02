@@ -715,35 +715,30 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    폭으로 크게 두고, 그 아래에 광역 구성·추이·요약 3패널을 한 행으로 컴팩트하게 배치한다.
    (2×2 그리드에서 지도를 한 칸에 넣거나 행을 span하면, 왼쪽 열이 길어질 때 지도가 요약
    위로 삐져나오거나 텍스트가 지도 옆까지 튀어나오는 문제가 있었음.) */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr) minmax(0, 0.92fr); gap: 18px; align-items: start; margin-bottom: 20px; }
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.55fr); gap: 18px; align-items: start; margin-bottom: 20px; }
 .applications-compact-row > * { min-width: 0; margin: 0; }
-.applications-compact-row .coverage-map-card { grid-column: 1 / -1; grid-row: 1; padding: 24px; }
-.applications-compact-row .province-composition { grid-column: 1; grid-row: 2; }
-.applications-compact-row .trend-chart { grid-column: 2; grid-row: 2; padding: 18px 20px 14px; }
-.applications-compact-row .coverage-insight { grid-column: 3; grid-row: 2; padding: 20px 22px; display: flex; flex-direction: column; align-items: stretch; }
+.applications-compact-row .province-composition { grid-column: 1; grid-row: 1; max-height: 560px; }
+.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
+.applications-compact-row .coverage-insight { grid-column: 1; grid-row: 3; padding: 20px 22px; display: flex; flex-direction: column; align-items: stretch; }
 .applications-compact-row .coverage-insight-stats { grid-template-columns: 1fr; }
-.applications-compact-row .coverage-map-stage { min-height: 560px; display: flex; align-items: center; justify-content: center; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 780px; }
-.applications-compact-row .province-composition { max-height: 520px; }
+/* 지도는 오른쪽 열에서 왼쪽 3패널(구성·추이·요약) 전체 높이를 차지해 크게 보인다.
+   요약(coverage-insight)은 왼쪽 좁은 열의 일반 세로 카드라 어느 폭에서도 글자가
+   칸 밖으로 나가거나 지도 옆까지 늘어나지 않는다(#116 재수정 — 전체 폭 가로 배치 폐기). */
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1 / -1; align-self: start; padding: 22px; }
+.applications-compact-row .coverage-map-stage { min-height: 520px; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 760px; }
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
-/* solo(지역 선택): 광역 구성 없음 → 지도 위, 추이·요약 아래 2열 */
-.applications-compact-row.solo { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 2; }
-.applications-compact-row.solo .coverage-insight { grid-column: 2; grid-row: 2; }
-.applications-compact-row.solo .coverage-map-card { grid-column: 1 / -1; grid-row: 1; }
-/* 중간 폭: 3패널을 2열로(구성 | 추이) + 요약은 아래 전체 폭. 지도는 계속 맨 위 전체 폭. */
-@media (max-width: 1180px) {
-  .applications-compact-row { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
-  .applications-compact-row .province-composition { grid-column: 1; grid-row: 2; }
-  .applications-compact-row .trend-chart { grid-column: 2; grid-row: 2; }
-  .applications-compact-row .coverage-insight { grid-column: 1 / -1; grid-row: 3; }
-}
-@media (max-width: 1000px) {
+/* solo(지역 선택): 광역 구성 없음 → 왼쪽 열에 추이·요약, 오른쪽 열에 시군구 지도 */
+.applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; }
+.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / -1; }
+@media (max-width: 1040px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
   .applications-compact-row > * { grid-column: 1 !important; grid-row: auto !important; }
+  .applications-compact-row .province-composition { max-height: none; }
   .applications-compact-row .coverage-map-stage { min-height: 420px; }
-  .applications-compact-row .coverage-map { max-height: 520px; }
+  .applications-compact-row .coverage-map { max-height: 560px; }
 }
 .province-composition { display: flex; flex-direction: column; min-width: 0; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--panel); overflow: hidden; }
 /* 이슈 #116(2026-08-31): 지역별 상표 출원을 4칸 한 행으로 압축한 뒤 이 칸이 가장 좁아져(약
