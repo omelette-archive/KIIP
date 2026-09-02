@@ -255,13 +255,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 단계 성격을 함께 표시한다. 단계별 대표·특이 지정상품 예시는 상표 단어검색 API에 지정상품이
     // 없어 별도 등록원부 수집이 끝난 뒤 붙인다(analyzeNationwideFlow.js 재실행 필요).
     const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
-    const stagesHtml = ["raw", "processed", "service"].map((key, index) => `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(flow.stages[key].count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(flow.stages[key].count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${flow.stages[key].topRegion ? `<small class="nationwide-flow-region">${esc(flow.stages[key].topRegion)}</small>` : ""}</div>`).join("");
+    const hasExamples = ["raw", "processed", "service"].some((key) => { const eg = flow.stages[key].examples; return eg && ((eg.representative || []).length || (eg.unusual || []).length); });
+    const stagesHtml = ["raw", "processed", "service"].map((key, index) => { const stage = flow.stages[key]; const eg = stage.examples; return `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(stage.count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(stage.count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${stage.topRegion ? `<small class="nationwide-flow-region">${esc(stage.topRegion)}</small>` : ""}${eg && (eg.representative || []).length ? `<small class="nationwide-flow-eg"><b>대표</b> ${esc(eg.representative.join(", "))}</small>` : ""}${eg && (eg.unusual || []).length ? `<small class="nationwide-flow-eg"><b>이색</b> ${esc(eg.unusual.join(", "))}</small>` : ""}</div>`; }).join("");
     return `<section class="nationwide-flow-card">
       <div class="section-heading"><div><h2>${esc(itemLabel)} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
       <p class="nationwide-flow-reach">현재 <strong>${furthestStage}</strong> 상표 활동이 확인됩니다 · 전체 ${number(flow.totalCount)}건 중 단계 분류 가능 ${number(classified)}건</p>
       <div class="nationwide-flow-stages">${stagesHtml}</div>
       ${clusterNote}
-      <p class="nationwide-flow-caveat">단계별 대표·특이 지정상품 예시는 등록원부 지정상품 수집을 마친 뒤 추가됩니다.</p>
+      <p class="nationwide-flow-caveat">${hasExamples ? "예시는 각 단계에서 실제 출원된 상표명입니다(지정상품 텍스트가 아님). 지정상품 대조는 등록원부 보강 후 반영됩니다." : "단계별 상표명·지정상품 예시는 전국 흐름 재수집 후 추가됩니다."}</p>
     </section>`;
   };
   // 이슈 #116(2026-08-26) 사용자 재요청: 상태 아이콘·배지, 근거 수치 스탯 줄, 문장별 도트

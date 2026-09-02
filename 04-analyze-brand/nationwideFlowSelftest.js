@@ -9,6 +9,7 @@ const {
   classifyHitStage,
   aggregateHits,
   topApplicantsByStage,
+  stageExamples,
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
@@ -128,6 +129,23 @@ async function runNationwideFlowTests() {
     assert.strictEqual(bounded.stopReason, "max_pages");
     assert.strictEqual(calls2, 3);
     ok("무한정 남아있으면 maxPages에서 bounded로 멈추고 무한 호출하지 않음");
+  }
+
+  console.log("7b) stageExamples — 단계별 상표명 예시를 대표(짧음)·이색(길거나 확장형)으로 분리 (#116)");
+  {
+    const hits = [
+      hit({ title: "인삼", classificationCode: "31" }),
+      hit({ title: "풍기 인삼", classificationCode: "31" }),
+      hit({ title: "인삼", classificationCode: "31" }), // 중복 title은 한 번만
+      hit({ title: "여섯해살이 산양삼 프리미엄 인삼 에디션", classificationCode: "31" }),
+      hit({ title: "", classificationCode: "31" }), // 빈 title은 제외
+    ];
+    const examples = stageExamples(hits, "인삼", 2);
+    assert.deepStrictEqual(examples.representative, ["인삼", "풍기 인삼"]);
+    assert.ok(examples.unusual.includes("여섯해살이 산양삼 프리미엄 인삼 에디션"));
+    assert.ok(!examples.unusual.includes("인삼")); // 대표에 이미 있으면 이색에서 제외
+    assert.deepStrictEqual(stageExamples([], "인삼"), { representative: [], unusual: [] });
+    ok("중복·빈 title 제거, 길이 오름차순으로 대표, 대표를 뺀 나머지에서 이색");
   }
 
   console.log("8b) topApplicantsByStage — 출원번호가 비어있는 첫 히트가 있어도 이후 정상 값으로 채움");

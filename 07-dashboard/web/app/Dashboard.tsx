@@ -11,7 +11,7 @@ type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
-type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null };
+type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[] } | null };
 type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
@@ -409,24 +409,27 @@ function NationwideFlowCard({ flow, itemLabel }: { flow: NationwideFlow; itemLab
   // 단계 성격을 함께 표시한다. 단계별 대표·특이 지정상품 예시는 상표 단어검색 API에 지정상품이
   // 없어 별도 등록원부 수집(analyzeNationwideFlow.js 재실행)이 끝난 뒤 붙인다.
   const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
+  const hasExamples = (["raw", "processed", "service"] as const).some((key) => flow.stages[key].examples && (flow.stages[key].examples!.representative.length || flow.stages[key].examples!.unusual.length));
   return (
     <section className="nationwide-flow-card">
       <div className="section-heading"><div><h2>{itemLabel} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
       <p className="nationwide-flow-reach">현재 <strong>{furthestStage}</strong> 상표 활동이 확인됩니다 · 전체 {number(flow.totalCount)}건 중 단계 분류 가능 {number(classified)}건</p>
       <div className="nationwide-flow-stages">
-        {(["raw", "processed", "service"] as const).map((key, index) => <Fragment key={key}>
+        {(["raw", "processed", "service"] as const).map((key, index) => { const stage = flow.stages[key]; return <Fragment key={key}>
           {index > 0 && <i className="nationwide-flow-arrow" aria-hidden="true">→</i>}
           <div className={`nationwide-flow-stage nationwide-flow-stage-${key}`}>
             <span>{FLOW_STAGE_LABELS[key]}</span>
-            <strong>{number(flow.stages[key].count)}건</strong>
-            <small className="nationwide-flow-share">전체의 {flowPercent(flow.stages[key].count)}</small>
+            <strong>{number(stage.count)}건</strong>
+            <small className="nationwide-flow-share">전체의 {flowPercent(stage.count)}</small>
             <small className="nationwide-flow-hint">{FLOW_STAGE_HINTS[key]}</small>
-            {flow.stages[key].topRegion && <small className="nationwide-flow-region">{flow.stages[key].topRegion}</small>}
+            {stage.topRegion && <small className="nationwide-flow-region">{stage.topRegion}</small>}
+            {stage.examples && stage.examples.representative.length > 0 && <small className="nationwide-flow-eg"><b>대표</b> {stage.examples.representative.join(", ")}</small>}
+            {stage.examples && stage.examples.unusual.length > 0 && <small className="nationwide-flow-eg"><b>이색</b> {stage.examples.unusual.join(", ")}</small>}
           </div>
-        </Fragment>)}
+        </Fragment>; })}
       </div>
       {clusterNote && <p className="nationwide-flow-note">{clusterNote}</p>}
-      <p className="nationwide-flow-caveat">단계별 대표·특이 지정상품 예시는 등록원부 지정상품 수집을 마친 뒤 추가됩니다.</p>
+      <p className="nationwide-flow-caveat">{hasExamples ? "예시는 각 단계에서 실제 출원된 상표명입니다(지정상품 텍스트가 아님). 지정상품 대조는 등록원부 보강 후 반영됩니다." : "단계별 상표명·지정상품 예시는 전국 흐름 재수집 후 추가됩니다."}</p>
     </section>
   );
 }
