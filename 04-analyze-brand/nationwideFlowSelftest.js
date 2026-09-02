@@ -10,6 +10,8 @@ const {
   aggregateHits,
   topApplicantsByStage,
   stageExamples,
+  stageClassDistribution,
+  stageTopRegions,
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
@@ -146,6 +148,30 @@ async function runNationwideFlowTests() {
     assert.ok(!examples.unusual.includes("인삼")); // 대표에 이미 있으면 이색에서 제외
     assert.deepStrictEqual(stageExamples([], "인삼"), { representative: [], unusual: [] });
     ok("중복·빈 title 제거, 길이 오름차순으로 대표, 대표를 뺀 나머지에서 이색");
+  }
+
+  console.log("7c) stageClassDistribution / stageTopRegions — 단계별 주요 상품류·상위 지역 (#119)");
+  {
+    const hits = [
+      hit({ title: "인삼", classificationCode: "31" }),
+      hit({ title: "인삼차", classificationCode: "30" }),
+      hit({ title: "인삼음료", classificationCode: "30" }),
+      hit({ title: "인삼", classificationCode: "31|30" }),
+    ];
+    const classes = stageClassDistribution(hits, 5);
+    assert.strictEqual(classes[0].classCode, "30"); // 30류 3건
+    assert.strictEqual(classes[0].count, 3);
+    assert.ok(Math.abs(classes[0].share - 3 / 5) < 1e-9); // 전체 클래스 등장 5회 중 3
+    const regions = stageTopRegions([
+      { applicant: "A", count: 5, region: "충청남도 금산군" },
+      { applicant: "B", count: 3, region: "강원특별자치도 홍천군" },
+      { applicant: "C", count: 2, region: "충청남도 금산군" },
+      { applicant: "D", count: 1, region: null },
+    ], 5);
+    assert.strictEqual(regions[0].region, "충청남도 금산군");
+    assert.strictEqual(regions[0].count, 7);
+    assert.ok(Math.abs(regions[0].share - 7 / 10) < 1e-9);
+    ok("상품류는 등장 횟수, 상위 지역은 상위 출원인 count 합산·점유율로 계산");
   }
 
   console.log("8b) topApplicantsByStage — 출원번호가 비어있는 첫 히트가 있어도 이후 정상 값으로 채움");

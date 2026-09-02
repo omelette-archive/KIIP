@@ -40,6 +40,11 @@ function stageSummary(stage, includeRegion) {
     topRegion: includeRegion ? top?.region || null : null,
     topApplicant: includeRegion ? top?.applicant || null : null,
     examples,
+    // 이슈 #119(2026-09-02): 단계별 주요 상품류·상위 지역. 상품류는 지역 귀속과 무관.
+    // 상위 지역은 상위 출원인 주소 기준 근사치라 rawSignalConfidence와 상관없이 통과시키되,
+    // "특산품 관리 지역 고려 X"라는 성격이므로 그대로 노출한다.
+    classes: Array.isArray(stage.classes) && stage.classes.length ? stage.classes : null,
+    topRegions: Array.isArray(stage.topRegions) && stage.topRegions.length ? stage.topRegions : null,
   };
 }
 

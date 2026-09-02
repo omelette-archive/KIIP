@@ -113,6 +113,36 @@ function stageExamples(stageHits, coreTerm, limit = 3) {
   return { representative, unusual };
 }
 
+// 이슈 #119(2026-09-02): 단계별 "주요 지정상품(류)" — 지정상품 텍스트는 없지만 NICE
+// 상품류 코드는 모든 hit에 있으므로, 그 단계에서 많이 쓰인 상품류를 상위 N개 보여준다.
+function stageClassDistribution(stageHits, limit = 5) {
+  const byClass = new Map();
+  for (const hit of stageHits) {
+    for (const code of hitClasses(hit)) byClass.set(code, (byClass.get(code) || 0) + 1);
+  }
+  const total = [...byClass.values()].reduce((sum, count) => sum + count, 0);
+  return [...byClass.entries()]
+    .sort((a, b) => b[1] - a[1] || Number(a[0]) - Number(b[0]))
+    .slice(0, limit)
+    .map(([classCode, count]) => ({ classCode, count, share: total ? count / total : 0 }));
+}
+
+// 이슈 #119: 단계별 상표 출원 상위 지역과 점유율(특산품 관리 지역 고려 X). 전체 hit의
+// 주소를 조회할 예산은 없으므로 상위 출원인(withRegion)이 이미 주소가 붙은 것을 지역별로
+// 합산한다 — 상위 출원인 기준 근사치다.
+function stageTopRegions(topApplicantsWithRegion, limit = 5) {
+  const byRegion = new Map();
+  for (const applicant of topApplicantsWithRegion || []) {
+    if (!applicant.region) continue;
+    byRegion.set(applicant.region, (byRegion.get(applicant.region) || 0) + (applicant.count || 0));
+  }
+  const total = [...byRegion.values()].reduce((sum, count) => sum + count, 0);
+  return [...byRegion.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko-KR"))
+    .slice(0, limit)
+    .map(([region, count]) => ({ region, count, share: total ? count / total : 0 }));
+}
+
 function topApplicantsByStage(stageHits, limit = 5) {
   const byApplicant = new Map();
   for (const hit of stageHits) {
@@ -213,6 +243,8 @@ module.exports = {
   isProducerLikeApplicant,
   rawSignalConfidence,
   stageExamples,
+  stageClassDistribution,
+  stageTopRegions,
   topApplicantsByStage,
   collectNationwideHits,
   resolveApplicantRegion,

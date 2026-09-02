@@ -11,7 +11,7 @@ type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
-type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[] } | null };
+type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[] } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
 type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
@@ -405,7 +405,10 @@ function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: 
 // 노출하지 않는다(사용자 결정, 2026-08-27).
 const FLOW_STAGE_LABELS: Record<"raw" | "processed" | "service", string> = { raw: "원물", processed: "가공품", service: "서비스·확장" };
 const FLOW_STAGE_HINTS: Record<"raw" | "processed" | "service", string> = { raw: "산지·1차 생산 단계 상표", processed: "가공식품·음료·화장품 등", service: "유통·체험·관광·식음 서비스류" };
-function NationwideFlowCard({ flow, itemLabel }: { flow: NationwideFlow; itemLabel: string }) {
+// 이슈 #119: 단계별 주요 상품류 — NICE 13판 대분류 이름(자주 나오는 것만).
+const NICE_CLASS_LABELS: Record<string, string> = { "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "35": "도소매·광고(35)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
+const niceClassLabel = (code: string) => NICE_CLASS_LABELS[code] || `${code}류`;
+function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow; itemLabel: string; origins?: string[] }) {
   const { raw, processed, service } = flow.stages;
   const classified = raw.count + processed.count + service.count;
   const flowPercent = (value: number) => classified ? `${Math.round(value / classified * 100)}%` : "—";
@@ -430,14 +433,16 @@ function NationwideFlowCard({ flow, itemLabel }: { flow: NationwideFlow; itemLab
             <strong>{number(stage.count)}건</strong>
             <small className="nationwide-flow-share">전체의 {flowPercent(stage.count)}</small>
             <small className="nationwide-flow-hint">{FLOW_STAGE_HINTS[key]}</small>
-            {stage.topRegion && <small className="nationwide-flow-region">{stage.topRegion}</small>}
+            {stage.classes && stage.classes.length > 0 && <small className="nationwide-flow-eg"><b>주요 상품류</b> {stage.classes.slice(0, 3).map((row) => `${niceClassLabel(row.classCode)} ${Math.round(row.share * 100)}%`).join(" · ")}</small>}
+            {stage.topRegions && stage.topRegions.length > 0 ? <small className="nationwide-flow-eg"><b>상위 지역</b> {stage.topRegions.slice(0, 3).map((row) => `${row.region} ${Math.round(row.share * 100)}%`).join(" · ")}</small> : stage.topRegion && <small className="nationwide-flow-region">{stage.topRegion}</small>}
             {stage.examples && stage.examples.representative.length > 0 && <small className="nationwide-flow-eg"><b>대표</b> {stage.examples.representative.join(", ")}</small>}
             {stage.examples && stage.examples.unusual.length > 0 && <small className="nationwide-flow-eg"><b>이색</b> {stage.examples.unusual.join(", ")}</small>}
           </div>
         </Fragment>; })}
       </div>
+      {origins && origins.length > 0 && <p className="nationwide-flow-origins"><strong>주요 원산지</strong> {origins.map(displayRegionName).join(", ")}</p>}
       {clusterNote && <p className="nationwide-flow-note">{clusterNote}</p>}
-      <p className="nationwide-flow-caveat">{hasExamples ? "예시는 각 단계에서 실제 출원된 상표명입니다(지정상품 텍스트가 아님). 지정상품 대조는 등록원부 보강 후 반영됩니다." : "단계별 상표명·지정상품 예시는 전국 흐름 재수집 후 추가됩니다."}</p>
+      <p className="nationwide-flow-caveat">{hasExamples ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 텍스트 대조는 등록원부 보강 후 반영됩니다." : "단계별 상품류·상위 지역·상표명 예시는 전국 흐름 재수집 후 채워집니다."}</p>
     </section>
   );
 }
@@ -819,18 +824,26 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 샘플 외에 나머지 품목도 이름을 직접 입력해 찾을 수 있게, 브리핑·흐름이 없는 품목도
   // 그룹을 만들어 둔다(화면에서 "데이터 없음"으로 안내).
   const strategyItemGroups = useMemo(() => {
-    const groups = new Map<string, { name: string; flow: NationwideFlow | null; briefings: { region: Region; item: Item }[] }>();
+    const groups = new Map<string, { name: string; flow: NationwideFlow | null; briefings: { region: Region; item: Item }[]; originRows: { region: string; apps: number; badge: boolean }[] }>();
     for (const region of regionalRegions) {
       for (const item of region.items) {
         const name = officialItemLabel(item);
         if (!name) continue;
-        const group = groups.get(name) || { name, flow: null, briefings: [] };
+        const group = groups.get(name) || { name, flow: null, briefings: [], originRows: [] };
         if (!group.flow && item.businessFlow) group.flow = item.businessFlow;
         if (item.briefing?.sentences.length) group.briefings.push({ region, item });
+        // 이슈 #119: "주요 원산지" — 이 품목을 특산품으로 수집한 지역. 지역 주소 일치 출원이
+        // 많거나 지리적표시·특화작목 배지가 있는 지역을 우선한다.
+        const apps = item.metrics.uniqueTrademarkCount.availability === "available" ? item.metrics.uniqueTrademarkCount.value || 0 : 0;
+        const badge = Boolean(item.regionalSpecialtyCropBadge) || (item.regionalEvidence?.some((evidence) => evidence.regionalMetricEligible) ?? false);
+        group.originRows.push({ region: region.region, apps, badge });
         groups.set(name, group);
       }
     }
-    return [...groups.values()].sort((a, b) => b.briefings.length - a.briefings.length || a.name.localeCompare(b.name, "ko-KR"));
+    return [...groups.values()].map((group) => ({
+      ...group,
+      origins: [...group.originRows].sort((a, b) => Number(b.badge) - Number(a.badge) || b.apps - a.apps || a.region.localeCompare(b.region, "ko-KR")).slice(0, 3).map((row) => row.region),
+    })).sort((a, b) => b.briefings.length - a.briefings.length || a.name.localeCompare(b.name, "ko-KR"));
   }, [regionalRegions]);
   // 드롭다운은 브리핑·흐름이 있는 "주요 샘플"만, 직접 입력(datalist)은 전체 품목.
   const strategySampleGroups = useMemo(() => strategyItemGroups.filter((group) => group.flow || group.briefings.length), [strategyItemGroups]);
@@ -991,7 +1004,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div>
             </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
-            {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} />}
+            {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} origins={[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)} />}
             {briefingItem?.briefing && <BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} />}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
         </div>
@@ -1016,7 +1029,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       {strategyItem && !selectedStrategyGroup && <p className="empty">&ldquo;{strategyItem}&rdquo; 품목을 찾지 못했습니다. 고시명칭이 확정된 품목명으로 입력해 주세요.</p>}
       {selectedStrategyGroup ? <>
         {!selectedStrategyGroup.flow && selectedStrategyGroup.briefings.length === 0 && <p className="empty">이 품목은 아직 비즈니스 확장 흐름·브리핑 데이터가 없습니다.</p>}
-        {selectedStrategyGroup.flow && <NationwideFlowCard flow={selectedStrategyGroup.flow} itemLabel={selectedStrategyGroup.name} />}
+        {selectedStrategyGroup.flow && <NationwideFlowCard flow={selectedStrategyGroup.flow} itemLabel={selectedStrategyGroup.name} origins={selectedStrategyGroup.origins} />}
         <div className="strategy-sample-list">{[...selectedStrategyGroup.briefings.filter(({ item }) => item.briefing?.isGapAlert), ...selectedStrategyGroup.briefings.filter(({ item }) => !item.briefing?.isGapAlert)].slice(0, 6).map(({ region, item }) => item.briefing && <BusinessStrategyCard
           key={`${regionKey(region)}-${item.specialtyId}`}
           briefing={item.briefing}
