@@ -29,10 +29,17 @@ function officialItemLabel(item) {
 
 function stageSummary(stage, includeRegion) {
   const top = stage.topApplicants?.[0];
+  // 이슈 #116(2026-09-01): 단계별 상표명 예시(대표/이색)는 지역 귀속과 무관하므로
+  // includeRegion 여부와 상관없이 항상 통과시킨다. 예시 수집 전 실행분(examples 없음)은
+  // null로 둬서 대시보드가 조용히 건너뛴다.
+  const examples = stage.examples && (stage.examples.representative?.length || stage.examples.unusual?.length)
+    ? { representative: stage.examples.representative || [], unusual: stage.examples.unusual || [] }
+    : null;
   return {
     count: stage.count,
     topRegion: includeRegion ? top?.region || null : null,
     topApplicant: includeRegion ? top?.applicant || null : null,
+    examples,
   };
 }
 

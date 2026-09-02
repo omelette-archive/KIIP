@@ -13,6 +13,7 @@ const { loadCache, saveCache } = require("../03-match-trademarks/lib/trademarkAp
 const {
   aggregateHits,
   topApplicantsByStage,
+  stageExamples,
   collectNationwideHits,
   resolveApplicantRegion,
   deriveAgriCoreItems,
@@ -105,7 +106,13 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
       }
       withRegion.push({ ...applicant, region: region.status === "matched" ? region.normalizedRegion : null });
     }
-    stageSummary[key] = { count: stages[key].length, topApplicants: withRegion };
+    stageSummary[key] = {
+      count: stages[key].length,
+      topApplicants: withRegion,
+      // 이슈 #116(2026-09-01): 단계별 상표명 예시(대표/이색). 지정상품 텍스트가 아니라
+      // 실제 출원된 상표명이며 지역 귀속과 무관하다.
+      examples: stageExamples(stages[key], term),
+    };
   }
   return {
     term,

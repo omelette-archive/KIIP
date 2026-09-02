@@ -108,6 +108,28 @@ function rawSignalConfidence(rawTopApplicants) {
   return top && isProducerLikeApplicant(top.applicant) ? "producer_confirmed" : "uncertain";
 }
 
+// 이슈 #116(2026-09-01): "단계별 대표·특이 지정상품 예시"를 보여달라는 요청. 상표
+// 단어검색 API 응답에는 지정상품 텍스트가 없어(경로 B 등록원부 대조는 전체의 2%뿐)
+// 대신 그 단계에서 실제로 출원된 "상표명" 예시를 보여준다 — 대표(coreTerm 옆에 짧게
+// 붙은 전형적 브랜딩)와 이색(길거나 coreTerm에서 멀어진 확장형)으로 나눈다. 상표명은
+// 지역 귀속과 무관하므로 rawSignalConfidence와 상관없이 항상 노출해도 안전하다.
+function stageExamples(stageHits, coreTerm, limit = 3) {
+  const seen = new Set();
+  const titles = [];
+  for (const hit of stageHits) {
+    const title = (hit.title || "").replace(/\s+/g, " ").trim();
+    if (!title || seen.has(title)) continue;
+    seen.add(title);
+    titles.push(title);
+  }
+  if (titles.length === 0) return { representative: [], unusual: [] };
+  const byLength = [...titles].sort((a, b) => a.length - b.length || a.localeCompare(b, "ko-KR"));
+  const representative = byLength.slice(0, limit);
+  const repSet = new Set(representative);
+  const unusual = [...byLength].reverse().filter((title) => !repSet.has(title)).slice(0, limit);
+  return { representative, unusual };
+}
+
 function topApplicantsByStage(stageHits, limit = 5) {
   const byApplicant = new Map();
   for (const hit of stageHits) {
@@ -207,6 +229,7 @@ module.exports = {
   aggregateHits,
   isProducerLikeApplicant,
   rawSignalConfidence,
+  stageExamples,
   topApplicantsByStage,
   collectNationwideHits,
   resolveApplicantRegion,
