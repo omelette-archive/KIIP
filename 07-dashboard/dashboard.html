@@ -514,7 +514,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-list-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
 .item-list-meta { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 10.5px; }
 .item-list button b { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--green-dark); font-size: 12px; white-space: nowrap; }
-.item-detail-panel { min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
+.item-detail-panel { min-width: 0; min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .item-detail-panel > .empty { color: var(--muted); font-size: 13px; }
 .item-detail-panel .item-card-head > div { display: block; }
 .item-detail-panel .item-card-head h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 800; }
@@ -543,11 +543,13 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-card-charts .trend-chart-compact .section-heading > span { font-size: 10px; }
 .item-share-block { display: flex; flex-direction: column; padding: 16px 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--panel); }
 .item-share-block .section-heading h2 { font-size: 14px; }
-.item-share { flex: 1; display: flex; align-items: center; gap: 20px; margin-top: 14px; }
+.item-share { flex: 1; display: flex; align-items: center; gap: 20px; margin-top: 14px; min-width: 0; }
 .item-share.empty { display: block; margin-top: 6px; }
 .item-share-donut { flex-shrink: 0; width: 124px; height: 124px; border-radius: 50%; }
-.item-share-legend { display: grid; gap: 7px; margin: 0; padding: 0; list-style: none; min-width: 0; }
-.item-share-legend li { display: flex; align-items: center; gap: 7px; color: var(--muted); font-size: 12px; }
+/* 이슈 #119(2026-09-03): 창을 줄이면 지역명(white-space:nowrap)이 그리드 auto 트랙을 넓혀
+   범례가 도넛 옆으로 튀어나오던 작은 버그 — 트랙을 minmax(0,1fr)로 바꿔 지역명이 말줄임되게. */
+.item-share-legend { display: grid; grid-template-columns: minmax(0, 1fr); gap: 7px; margin: 0; padding: 0; list-style: none; min-width: 0; }
+.item-share-legend li { display: flex; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 12px; }
 .item-share-legend li i { flex-shrink: 0; width: 11px; height: 11px; border-radius: 999px; }
 /* 이슈 #116(2026-09-01): 창이 좁아져도 비중 숫자(%)는 절대 잘리면 안 된다 — 지역명만
    말줄임 처리하고 숫자는 flex-shrink:0으로 항상 표시. */
