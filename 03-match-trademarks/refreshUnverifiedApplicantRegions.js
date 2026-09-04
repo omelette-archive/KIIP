@@ -233,18 +233,27 @@ async function main() {
   if (args["merged-out"]) {
     const merged = new Map(baseCache);
     let mergedCount = 0;
+    let conflictingRefreshed = 0;
     for (const [number, entry] of refreshEntries) {
-      const before = classifyCacheEntry(number, baseCache.get(number)).category;
-      const after = classifyCacheEntry(number, entry).category;
+      const before = classifyCacheEntry(number, baseCache.get(number), { includeConflicting }).category;
+      const after = classifyCacheEntry(number, entry, { includeConflicting }).category;
       if (before !== "matched" && after === "matched") {
         merged.set(number, entry);
         mergedCount++;
+      } else if (includeConflicting && after === "conflicting") {
+        // #118: 상충 건은 matched로 "개선"되진 않지만, 방금 재조회로 각 출원인의
+        // producerOrg가 채워졌다 — 하류 evaluateApplicantRegions가 이 값으로
+        // producer_org_coapplicant_inside를 판정하므로 최신 항목으로 교체한다.
+        merged.set(number, entry);
+        conflictingRefreshed++;
       }
     }
     const mergedOutPath = path.resolve(args["merged-out"]);
     saveCache(mergedOutPath, merged);
     console.error(
-      `[refreshUnverified] 병합 결과(개선된 ${mergedCount}건만 반영) -> ${mergedOutPath} ` +
+      `[refreshUnverified] 병합 결과(matched 개선 ${mergedCount}건` +
+        (conflictingRefreshed ? ` + 상충 재조회 ${conflictingRefreshed}건` : "") +
+        `) -> ${mergedOutPath} ` +
         "(기준 캐시는 변경되지 않았습니다 — 검증 후 사람이 직접 교체하세요)"
     );
   }
