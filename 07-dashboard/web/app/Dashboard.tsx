@@ -255,8 +255,11 @@ function categoryShareSegments(items: Item[], field: "uniqueTrademarkCount" | "r
 function CategoryShareDonut({ items, field, label }: { items: Item[]; field: "uniqueTrademarkCount" | "registeredTrademarkCount"; label: string }) {
   const { total, segments } = categoryShareSegments(items, field);
   if (!total) return <div className="item-share empty"><p className="empty">표시할 {label} 데이터가 없습니다.</p></div>;
-  let acc = 0;
-  const gradient = segments.map((segment) => { const start = acc * 360; acc += segment.pct; return `${categoryShareColor(segment.name)} ${start.toFixed(1)}deg ${(acc * 360).toFixed(1)}deg`; }).join(", ");
+  const gradient = segments.reduce<{ stops: string[]; cursor: number }>((state, segment) => {
+    const start = state.cursor;
+    const end = start + segment.pct * 360;
+    return { cursor: end, stops: [...state.stops, `${categoryShareColor(segment.name)} ${start.toFixed(1)}deg ${end.toFixed(1)}deg`] };
+  }, { stops: [], cursor: 0 }).stops.join(", ");
   return <div className="item-share category-share"><div className="item-share-donut" style={{ background: `conic-gradient(${gradient})` }} role="img" aria-label={`특산품 유형별 ${label} 비중`} /><ul className="item-share-legend">{segments.map((segment) => <li key={segment.name}><i style={{ background: categoryShareColor(segment.name) }} /><span className="item-share-region">{segment.name}</span><b>{percent(segment.pct)}</b></li>)}</ul></div>;
 }
 // 이슈 #116(2026-09-01): 지자체별 조회에서 추이 그래프 크기를 사용자가 조절하고
@@ -422,7 +425,6 @@ function tradeDisplay(item: Item): { value: number | null; provisional: boolean 
   const nationwide = item.metrics.nationwideSearchTrademarkCount;
   return typeof nationwide?.value === "number" ? { value: nationwide.value, provisional: true } : { value: null, provisional: false };
 }
-function verdictTitle(verdict: ItemVerdict) { return `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`; }
 function regionKey(region: Region) { return region.regionCode || region.region; }
 // 이슈 #116/#119: 등록 사례에서 KIPRIS로 "검색된 결과"를 바로 보고 싶다는 요청.
 // searchResult.do는 tab·queryText만 주면 검색을 실행하지 않고 상세검색 창만 연다(#116
@@ -1164,17 +1166,15 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     {tab === "data" && pipeline && <section className="screen-section data-overview">
       <section className="criteria" aria-label="판정 기준과 매칭 방법">
-        <div className="section-heading">
-          <div><h2>판정 기준과 매칭 방법</h2></div>
-          <span>현재 출처 {sourceLine}</span>
+        <strong className="criteria-title">판정 기준과 매칭 방법</strong>
+        <div className="criteria-line">
+          <span title="등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다."><b>품목</b> 지정상품명 확인</span>
+          <span title="국토교통부 전국 법정동 코드를 기준으로 시·군·구를 완전 일치시킵니다."><b>지역</b> 법정동코드 완전일치</span>
+          <span title="검색·집계 키는 고시명칭과 NICE류이며 서비스류는 포함하지 않습니다."><b>검색</b> KIPRIS 고시명칭·NICE류</span>
+          <span title="등록은 권리자 주소, 출원은 출원인정보 API 주소가 해당 지역으로 확인된 건만 집계합니다."><b>지역 출원</b> 출원인·권리자 주소 일치</span>
+          <span title="주소 미확보 건은 지역 귀속에서 제외하며 확보율을 참고 지표로 함께 제공합니다."><b>주소</b> 확보율은 참고 지표</span>
         </div>
-        <div className="criteria-grid">
-          <article><span>품목 관련성 확인</span><strong>지정상품명에서 품목명 확인</strong><small>등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다. NICE류만 일치하거나 검색어로만 포착된 후보는 확인 사례에 포함하지 않습니다. 대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다.</small></article>
-          <article><span>지역 매칭</span><strong>법정동코드 완전일치</strong><small>국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만</small></article>
-          <article><span>상표 검색</span><strong>KIPRIS 단어검색(고시명칭 기준)</strong><small>검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음. 현재 수치는 각 특산품에 매핑된 고시상품 NICE류 기준입니다. 음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다.</small></article>
-          <article><span>지역 주소 일치 출원 / 등록 완료</span><strong>출원인·권리자 주소가 해당 지역으로 확인된 출원만</strong><small>등록 완료 건은 등록원부의 권리자 소재지, 출원만 된 건은 출원인정보 API의 출원인 소재지 기준입니다. 등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수이며, 전국 검색 후보와 주소 미확보 건은 제외합니다.</small></article>
-          <article><span>출원인 지역 매칭</span><strong>주소 확보율은 참고 지표</strong><small>주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 공동출원인은 전원 일치가 원칙이나, 그중 영농조합·협동조합·지자체 등 지역 생산 주체가 해당 지역이면 인정합니다.</small></article>
-        </div>
+        <span className="criteria-source" title={sourceLine}>출처 {snapshot.sources.length}개</span>
       </section>
       <p className="screen-note">수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다.</p>
       <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합{snapshot.coverage.regionItemCount > pipeline.rowCounts.total ? ` · 복수 품목 행 분리 +${number(snapshot.coverage.regionItemCount - pipeline.rowCounts.total)}` : ""}</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
@@ -1238,7 +1238,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     {heading}
     <RegionTrend region={region} heading="지역 연도별 출원·등록 추이" subtitle={`${region.region} 전체 특산품 · 연도별`} prominent />
     <div className="item-tabs word-cloud" role="tablist" aria-label={`${region.region} 특산품 · 출원건수 기준 글자 크기`}>{region.items.map((row) => { const value = row.metrics.uniqueTrademarkCount.value || 0; return <button type="button" role="tab" aria-selected={item.specialtyId === row.specialtyId} key={row.specialtyId || row.itemName} onClick={() => onItem(row.specialtyId || "")} style={{ fontSize: `${wordCloudFontSize(value, itemTabsMaxTrademarks)}px`, color: item.specialtyId === row.specialtyId ? undefined : wordCloudColor(row.specialtyId || itemName(row)) }} title={`${itemName(row)} · 출원 ${number(value)}건`}>{itemName(row)}</button>; })}</div>
-    <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier} · {item.regionalSpecialtyCropBadge.referenceYear}</em>}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span>{item.itemVerdict?.source === "algorithm" && <span className="verdict-chip" title={verdictTitle(item.itemVerdict)}>AI 판정</span>}</div>
+    <div className="item-title"><div><span>이 지역의 대표 특산품</span><h3>{itemName(item)}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier} · {item.regionalSpecialtyCropBadge.referenceYear}</em>}</h3><small>{noticeBasis(item)}</small></div><span className="class-chip">{item.niceClass ? `NICE ${item.niceClass}` : "NICE 분류 미확정"}</span></div>
     <div className="metric-reading-note"><strong>출원 건수 기준</strong><p><b>{region.sigungu || region.region} {itemName(item)} 출원</b>은 출원인 주소가 {region.region}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
     {item.regionalEvidence?.length ? <div className="metric-reading-note"><strong>공식 생산 주산지 근거</strong><p>{item.regionalEvidence.map((evidence) => `${evidence.region} (${evidence.referenceYear})`).join(", ")} · 임산물생산조사 기준입니다. {item.regionalEvidence.some((evidence) => evidence.regionalMetricEligible) ? "출원인 주소를 주산지와 대조해 지역 상표 통계에 반영했습니다." : "검색 범위가 완료된 뒤 지역 상표 통계에 반영합니다."}</p></div> : null}
     <div className="detail-grid">

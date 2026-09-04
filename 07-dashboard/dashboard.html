@@ -56,13 +56,12 @@ a { color: inherit; text-decoration: none; }
 .hero-note strong { margin-top: 0; font-size: 14px; line-height: 1.3; }
 .hero-note p { display: none; }
 
-.criteria { margin-top: 8px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.criteria-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
-.criteria-grid article { padding: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f4f6f9; }
-.criteria-grid span, .criteria-grid strong, .criteria-grid small { display: block; }
-.criteria-grid span { color: var(--green); font-size: 10px; font-weight: 800; letter-spacing: 0.03em; }
-.criteria-grid strong { margin: 9px 0 6px; font-size: 14px; letter-spacing: -0.02em; }
-.criteria-grid small { color: var(--muted); font-size: 10.5px; line-height: 1.6; }
+.criteria { display: flex; align-items: center; gap: 14px; margin-top: 8px; padding: 9px 14px; overflow-x: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--muted); box-shadow: none; white-space: nowrap; scrollbar-width: thin; }
+.criteria-title { flex: none; padding-right: 14px; border-right: 1px solid var(--line); color: var(--green-dark); font-size: 12px; }
+.criteria-line { display: flex; flex: none; align-items: center; gap: 14px; }
+.criteria-line span { display: inline-flex; align-items: baseline; gap: 5px; font-size: 11px; }
+.criteria-line b { color: var(--green); font-size: 10px; }
+.criteria-source { flex: none; margin-left: auto; color: var(--faint); font-size: 10px; }
 
 .metrics { display: grid; grid-template-columns: repeat(4, 1fr); border: 1px solid var(--line); border-radius: 18px; background: rgba(255, 255, 255, 0.85); box-shadow: var(--shadow); overflow: hidden; }
 .metrics article { min-height: 88px; padding: 12px 14px; border-right: 1px solid var(--line); }
@@ -97,15 +96,16 @@ a { color: inherit; text-decoration: none; }
    해결: 넓은 레이아웃에서 .ranking-stack을 position:absolute; inset:0으로 그리드 칸을
    꽉 채운다. absolute 요소 높이는 확정 크기라 내부 flex:1이 정상 동작 → 두 랭킹 카드가
    칸 높이를 정확히 반씩 나눠 갖고 아래 끝선이 지도 카드와 맞는다. 표가 길면 카드 안에서
-   세로 스크롤(.ranking-table-wrap). 좁은 화면(≤980px 1단 적층)에서는 static 흐름 배치. */
+   세로 스크롤(.ranking-table-wrap). 축소 화면(≤1280px 1단 적층)에서는 static 흐름 배치. */
 .ranking-columns { position: relative; min-height: 0; }
 .ranking-stack { display: flex; flex-direction: column; gap: 16px; }
-@media (min-width: 981px) {
+@media (min-width: 1281px) {
   .ranking-stack { position: absolute; inset: 0; }
 }
-.ranking { display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; padding: 22px 20px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
+.ranking { display: flex; flex-direction: column; flex: 1 1 0; min-width: 0; min-height: 0; padding: 22px 20px; overflow: hidden; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
 .ranking .section-heading { flex-wrap: nowrap; }
-.ranking .section-heading h2 { word-break: keep-all; overflow-wrap: normal; }
+.ranking .section-heading > div { min-width: 0; }
+.ranking .section-heading h2 { min-width: 0; line-height: 1.35; word-break: keep-all; overflow-wrap: anywhere; }
 .ranking .section-heading > span { flex-shrink: 0; color: var(--faint); font-size: 11px; white-space: nowrap; }
 .ranking-note { margin: 14px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
 /* 이슈 #116(2026-08-26): 좁아진 3번째 칸에서 표가 옆으로 삐져나가 가로 스크롤이 생기던
@@ -119,6 +119,17 @@ a { color: inherit; text-decoration: none; }
 .ranking-table th:last-child, .ranking-table td:last-child { width: 64px; text-align: right; }
 .ranking-table tbody tr:hover { background: #f4f6f9; }
 .ranking-table td.empty { text-align: center; white-space: normal; }
+
+/* 축소 화면에서는 랭킹 칸이 요약 3열의 절대 배치 높이에 묶이지 않게 한다.
+   두 TOP 10 표가 문서 흐름에서 자체 높이를 갖도록 해 사라짐·겹침을 함께 막는다. */
+@media (max-width: 1280px) {
+  .summary-row { grid-template-columns: minmax(0, 1fr); }
+  .summary-row > * { min-width: 0; }
+  .ranking-columns { min-height: auto; }
+  .ranking-stack { position: static; }
+  .ranking { flex: none; }
+  .ranking-table-wrap { flex: none; overflow-y: visible; }
+}
 
 .workspace { display: grid; grid-template-columns: clamp(320px, 22vw, 420px) minmax(0, 1fr); gap: clamp(16px, 1.5vw, 28px); margin-top: 24px; }
 .region-panel, .detail-panel, .provenance { border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
@@ -491,7 +502,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
 .gi-mark-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #eef1fb; color: #4a4fc4; font-size: 8px; font-weight: 800; white-space: nowrap; }
 .example-region-note { grid-column: 1 / -1; margin-top: 2px; color: var(--green); font-size: 8.5px; font-weight: 700; }
-.verdict-chip { padding: 5px 9px; border-radius: 999px; background: var(--violet-soft); color: var(--violet); font-size: 8px; font-weight: 800; white-space: nowrap; }
 
 .screen-section { padding-top: 28px; }
 .screen-note { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
@@ -673,7 +683,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .coverage-kpis article:nth-child(2) { border-right: 0; }
   .coverage-kpis article:nth-child(-n+2) { border-bottom: 1px solid var(--line); }
   .coverage-region-grid { grid-template-columns: 1fr; }
-  .criteria-grid { grid-template-columns: repeat(2, 1fr); }
   .pipeline-grid { grid-template-columns: repeat(2, 1fr); }
   .data-flow { grid-template-columns: 1fr; }
   .data-flow > i { min-height: 20px; transform: rotate(90deg); }
@@ -701,11 +710,13 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .metric-reading-note { grid-template-columns: 1fr; gap: 5px; }
   .detail-grid { grid-template-columns: 1fr; }
   .source-grid { grid-template-columns: 1fr; }
-  .criteria-grid { grid-template-columns: 1fr; }
   footer { flex-direction: column; }
   .primary-tabs { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; grid-auto-flow: row; position: static; }
   .primary-tabs button { padding: 12px 8px; font-size: 11px; }
   .map-card, .map-insight, .item-screen { padding: 18px; }
+  .ranking { padding: 18px 14px; }
+  .ranking .section-heading { gap: 10px; }
+  .ranking .section-heading h2 { font-size: 16px; }
   .map-heading { align-items: flex-start; flex-direction: column; }
   .map-stage { min-height: 390px; }
   .map-label { font-size: 7.5px; }
@@ -740,14 +751,14 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 
 /* #116: 보조 문구까지 읽기 쉬운 최소 크기로 올린다. */
 .screen-note, .map-metric-description, .map-warning, .insight-summary,
-.criteria-grid small, .pipeline-grid p, .metrics small, .ranking-note,
+.pipeline-grid p, .metrics small, .ranking-note,
 .province-toggle small, .region-button small, .detail-heading p:not(.eyebrow),
 .detail-grid small, .source-grid small, .mini-list small, .rate-hero-detail small,
 .province-municipalities button small { font-size: 12px; }
 .metrics span, .ranking-table, .source-table, .coverage-insight-stats dt,
 .trend-range-inputs, .trend-range-label, .trend-legend { font-size: 13px; }
 .ranking-table th, .source-table thead th, .detail-grid span,
-.criteria-grid span, .pipeline-grid span { font-size: 11.5px; }
+.pipeline-grid span { font-size: 11.5px; }
 .state { font-size: 11px; }
 /* 이슈 #116(2026-08-26): 광역별 구성 목록과 연도별 추이 그래프가 각각 별도 행으로 쌓이던 걸
    한 행에 나란히 넣어달라는 요청 — 지역을 좁혀 구성 목록이 없을 때는 그래프가 전체 폭을 쓴다. */
@@ -1046,7 +1057,6 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const nationwide = item.metrics.nationwideSearchTrademarkCount;
     return typeof nationwide?.value === "number" ? { value: nationwide.value, provisional: true } : { value: null, provisional: false };
   };
-  const verdictTitle = (verdict) => `사람이 개별 승인하지 않고 규칙 기반 알고리즘이 자동 확정(${verdict.method || "algorithm"}, 신뢰도 ${verdict.confidence ?? "미기록"})`;
   const regionKey = (region) => region.regionCode || region.region;
   // 이슈 #116/#119: searchResult.do는 tab·queryText만으로는 검색을 실행하지 않고 상세검색
   // 창만 연다("검색창만 나온다" 재지적). tab 없이 searchKind=keywordSearch(지식재산처
@@ -1367,7 +1377,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       ${heading}
       ${regionTrendHtml(region, "지역 연도별 출원·등록 추이", `${region.region} 전체 특산품 · 연도별`, { prominent: true })}
       <div class="item-tabs word-cloud" role="tablist" aria-label="${esc(region.region)} 특산품 · 출원건수 기준 글자 크기">${(() => { const max = Math.max(1, ...region.items.map((row) => row.metrics.uniqueTrademarkCount.value || 0)); return region.items.map((row) => { const value = row.metrics.uniqueTrademarkCount.value || 0; const selected = item.specialtyId === row.specialtyId; const colorStyle = selected ? "" : `;color:${wordCloudColor(row.specialtyId || itemName(row))}`; return `<button type="button" data-region-item="${esc(row.specialtyId || "")}" aria-selected="${selected}" style="font-size:${wordCloudFontSize(value, max)}px${colorStyle}" title="${esc(itemName(row))} · 출원 ${number(value)}건">${esc(itemName(row))}</button>`; }).join(""); })()}</div>
-      <div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}${cropBadgeHtml(item, true)}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span>${item.itemVerdict?.source === "algorithm" ? `<span class="verdict-chip" title="${esc(verdictTitle(item.itemVerdict))}">AI 판정</span>` : ""}</div>
+      <div class="item-title"><div><span>이 지역의 대표 특산품</span><h3>${esc(itemName(item))}${cropBadgeHtml(item, true)}</h3><small>${esc(noticeBasis(item))}</small></div><span class="class-chip">${item.niceClass ? `NICE ${esc(item.niceClass)}` : "NICE 분류 미확정"}</span></div>
       <div class="metric-reading-note"><strong>출원 건수 기준</strong><p><b>${esc(region.sigungu || region.region)} ${esc(itemName(item))} 출원</b>은 출원인 주소가 ${esc(region.region)}으로 확인된 고유 출원 수입니다. 전국 검색 후보나 주소가 확인되지 않은 출원은 포함하지 않습니다.</p></div>
       ${item.regionalEvidence?.length ? `<div class="metric-reading-note"><strong>공식 생산 주산지 근거</strong><p>${esc(item.regionalEvidence.map((evidence) => `${evidence.region} (${evidence.referenceYear})`).join(", "))} · 임산물생산조사 기준입니다. ${item.regionalEvidence.some((evidence) => evidence.regionalMetricEligible) ? "출원인 주소를 주산지와 대조해 지역 상표 통계에 반영했습니다." : "검색 범위가 완료된 뒤 지역 상표 통계에 반영합니다."}</p></div>` : ""}
       <div class="detail-grid">
@@ -1602,13 +1612,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 피드백에 따라 데이터 개요로 옮김. 그 전에는 모든 탭에 반복 노출하던 것을 정리했었음).
   function criteriaHtml() {
     const rows = [
-      ["품목 관련성 확인", "지정상품명에서 품목명 확인", '등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다. NICE류만 일치하거나 검색어로만 포착된 후보는 확인 사례에 포함하지 않습니다. 대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다.'],
-      ["지역 매칭", "법정동코드 완전일치", "국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만"],
-      ["상표 검색", "KIPRIS 단어검색(고시명칭 기준)", "검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음. 현재 수치는 각 특산품에 매핑된 고시상품 NICE류 기준입니다. 음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다."],
-      ["지역 주소 일치 출원 / 등록 완료", "출원인·권리자 주소가 해당 지역으로 확인된 출원만", "등록 완료 건은 등록원부의 권리자 소재지, 출원만 된 건은 출원인정보 API의 출원인 소재지 기준입니다. 등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수이며, 전국 검색 후보와 주소 미확보 건은 제외합니다."],
-      ["출원인 지역 매칭", "주소 확보율은 참고 지표", "주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 공동출원인은 전원 일치가 원칙이나, 그중 영농조합·협동조합·지자체 등 지역 생산 주체가 해당 지역이면 인정합니다."],
+      ["품목", "지정상품명 확인", '등록원부 지정상품명이 고시상품명칭과 일치하거나 품목명을 포함한 사례만 상세 화면에 표시합니다. NICE류만 일치하거나 검색어로만 포착된 후보는 확인 사례에 포함하지 않습니다. 대부분의 "출원 확인" 건수는 품목명 검색어와 출원인 주소까지 확인된 집계이며, 등록원부 지정상품 확인은 계속 보완 중입니다.'],
+      ["지역", "법정동코드 완전일치", "국토교통부 전국 법정동 코드(2026-07-03). 시/군/구 접미사 복원은 후보가 유일할 때만"],
+      ["검색", "KIPRIS 고시명칭·NICE류", "검색·집계 키는 고시명칭 + NICE류이며, 상표명은 개별 사례로만 보존하고 집계 키로 쓰지 않음. 현재 수치는 각 특산품에 매핑된 고시상품 NICE류 기준입니다. 음식점업 43류·도소매업 35류 등 서비스류는 포함하지 않으며 후속 확장 검토 대상입니다."],
+      ["지역 출원", "출원인·권리자 주소 일치", "등록 완료 건은 등록원부의 권리자 소재지, 출원만 된 건은 출원인정보 API의 출원인 소재지 기준입니다. 등록률은 그중 상표 상태가 등록 완료인 건수 ÷ 지역 주소 일치 출원 건수이며, 전국 검색 후보와 주소 미확보 건은 제외합니다."],
+      ["주소", "확보율은 참고 지표", "주소가 확인된 건은 지역 귀속에 반영하고, 미확보 건도 원자료와 확보율을 함께 표시합니다. 공동출원인은 전원 일치가 원칙이나, 그중 영농조합·협동조합·지자체 등 지역 생산 주체가 해당 지역이면 인정합니다."],
     ];
-    return `<section class="criteria" aria-label="판정 기준과 매칭 방법"><div class="section-heading"><div><h2>판정 기준과 매칭 방법</h2></div><span>현재 출처 ${esc(sourceLine)}</span></div><div class="criteria-grid">${rows.map(([label, value, note]) => `<article><span>${esc(label)}</span><strong>${esc(value)}</strong><small>${esc(note)}</small></article>`).join("")}</div></section>`;
+    return `<section class="criteria" aria-label="판정 기준과 매칭 방법"><strong class="criteria-title">판정 기준과 매칭 방법</strong><div class="criteria-line">${rows.map(([label, value, note]) => `<span title="${esc(note)}"><b>${esc(label)}</b> ${esc(value)}</span>`).join("")}</div><span class="criteria-source" title="${esc(sourceLine)}">출처 ${snapshot.sources.length}개</span></section>`;
   }
   function provenanceHtml() {
     const boundaryDate = geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록";

@@ -191,14 +191,15 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
   // 2026-08-31(#117): 농촌진흥청 지역특화작목 69개(대표작목 포함)를 도 단위 공식
   // 특산품으로 병합해 분모가 1736->1805로 늘었다.
-  // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집(쿼리당 150건->최대 1,800건, 고유 상표
-  // 37,688->182,238)으로 지역 판정이 늘었다. #12(normalized_exact만 확정)·#116 partial
-  // 게이트·regionalCoverageThreshold 0.6도 함께 반영됐다.
-  assert.equal(coverage.total, 1827);
-  assert.equal(coverage.decided, 1812);
-  assert.equal(coverage.applied, 1130);
-  assert.equal(coverage.pending, 15);
-  assert.equal(Math.round(coverage.rate * 100), 62);
+  // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집(고유 상표 37,688->186,172)으로 지역
+  // 판정이 늘었다. #12(normalized_exact만 확정)·#116 partial 게이트·regionalCoverageThreshold
+  // 0.6도 함께 반영. 정식 통합(#137)에서 NFQS 전국 카탈로그 skip 버그 수정 + 07d_reconcile
+  // (직전 공개 스냅샷과 max/union — 지역 상표 수치는 절대 감소하지 않음).
+  assert.equal(coverage.total, 1826);
+  assert.equal(coverage.decided, 1826);
+  assert.equal(coverage.applied, 1156);
+  assert.equal(coverage.pending, 0);
+  assert.equal(Math.round(coverage.rate * 100), 63);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   // 2026-09-01(#116): 요약 첫 칸을 "전국 특산품 수"로 바꿈. 분모와 출원 확인 수가
   // 모두 요약 탭에 노출돼야 한다.
@@ -282,7 +283,7 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   const pepperCandidates = candidates.filter(({ item }) => item.noticeName?.includes("고추"));
   assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
   // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 available 0건 후보가 86 -> 211로 늘었다.
-  assert.equal(excluded.length, 211, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  assert.equal(excluded.length, 217, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
   assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
@@ -299,7 +300,7 @@ test("renders tab navigation and separate application/registration ranking table
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
   assert.match(html, /지역·대표 특산품 출원 랭킹/, "출원 랭킹 섹션이 있어야 함");
   assert.match(html, /지역·대표 특산품 등록 랭킹/, "등록 랭킹 섹션이 있어야 함");
-  assert.doesNotMatch(html, /class="ranking-toggle"|TOP 50/, "TOP10\/50 토글은 제거돼야 함(고정 TOP 10)");
+  assert.doesNotMatch(html, /class="ranking-toggle"|TOP 50/, "TOP10/50 토글은 제거돼야 함(고정 TOP 10)");
   const rankingTableCount = (html.match(/class="ranking-table"/g) || []).length;
   assert.equal(rankingTableCount, 2, "출원·등록 랭킹 테이블이 각각 하나씩, 총 두 개 있어야 함");
 
@@ -358,14 +359,17 @@ test("renders matching criteria once, on the data overview tab, not on the summa
   assert.match(standaloneHtml, /data-overview">\$\{criteriaHtml\(\)\}/, "판정 기준 섹션은 데이터 개요 탭에서만 호출돼야 함");
   assert.doesNotMatch(standaloneHtml, /\$\{criteriaHtml\(\)\}<section class="hero"/, "판정 기준 섹션이 요약 탭(hero) 앞에서 호출되면 안 됨");
   assert.match(standaloneHtml, /판정 기준과 매칭 방법/);
+  assert.match(standaloneHtml, /class="criteria-line"/, "판정 기준은 얇은 한 줄 요약 바여야 함");
+  assert.doesNotMatch(standaloneHtml, /class="criteria-grid"/, "판정 기준을 여러 줄 카드 그리드로 표시하면 안 됨");
   const standaloneClientSource = standaloneHtml.slice(0, standaloneHtml.indexOf("\ndashboardClient("));
   // 2026-08-21 디자인 정리: "GI 출처 또는 상표 출원 3건 이상"은 실제로 어떤 집계·표시
   // 로직에도 쓰이지 않는 죽은 문구였다(gapScore는 타입에만 존재하고 읽히지 않음) —
   // 사용자 요청으로 검토 후 제거했다. 이 자리를 실제로 쓰이는 매칭 기준으로 대체.
   assert.doesNotMatch(standaloneClientSource, /GI 출처 또는 상표 출원 3건 이상/, "실제로 쓰이지 않는 대표 특산품 판정 기준 문구는 노출되면 안 됨");
-  assert.match(standaloneHtml, /지정상품명에서 품목명 확인/, "품목 관련성 확인 기준이 명시돼야 함");
+  assert.match(standaloneHtml, /<b>\$\{esc\(label\)\}<\/b> \$\{esc\(value\)\}/, "판정 기준의 항목과 값을 한 줄에 표시해야 함");
+  assert.match(standaloneHtml, /\["품목", "지정상품명 확인"/, "품목 관련성 확인 기준이 명시돼야 함");
   assert.match(standaloneHtml, /법정동코드 완전일치/, "지역 매칭 기준이 명시돼야 함");
-  assert.match(standaloneHtml, /주소 확보율은 참고 지표/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
+  assert.match(standaloneHtml, /\["주소", "확보율은 참고 지표"/, "출원인 주소 확보율의 참고 지표 정책이 명시돼야 함");
   // 2026-08-21 사용자 지적: 품목 관련성 설명이 지정상품 검증을 전제로 읽혔지만, 실제로는
   // 대부분의 "출원 확인" 건수가 아직 지정상품 근거 없이(품목명 검색+주소 일치만) 집계돼
   // 있어 설명이 실제보다 과신을 준다. 진행 상태를 정직하게 명시해야 한다.
@@ -389,7 +393,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
-  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 1000);
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 1028);
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
   // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
@@ -401,9 +405,9 @@ test("ships a valid dashboard snapshot", async () => {
   // 1648->1688로 늘었다.
   // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집으로 지역 판정이 1688->1812, 출원인 주소
   // 확인이 77,312->92,305로 늘었다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1812);
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1826);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 92305);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 95113);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -413,38 +417,40 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
   // 2026-09-04(#70): 지역 특산품 1805->1827(깊은 재수집) + 전국 카탈로그 132 = 1959.
-  assert.equal(snapshot.coverage.catalogItemCount, 1959);
-  assert.equal(snapshot.coverage.nationwideCatalogItemCount, 132);
+  assert.equal(snapshot.coverage.catalogItemCount, 1933);
+  assert.equal(snapshot.coverage.nationwideCatalogItemCount, 107);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 217);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 166);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 51);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 4730);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 106516);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 106516);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 207);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 137);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 70);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 12770);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 80497);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 80497);
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.nfqsGeographicalIndication, {
     registeredCount: 24,
     regionalizedCount: 23,
     regionReviewCount: 1,
     liveVerifiedAt: "2026-08-26",
   });
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 13);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 56487);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 35);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 78343);
   // 이슈 #117(2026-08-31): 농촌진흥청 지역특화작목 69개 공식 수집원 병합 메타데이터.
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops, {
     officialCount: 69,
     representativeCount: 9,
     intensiveCount: 18,
     selfDirectedCount: 42,
-    dashboardBadgeCount: 170,
+    dashboardBadgeCount: 194,
     regionalScope: "province",
     liveVerifiedAt: "2026-08-26",
   });
   const nationwideCatalogItems = snapshot.regions.filter((region) => region.sido === "전국")
     .flatMap((region) => region.items);
-  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("kofpi_forest_product")).length, 90);
-  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("nfqs_quality_cert")).length, 41);
+  // 2026-09-04(#137): 주산지 근거가 있는 KOFPI 26품목은 03d에서 지역 행으로 확장돼
+  // 전국 카탈로그에는 자생 채취류만 남는다(90 -> 64). NFQS 인증품은 42.
+  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("kofpi_forest_product")).length, 64);
+  assert.equal(nationwideCatalogItems.filter((item) => item.sources.includes("nfqs_quality_cert")).length, 42);
   assert.equal(
     snapshot.regions.filter((region) => region.sido !== "전국")
       .flatMap((region) => region.items)
@@ -457,16 +463,23 @@ test("ships a valid dashboard snapshot", async () => {
     .flatMap((region) => region.items)
     .filter((item) => item.sources.includes("nfqs_geographical_indication"));
   assert.equal(regionalGeoItems.length, 23);
-  assert.ok(snapshot.warnings.some((warning) => warning.includes("여자만새고막") && warning.includes("지역 검토대기")));
-  const forestEvidenceItems = nationwideCatalogItems.filter((item) => item.regionalEvidence?.length);
-  assert.equal(forestEvidenceItems.length, 26);
-  assert.equal(forestEvidenceItems.reduce((sum, item) => sum + item.regionalEvidence.length, 0), 27);
-  assert.ok(forestEvidenceItems.every((item) => item.regionalEvidence.every((row) => row.regionalMetricEligible === false)));
-  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "밤")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군"]);
-  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "표고")?.regionalEvidence.map((row) => row.region), ["충청남도 부여군", "전라남도 장흥군"]);
+  assert.ok(snapshot.warnings.some((warning) => warning.includes("지역 검토대기")));
+  // 2026-09-04(#137): KOFPI 주산지 근거가 있는 임산물은 이제 전국이 아니라 해당 지역 행에
+  // regionalEvidence로 붙는다. 26품목 27행이고, 지역 행이라 regionalMetricEligible=true.
+  const forestEvidenceItems = snapshot.regions.filter((region) => region.sido !== "전국")
+    .flatMap((region) => region.items.filter((item) => item.regionalEvidence?.length).map((item) => ({ region: region.region, item })));
+  // 26개 고유 임산물(표고는 두 지역에 각각 한 행)이라 행 수는 27.
+  assert.equal(forestEvidenceItems.length, 27);
+  assert.equal(new Set(forestEvidenceItems.map(({ item }) => item.itemName)).size, 26);
+  assert.equal(forestEvidenceItems.reduce((sum, { item }) => sum + item.regionalEvidence.length, 0), 27);
+  assert.deepEqual(forestEvidenceItems.filter(({ item }) => item.itemName === "밤").map(({ region }) => region), ["충청남도 부여군"]);
+  assert.deepEqual(
+    forestEvidenceItems.filter(({ item }) => item.itemName === "표고").map(({ region }) => region).sort(),
+    ["전라남도 장흥군", "충청남도 부여군"],
+  );
   // 2026-08-25: extractForestProductionPrimaryRegions.py의 ALIASES에 "고로쇠"→"수액"을
   // 추가해 표27(고로쇠, 전남 광양시)이 더 이상 unmatchedSourceTables로 빠지지 않는다(#114 리뷰).
-  assert.deepEqual(forestEvidenceItems.find((item) => item.itemName === "수액")?.regionalEvidence.map((row) => row.region), ["전라남도 광양시"]);
+  assert.deepEqual(forestEvidenceItems.filter(({ item }) => item.itemName === "수액").map(({ region }) => region), ["전라남도 광양시"]);
   // 2026-08-25(#114 리뷰): Dashboard.tsx에만 있고 standalone-client.js에는 없던
   // "공식 생산 주산지 근거" 안내 문구를 두 구현이 다시 같은 내용을 보여주도록 맞췄다.
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
@@ -492,8 +505,9 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1826.
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1826, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1842
+  // (지역 게이트 availableRegionItemCount 1826 + 전국 카탈로그 중 available 16건).
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1842, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
@@ -874,6 +888,11 @@ test("generates a self-contained standalone dashboard", async () => {
   // 단일 HTML은 클라이언트가 지도·탭·랭킹·판정 기준을 같은 데이터로 렌더링한다.
   assert.match(html, /primary-tabs/);
   assert.match(html, /ranking-table/);
+  // 축소 화면에서도 두 TOP 10 표가 절대 배치로 높이를 잃지 않고, 긴 제목이 카드 안에서
+  // 줄바꿈되어 TOP 10 배지나 표를 바깥으로 밀어내지 않아야 한다.
+  assert.match(html, /@media \(max-width: 1280px\)[\s\S]*\.summary-row \{ grid-template-columns: minmax\(0, 1fr\); \}/);
+  assert.match(html, /\.ranking-table-wrap \{ flex: none; overflow-y: visible; \}/);
+  assert.match(html, /\.ranking \.section-heading h2 \{ min-width: 0;[^}]*overflow-wrap: anywhere; \}/);
   assert.match(html, /class="criteria"/, "판정 기준 섹션이 단독 HTML에도 동일하게 있어야 함");
   assert.match(html, /광역별 상표 출원·등록 구성/);
   assert.match(html, /cropBadgeHtml\(item, true\)/);
@@ -882,9 +901,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /source-group/);
   assert.doesNotMatch(html, /data-trend-preset=|추이 그래프 기간 프리셋/);
   assert.match(html, /dashboardClient\(/);
-  // 이슈 #116/#74/#110(2026-08-27): 품목 전국 상표 흐름 카드 — 근사치 caveat는 화면에
-  // "AI 판정" 같은 표시로 노출하지 않는다(사용자 결정, 기존 itemVerdict 칩과는 무관).
+  // 이슈 #116/#74/#110: 품목 전국 상표 흐름과 지역·품목 상세 모두 내부 판정 방식을
+  // "AI 판정" 같은 표시로 노출하지 않는다.
   assert.match(html, /class="nationwide-flow-card"/);
   assert.match(html, /비즈니스 확장 흐름/);
   assert.match(html, /nationwideFlowCardHtml/);
+  assert.doesNotMatch(html, />AI 판정</);
 });
