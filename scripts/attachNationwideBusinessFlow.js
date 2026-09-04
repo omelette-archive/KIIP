@@ -98,12 +98,35 @@ function attachNationwideBusinessFlow(snap, flow) {
   return { matched, confirmedCount };
 }
 
+function parseArgs(argv) {
+  const args = {};
+  for (let i = 0; i < argv.length; i++) {
+    if (!argv[i].startsWith("--")) continue;
+    const key = argv[i].slice(2);
+    const next = argv[i + 1];
+    if (next !== undefined && !next.startsWith("--")) { args[key] = next; i++; }
+    else args[key] = true;
+  }
+  return args;
+}
+
 function main() {
-  const snap = JSON.parse(fs.readFileSync(SNAPSHOT_PATH, "utf8"));
-  const flow = JSON.parse(fs.readFileSync(FLOW_PATH, "utf8"));
+  const args = parseArgs(process.argv.slice(2));
+  const snapshotPath = path.resolve(args.input || SNAPSHOT_PATH);
+  const outPath = path.resolve(args.out || args.input || SNAPSHOT_PATH);
+  const flowPath = path.resolve(args.flow || FLOW_PATH);
+  const snap = JSON.parse(fs.readFileSync(snapshotPath, "utf8"));
+  if (!fs.existsSync(flowPath)) {
+    // 운영 파이프라인은 04-analyze-brand/output/nationwide-flow.json이 아직 없을 수 있다
+    // (전국 흐름 배치는 별도 실행). 그 경우 스냅샷을 그대로 통과시킨다.
+    console.log(`[attachNationwideBusinessFlow] flow 파일 없음(${flowPath}) — 스냅샷 그대로 통과`);
+    if (outPath !== snapshotPath) fs.writeFileSync(outPath, JSON.stringify(snap, null, 2) + "\n", "utf8");
+    return;
+  }
+  const flow = JSON.parse(fs.readFileSync(flowPath, "utf8"));
   const result = attachNationwideBusinessFlow(snap, flow);
   console.log("matched:", result.matched, "/ producer_confirmed 품목:", result.confirmedCount);
-  fs.writeFileSync(SNAPSHOT_PATH, JSON.stringify(snap, null, 2) + "\n", "utf8");
+  fs.writeFileSync(outPath, JSON.stringify(snap, null, 2) + "\n", "utf8");
   console.log("saved.");
 }
 

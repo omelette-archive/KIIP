@@ -413,6 +413,21 @@ async function run() {
       }),
       { region: "경기도", item: "선인장·다육식물", classCode: null, sourceScope: "province_policy_specialty" }
     );
+    // 2026-09-04(#70): NFQS 품질인증수산물은 지역 없이 수집되지만(인증사업장 소재지≠산지)
+    // "전국 카탈로그" scope라 스킵하지 않고 전국 검색해야 한다. 03d가 "전국 지역 미제공"으로
+    // 정규화한다.
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "",
+        sigungu: "",
+        itemName: "간고등어",
+        rawItemName: "간고등어",
+        status: "ok",
+        sourceId: "nfqs_quality_cert",
+        sourceScope: "nationwide_certified_product_catalog",
+      }),
+      { region: null, item: "간고등어", classCode: null, sourceScope: "nationwide_certified_product_catalog" }
+    );
     assert.strictEqual(
       countSearchableRows([
         { sido: "경상북도", sigungu: "안동시", rawItemName: "사과", noticeName: "신선한 사과", niceClass: "31", status: "ok" },
@@ -608,6 +623,11 @@ async function run() {
     assert.strictEqual(compact.queryFactCount, 1);
     assert.strictEqual(Object.values(compact.queryFacts)[0].hits.length, 5);
     assert.ok(compact.results.every((row) => !Object.hasOwn(row, "hits")));
+    // 2026-09-04(#70): hit 다이어트(미사용 필드 제거) + --out-max-hits 출력 상한
+    assert.ok(Object.values(compact.queryFacts)[0].hits.every((hit) => !("drawing" in hit) && !("agent" in hit)));
+    const capped = compactBatchOutput({ schemaVersion: "1.2", mode: "batch", results: reused.results }, { outMaxHits: 2 });
+    assert.strictEqual(Object.values(capped.queryFacts)[0].hits.length, 2);
+    assert.deepStrictEqual(Object.values(capped.queryFacts)[0].outputHitCap, { cap: 2, collectedCount: 5 });
     assert.ok(compact.results.every((row) => row.query?.region), "지역행에는 지역 질의 차원을 보존해야 함");
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
   }

@@ -79,9 +79,14 @@ function cleanItemName(rawItemName, region = {}) {
   let cleaned = stripRegionNames(raw, [region.sido, region.sigungu]).trim();
   if (!cleaned) cleaned = raw;
 
-  // 품종·부연 설명은 검토용 원문에 남기고, 1차 규칙 매칭에는 첫 품목 구간만 사용한다.
+  // 품종·부연 설명은 검토용 원문(rawItemName)에 남기고, 1차 규칙 매칭·검색에는 품목명만 쓴다.
+  // 괄호 부기를 먼저 지운다 — 안 그러면 "딸기(삼례,고산,완창)"이 구간 분리에서 "딸기(삼례"로
+  // 잘려 KIPRIS가 INVALID_REQUEST를 낸다(2026-09-04, #70).
+  cleaned = cleaned.replace(/\s*[（(][^）)]*[）)]/g, " ");
+  // 닫히지 않은 괄호(예: 구간 분리로 잘린 경우) 이후는 전부 버린다.
+  cleaned = cleaned.replace(/\s*[（(\[].*$/u, "");
   cleaned = cleaned.split(SEGMENT_SEPARATOR_RE)[0];
-  cleaned = cleaned.replace(/\([^)]*\)|\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
+  cleaned = cleaned.replace(/\[[^\]]*\]/g, " ").replace(/\s+/g, " ").trim();
   return cleaned || raw;
 }
 
@@ -163,8 +168,10 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
     rawItemName: row.rawItemName || "",
     source: row.source || "",
   };
+  // RDA·NFQS-GI는 공식 등록명이라 cleanItemName 규칙은 안 태우되, 괄호 부기("딸기(수출형)")는
+  // 검색에서 지운다(2026-09-04, #70).
   const itemName = ["nfqs_geographical_indication", "rda_regional_specialty_crops"].includes(row.sourceId)
-    ? String(row.rawItemName || "").normalize("NFC").trim()
+    ? String(row.rawItemName || "").normalize("NFC").replace(/\s*[（(][^）)]*[）)]/g, "").replace(/\s+/g, " ").trim()
     : cleanItemName(row.rawItemName, row);
   if (!itemName) return reviewResult(base, "", [], "정제할 품목명이 없음");
 

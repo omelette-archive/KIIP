@@ -32,6 +32,7 @@ try {
     "00_cleanup_outputs",
     "01_collect",
     "02_normalize",
+    "01b_area_brands",
     "03_match",
     "03b_applicant_region",
     "03c_ip_registry",
@@ -41,6 +42,8 @@ try {
     "06_strategy",
     "07_snapshot",
     "07b_supplemental_attach",
+    "07c_nationwide_flow",
+    "07d_reconcile",
     "validate",
     "render_candidate",
   ]);
@@ -73,7 +76,17 @@ try {
   assert.strictEqual(scopeStage.args[scopeStage.args.indexOf("--input") + 1], plan.files.registryEnriched);
   const attachStage = plan.stages.find((stage) => stage.id === "07b_supplemental_attach");
   assert.strictEqual(attachStage.args[attachStage.args.indexOf("--input") + 1], plan.files.snapshotRaw);
-  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--out") + 1], plan.files.snapshot);
+  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--out") + 1], plan.files.snapshotAttached);
+  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--match-doc") + 1], plan.files.scopedSearch);
+  // 07c: 전국 흐름 연결이 07b 뒤. 07d: 직전 공개 스냅샷과 대조해 floor 유지·복원 후 최종 스냅샷.
+  const flowStage = plan.stages.find((stage) => stage.id === "07c_nationwide_flow");
+  assert.strictEqual(flowStage.args[flowStage.args.indexOf("--input") + 1], plan.files.snapshotAttached);
+  assert.strictEqual(flowStage.args[flowStage.args.indexOf("--out") + 1], plan.files.snapshotFlowed);
+  const reconcileStage = plan.stages.find((stage) => stage.id === "07d_reconcile");
+  assert.strictEqual(reconcileStage.args[reconcileStage.args.indexOf("--input") + 1], plan.files.snapshotFlowed);
+  assert.strictEqual(reconcileStage.args[reconcileStage.args.indexOf("--out") + 1], plan.files.snapshot);
+  assert.ok(reconcileStage.args[reconcileStage.args.indexOf("--previous") + 1].endsWith(path.join("public", "data", "dashboard-snapshot.json")));
+  assert.ok(plan.stages.findIndex((s) => s.id === "07d_reconcile") < plan.stages.findIndex((s) => s.id === "validate"));
   const collectSources = collectStage.args[collectStage.args.indexOf("--sources") + 1];
   assert.ok(collectSources.includes("kofpi_forest_product") && collectSources.includes("nfqs_quality_cert"));
   // --include-review-required 옵션

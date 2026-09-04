@@ -25,8 +25,12 @@ function parseArgs(argv) {
     promote: false,
     includeReviewRequired: false,
     maxRequests: 100,
-    maxPages: 5,
-    maxHitsPerQuery: 100,
+    // #70(2026-09-04): 수집 깊이를 문서화된 "제한적 완료"(03-match-trademarks/README.md)로
+    // 맞춘다 — 얕은 상한으로 만든 체크포인트는 라이브 데이터보다 12배 얕았다. 전체 수집분은
+    // 체크포인트에 보존되고, 파이프라인 중간파일은 --out-max-hits로 512MB 한계 안에 든다.
+    maxPages: 150,
+    maxHitsPerQuery: 3000,
+    outMaxHits: 1800,
     applicantLimit: 5000,
     ipRegistryDailyBudget: 100,
     ipRegistryLimit: 100,
@@ -41,6 +45,7 @@ function parseArgs(argv) {
     ["--max-requests", "maxRequests"],
     ["--max-pages", "maxPages"],
     ["--max-hits-per-query", "maxHitsPerQuery"],
+    ["--out-max-hits", "outMaxHits"],
     ["--applicant-limit", "applicantLimit"],
     ["--ip-registry-daily-budget", "ipRegistryDailyBudget"],
     ["--ip-registry-limit", "ipRegistryLimit"],
@@ -66,6 +71,7 @@ function parseArgs(argv) {
     "maxRequests",
     "maxPages",
     "maxHitsPerQuery",
+    "outMaxHits",
     "applicantLimit",
     "ipRegistryDailyBudget",
     "ipRegistryLimit",
@@ -103,8 +109,9 @@ function printUsage() {
       "  --state-dir <path>           SQLite·검색 체크포인트·보강 캐시·예산 상태 영구 디렉터리",
       "  --raw-goods-review <json>    승인된 원물명 지정상품 검토 파일(기본: 저장소 검토본)",
       "  --max-requests <n>           이번 ③ 검색 실행의 요청 상한(기본 100)",
-      "  --max-pages <n>              ③ 검색 조합별 페이지 상한(기본 5)",
-      "  --max-hits-per-query <n>     ③ 검색 조합별 저장 상한(기본 100)",
+      "  --max-pages <n>              ③ 검색 조합별 페이지 상한(기본 150)",
+      "  --max-hits-per-query <n>     ③ 검색 조합별 수집 상한(기본 3000, 체크포인트 저장)",
+      "  --out-max-hits <n>           ③ 출력 파일 조합별 hit 상한(기본 1800, 수집분은 보존)",
       "  --applicant-limit <n>        03b 출원인 주소 보강의 이번 실행 신규 호출 상한(기본 5000)",
       "  --ip-registry-daily-budget <n>  03c 등록원부 하루(KST) 누적 호출 상한(기본 100)",
       "  --ip-registry-limit <n>      03c 이번 실행 등록번호 호출 상한(기본 100)",
@@ -158,9 +165,15 @@ function buildPlan(options = {}) {
     gap: path.join(runDir, "05-gap.json"),
     strategy: path.join(runDir, "06-strategy.json"),
     snapshotRaw: path.join(runDir, "07-dashboard-snapshot.raw.json"),
+    snapshotAttached: path.join(runDir, "07-dashboard-snapshot.attached.json"),
+    snapshotFlowed: path.join(runDir, "07-dashboard-snapshot.flowed.json"),
     snapshot: path.join(runDir, "07-dashboard-snapshot.json"),
+    reconcileReport: path.join(runDir, "public-snapshot-reconcile-report.json"),
     dashboardCandidate: path.join(runDir, "dashboard.candidate.html"),
     manifest: path.join(runDir, "run-manifest.json"),
+    // 전국 비즈니스 흐름 배치 산출물(있으면 07c에서 연결, 없으면 조용히 통과).
+    nationwideFlow: path.join(ROOT, "04-analyze-brand", "output", "nationwide-flow.json"),
+    tombstones: path.join(ROOT, "04-analyze-brand", "data", "specialty-tombstones.json"),
   };
   const forestRegions = path.resolve(
     options.forestRegions || path.join(ROOT, "02-normalize-items", "data", "kofpi-primary-regions-2024.json")
@@ -176,6 +189,7 @@ function buildPlan(options = {}) {
     applicantRegionCache: path.join(stateDir, "trademark-applicant-region-cache.json"),
     ipRegistryCache: path.join(stateDir, "ip-registry-cache.json"),
     ipRegistryBudget: path.join(stateDir, "ip-registry-daily-budget.json"),
+    areaBrands: path.join(stateDir, "nongsaro-area-brands.json"),
   };
   const webPublicDir = path.join(ROOT, "07-dashboard", "web", "public", "data");
   const promotion = {
@@ -195,9 +209,16 @@ function buildPlan(options = {}) {
     "--max-pages",
     String(options.maxPages ?? 5),
     "--max-hits-per-query",
-    String(options.maxHitsPerQuery ?? 100),
+    String(options.maxHitsPerQuery),
+    // #70(2026-09-04): hit 필드 다이어트(compactBatchOutput)를 해도 3,000건×수십만 hit면
+    // 중간파일이 enrichIpRegistry·analyzeBrands의 통짜 JSON 512MB 문자열 한계를 넘긴다.
+    // 출력 파일에만 상한을 걸어 라이브 흔한 값(1,500)보다 깊게 유지하면서 한계 안에 든다.
+    "--out-max-hits",
+    String(options.outMaxHits),
   ];
   if (options.includeReviewRequired) matchArgs.push("--include-review-required");
+  // #70: 농사로 지역브랜드 참조가 있으면 출원번호로 조인(nongsaro_area_brand source 복원).
+  if (fs.existsSync(state.areaBrands)) matchArgs.push("--area-brands", state.areaBrands);
   if (fs.existsSync(state.trademarkCheckpoint)) matchArgs.push("--resume");
 
   const stages = [
@@ -238,6 +259,15 @@ function buildPlan(options = {}) {
       "02-normalize-items/normalizeItems.js",
       ["--input", files.collected, "--out", files.normalized, "--review-out", files.review],
       [files.normalized, files.review]
+    ),
+    nodeStage(
+      "01b_area_brands",
+      "농사로 지역브랜드(areaBrandLst) 참조 수집(상표 검증용, nongsaro_area_brand)",
+      "03-match-trademarks/fetchAreaBrands.js",
+      ["--limit", "602", "--out", state.areaBrands],
+      [state.areaBrands],
+      // 인증키 없음·API 오류 시에도 파이프라인을 막지 않는다(참조용 소스).
+      [0, 1]
     ),
     nodeStage(
       "03_match",
@@ -363,19 +393,53 @@ function buildPlan(options = {}) {
     ),
     nodeStage(
       "07b_supplemental_attach",
-      "KOFPI 주산지 근거·농촌진흥청 특화작목 배지를 스냅샷에 연결",
+      "KOFPI 주산지 근거·특화작목 배지·supplementalCollection 프로비넌스를 스냅샷에 연결",
       "scripts/attachSupplementalEvidence.js",
       [
         "--input",
         files.snapshotRaw,
         "--out",
-        files.snapshot,
+        files.snapshotAttached,
         "--forest-regions",
         forestRegions,
         "--rda-crops",
         rdaCrops,
+        "--match-doc",
+        files.scopedSearch,
       ],
-      [files.snapshot]
+      [files.snapshotAttached]
+    ),
+    nodeStage(
+      "07c_nationwide_flow",
+      "품목별 전국 상표 흐름(원물·가공품·서비스) 참고 지표 연결(있으면)",
+      "scripts/attachNationwideBusinessFlow.js",
+      [
+        "--input",
+        files.snapshotAttached,
+        "--out",
+        files.snapshotFlowed,
+        "--flow",
+        files.nationwideFlow,
+      ],
+      [files.snapshotFlowed]
+    ),
+    nodeStage(
+      "07d_reconcile",
+      "직전 공개 스냅샷과 대조해 지역 상표 수치 floor 유지·실종 항목 last-known-good 복원",
+      "scripts/reconcilePublicSnapshot.js",
+      [
+        "--input",
+        files.snapshotFlowed,
+        "--out",
+        files.snapshot,
+        "--previous",
+        promotion.snapshotTarget,
+        "--tombstones",
+        files.tombstones,
+        "--report",
+        files.reconcileReport,
+      ],
+      [files.snapshot, files.reconcileReport]
     ),
     nodeStage(
       "validate",

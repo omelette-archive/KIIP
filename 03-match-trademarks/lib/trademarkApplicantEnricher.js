@@ -118,6 +118,29 @@ async function enrichApplicantRegions(document, client, options = {}) {
   for (const row of fetched) if (row.status === "complete") available.set(row.applicationNumber, row);
 
   const counts = { inside: 0, outside: 0, unverified: 0, notCollected: 0, noApplicationNumber: 0 };
+  // ④ analyzer(evidenceRegionCategory)와 #118 producer_org 판정이 실제로 읽는 evidence
+  // 필드만 남기고 중복을 제거한다. hit 수십만 건이면 normalizedRegion·nationality·
+  // representative·normalizationMethod/Reason·confidence 중복이 파이프라인 중간파일을
+  // 512MB 문자열 한계 너머로 밀어낸다(2026-09-04, #70). analyzer는 지역별로 다시 판정하므로
+  // match 결과 자체는 손실 없음.
+  const EVIDENCE_KEEP = ["sido", "sigungu", "regionStatus", "regionLevel", "producerOrg", "match"];
+  const leanEvidence = (evidence) => {
+    if (!Array.isArray(evidence) || evidence.length === 0) return evidence;
+    const seen = new Set();
+    const lean = [];
+    for (const row of evidence) {
+      const compact = {};
+      for (const key of EVIDENCE_KEEP) {
+        if (row[key] !== undefined && row[key] !== null) compact[key] = row[key];
+      }
+      const dedupeKey = JSON.stringify(compact);
+      if (seen.has(dedupeKey)) continue;
+      seen.add(dedupeKey);
+      lean.push(compact);
+    }
+    return lean;
+  };
+
   const enrichHitForRegion = (hit, queryRegion) => {
       const number = normalizeApplicationNumber(hit.applicationNumber);
       if (!number) {
@@ -138,10 +161,11 @@ async function enrichApplicantRegions(document, client, options = {}) {
       return {
         ...hit,
         applicantRegionMatch: evaluated.match,
+        // applicantRegionMatchVersion는 문서 레벨(applicationApplicantEnrichment.policy)에
+        // 이미 있으므로 hit마다 반복하지 않는다(2026-09-04, #70).
         applicantRegionMatchSource: SOURCE_METADATA.sourceId,
-        applicantRegionMatchVersion: MATCH_VERSION,
         applicantRegionMatchConfidence: evaluated.confidence,
-        applicantRegionEvidence: evaluated.evidence,
+        applicantRegionEvidence: leanEvidence(evaluated.evidence),
         applicationApplicantLookup: {
           status: "ok",
           fetchedAt: cached.fetchedAt || null,

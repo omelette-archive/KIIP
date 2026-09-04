@@ -73,7 +73,8 @@ function printUsageAndExit(message) {
       "  --concurrency <n>    배치 모드 동시 요청 수 (기본 2)",
       "  --max-requests <n>   배치 1회 검색 요청 상한 (기본 100)",
       "  --max-pages <n>      쿼리당 페이지 상한 (기본 5)",
-      "  --max-hits-per-query <n> 쿼리당 필터 통과 hit 상한 (기본 100)",
+      "  --max-hits-per-query <n> 쿼리당 필터 통과 hit 수집 상한 (기본 100, 체크포인트에 저장)",
+      "  --out-max-hits <n>   query_facts 출력 파일에만 적용하는 쿼리당 hit 상한(수집분은 보존)",
       "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
       "  --storage-mode <mode> 배치 저장 구조: query-facts(기본, hit 1회 저장) | expanded(호환용)",
@@ -163,8 +164,14 @@ function makeBatchQuery(row, options = {}) {
   }
 
   const region = [row.sido, row.sigungu].filter(Boolean).join(" ").trim();
-  const nationwideCatalog = ["nationwide_catalog", "geographical_indication_region_review"]
-    .includes(row.sourceScope);
+  // 지역 없이도 전국 검색해야 하는 카탈로그 스코프. NFQS 품질인증수산물은 인증사업장
+  // 소재지가 산지가 아니라 지역 없이 수집되고(01-collect normalize.js), 03d에서
+  // "전국 지역 미제공"으로 정규화된다 — 03에서 스킵하면 안 된다(2026-09-04, #70).
+  const nationwideCatalog = [
+    "nationwide_catalog",
+    "nationwide_certified_product_catalog",
+    "geographical_indication_region_review",
+  ].includes(row.sourceScope);
   if (!region && !nationwideCatalog) return { skipReason: "지역 정보 없음" };
 
   if (row.status === "ok" && [
@@ -668,7 +675,25 @@ function loadCheckpoint(filePath, options) {
   return parsed;
 }
 
-function compactBatchOutput(output) {
+// ④ analyzer·대시보드 어디서도 안 쓰는 hit 필드(drawing=이미지 URL이 가장 큼, agent,
+// publicationNumber/Date, rightHolder)를 저장 단계에서 제거한다. hit 수십만 건이면 이 필드
+// 때문에 파이프라인 중간파일이 enrichIpRegistry·analyzeBrands의 통짜 JSON.parse/stringify
+// 512MB 문자열 한계를 넘겨 쿼리당 상한을 못 올린다(2026-09-04, #70). 실측 ~64% 절감.
+const HIT_DROP_FIELDS = ["drawing", "agent", "publicationNumber", "publicationDate", "rightHolder", "bigDrawing", "viennaCode", "fullText"];
+function leanHit(hit) {
+  if (!hit || typeof hit !== "object") return hit;
+  const lean = {};
+  for (const key of Object.keys(hit)) {
+    if (!HIT_DROP_FIELDS.includes(key)) lean[key] = hit[key];
+  }
+  return lean;
+}
+
+function compactBatchOutput(output, { outMaxHits } = {}) {
+  // 수집(체크포인트)은 문서 상한(3,000)까지 깊게 하되, 통합 파이프라인의 중간파일이
+  // enrichIpRegistry·analyzeBrands의 통짜 JSON 512MB 한계를 넘지 않도록 출력에서만
+  // hit 수를 자를 수 있게 한다(--out-max-hits). 전체 수집분은 체크포인트에 보존된다.
+  const cap = Number.isInteger(outMaxHits) && outMaxHits > 0 ? outMaxHits : Infinity;
   const queryFacts = {};
   const results = (output.results || []).map((entry) => {
     if (!entry.queryKey || !Array.isArray(entry.hits)) return entry;
@@ -681,8 +706,13 @@ function compactBatchOutput(output) {
         reusedFromCheckpoint,
         ...fact
       } = entry;
+      const capped = Array.isArray(fact.hits) ? fact.hits.slice(0, cap).map(leanHit) : fact.hits;
       queryFacts[entry.queryKey] = {
         ...fact,
+        hits: capped,
+        ...(Array.isArray(fact.hits) && fact.hits.length > cap
+          ? { outputHitCap: { cap, collectedCount: fact.hits.length } }
+          : {}),
         query: {
           ...(fact.query || {}),
           region: null,
@@ -901,7 +931,9 @@ async function main() {
       completedAt: new Date().toISOString(),
       results,
     };
-    if (args["storage-mode"] === "query-facts") output = compactBatchOutput(output);
+    if (args["storage-mode"] === "query-facts") {
+      output = compactBatchOutput(output, { outMaxHits: args["out-max-hits"] ? Number(args["out-max-hits"]) : undefined });
+    }
     const outPath = writeJson(output, args.out);
     console.error(
       `[matchTrademarks] batch done. requests=${output.requestCount}, success=${output.successCount}, partial=${output.partialCount}, error=${output.errorCount}, skipped=${output.skippedCount}${outPath ? ` -> ${outPath}` : ""}`

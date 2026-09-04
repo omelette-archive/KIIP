@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "specialty-tombstones-v1",
+  "note": "공개 스냅샷에서 지역×품목을 제거해도 되는 명시적 사유. 키는 reconcilePublicSnapshot의 regionItemKey(sido\\u001fsigungu\\u001f품목명\\u001fniceClass) 라벨을 ' / '로 이어붙인 형태. 여기 없는 실종은 last-known-good로 되살린다.",
+  "tombstones": []
+}

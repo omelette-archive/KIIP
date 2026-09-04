@@ -13,7 +13,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const { attachForestPrimaryRegionEvidence } = require("./lib/supplementalScopes");
+const {
+  attachForestPrimaryRegionEvidence,
+  buildSupplementalCollectionSummary,
+  union,
+} = require("./lib/supplementalScopes");
 const { attachRegionalSpecialtyCropBadges } = require("./attachRegionalSpecialtyCropBadges");
 
 const ROOT = path.resolve(__dirname, "..");
@@ -56,12 +60,16 @@ function main() {
   const rdaPath = path.resolve(args["rda-crops"] || DEFAULT_RDA_CROPS);
 
   let forestCoverage = { matchedItems: 0, evidenceRows: 0 };
+  let forestRegionEvidence = null;
   if (fs.existsSync(forestPath)) {
-    forestCoverage = attachForestPrimaryRegionEvidence(snapshot.regions, readJson(forestPath));
+    forestRegionEvidence = readJson(forestPath);
+    forestCoverage = attachForestPrimaryRegionEvidence(snapshot.regions, forestRegionEvidence);
   }
   let rdaMatched = 0;
+  let rdaCropReference = null;
   if (fs.existsSync(rdaPath)) {
-    rdaMatched = attachRegionalSpecialtyCropBadges(snapshot, readJson(rdaPath)).matched;
+    rdaCropReference = readJson(rdaPath);
+    rdaMatched = attachRegionalSpecialtyCropBadges(snapshot, rdaCropReference).matched;
   }
 
   // #70: buildDashboardSnapshot는 "전국" 의사 지역(NFQS 인증사업장·주산지 근거 없는 KOFPI)까지
@@ -100,6 +108,64 @@ function main() {
       rdaRegionalSpecialtyCropBadges: rdaMatched,
       attachedAt: new Date().toISOString(),
     };
+  }
+
+  // #70(2026-09-04): mergeSupplementalDashboardData.js가 별도 검색분으로 만들던
+  // supplementalCollection 프로비넌스를, 통합 파이프라인의 ③d 산출물에서 파생한다.
+  if (args["match-doc"] && fs.existsSync(path.resolve(args["match-doc"])) && snapshot.pipelineStatus) {
+    const matchDoc = readJson(path.resolve(args["match-doc"]));
+    snapshot.pipelineStatus.supplementalCollection = buildSupplementalCollectionSummary(matchDoc, {
+      rdaCropReference,
+      rdaCropCoverage: { matched: rdaMatched },
+    });
+  }
+
+  // 보완 소스가 스냅샷 sources 목록에 빠지지 않게 보강한다.
+  const knownSources = new Map((snapshot.sources || []).map((source) => [source.sourceId, source]));
+  const ensureSource = (source) => { if (!knownSources.has(source.sourceId)) knownSources.set(source.sourceId, source); };
+  if (forestRegionEvidence) {
+    ensureSource({
+      sourceId: "forest_product_production_survey",
+      sourceLabel: "2024년 임산물생산조사",
+      sourceContractVersion: forestRegionEvidence.schemaVersion || null,
+      sourceFetchedAt: forestRegionEvidence.generatedAt || null,
+      sourceUrl: forestRegionEvidence.sourceUrl || null,
+      sourceLastVerifiedAt: "2026-08-25",
+      idOrigin: "upstream",
+    });
+  }
+  const hasNfqsCatalogItem = snapshot.regions
+    .filter((region) => region.sido === "전국")
+    .some((region) => region.items.some((item) => (item.sources || []).includes("nfqs_quality_cert")));
+  if (hasNfqsCatalogItem) {
+    ensureSource({
+      sourceId: "nfqs_quality_cert",
+      sourceLabel: "해양수산부 국립수산물품질관리원 품질인증수산물",
+      sourceContractVersion: "provider-live-api",
+      sourceLastVerifiedAt: "2026-08-25",
+      idOrigin: "upstream",
+    });
+  }
+  snapshot.sources = [...knownSources.values()];
+
+  // NFQS 인증사업장 소재지·jisokaddr 관련 경고를 보존한다(mergeSupplementalDashboardData.js에서 이전).
+  const supplementalWarnings = [];
+  if (hasNfqsCatalogItem) {
+    supplementalWarnings.push(
+      "NFQS jisokaddr는 인증사업장 소재지이므로 지역 특산품 귀속에 사용하지 않고 전국 인증 수산물 카탈로그로만 표시합니다."
+    );
+  }
+  const regionalGeoCount = snapshot.regions
+    .filter((region) => region.sido !== "전국")
+    .flatMap((region) => region.items)
+    .filter((item) => (item.sources || []).includes("nfqs_geographical_indication")).length;
+  if (regionalGeoCount > 0) {
+    supplementalWarnings.push(
+      `NFQS 지리적표시수산물 중 등록명칭과 공식 단체 주소의 행정구역이 교차 확인된 ${regionalGeoCount}건만 지역 특산품으로 반영하고, 복수 지역 가능성이 있는 건은 지역 검토대기로 보존합니다.`
+    );
+  }
+  if (supplementalWarnings.length) {
+    snapshot.warnings = union([...(snapshot.warnings || []), ...supplementalWarnings]);
   }
 
   const outPath = path.resolve(args.out);

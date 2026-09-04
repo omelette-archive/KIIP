@@ -300,6 +300,7 @@ function main() {
   runNode("운영 실행기 자체 테스트", ["scripts/runOperationalPipeline.selftest.js"]);
   runNode("운영 프리플라이트 자체 테스트", ["scripts/checkOperationalEnv.selftest.js"]);
   runNode("③→⑦ 재생성 실행기 자체 테스트", ["scripts/regenerateAnalysisFromMatch.selftest.js"]);
+  runNode("공개 스냅샷 reconcile 자체 테스트", ["scripts/lib/snapshotReconcile.selftest.js"]);
   runNode("GitHub Pages 산출물 허브 생성", ["scripts/testArtifactSite.js"]);
   for (const phase of ["01", "02", "03", "04", "05", "06", "07"]) {
     const directory = fs
