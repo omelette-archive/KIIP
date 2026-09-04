@@ -45,8 +45,13 @@ function classifyApplicant(applicant) {
 /**
  * 출원번호 하나의 캐시 항목(복수 출원인 가능)을 재조회 우선순위 카테고리 하나로
  * 판정한다. refreshCandidate=true인 것만 재조회 대상이다.
+ *
+ * options.includeConflicting=true면 "주소 상충 공동출원"(conflicting)도 재조회 대상에
+ * 넣는다 — #118(2026-09-04): 재조회로 각 출원인의 producerOrg(지역 생산 주체형) 여부를
+ * 캐시에 채워야 `producer_org_coapplicant_inside` 회복 로직이 동작하기 때문. 기본값은
+ * false라 기존 #73 재조회 동작은 그대로다.
  */
-function classifyCacheEntry(applicationNumber, entry) {
+function classifyCacheEntry(applicationNumber, entry, options = {}) {
   if (!entry || entry.status !== "complete") {
     return { applicationNumber, category: "not_collected", refreshCandidate: false };
   }
@@ -63,7 +68,7 @@ function classifyCacheEntry(applicationNumber, entry) {
   const categories = applicants.map(classifyApplicant);
   const matchedAddresses = new Set(applicants.filter((a) => a.address).map((a) => a.address));
   if (matchedAddresses.size > 1) {
-    return { applicationNumber, category: "conflicting", refreshCandidate: false };
+    return { applicationNumber, category: "conflicting", refreshCandidate: Boolean(options.includeConflicting) };
   }
   if (categories.includes("matched")) {
     return { applicationNumber, category: "matched", refreshCandidate: false };
@@ -92,7 +97,7 @@ function buildRefreshManifest(cacheEntries, options = {}) {
     : [...cacheEntries.keys()];
   const rows = universe
     .sort((a, b) => a.localeCompare(b))
-    .map((applicationNumber) => classifyCacheEntry(applicationNumber, cacheEntries.get(applicationNumber)));
+    .map((applicationNumber) => classifyCacheEntry(applicationNumber, cacheEntries.get(applicationNumber), options));
   const byCategory = {};
   for (const row of rows) byCategory[row.category] = (byCategory[row.category] || 0) + 1;
   const candidates = rows.filter((row) => row.refreshCandidate);

@@ -133,7 +133,7 @@ async function runNationwideFlowTests() {
     ok("무한정 남아있으면 maxPages에서 bounded로 멈추고 무한 호출하지 않음");
   }
 
-  console.log("7b) stageExamples — 단계별 상표명 예시를 대표(짧음)·이색(길거나 확장형)으로 분리 (#116)");
+  console.log("7b) stageExamples — 단계별 상표명 예시를 대표(짧은 브랜딩)·이색(확장형)으로 분리 (#116)");
   {
     const hits = [
       hit({ title: "인삼", classificationCode: "31" }),
@@ -147,7 +147,25 @@ async function runNationwideFlowTests() {
     assert.ok(examples.unusual.includes("여섯해살이 산양삼 프리미엄 인삼 에디션"));
     assert.ok(!examples.unusual.includes("인삼")); // 대표에 이미 있으면 이색에서 제외
     assert.deepStrictEqual(stageExamples([], "인삼"), { representative: [], unusual: [] });
-    ok("중복·빈 title 제거, 길이 오름차순으로 대표, 대표를 뺀 나머지에서 이색");
+    ok("중복·빈 title 제거, coreTerm 담은 짧은 브랜딩을 대표, 나머지에서 이색");
+  }
+  {
+    // 2026-09-04(#116): 실데이터 회귀 방지 — 한 글자·기호뿐인 상표와 슬로건형 장문은
+    // 예시 후보에서 빠져야 한다("A"·"j"가 대표로, 100자 문구가 이색으로 뽑히던 문제).
+    const noisy = [
+      hit({ title: "A", classificationCode: "29" }),
+      hit({ title: "j", classificationCode: "29" }),
+      hit({ title: "!!", classificationCode: "29" }),
+      hit({ title: "발효마늘", classificationCode: "29" }),
+      hit({ title: "국산 쥐눈이콩으로 띄운 청국장 발효 마늘 발효 한약재 다시마로 빚은 천연식품입니다 100퍼센트 천연", classificationCode: "29" }),
+      hit({ title: "마늘빵 공장", classificationCode: "29" }),
+    ];
+    const examples = stageExamples(noisy, "마늘", 3);
+    assert.ok(!examples.representative.includes("A") && !examples.representative.includes("j") && !examples.representative.includes("!!"));
+    assert.ok(examples.representative.includes("발효마늘"));
+    assert.ok(examples.representative.every((title) => title.replace(/\s+/g, "").length >= 2));
+    assert.ok(![...examples.representative, ...examples.unusual].some((title) => title.replace(/\s+/g, "").length > 40));
+    ok("한 글자·기호 상표 제외, 40자 초과 슬로건형 제외");
   }
 
   console.log("7c) stageClassDistribution / stageTopRegions — 단계별 주요 상품류·상위 지역 (#119)");

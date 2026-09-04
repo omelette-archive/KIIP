@@ -53,6 +53,7 @@ function usage(message) {
       "옵션:",
       "  --input <path>          ③ 검색 결과 JSON — 주면 캐시에 아예 없는 출원번호도 not_collected로 집계",
       "  --dry-run                API 호출 없이 재조회 후보 manifest만 생성",
+      "  --include-conflicting    주소 상충 공동출원(conflicting)도 재조회 대상에 포함(#118 producerOrg 채우기용)",
       "  --manifest-out <path>    manifest JSON 경로 (기본: <cache 옆> refresh-manifest.json)",
       "  --refresh-cache <path>   재조회 결과 전용 캐시(기준 캐시와 달라야 함, 재실행 시 이어서 진행)",
       "  --limit <n>              이번 실행에서 새로 호출할 후보 수 상한(기본 50)",
@@ -87,7 +88,8 @@ async function main() {
   const baseCache = loadCache(cachePath);
   const document = loadDocument(args.input);
   const universe = document ? applicationNumbers(document) : undefined;
-  const manifest = buildRefreshManifest(baseCache, { applicationNumbers: universe });
+  const includeConflicting = Boolean(args["include-conflicting"]);
+  const manifest = buildRefreshManifest(baseCache, { applicationNumbers: universe, includeConflicting });
 
   const manifestOutPath = path.resolve(
     args["manifest-out"] || path.join(path.dirname(cachePath), "refresh-manifest.json")

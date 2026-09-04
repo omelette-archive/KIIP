@@ -126,7 +126,19 @@ async function runApplicantRegionRefreshTests() {
     assert.strictEqual(conflicting.category, "conflicting");
     assert.strictEqual(conflicting.refreshCandidate, false, "출원인 주소가 상충하면 별칭 재조회로 해결되지 않으므로 후보에서 제외");
 
-    ok("not_collected/no_result/empty_after_retries/no_address/unmatched/ambiguous/matched/conflicting을 분리하고 unmatched·ambiguous만 재조회 후보로 표시");
+    // #118: --include-conflicting 옵션이면 conflicting도 재조회 후보(producerOrg 채우기용).
+    const conflictingOptIn = classifyCacheEntry(
+      "1",
+      completeEntry([
+        applicant({ hasSourceAddress: true, address: "경상북도 안동시" }),
+        applicant({ hasSourceAddress: true, address: "전라남도 보성군" }),
+      ]),
+      { includeConflicting: true }
+    );
+    assert.strictEqual(conflictingOptIn.category, "conflicting");
+    assert.strictEqual(conflictingOptIn.refreshCandidate, true, "includeConflicting=true면 상충 건도 재조회 후보");
+
+    ok("not_collected/no_result/empty_after_retries/no_address/unmatched/ambiguous/matched/conflicting을 분리하고 unmatched·ambiguous만 재조회 후보로 표시(includeConflicting 시 conflicting 포함)");
   }
 
   console.log("13-4) buildRefreshManifest — 전체 캐시 집계와 결정론적 정렬");

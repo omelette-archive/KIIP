@@ -1031,6 +1031,17 @@ async function run() {
       </trademarkApplicantInfo></items></body></response>`);
     assert.strictEqual(parsed.found, true);
     assert.strictEqual(parsed.applicants[0].address, "강원특별자치도 양양군 상세주소 123");
+    // #118: 이름은 저장하지 않되 <nameKoreanLong>으로 생산자 주체형 여부만 판정한다.
+    assert.strictEqual(parsed.applicants[0].producerOrg, false);
+    assert.strictEqual("applicantName" in parsed.applicants[0], false, "이름 필드는 저장하지 않음");
+    const producerParsed = parseApplicantResponse(`
+      <response><header><resultCode>00</resultCode><resultMsg>success</resultMsg></header>
+      <body><items><trademarkApplicantInfo>
+      <nameKoreanLong>남해마늘영농조합법인</nameKoreanLong>
+      <applicantAddress>경상남도 남해군 상세주소</applicantAddress>
+      <nationalCode>KR</nationalCode><applicantCode>456</applicantCode><seq>1</seq>
+      </trademarkApplicantInfo></items></body></response>`);
+    assert.strictEqual(producerParsed.applicants[0].producerOrg, true, "<nameKoreanLong>이 영농조합이면 producerOrg=true");
 
     let requestedUrl = null;
     let applicantRequestCount = 0;

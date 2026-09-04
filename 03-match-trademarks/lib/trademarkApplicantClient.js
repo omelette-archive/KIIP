@@ -56,8 +56,11 @@ function parseApplicantResponse(xml) {
       nationality: tagValue(match[1], "nationalCode") || null,
       applicantCode: tagValue(match[1], "applicantCode") || null,
       sequence: tagValue(match[1], "seq") || null,
-      // #118: 이름은 저장하지 않고 지역 생산 주체형 여부만 불리언으로.
-      producerOrg: isProducerLikeApplicant(tagValue(match[1], "applicantName")),
+      // #118: 이름은 저장하지 않고 지역 생산 주체형 여부만 불리언으로. 이 API는 출원인
+      // 이름을 <nameKoreanLong>으로 준다(<applicantName>이 아님 — 2026-09-04 실키 확인).
+      producerOrg: isProducerLikeApplicant(
+        tagValue(match[1], "nameKoreanLong") || tagValue(match[1], "nameKoreanShort")
+      ),
     }))
     .filter((row) => row.address || row.nationality || row.applicantCode);
   return {

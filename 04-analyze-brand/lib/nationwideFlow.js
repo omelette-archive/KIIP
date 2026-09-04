@@ -94,9 +94,16 @@ function rawSignalConfidence(rawTopApplicants) {
 // 이슈 #116(2026-09-01): "단계별 대표·특이 지정상품 예시"를 보여달라는 요청. 상표
 // 단어검색 API 응답에는 지정상품 텍스트가 없어(경로 B 등록원부 대조는 전체의 2%뿐)
 // 대신 그 단계에서 실제로 출원된 "상표명" 예시를 보여준다 — 대표(coreTerm 옆에 짧게
-// 붙은 전형적 브랜딩)와 이색(길거나 coreTerm에서 멀어진 확장형)으로 나눈다. 상표명은
+// 붙은 전형적 브랜딩)와 이색(coreTerm에서 멀어진 확장형)으로 나눈다. 상표명은
 // 지역 귀속과 무관하므로 rawSignalConfidence와 상관없이 항상 노출해도 안전하다.
+// 2026-09-04(#116): 실데이터 검증에서 "짧은 순 = 대표"가 한 글자 상표("A","j")를,
+// "긴 순 = 이색"이 100자짜리 마케팅 문구를 뽑는 문제 확인. 한 글자·기호만 있는 상표와
+// 슬로건형 장문을 먼저 걸러내고, 대표는 coreTerm을 포함한 전형적 브랜딩에서 고른다.
+const EXAMPLE_MIN_LEN = 2;
+const EXAMPLE_MAX_LEN = 40;
+const EXAMPLE_REP_MAX_LEN = 14;
 function stageExamples(stageHits, coreTerm, limit = 3) {
+  const core = String(coreTerm || "").trim();
   const seen = new Set();
   const titles = [];
   for (const hit of stageHits) {
@@ -105,11 +112,27 @@ function stageExamples(stageHits, coreTerm, limit = 3) {
     seen.add(title);
     titles.push(title);
   }
-  if (titles.length === 0) return { representative: [], unusual: [] };
-  const byLength = [...titles].sort((a, b) => a.length - b.length || a.localeCompare(b, "ko-KR"));
-  const representative = byLength.slice(0, limit);
+  // 한 글자·기호뿐인 상표, 슬로건형 장문은 예시로서 의미가 없다.
+  const compactLen = (title) => title.replace(/\s+/g, "").length;
+  const pool = titles.filter((title) => {
+    const len = compactLen(title);
+    return len >= EXAMPLE_MIN_LEN && len <= EXAMPLE_MAX_LEN && /[가-힣A-Za-z0-9]{2,}/.test(title.replace(/\s+/g, ""));
+  });
+  if (pool.length === 0) return { representative: [], unusual: [] };
+  const byLength = [...pool].sort((a, b) => compactLen(a) - compactLen(b) || a.localeCompare(b, "ko-KR"));
+  // 대표: coreTerm을 담은 짧은 브랜딩 우선, 모자라면 그냥 짧은 순으로 채운다.
+  const withCore = core ? byLength.filter((title) => title.includes(core) && compactLen(title) <= EXAMPLE_REP_MAX_LEN) : [];
+  const representative = [...new Set([...withCore, ...byLength])].slice(0, limit);
   const repSet = new Set(representative);
-  const unusual = [...byLength].reverse().filter((title) => !repSet.has(title)).slice(0, limit);
+  // 이색: coreTerm에서 멀어진 확장형 — coreTerm 미포함을 먼저, 그다음 긴 순.
+  const unusual = [...pool]
+    .filter((title) => !repSet.has(title))
+    .sort((a, b) => {
+      const aCore = core && a.includes(core) ? 1 : 0;
+      const bCore = core && b.includes(core) ? 1 : 0;
+      return aCore - bCore || compactLen(b) - compactLen(a) || a.localeCompare(b, "ko-KR");
+    })
+    .slice(0, limit);
   return { representative, unusual };
 }
 
