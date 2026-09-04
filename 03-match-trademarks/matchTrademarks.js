@@ -346,6 +346,13 @@ function createRequestBudget(maxRequests) {
   };
 }
 
+function hitKey(hit) {
+  return (
+    String(hit?.applicationNumber || "").replace(/\D/g, "") ||
+    `${String(hit?.registrationNumber || "").replace(/\D/g, "")}|${hit?.title || ""}`
+  );
+}
+
 function checkpointSeed(query, initial, startPage = 1) {
   if (!initial || !["partial", "error"].includes(initial.collectionStatus)) {
     return {
@@ -357,11 +364,19 @@ function checkpointSeed(query, initial, startPage = 1) {
       filteredCount: 0,
     };
   }
+  const fetched = Number(initial.pages?.fetchedCount) || 0;
+  let nextPage = Number(initial.pages?.nextPage) || 1;
+  // hit 상한(max_hits_per_query)에 걸려 멈춘 쿼리는 마지막 페이지에서 상한 초과분이
+  // 잘려나갔고 nextPage는 이미 그 다음을 가리킨다. 더 깊은 상한으로 재개할 때 그 잘린
+  // hit를 잃지 않도록 마지막 페이지를 다시 받는다(아래 dedup이 중복을 제거).
+  if (["max_hits_per_query", "max_hits"].includes(initial.stopReason) && nextPage > 1) {
+    nextPage -= 1;
+  }
   return {
     keywordTotalCount: Number(initial.keywordTotalCount) || 0,
     hits: Array.isArray(initial.hits) ? [...initial.hits] : [],
-    pagesFetched: Number(initial.pages?.fetchedCount) || 0,
-    nextPage: Number(initial.pages?.nextPage) || 1,
+    pagesFetched: fetched,
+    nextPage,
     unfilteredCount: Number(initial.pages?.unfilteredCount) || 0,
     filteredCount: Number(initial.pages?.filteredCount) || 0,
   };
@@ -375,6 +390,9 @@ async function collectSearchPages(client, query, options, budget, initial) {
   const classCodeFallbackApplied = !query.classCode;
   const allowedClasses = query.classCode || FOOD_RELATED_CLASSES;
   const startedAt = initial?.startedAt || new Date().toISOString();
+  // 재개 시 마지막 페이지를 다시 받을 수 있으므로(위 checkpointSeed 참고) 출원번호 기준
+  // 중복을 제거한다.
+  const seenHitKeys = new Set(state.hits.map(hitKey));
   let collectionStatus = "partial";
   let stopReason = "max_pages";
   let error = null;
@@ -404,7 +422,12 @@ async function collectSearchPages(client, query, options, budget, initial) {
       break;
     }
 
-    const pageHits = filterByClassCode(result.hits, allowedClasses);
+    const pageHits = filterByClassCode(result.hits, allowedClasses).filter((hit) => {
+      const key = hitKey(hit);
+      if (seenHitKeys.has(key)) return false;
+      seenHitKeys.add(key);
+      return true;
+    });
     const remaining = maxHitsPerQuery - state.hits.length;
     state.hits.push(...pageHits.slice(0, remaining));
     state.keywordTotalCount = Number(result.totalCount) || 0;
@@ -626,17 +649,21 @@ function areaBrandValidationMetadata(context, sourceFile, results) {
 function loadCheckpoint(filePath, options) {
   if (!fs.existsSync(filePath)) throw new Error(`재개할 체크포인트가 없습니다: ${filePath}`);
   const parsed = JSON.parse(fs.readFileSync(filePath, "utf8"));
-  for (const key of ["numOfRows", "maxHitsPerQuery"]) {
-    if (Number(parsed.options?.[key]) !== Number(options[key])) {
-      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}가 현재 값 ${options[key]}와 다릅니다.`);
-    }
+  // numOfRows(페이지 크기)는 재개 중 바뀌면 저장된 pages.nextPage 커서 의미가 어긋나므로
+  // 완전일치를 요구한다.
+  if (Number(parsed.options?.numOfRows) !== Number(options.numOfRows)) {
+    throw new Error(`체크포인트 numOfRows=${parsed.options?.numOfRows}가 현재 값 ${options.numOfRows}와 다릅니다.`);
   }
-  const savedMaxPages = Number(parsed.options?.maxPages);
-  const currentMaxPages = Number(options.maxPages);
-  if (!Number.isInteger(savedMaxPages) || currentMaxPages < savedMaxPages) {
-    throw new Error(
-      `체크포인트 maxPages=${parsed.options?.maxPages}보다 현재 값 ${options.maxPages}가 작습니다.`
-    );
+  // maxHitsPerQuery·maxPages는 "더 깊게"만 허용한다(낮추면 이미 수집한 걸 잘라내는 셈이라
+  // 금지). 2026-09-04: 운영 파이프라인이 얕은 상한(150건)으로 만든 체크포인트를,
+  // partial 쿼리만 골라 문서화된 깊은 상한(3,000건 = 150페이지)으로 이어서 보수하려면
+  // 이 상향 재개가 필요하다(03-match-trademarks/README.md "범위가 명시된 제한적 완료").
+  for (const key of ["maxHitsPerQuery", "maxPages"]) {
+    const saved = Number(parsed.options?.[key]);
+    const current = Number(options[key]);
+    if (!Number.isInteger(saved) || current < saved) {
+      throw new Error(`체크포인트 ${key}=${parsed.options?.[key]}보다 현재 값 ${options[key]}가 작습니다(더 깊게만 재개 가능).`);
+    }
   }
   return parsed;
 }

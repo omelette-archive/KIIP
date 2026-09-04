@@ -612,7 +612,7 @@ async function run() {
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
   }
 
-  console.log("9-3) max_pages 부분 체크포인트 — 상한을 늘려 다음 페이지부터 재개");
+  console.log("9-3) 부분 체크포인트 — 상한을 늘려 이어서 더 깊게 재개");
   {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-"));
     const checkpointPath = path.join(dir, "checkpoint.json");
@@ -627,12 +627,19 @@ async function run() {
     assert.throws(() => loadCheckpoint(checkpointPath, {
       numOfRows: 20, maxPages: 4, maxHitsPerQuery: 600,
     }), /보다 현재 값 4가 작습니다/);
+    // 2026-09-04: hit 상한 상향은 허용한다(얕게 만든 체크포인트를 깊게 이어서 보수).
+    // 낮추는 것만 금지(수집분을 잘라내는 셈).
+    assert.doesNotThrow(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 3000,
+    }), "hit 상한 상향은 이어서 더 깊게 수집하는 것이라 허용해야 함");
     assert.throws(() => loadCheckpoint(checkpointPath, {
-      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 1200,
-    }), /maxHitsPerQuery/,
-    "hit 상한 변경은 마지막 수집 페이지의 잘린 hit를 잃을 수 있어 계속 차단해야 함");
+      numOfRows: 20, maxPages: 100, maxHitsPerQuery: 300,
+    }), /maxHitsPerQuery=600보다 현재 값 300가 작습니다/);
+    assert.throws(() => loadCheckpoint(checkpointPath, {
+      numOfRows: 100, maxPages: 100, maxHitsPerQuery: 600,
+    }), /numOfRows/, "페이지 크기 변경은 nextPage 커서 의미가 어긋나 계속 차단");
     fs.rmSync(dir, { recursive: true, force: true });
-    ok("페이지 상한 증가는 허용하고 페이지 크기·hit 상한 변경은 안전을 위해 차단");
+    ok("페이지 상한·hit 상한은 상향만 허용, 하향·페이지 크기 변경은 차단");
   }
 
   console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");
