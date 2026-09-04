@@ -174,6 +174,33 @@ function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: numb
   return Math.round(fullStart + fraction * (fullEnd - fullStart));
 }
 
+function clampTrendRange(startYear: number | null, endYear: number | null, fullStart: number, fullEnd: number) {
+  const start = Math.max(fullStart, Math.min(startYear ?? fullStart, fullEnd));
+  const end = Math.max(start, Math.min(endYear ?? fullEnd, fullEnd));
+  return { start, end };
+}
+
+function TrendRangeControl({ idPrefix, fullStart, fullEnd, start, end, onStartChange, onEndChange }: { idPrefix: string; fullStart: number; fullEnd: number; start: number; end: number; onStartChange: (year: number) => void; onEndChange: (year: number) => void }) {
+  const setStart = (year: number) => onStartChange(Math.max(fullStart, Math.min(year, end)));
+  const setEnd = (year: number) => onEndChange(Math.max(start, Math.min(year, fullEnd)));
+  return <>
+    <div className="trend-controls">
+      <div className="trend-range-inputs">
+        <label><span className="sr-only">시작 연도</span>{start}<input id={`${idPrefix}-start-input`} type="number" min={fullStart} max={end} aria-label="시작 연도" value={start} onChange={(event) => setStart(Number(event.target.value) || fullStart)} /></label>
+        <span>~</span>
+        <label><span className="sr-only">끝 연도</span>{end}<input id={`${idPrefix}-end-input`} type="number" min={start} max={fullEnd} aria-label="끝 연도" value={end} onChange={(event) => setEnd(Number(event.target.value) || fullEnd)} /></label>
+      </div>
+    </div>
+    <div className="trend-range-slider"><span className="trend-range-label">{fullStart}년 – {fullEnd}년 중 {start}년 – {end}년 선택</span>
+      <div className="trend-range-track">
+        <div className="trend-range-fill" style={{ left: `${trendHandlePercent(start, fullStart, fullEnd)}%`, right: `${100 - trendHandlePercent(end, fullStart, fullEnd)}%` }} />
+        <button type="button" id={`${idPrefix}-range-handle-start`} className="trend-range-handle trend-range-handle-start" role="slider" aria-label="시작 연도 조절" aria-valuemin={fullStart} aria-valuemax={end} aria-valuenow={start} style={{ left: `${trendHandlePercent(start, fullStart, fullEnd)}%` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => { if (event.buttons !== 1 || !event.currentTarget.parentElement) return; setStart(trendYearAtPointer(event.clientX, event.currentTarget.parentElement, fullStart, fullEnd)); }} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowDown") { event.preventDefault(); setStart(start - 1); } else if (event.key === "ArrowRight" || event.key === "ArrowUp") { event.preventDefault(); setStart(start + 1); } }} />
+        <button type="button" id={`${idPrefix}-range-handle-end`} className="trend-range-handle trend-range-handle-end" role="slider" aria-label="끝 연도 조절" aria-valuemin={start} aria-valuemax={fullEnd} aria-valuenow={end} style={{ left: `${trendHandlePercent(end, fullStart, fullEnd)}%` }} onPointerDown={(event) => event.currentTarget.setPointerCapture(event.pointerId)} onPointerMove={(event) => { if (event.buttons !== 1 || !event.currentTarget.parentElement) return; setEnd(trendYearAtPointer(event.clientX, event.currentTarget.parentElement, fullStart, fullEnd)); }} onKeyDown={(event) => { if (event.key === "ArrowLeft" || event.key === "ArrowDown") { event.preventDefault(); setEnd(end - 1); } else if (event.key === "ArrowRight" || event.key === "ArrowUp") { event.preventDefault(); setEnd(end + 1); } }} />
+      </div>
+    </div>
+  </>;
+}
+
 // 이슈 #116(2026-08-26): 품목별 조회에 광역 단위 출원 비중 원그래프 추가 요청 — 상위 4개 광역 +
 // "기타"로 묶어 conic-gradient 도넛을 그리고, 색상만으로 구분하지 않도록 범례에 지역명·비율을 함께 적는다.
 function provinceShareSegments(counts: Record<string, number>) {
@@ -203,6 +230,35 @@ function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>;
     <ul className="item-share-legend">{segments.map((segment) => <li key={segment.name}><i style={{ background: shareSegmentColor(segment.name) }} /><span className="item-share-region">{displayRegionName(segment.name)}</span><b>{percent(segment.pct)}</b></li>)}</ul>
   </div>;
 }
+
+const CATEGORY_SHARE_COLORS = ["#0f5fa6", "#d97706", "#11865b", "#7c3aed", "#c2416c", "#0e7490", "#6b7f18", "#64748b"];
+function categoryShareColor(name: string) {
+  let hash = 0;
+  for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
+  return CATEGORY_SHARE_COLORS[hash % CATEGORY_SHARE_COLORS.length];
+}
+function categoryShareSegments(items: Item[], field: "uniqueTrademarkCount" | "registeredTrademarkCount") {
+  const counts: Record<string, number> = {};
+  for (const item of items) {
+    const metric = item.metrics[field];
+    if (metric.availability !== "available" || !metric.value) continue;
+    const label = item.category?.label || "기타";
+    counts[label] = (counts[label] || 0) + metric.value;
+  }
+  const entries = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "ko-KR"));
+  const total = entries.reduce((sum, [, value]) => sum + value, 0);
+  const top = entries.slice(0, 5);
+  const rest = entries.slice(5).reduce((sum, [, value]) => sum + value, 0);
+  const rows = rest > 0 ? [...top, ["기타 유형", rest] as [string, number]] : top;
+  return { total, segments: rows.map(([name, value]) => ({ name, value, pct: total ? value / total : 0 })) };
+}
+function CategoryShareDonut({ items, field, label }: { items: Item[]; field: "uniqueTrademarkCount" | "registeredTrademarkCount"; label: string }) {
+  const { total, segments } = categoryShareSegments(items, field);
+  if (!total) return <div className="item-share empty"><p className="empty">표시할 {label} 데이터가 없습니다.</p></div>;
+  let acc = 0;
+  const gradient = segments.map((segment) => { const start = acc * 360; acc += segment.pct; return `${categoryShareColor(segment.name)} ${start.toFixed(1)}deg ${(acc * 360).toFixed(1)}deg`; }).join(", ");
+  return <div className="item-share category-share"><div className="item-share-donut" style={{ background: `conic-gradient(${gradient})` }} role="img" aria-label={`특산품 유형별 ${label} 비중`} /><ul className="item-share-legend">{segments.map((segment) => <li key={segment.name}><i style={{ background: categoryShareColor(segment.name) }} /><span className="item-share-region">{segment.name}</span><b>{percent(segment.pct)}</b></li>)}</ul></div>;
+}
 // 이슈 #116(2026-09-01): 지자체별 조회에서 추이 그래프 크기를 사용자가 조절하고
 // 싶다는 요청. 세 단계(작게/보통/크게)를 :root의 data-trend-size로 저장하고 CSS가
 // province-detail-cols 그리드 비율을 바꾼다. localStorage에 남겨 새로고침에도 유지.
@@ -224,20 +280,26 @@ function TrendSizeControl() {
 }
 // 이슈 #118: 요약·지역·품목 화면에서 출원·등록 추이 그래프를 같은 모양으로 부각한다.
 // prominent=true면 -compact 축소를 빼고 큰 카드로 그린다.
-function RegionTrend({ region, heading = "연도별 출원·등록 추이", subtitle, prominent = false, emptyLabel = "이 지역은 아직 연도별 데이터가 없습니다." }: { region: Pick<Region, "region" | "items">; heading?: string; subtitle?: string; prominent?: boolean; emptyLabel?: string }) {
+function RegionTrend({ region, heading = "연도별 출원·등록 추이", subtitle, prominent = false, adjustable = false, emptyLabel = "이 지역은 아직 연도별 데이터가 없습니다." }: { region: Pick<Region, "region" | "items">; heading?: string; subtitle?: string; prominent?: boolean; adjustable?: boolean; emptyLabel?: string }) {
   const wrapClass = prominent ? "trend-chart trend-chart-prominent region-trend" : "trend-chart trend-chart-compact region-trend";
   const trendSubtitle = subtitle || `${region.region} 전체 특산품 · 연도별`;
   const applicationTotals = sumYearCounts(region.items, "applicationYearCounts");
   const registrationTotals = sumYearCounts(region.items, "registrationYearCounts");
-  const years = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])]
+  const allYears = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])]
     .map(Number)
     .sort((a, b) => a - b);
-  if (years.length === 0) return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{region.region}</span></div><p className="empty">{emptyLabel}</p></section>;
-  const start = years[0];
-  const end = years[years.length - 1];
+  const [selectedStart, setSelectedStart] = useState<number | null>(null);
+  const [selectedEnd, setSelectedEnd] = useState<number | null>(null);
+  if (allYears.length === 0) return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{region.region}</span></div><p className="empty">{emptyLabel}</p></section>;
+  const fullStart = allYears[0];
+  const fullEnd = allYears[allYears.length - 1];
+  const { start, end } = clampTrendRange(adjustable ? selectedStart : null, adjustable ? selectedEnd : null, fullStart, fullEnd);
+  const years: number[] = [];
+  for (let year = start; year <= end; year++) years.push(year);
   const max = Math.max(1, ...years.map((year) => Math.max(applicationTotals[year] || 0, registrationTotals[year] || 0)));
   const scale = trendScales(start, end, max);
   return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{trendSubtitle}</span></div>
+    {adjustable && <TrendRangeControl idPrefix="summary-trend" fullStart={fullStart} fullEnd={fullEnd} start={start} end={end} onStartChange={setSelectedStart} onEndChange={setSelectedEnd} />}
     <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${region.region} ${start}년부터 ${end}년까지 출원·등록 추이`}>
       {[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 7} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
       <path d={`${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
@@ -536,7 +598,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
   const regionalRegions = useMemo(() => snapshot.regions.filter((region) => region.sido !== "전국"), [snapshot.regions]);
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
-  const sourceLine = snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean).join(" · ");
+  const sourceLine = [...new Set(snapshot.sources.map((source) => source.sourceLabel || source.sourceId).filter(Boolean))].join(" · ");
   const dashboardUpdatedAt = snapshotUpdatedAt(snapshot);
   const provinceStats = useMemo(() => {
     const stats = new Map<string, { trademarks: number; registered: number; verified: number; totalItems: number; decidedItems: number; appliedItems: number }>();
@@ -793,8 +855,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const trendAllYears = [...new Set([...Object.keys(trendApplicationTotals), ...Object.keys(trendRegisteredTotals)])].map(Number).sort((a, b) => a - b);
   const trendFullStart = trendAllYears[0] ?? new Date().getFullYear();
   const trendFullEnd = trendAllYears[trendAllYears.length - 1] ?? new Date().getFullYear();
-  const trendStart = Math.min(trendStartYear ?? trendFullStart, trendFullEnd);
-  const trendEnd = Math.max(trendEndYear ?? trendFullEnd, trendStart);
+  // 지역을 바꾸면 이전 지역의 시작 연도가 새 지역 범위보다 앞설 수 있다. 양 끝을 현재
+  // 데이터 범위에 모두 고정해 핸들이 트랙 바깥(음수 %)으로 사라지지 않게 한다(#136).
+  const { start: trendStart, end: trendEnd } = clampTrendRange(trendStartYear, trendEndYear, trendFullStart, trendFullEnd);
   const trendYears: number[] = [];
   for (let year = trendStart; year <= trendEnd; year++) trendYears.push(year);
   const trendMax = Math.max(1, ...trendYears.map((year) => Math.max(trendApplicationTotals[year] || 0, trendRegisteredTotals[year] || 0)));
@@ -857,6 +920,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }, [regionalRegions]);
   // 드롭다운은 브리핑·흐름이 있는 "주요 샘플"만, 직접 입력(datalist)은 전체 품목.
   const strategySampleGroups = useMemo(() => strategyItemGroups.filter((group) => group.flow || group.briefings.length), [strategyItemGroups]);
+  // #136: 잘 보이지 않는 select 대신 첫 화면에서 바로 누를 수 있는 주요 특산품 토글을 둔다.
+  // 지역별 브리핑이 많은 품목을 우선하고, 동률이면 전국 흐름 건수로 정렬한다.
+  const strategyFeaturedGroups = useMemo(() => [...strategySampleGroups]
+    .sort((a, b) => b.briefings.length - a.briefings.length || (b.flow?.totalCount || 0) - (a.flow?.totalCount || 0) || a.name.localeCompare(b.name, "ko-KR"))
+    .slice(0, 12), [strategySampleGroups]);
   const selectedStrategyGroup = strategyItemGroups.find((group) => group.name === strategyItem) || null;
   return <main className="shell">
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
@@ -894,7 +962,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
       </section>
       {/* 이슈 #118: 요약 화면에 전국 출원·등록 추이 그래프를 부각한다. */}
-      <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
+      <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
     </>}
 
     {tab === "applications" && <section className="screen-section coverage-screen">
@@ -1025,12 +1093,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "strategy" && <section className="screen-section strategy-screen">
       <p className="screen-note">⑤·⑥단계 분석에서 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>
       <div className="strategy-item-selector">
-        <label><span>주요 샘플</span>
-          <select value={strategySampleGroups.some((group) => group.name === strategyItem) ? strategyItem : ""} onChange={(event) => setStrategyItem(event.target.value)}>
-            <option value="">대표 샘플 보기</option>
-            {strategySampleGroups.map((group) => <option key={group.name} value={group.name}>{group.name}{group.briefings.length ? ` (지역 ${group.briefings.length})` : ""}</option>)}
-          </select>
-        </label>
+        <div className="strategy-featured"><span>주요 특산품</span><div className="strategy-featured-options" role="group" aria-label="주요 특산품 바로 선택">
+          <button type="button" className={!strategyItem ? "active" : ""} onClick={() => setStrategyItem("")}>대표 사례</button>
+          {strategyFeaturedGroups.map((group) => <button type="button" key={group.name} className={strategyItem === group.name ? "active" : ""} onClick={() => setStrategyItem(group.name)}>{group.name}{group.briefings.length ? <small>{group.briefings.length}개 지역</small> : null}</button>)}
+        </div></div>
         <label><span>품목 직접 입력</span>
           <input type="search" list="strategy-item-list" value={strategyItem} placeholder="품목명 입력" onChange={(event) => setStrategyItem(event.target.value)} />
           <datalist id="strategy-item-list">{strategyItemGroups.map((group) => <option key={group.name} value={group.name} />)}</datalist>
@@ -1064,7 +1130,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
       {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}
       <section className="compare-region-section"><div className="compare-section-head"><div><span>69개 전체 상세</span><h2>등급별 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div>
-        <div className="compare-region-table"><div className="compare-region-head"><span>지역</span><span>대표작목</span><span>자체육성작목</span><span>집중육성작목</span><span>상표 출원건수<small>원물 기준</small></span><span>출원 비율</span><span>상태</span></div>
+        <div className="compare-region-table"><div className="compare-region-head"><span>지역</span><span>대표작목</span><span>자체육성작목</span><span>집중육성작목</span><span>상표 출원건수<small>원물 기준</small></span><span>출원 비율</span><span title="지역 특화작목 중 지역별 상표 집계를 완료한 작목 수">수집 진행</span></div>
           {comparisonRows.map(({ province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate }) => {
             const byTier = (tier: string) => policyCrops.filter((crop) => crop.tier === tier);
             const tierCell = (tier: string) => { const crops = byTier(tier); return crops.length === 0 ? <span className="compare-tier-empty">—</span> : <span className="compare-tier-crops">{crops.map((crop) => <em key={crop.name} className={crop.applied ? "filed" : crop.decided ? "unfiled" : "pending"}>{crop.displayName}</em>)}</span>; };
@@ -1075,7 +1141,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               {tierCell("집중육성작목")}
               <b>{number(policyApplicationsTotal)}건</b>
               <div className="compare-region-rate"><b>{percent(policyRate)}</b><small>{policyApplied}/{policyCrops.length}작목</small></div>
-              <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided === policyCrops.length ? "완료" : `${policyDecided}/${policyCrops.length}`}</span>
+              <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided}/{policyCrops.length}{policyDecided === policyCrops.length ? " 완료" : ""}</span>
             </div>;
           })}</div></section>
       <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p></div>
@@ -1111,7 +1177,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
       </section>
       <p className="screen-note">수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다.</p>
-      <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
+      <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합{snapshot.coverage.regionItemCount > pipeline.rowCounts.total ? ` · 복수 품목 행 분리 +${number(snapshot.coverage.regionItemCount - pipeline.rowCounts.total)}` : ""}</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
       <div className="data-summary-grid"><article className="data-summary-card"><h2>특산물 데이터</h2><div className="data-stat"><strong>{number(uniqueSpecialtyCount)}개</strong><span>고유 특산품명</span></div><div className="data-stat"><strong>{number(snapshot.coverage.regionItemCount)}개</strong><span>지역-품목 조합</span></div><div className="data-stat"><strong>{number(snapshot.coverage.observedRegionCount)}개</strong><span>관측 지역</span></div><p className="data-card-note">같은 특산물도 지역이 다르면 별도 관측 단위로 관리합니다.</p></article><article className="data-summary-card"><h2>상표 매칭 결과</h2><div className="match-bars"><div><span>특산품 출원율 <b>{percent(nationalSpecialtyCoverage.rate)}</b></span><em><i style={{ width: `${Math.round((nationalSpecialtyCoverage.rate || 0) * 100)}%` }} /></em><small>출원 확인 {number(nationalSpecialtyCoverage.applied)} / 전체 수집 특산품 {number(nationalSpecialtyCoverage.total)}(지역별 집계 완료 {number(nationalSpecialtyCoverage.decided)})</small></div><div><span>고유 상표 주소 확보 <b>{number(pipeline.applicantRegionVerification.verifiedCount)}건</b></span><em><i style={{ width: `${Math.round((pipeline.applicantRegionVerification.rate || 0) * 100)}%` }} /></em><small>전국 고유 후보 중 {percent(pipeline.applicantRegionVerification.rate)}</small></div><div><span>지역별 출원 수 표시 가능 <b>{number(pipeline.regionalMetricGate.availableRegionItemCount)}개</b></span><em><i style={{ width: `${Math.round(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal) * 100)}%` }} /></em><small>전체 {number(gateTotal)}개 지역-품목 중 {percent(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal))}</small></div></div><p className="match-explanation">특산품 출원율은 현재 수집된 지역×특산품 전체 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 전체 {number(nationalSpecialtyCoverage.total)}개 중 명칭 확인이나 지역별 집계가 덜 끝난 항목도 분모에 포함하며, 출원이 확인될 때만 분자에 더합니다 — 후속 확인이 진행되면 값이 올라갈 수 있습니다.</p></article></div>
       <div className="data-reading-note"><strong>숫자를 읽는 법</strong><p><b>특산품 출원율 = 지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수</b>입니다. 명칭 확인이나 지역별 집계가 아직 끝나지 않은 항목도 분모에 포함하고 분자에는 넣지 않습니다. <b>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}건</b>은 출원번호 중복을 제거한 전국 검색 후보이며, 등록 비율은 지역 주소 일치 출원 중 등록 상태인 건의 비율로 별도 계산합니다. 검색이 부분 수집 상태인 품목은 0건으로 확정하지 않고 <b>지역별 집계 대기</b>로 표시합니다.</p></div>
       <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>그룹</th><th>데이터명</th><th>수집 항목</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).sort((a, b) => sourceGroupRank(a.sourceId) - sourceGroupRank(b.sourceId)).map((source) => <tr key={source.sourceId}><td><span className="source-group">{sourceGroup(source.sourceId)}</span></td><th scope="row">{source.sourceLabel || source.sourceId}</th><td>{sourceItems(source.sourceId)}</td><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><td><span className="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
@@ -1124,11 +1190,12 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 function ProvinceDetail({ province, regions, onRegion }: { province: string; regions: Region[]; onRegion: (region: Region) => void }) {
   const coverage = specialtyCoverage(regions);
   const items = regions.flatMap((region) => region.items);
+  const municipalityRegions = regions.filter((region) => region.sigungu && region.sigungu !== region.sido);
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const applications = availableItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0);
   const registrations = availableItems.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0);
   return <div className="detail-panel province-detail">
-    <div className="detail-heading"><div><p className="eyebrow">광역 기본 보기</p><h2>{displayRegionName(province)}</h2><p>시군구 {regions.length}곳의 특산품·상표 현황 합계</p></div><span className="state">광역 집계</span></div>
+    <div className="detail-heading"><div><p className="eyebrow">광역 기본 보기</p><h2>{displayRegionName(province)}</h2><p>광역 전체와 시군구 {municipalityRegions.length}곳의 특산품·상표 현황 합계</p></div><span className="state">광역 집계</span></div>
     <TrendSizeControl />
     <div className="province-detail-cols">
       <RegionTrend region={{ region: province, items }} />
@@ -1138,7 +1205,8 @@ function ProvinceDetail({ province, regions, onRegion }: { province: string; reg
         <article><span>지역 주소 일치 출원</span><strong>{number(applications)}건</strong><small>등록 완료 {number(registrations)}건</small></article>
       </div>
     </div>
-    <section className="province-municipalities"><div className="section-heading"><div><h2>시군구 상세</h2></div><span>지역을 선택하면 품목별 상세로 전환</span></div><div>{regions.map((region) => { const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} onClick={() => onRegion(region)}><strong>{region.sigungu && region.sigungu !== region.sido ? region.sigungu : "시도 전체"}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개</small></button>; })}</div></section>
+    <section className="province-category-shares"><div className="section-heading"><div><h2>특산품 유형별 출원·등록 비중</h2></div><span>광역 전체 · 지역 주소 일치 기준</span></div><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={items} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={items} field="registeredTrademarkCount" label="등록" /></article></div></section>
+    <details className="province-municipalities"><summary><span>세부 시군구 보기</span><small>{municipalityRegions.length}곳 · 클릭하면 품목별 상세로 전환</small></summary><div>{municipalityRegions.length ? municipalityRegions.map((region) => { const rowCoverage = specialtyCoverage([region]); return <button type="button" key={regionKey(region)} onClick={() => onRegion(region)}><strong>{region.sigungu}</strong><small>특산품 {rowCoverage.total}개 · 출원 확인 {rowCoverage.applied}개</small></button>; }) : <p className="empty">시군구 단위로 구분된 원본 자료가 없습니다.</p>}</div></details>
   </div>;
 }
 

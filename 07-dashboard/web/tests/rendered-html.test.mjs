@@ -190,14 +190,17 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(coverage.total, snapshot.coverage.regionItemCount);
   assert.equal(coverage.total + nationwideCatalogCount, snapshot.coverage.catalogItemCount);
   // 2026-08-31(#117): 농촌진흥청 지역특화작목 69개(대표작목 포함)를 도 단위 공식
-  // 특산품으로 병합(scripts/mergeSupplementalDashboardData.js)해 분모가 1736->1805로 늘었다.
-  assert.equal(coverage.total, 1805);
-  assert.equal(coverage.decided, 1688);
-  assert.equal(coverage.applied, 1042);
-  assert.equal(coverage.pending, 117);
-  assert.equal(Math.round(coverage.rate * 100), 58);
+  // 특산품으로 병합해 분모가 1736->1805로 늘었다.
+  // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집(쿼리당 150건->최대 1,800건, 고유 상표
+  // 37,688->182,238)으로 지역 판정이 늘었다. #12(normalized_exact만 확정)·#116 partial
+  // 게이트·regionalCoverageThreshold 0.6도 함께 반영됐다.
+  assert.equal(coverage.total, 1827);
+  assert.equal(coverage.decided, 1812);
+  assert.equal(coverage.applied, 1130);
+  assert.equal(coverage.pending, 15);
+  assert.equal(Math.round(coverage.rate * 100), 62);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  // 2026-09-01(#116): 요약 첫 칸을 "전국 특산품 수"로 바꿈. 분모(1,805)와 출원 확인(1,042)이
+  // 2026-09-01(#116): 요약 첫 칸을 "전국 특산품 수"로 바꿈. 분모와 출원 확인 수가
   // 모두 요약 탭에 노출돼야 한다.
   assert.match(visibleTextHtml, new RegExp(`전국 특산품 수[\\s\\S]{0,60}${localeNumber(coverage.total)}`));
   assert.match(visibleTextHtml, new RegExp(`출원 확인 ${localeNumber(coverage.applied)}개`));
@@ -216,24 +219,28 @@ test("keeps item totals, registration denominator, and pending states explicit",
   );
   const driedPersimmon = officialRows.filter(({ item }) => item.itemName === "감말랭이");
   assert.equal(driedPersimmon.length, 3);
+  // 2026-09-04(#70 첫 풀 실행): 깊은 재수집 + #12(normalized_exact만 확정)로 감말랭이
+  // 세 지역 주소 일치 출원 합계가 이전 66건에서 갱신됐다.
   assert.equal(
     driedPersimmon.reduce((sum, { item }) => sum + item.metrics.uniqueTrademarkCount.value, 0),
-    66,
-    "감말랭이 66건은 세 지역의 주소 일치 출원 합계여야 함",
+    38,
+    "감말랭이는 세 지역의 주소 일치 출원 합계여야 함",
   );
   assert.equal(
     driedPersimmon.reduce((sum, { item }) => sum + item.metrics.registeredTrademarkCount.value, 0),
-    42,
-    "감말랭이 등록 42건은 같은 66건 중 등록 상태 합계여야 함",
+    22,
+    "감말랭이 등록 건수는 같은 출원 중 등록 상태 합계여야 함",
   );
-  // 2026-08-20: 블루베리(신선한 블루베리·31류)는 이번 재수집 대상(사과 등 183개 쿼리)에
-  // 포함돼 partial -> complete로 바뀌었다(전국 검색 329건 -> 1,294건, 지역 판정도 완료).
-  // 아직 판정 대기 상태를 보여주는 예시로는 이번 재수집 대상이 아니었던 "벌꿀"을 대신 쓴다.
+  // 2026-09-04(#116 partial 게이트 + #70): 전국 검색이 상한(#50 노이즈 억제)에 걸린 품목은
+  // 이제 blocked가 아니라 "부분 검증(partial)"으로 최소 확인값을 보여준다. "벌꿀"이 그 예시.
   const honey = officialRows.filter(({ item }) => item.itemName === "벌꿀");
   assert.ok(honey.length > 0, "벌꿀은 고시명칭·NICE류가 확인된 품목이어야 함");
   assert.ok(honey.every(({ item }) => item.dataState === "partial"));
-  assert.ok(honey.every(({ item }) => item.metrics.uniqueTrademarkCount.availability === "blocked"));
-  assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.value === 213));
+  assert.ok(
+    honey.every(({ item }) => item.metrics.uniqueTrademarkCount.partial === true),
+    "전국 검색 상한에 걸린 품목은 지역 출원 수를 partial(최소 확인값)로 표시해야 함",
+  );
+  assert.ok(honey.every(({ item }) => item.metrics.nationwideSearchTrademarkCount.status === "partial"));
 });
 
 test("tags official items with a category and lets the items tab filter by it", async () => {
@@ -274,7 +281,8 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   const excluded = candidates.filter((entry) => !hasGoodsEvidence(entry));
   const pepperCandidates = candidates.filter(({ item }) => item.noticeName?.includes("고추"));
   assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
-  assert.equal(excluded.length, 86, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 available 0건 후보가 86 -> 211로 늘었다.
+  assert.equal(excluded.length, 211, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
   assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
@@ -381,7 +389,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
-  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 861);
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 1000);
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
   // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
@@ -390,10 +398,12 @@ test("ships a valid dashboard snapshot", async () => {
   // 성격의 이 필드에서 제외한다 — scripts/auditDashboardSnapshot.js가 정확히 이
   // "전국 제외" 기준으로 검증한다(catalogItemCount는 전국 포함 원본 전체). #114)
   // 2026-08-31(#117): 농촌진흥청 지역특화작목 69개를 도 단위 공식 특산품으로 병합해
-  // 1648->1688, catalogItemCount 1868->1937로 늘었다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1688);
+  // 1648->1688로 늘었다.
+  // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집으로 지역 판정이 1688->1812, 출원인 주소
+  // 확인이 77,312->92,305로 늘었다.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1812);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 77312);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 92305);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -402,7 +412,8 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "nfqs_geographical_indication"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
-  assert.equal(snapshot.coverage.catalogItemCount, 1937);
+  // 2026-09-04(#70): 지역 특산품 1805->1827(깊은 재수집) + 전국 카탈로그 132 = 1959.
+  assert.equal(snapshot.coverage.catalogItemCount, 1959);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 132);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
@@ -481,13 +492,15 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1715, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1826.
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1826, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
   assert.equal(regionalForestItems.length, 27);
-  assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 14);
-  assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 121);
+  // 깊은 재수집으로 임산물 27개 전부 available, 지역 출원 합계 121 -> 297.
+  assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 27);
+  assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 297);
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
@@ -696,6 +709,13 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   assert.match(standaloneHtml, /class="trend-range-track"/, "양 끝 드래그 핸들 구간 조절 바가 있어야 함");
   assert.match(standaloneHtml, /id="trend-range-handle-start"/);
   assert.match(standaloneHtml, /id="trend-range-handle-end"/);
+  // #136: 요약의 전국 추이에도 같은 기간 조절을 제공하고, 지역을 바꿀 때 이전 범위가
+  // 새 지역의 최초 연도보다 앞서 핸들이 화면 밖으로 사라지지 않도록 양쪽 경계를 고정한다.
+  assert.match(standaloneHtml, /id="summary-trend-start-input"/);
+  assert.match(standaloneHtml, /id="summary-trend-range-handle-start"/);
+  assert.match(standaloneHtml, /adjustable: true/);
+  assert.match(standaloneHtml, /const clampTrendRange = \(startYear, endYear, fullStart, fullEnd\) => \{/);
+  assert.match(standaloneHtml, /Math\.max\(fullStart, Math\.min\(startYear \?\? fullStart, fullEnd\)\)/);
   // 2026-09-02(#116): 지도를 맨 위 전체 폭으로 크게 두고, 그 아래에 광역 구성·추이·요약을
   // 한 행으로 배치한다. 추이 그래프는 소스 순서상 지도 카드보다 먼저 나온다(DOM 순서 유지).
   assert.ok(
@@ -726,6 +746,12 @@ test("defaults municipality lookup to a responsive province overview with cleane
   assert.match(standaloneHtml, /regionKey: ""/, "초기 지자체 선택은 특정 시군구가 아니어야 함");
   assert.match(standaloneHtml, /function provinceDetail\(province, regions\)/);
   assert.match(standaloneHtml, /광역 기본 보기/);
+  // #117 최신 댓글: 광역 전체 행을 시군구 목록에 섞지 않고, 유형별 출원·등록 비중을
+  // 먼저 보여준 뒤 세부 시군구를 접힌 토글로 연다.
+  assert.match(standaloneHtml, /const municipalities = regions\.filter\(\(region\) => region\.sigungu && region\.sigungu !== region\.sido\)/);
+  assert.match(standaloneHtml, /특산품 유형별 출원·등록 비중/);
+  assert.match(standaloneHtml, /categoryShareDonutHtml\(items, "uniqueTrademarkCount", "출원"\)/);
+  assert.match(standaloneHtml, /<details class="province-municipalities"><summary><span>세부 시군구 보기/);
   assert.match(standaloneHtml, /state\.regionKey = ""; state\.itemId = "";/, "광역 선택 시 시군구 선택을 해제해야 함");
   assert.match(
     standaloneHtml,
@@ -821,6 +847,10 @@ test("generates a self-contained standalone dashboard", async () => {
   // 상태에서 향후 확장 제안을 이어가도록 화면 구조를 단순화한다.
   assert.doesNotMatch(html, /지역 출원 미확인|function gapsScreen\(\)|id="gap-search"/);
   assert.match(html, /미출원\(검토중\)/);
+  // #136: 비즈니스 전략의 주요 품목은 잘 안 보이는 select 대신 즉시 누르는 토글로 제공.
+  assert.match(html, /class="strategy-featured-options"/);
+  assert.match(html, /data-strategy-sample=/);
+  assert.doesNotMatch(html, /<select id="strategy-item">/);
   assert.match(html, /특화작목 비교/);
   assert.doesNotMatch(html, /class="compare-readiness"/);
   assert.match(html, /공식 원본 반영 완료/);
