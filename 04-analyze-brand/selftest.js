@@ -786,11 +786,21 @@ console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론
     1,
     "같은 검토본 재적용은 provenance를 중복시키지 않음"
   );
+  // strict=true면 검토 행이 안 맞을 때 예전처럼 즉시 실패한다(검토본 갓 만들었을 때 검증용).
   assert.throws(
-    () => applyRawGoodsReview(analysis, [{ ...review[0], itemName: "없는 품목" }]),
+    () => applyRawGoodsReview(analysis, [{ ...review[0], itemName: "없는 품목" }], { strict: true }),
     /일치하는 ④ 지역×품목이 없습니다/
   );
-  ok("복합 지역명 보정, 건수·등록률·exact/contains·근거·상위 집계를 함께 재현");
+  // 2026-09-04: 기본(strict 아님)은 못 맞춘 검토 행을 건너뛰고 나머지를 적용한다 —
+  // 검토본은 고정인데 특산품 수집은 계속 바뀌므로 전체 파이프라인이 멈추면 안 된다.
+  const leni = applyRawGoodsReview(analysis, [
+    review[0],
+    { ...review[0], sigungu: "경기도 > 없는군", itemName: "깻잎" },
+  ]);
+  assert.strictEqual(leni.rawGoodsReview.appliedRowCount, 1, "맞는 행만 적용");
+  assert.strictEqual(leni.rawGoodsReview.skippedRowCount, 1, "안 맞는 행은 건너뛰고 집계");
+  assert.match(leni.rawGoodsReview.skippedRows[0].reason, /no_matching_region_item/);
+  ok("복합 지역명 보정, 건수·등록률·exact/contains·근거·상위 집계 재현 + 드리프트 행 건너뛰기");
 }
 
 runNationwideFlowTests()

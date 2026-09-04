@@ -60,8 +60,12 @@ function main() {
     regionalCoverageThreshold: args.regionalCoverageThreshold,
   });
   analysis.provenance.inputFile = inputPath;
-  if (args.rawGoodsReview) {
-    const reviewPath = path.resolve(args.rawGoodsReview);
+  // parseArgs는 플래그를 그대로 키로 쓴다(`--raw-goods-review` → `args["raw-goods-review"]`).
+  // 과거엔 존재하지 않는 `args.rawGoodsReview`(카멜)만 확인해 이 옵션이 조용히 무시됐고,
+  // 그 결과 전체 파이프라인 재실행마다 검토 승인 원물명 213건이 사라졌다(2026-09-04 발견).
+  const rawGoodsReviewPath = args["raw-goods-review"] || args.rawGoodsReview;
+  if (rawGoodsReviewPath) {
+    const reviewPath = path.resolve(rawGoodsReviewPath);
     let review;
     try {
       review = JSON.parse(fs.readFileSync(reviewPath, "utf8").replace(/^\uFEFF/, ""));

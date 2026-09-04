@@ -29,7 +29,11 @@ function normalizeRegion(sidoValue, sigunguValue) {
 
 function rowKey(row) {
   const { sido, sigungu } = normalizeRegion(row.sido, row.sigungu);
-  return [sido, sigungu, clean(row.itemName)].join("\u001f");
+  // niceClass까지 키에 넣는다: 같은 지자체·품목명이라도 원물명 미분류 행(niceClass 없음)과
+  // 고시명칭 매칭 행(예: "신선한 복분자" NICE 31)은 별개 행이다 — 구분 안 하면 수집에 두
+  // 행이 다 생겼을 때 "중복 지역×품목"으로 잘못 걸린다(2026-09-04, 고창군 복분자 등 3건).
+  // 검토본 행은 niceClass가 없어 clean() 결과가 원물 행(null→"")과 같아 매칭이 유지된다.
+  return [sido, sigungu, clean(row.itemName), clean(row.niceClass)].join("\u001f");
 }
 
 function regionLabel(sido, sigungu) {
@@ -304,20 +308,33 @@ function applyRawGoodsReview(analysis, reviewDocument, options = {}) {
     targets.set(key, row);
   }
   const appliedRows = [];
+  // 검토본(raw-item-goods-review-v1.json)은 2026-08-20 시점의 사람 판정으로 고정돼 있고,
+  // 그 뒤로 특산품 수집이 계속 바뀐다(품목이 고시명칭 매칭으로 승격되거나 이름·지역이
+  // 달라짐). 그럴 때 검토 행 하나 안 맞는다고 전체 파이프라인을 멈추면 안 된다 — 기본은
+  // 못 맞춘 행을 건너뛰고 나머지를 적용한다. strict=true면 예전처럼 즉시 실패(검토본을 갓
+  // 만들어 검증할 때). 2026-09-04: --raw-goods-review 플래그가 애초에 안 먹던 버그를 고치자
+  // 이 드리프트가 처음 드러났다(알밤한우/공주시가 고시명칭 매칭으로 승격됨).
+  const strict = Boolean(options.strict);
+  const skippedRows = [];
   const maxExamples = Number(options.maxRecentBrands ?? analysis.parameters?.maxRecentBrands ?? 10);
   if (!Number.isInteger(maxExamples) || maxExamples < 1 || maxExamples > 100) {
     throw new Error("maxRecentBrands는 1~100 범위의 정수여야 합니다.");
   }
   for (const reviewedRow of review.rows) {
     const key = rowKey(reviewedRow);
+    const label = key.replace(/\u001f/g, " / ");
     const target = targets.get(key);
     if (!target) {
-      throw new Error(`검토 행과 일치하는 ④ 지역×품목이 없습니다: ${key.replace(/\u001f/g, " / ")}`);
+      if (strict) throw new Error(`검토 행과 일치하는 ④ 지역×품목이 없습니다: ${label}`);
+      skippedRows.push({ key: label, reason: "no_matching_region_item" });
+      continue;
     }
     if (!new Set(["raw_item_name_unclassified", "raw_item_goods_matched"]).has(target.matchingBasis)) {
-      throw new Error(
-        `검토 행의 ④ matchingBasis가 원물명 미분류가 아닙니다: ${key.replace(/\u001f/g, " / ")} / ${target.matchingBasis}`
-      );
+      if (strict) {
+        throw new Error(`검토 행의 ④ matchingBasis가 원물명 미분류가 아닙니다: ${label} / ${target.matchingBasis}`);
+      }
+      skippedRows.push({ key: label, reason: `matching_basis_${target.matchingBasis}` });
+      continue;
     }
     const regionalStatusCounts = statusCounts(reviewedRow.apps);
     const matchCounts = goodsCounts(reviewedRow.apps);
@@ -393,6 +410,8 @@ function applyRawGoodsReview(analysis, reviewDocument, options = {}) {
       (sum, row) => sum + Number(row.goodsReviewRequiredHitCount || 0),
       0
     ),
+    skippedRowCount: skippedRows.length,
+    skippedRows,
   };
   analysis.provenance = analysis.provenance || {};
   analysis.provenance.rawGoodsReview = analysis.rawGoodsReview;
