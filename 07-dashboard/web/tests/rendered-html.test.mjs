@@ -903,7 +903,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /광역별 상표 출원·등록 구성/);
   assert.match(html, /cropBadgeHtml\(item, true\)/);
   assert.match(html, /crop-badge-대표작목/);
-  assert.match(html, /<th>그룹<\/th><th>데이터명<\/th><th>수집 항목<\/th>/);
+  // UI 검토(#136) 14번: th에 scope를 붙여 스크린리더가 열/행 헤더를 구분할 수 있게 함.
+  assert.match(html, /<th scope="col">그룹<\/th><th scope="col">데이터명<\/th><th scope="col">수집 항목<\/th>/);
   assert.match(html, /source-group/);
   assert.doesNotMatch(html, /data-trend-preset=|추이 그래프 기간 프리셋/);
   assert.match(html, /dashboardClient\(/);

@@ -1089,6 +1089,24 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }, [regionalRegions]);
   // 이슈 #116(2026-09-01): 지역·품목별 조회 탭 안의 지역별/품목별 토글.
   const goExplore = (mode: "region" | "item") => { setTab(mode === "item" ? "items" : "applications"); setSelectedRegionCode(""); setSelectedItemId(""); };
+  // UI 검토(#136) 14번: 상단 탭이 role·aria-selected·aria-controls 없는 일반 버튼이라
+  // 스크린리더에 "탭"으로 전달되지 않았다 — 서브내비(exploreSubnav)는 이미 role="tablist"
+  // 패턴을 쓰고 있어 같은 기준을 최상단 탭에도 맞춘다. 화살표 키로 탭 사이를 이동하며
+  // 이동과 동시에 활성화한다(WAI-ARIA APG의 automatic activation 패턴).
+  function handlePrimaryTabsKeyDown(event: React.KeyboardEvent<HTMLElement>) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const lastIndex = PRIMARY_NAV.length - 1;
+    const currentIndex = Math.max(0, PRIMARY_NAV.findIndex(({ key }) => key === tab || (key === "applications" && EXPLORE_TABS.includes(tab))));
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = currentIndex >= lastIndex ? 0 : currentIndex + 1;
+    else if (event.key === "ArrowLeft") nextIndex = currentIndex <= 0 ? lastIndex : currentIndex - 1;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = lastIndex;
+    const nextKey = PRIMARY_NAV[nextIndex].key;
+    setTab(nextKey);
+    requestAnimationFrame(() => document.getElementById(`primary-tab-${nextKey}`)?.focus());
+  }
   const exploreSubnav = (mode: "region" | "item") => <div className="explore-subnav" role="tablist" aria-label="지역·품목별 조회 전환">
     <button type="button" role="tab" aria-selected={mode === "region"} className={mode === "region" ? "active" : ""} onClick={() => goExplore("region")}>지역별</button>
     <button type="button" role="tab" aria-selected={mode === "item"} className={mode === "item" ? "active" : ""} onClick={() => goExplore("item")}>품목별</button>
@@ -1127,10 +1145,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     .slice(0, 12), [strategySampleGroups]);
   const selectedStrategyGroup = strategyItemGroups.find((group) => group.name === strategyItem) || null;
   return <main className="shell">
-    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span><button type="button" className="copy-link-button" onClick={copyCurrentLink}>{linkCopied ? "복사됨" : "이 화면 링크 복사"}</button></div></header>
-    <nav className="primary-tabs" aria-label="대시보드 화면">{PRIMARY_NAV.map(({ key, label }) => { const active = tab === key || (key === "applications" && EXPLORE_TABS.includes(tab)); return <button type="button" key={key} className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={() => { if (key === "applications" && EXPLORE_TABS.includes(tab)) return; setTab(key); }}>{label}</button>; })}</nav>
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><h1>지역 특산품-상표 분석·정책지원 플랫폼</h1></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span><button type="button" className="copy-link-button" onClick={copyCurrentLink}>{linkCopied ? "복사됨" : "이 화면 링크 복사"}</button></div></header>
+    <nav className="primary-tabs" role="tablist" aria-label="대시보드 화면" onKeyDown={handlePrimaryTabsKeyDown}>{PRIMARY_NAV.map(({ key, label }) => { const active = tab === key || (key === "applications" && EXPLORE_TABS.includes(tab)); return <button type="button" key={key} id={`primary-tab-${key}`} role="tab" aria-selected={active} aria-controls={`primary-tabpanel-${key}`} tabIndex={active ? 0 : -1} className={active ? "active" : ""} onClick={() => { if (key === "applications" && EXPLORE_TABS.includes(tab)) return; setTab(key); }}>{label}</button>; })}</nav>
 
-    {tab === "summary" && <>
+    {tab === "summary" && <section role="tabpanel" id="primary-tabpanel-summary" aria-labelledby="primary-tab-summary">
       {/* 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮긴다 —
           "전국 특산품 수" 카드가 그 지표 바와 겹쳐 보인다는 지적. 지도 지표 토글에 연동되는
           출원율·등록률 링만 왼쪽 열에 남기고, 특산품 수·상표 건수 단독 카드는 뺀다. */}
@@ -1156,16 +1174,16 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
          <div className="ranking-stack">
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.uniqueTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품등록랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "등록 완료"], registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.registeredTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.uniqueTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품등록랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "등록 완료"], registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.registeredTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
          </div>
         </div>
       </section>
       {/* 이슈 #118: 요약 화면에 전국 출원·등록 추이 그래프를 부각한다. */}
       <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
-    </>}
+    </section>}
 
-    {tab === "applications" && <section className="screen-section coverage-screen">
+    {tab === "applications" && <section className="screen-section coverage-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       {exploreSubnav("region")}
       <div className="province-tabbar region-quick-filter" role="group" aria-label="시도 바로가기">
         <button type="button" className={!selectedProvince ? "active" : ""} onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>전국</button>
@@ -1236,7 +1254,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>
     </section>}
 
-    {tab === "regions" && <section className="screen-section region-detail-screen">
+    {tab === "regions" && <section className="screen-section region-detail-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       {exploreSubnav("region")}
       <button type="button" className="drill-back" onClick={() => setTab("applications")}>← 전국 시도 비교로</button>
       <p className="screen-note">선택한 지역의 특산품·상표를 시도 → 시군구 → 품목 순으로 파고듭니다. 다른 시도를 눌러 바로 이동할 수도 있습니다.</p>
@@ -1264,7 +1282,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>
     </section>}
 
-    {tab === "items" && <section className="screen-section">
+    {tab === "items" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       {exploreSubnav("item")}
       <div className="item-category-filter region-quick-filter" role="group" aria-label="품목 유형 필터"><button type="button" className={categoryFilter === "" ? "active" : ""} onClick={() => setCategoryFilter("")}>전체</button>{availableCategories.map((category) => <button type="button" key={category.code} className={categoryFilter === category.code ? "active" : ""} onClick={() => setCategoryFilter(category.code)}>{category.label}</button>)}</div>
       <label className="search-field explore-search"><span className="sr-only">품목 또는 지역 검색</span><input type="search" value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
@@ -1308,7 +1326,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </div>
     </section>}
 
-    {tab === "strategy" && <section className="screen-section strategy-screen">
+    {tab === "strategy" && <section className="screen-section strategy-screen" role="tabpanel" id="primary-tabpanel-strategy" aria-labelledby="primary-tab-strategy">
       <p className="screen-note">품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>
       <div className="strategy-item-selector">
         <div className="strategy-featured"><span>주요 특산품</span><div className="strategy-featured-options" role="group" aria-label="주요 특산품 바로 선택">
@@ -1345,7 +1363,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </>}
     </section>}
 
-    {tab === "compare" && <section className="screen-section">
+    {tab === "compare" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-compare" aria-labelledby="primary-tab-compare">
       <p className="screen-note">농촌진흥청이 2025년에 지정한 9개 도·69개 특화작목과 지역 주소 일치 상표 현황을 비교합니다.</p>
       <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
       {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}
@@ -1384,7 +1402,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <div className="compare-sources"><article><span>공식 근거</span><strong>농촌진흥청 2025년도 지역특화작목 현황</strong><p>제1차 종합계획(2021~2025) 종료 시점의 69개 배정을 사용합니다.</p></article><article><span>지역 판정</span><strong>출원인 주소를 도 단위로 대조</strong><p>검색 상한에 도달한 품목은 0건으로 확정하지 않고 집계 대기로 표시합니다.</p></article></div>
     </section>}
 
-    {tab === "data" && pipeline && <section className="screen-section data-overview">
+    {tab === "data" && pipeline && <section className="screen-section data-overview" role="tabpanel" id="primary-tabpanel-data" aria-labelledby="primary-tab-data">
       <section className="criteria" aria-label="판정 기준과 매칭 방법">
         <strong className="criteria-title">판정 기준과 매칭 방법</strong>
         <div className="criteria-line">
@@ -1400,7 +1418,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합{snapshot.coverage.regionItemCount > pipeline.rowCounts.total ? ` · 복수 품목 행 분리 +${number(snapshot.coverage.regionItemCount - pipeline.rowCounts.total)}` : ""}</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
       <div className="data-summary-grid"><article className="data-summary-card"><h2>특산물 데이터</h2><div className="data-stat"><strong>{number(uniqueSpecialtyCount)}개</strong><span>고유 특산품명</span></div><div className="data-stat"><strong>{number(snapshot.coverage.regionItemCount)}개</strong><span>지역-품목 조합</span></div><div className="data-stat"><strong>{number(snapshot.coverage.observedRegionCount)}개</strong><span>관측 지역</span></div><p className="data-card-note">같은 특산물도 지역이 다르면 별도 관측 단위로 관리합니다.</p></article><article className="data-summary-card"><h2>상표 매칭 결과</h2><div className="match-bars"><div><span>특산품 출원율 <b>{percent(nationalSpecialtyCoverage.rate)}</b></span><em><i style={{ width: `${Math.round((nationalSpecialtyCoverage.rate || 0) * 100)}%` }} /></em><small>출원 확인 {number(nationalSpecialtyCoverage.applied)} / 전체 수집 특산품 {number(nationalSpecialtyCoverage.total)}(지역별 집계 완료 {number(nationalSpecialtyCoverage.decided)})</small></div><div><span>고유 상표 주소 확보 <b>{number(pipeline.applicantRegionVerification.verifiedCount)}건</b></span><em><i style={{ width: `${Math.round((pipeline.applicantRegionVerification.rate || 0) * 100)}%` }} /></em><small>전국 고유 후보 중 {percent(pipeline.applicantRegionVerification.rate)}</small></div><div><span>지역별 출원 수 표시 가능 <b>{number(pipeline.regionalMetricGate.availableRegionItemCount)}개</b></span><em><i style={{ width: `${Math.round(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal) * 100)}%` }} /></em><small>전체 {number(gateTotal)}개 지역-품목 중 {percent(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal))}</small></div></div><p className="match-explanation">특산품 출원율은 현재 수집된 지역×특산품 전체 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 전체 {number(nationalSpecialtyCoverage.total)}개 중 명칭 확인이나 지역별 집계가 덜 끝난 항목도 분모에 포함하며, 출원이 확인될 때만 분자에 더합니다 — 후속 확인이 진행되면 값이 올라갈 수 있습니다.</p></article></div>
       <div className="data-reading-note"><strong>숫자를 읽는 법</strong><p><b>특산품 출원율 = 지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수</b>입니다. 명칭 확인이나 지역별 집계가 아직 끝나지 않은 항목도 분모에 포함하고 분자에는 넣지 않습니다. <b>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}건</b>은 출원번호 중복을 제거한 전국 검색 후보이며, 등록 비율은 지역 주소 일치 출원 중 등록 상태인 건의 비율로 별도 계산합니다. 검색이 부분 수집 상태인 품목은 0건으로 확정하지 않고 <b>지역별 집계 대기</b>로 표시합니다.</p></div>
-      <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>그룹</th><th>데이터명</th><th>수집 항목</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).sort((a, b) => sourceGroupRank(a.sourceId) - sourceGroupRank(b.sourceId)).map((source) => <tr key={source.sourceId}><td><span className="source-group">{sourceGroup(source.sourceId)}</span></td><th scope="row">{source.sourceLabel || source.sourceId}</th><td>{sourceItems(source.sourceId)}</td><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><td><span className="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
+      <section className="provenance"><div className="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>{snapshot.schemaVersion}</span></div><div className="source-table-wrap"><table className="source-table"><caption className="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th scope="col">그룹</th><th scope="col">데이터명</th><th scope="col">수집 항목</th><th scope="col">출처</th><th scope="col">수집 소스</th><th scope="col">수집 방법</th><th scope="col">최근 수집 일자</th></tr></thead><tbody>{snapshot.sources.filter((source) => source.sourceUrl).sort((a, b) => sourceGroupRank(a.sourceId) - sourceGroupRank(b.sourceId)).map((source) => <tr key={source.sourceId}><td><span className="source-group">{sourceGroup(source.sourceId)}</span></td><th scope="row">{source.sourceLabel || source.sourceId}</th><td>{sourceItems(source.sourceId)}</td><td><a href={source.sourceUrl || "#"} target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>{source.sourceContractVersion || "버전 미기록"}</td><td>{sourceMethod(source.sourceId)}</td><td>{dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt))}</td></tr>)}<tr><td><span className="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href={geometry.boundaryReference.sourceUrl} target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>{geometry.boundaryReference.sourceName}</td><td>경계 파일 생성·코드 조인</td><td>{geometry.boundaryReference.sourceBasis.match(/\d{4}/)?.[0] || "미기록"}</td></tr></tbody></table></div></section>
     </section>}
 
     <footer><div className="footer-brand"><img className="footer-logo" src="/images/kiip-logo-lockup.png" alt="한국지식재산연구원 Korea Institute of Intellectual Property" height={26} /><span>지역 특산품-상표 분석·정책지원 플랫폼</span></div><span>Snapshot {snapshot.snapshotId} · 업데이트 {date(dashboardUpdatedAt)}</span></footer>
