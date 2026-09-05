@@ -495,11 +495,14 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-head-title strong { font-size: 15px; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strategy-status-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 12px; font-weight: 800; }
 .business-strategy.alert .strategy-status-icon { color: var(--amber); }
-.strategy-status-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 9.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.strategy-status-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 12px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; cursor: help; }
 .business-strategy.alert .strategy-status-badge { color: var(--amber); }
+/* UI 검토(#136) 07번: 표본이 작을 때(고유 상표 5건 미만) 백분율 대신 실제 건수를
+   강조하는 표식 */
+.small-sample-mark { display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 999px; background: rgba(163, 64, 53, .12); color: var(--red); font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: help; }
 .strategy-stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .strategy-stat { padding: 7px 12px; border-radius: 10px; background: rgba(255,255,255,.7); }
-.strategy-stat span { display: block; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
+.strategy-stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
 .strategy-stat strong { display: block; margin-top: 3px; color: var(--ink); font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
 .business-strategy-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
 .business-strategy-list li { position: relative; padding-left: 16px; color: var(--ink); font-size: 12px; line-height: 1.65; }

@@ -495,11 +495,14 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-head-title strong { font-size: 15px; letter-spacing: -.015em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .strategy-status-icon { display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0; width: 24px; height: 24px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 12px; font-weight: 800; }
 .business-strategy.alert .strategy-status-icon { color: var(--amber); }
-.strategy-status-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 9.5px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+.strategy-status-badge { flex-shrink: 0; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.75); color: var(--green-dark); font-size: 12px; font-weight: 800; letter-spacing: .02em; white-space: nowrap; cursor: help; }
 .business-strategy.alert .strategy-status-badge { color: var(--amber); }
+/* UI 검토(#136) 07번: 표본이 작을 때(고유 상표 5건 미만) 백분율 대신 실제 건수를
+   강조하는 표식 */
+.small-sample-mark { display: inline-block; margin-left: 5px; padding: 1px 6px; border-radius: 999px; background: rgba(163, 64, 53, .12); color: var(--red); font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none; cursor: help; }
 .strategy-stat-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .strategy-stat { padding: 7px 12px; border-radius: 10px; background: rgba(255,255,255,.7); }
-.strategy-stat span { display: block; color: var(--muted); font-size: 9px; font-weight: 700; letter-spacing: .02em; }
+.strategy-stat span { display: block; color: var(--muted); font-size: 12px; font-weight: 700; letter-spacing: .02em; }
 .strategy-stat strong { display: block; margin-top: 3px; color: var(--ink); font-size: 14px; font-weight: 800; letter-spacing: -.01em; }
 .business-strategy-list { display: grid; gap: 8px; margin: 14px 0 0; padding: 0; list-style: none; }
 .business-strategy-list li { position: relative; padding-left: 16px; color: var(--ink); font-size: 12px; line-height: 1.65; }
@@ -1220,15 +1223,28 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   // 이슈 #116(2026-08-26) 사용자 재요청: 상태 아이콘·배지, 근거 수치 스탯 줄, 문장별 도트
   // 마커로 가독성을 높였다 — Dashboard.tsx의 BusinessStrategyCard와 동일 구조.
+  // UI 검토(#136) 07번: "고유 상표 1건·등록률 100%는 공백 알림, 6건·등록률 17%는 양호"처럼
+  // 배지 판정이 눈에 보이는 근거와 반대로 보인다는 지적 — 실제로는 출원 건수(5건 도달 시
+  // 포화)와 등록률을 7:3 가중으로 종합한 결과라(05-detect-brand-gap/lib/scorer.js), 건수가
+  // 적으면 등록률이 높아도 공백으로 판정될 수 있다. "AI 판정" 표시는 넣지 않되(사용자 지침),
+  // 배지에 이 판정 기준을 그대로 풀어서 설명한다. 분모가 작을 때(5건 미만)는 100%·0% 같은
+  // 백분율 대신 분수(N/M건) + "표본 적음" 표식을 덧붙인다.
+  const SMALL_SAMPLE_TRADEMARK_COUNT = 5;
+  const GAP_BADGE_CRITERIA = "상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합 평가합니다 — 출원 건수가 적으면 등록률이 높아도 공백 알림으로 표시될 수 있습니다.";
   const businessStrategyCardHtml = (briefing, title, footerHtml = "") => {
     const evidence = briefing.evidence || {};
+    const uniqueCount = evidence.uniqueTrademarkCount;
+    const isSmallSample = typeof uniqueCount === "number" && uniqueCount > 0 && uniqueCount < SMALL_SAMPLE_TRADEMARK_COUNT;
+    const registeredCount = isSmallSample && typeof evidence.registrationRate === "number" ? Math.round(uniqueCount * evidence.registrationRate) : null;
+    const registrationDisplay = isSmallSample && registeredCount !== null ? `${registeredCount}/${uniqueCount}건` : percent(evidence.registrationRate);
+    const smallSampleMarkHtml = isSmallSample ? `<em class="small-sample-mark" title="${esc(`표본이 적어(고유 상표 ${SMALL_SAMPLE_TRADEMARK_COUNT}건 미만) 백분율보다 실제 건수로 보는 게 정확합니다.`)}">표본 적음</em>` : "";
     const stats = [
       typeof evidence.uniqueTrademarkCount === "number" ? `<div class="strategy-stat"><span>고유 상표</span><strong>${number(evidence.uniqueTrademarkCount)}건</strong></div>` : "",
-      typeof evidence.registrationRate === "number" ? `<div class="strategy-stat"><span>등록률</span><strong>${percent(evidence.registrationRate)}</strong></div>` : "",
+      typeof evidence.registrationRate === "number" ? `<div class="strategy-stat"><span>등록률${smallSampleMarkHtml}</span><strong>${registrationDisplay}</strong></div>` : "",
       typeof evidence.localApplicantShare === "number" ? `<div class="strategy-stat"><span>지역 출원인 비중</span><strong>${percent(evidence.localApplicantShare)}</strong></div>` : "",
     ].join("");
     return `<section class="business-strategy${briefing.isGapAlert ? " alert" : ""}">
-      <div class="strategy-head"><div class="strategy-head-title"><span class="strategy-status-icon" aria-hidden="true">${briefing.isGapAlert ? "!" : "✓"}</span><strong>${esc(title)}</strong></div><span class="strategy-status-badge">${briefing.isGapAlert ? "공백 알림" : "양호"}</span></div>
+      <div class="strategy-head"><div class="strategy-head-title"><span class="strategy-status-icon" aria-hidden="true">${briefing.isGapAlert ? "!" : "✓"}</span><strong>${esc(title)}</strong></div><span class="strategy-status-badge" title="${esc(GAP_BADGE_CRITERIA)}">${briefing.isGapAlert ? "공백 알림" : "양호"}</span></div>
       ${stats ? `<div class="strategy-stat-row">${stats}</div>` : ""}
       <ul class="business-strategy-list">${briefing.sentences.map((sentence) => `<li>${esc(displayRegionName(sentence))}</li>`).join("")}</ul>
       ${footerHtml ? `<p class="business-strategy-footer">${footerHtml}</p>` : ""}
