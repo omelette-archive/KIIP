@@ -645,7 +645,11 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* 이슈 #117: 등급별 특화작목 표 — 지역 / 대표 / 자체육성 / 집중육성 / 출원건수 / 비율 / 상태 */
 .compare-region-table { overflow-x: auto; border: 1px solid var(--line); border-radius: 13px; }
 .compare-region-head, .compare-region-row { display: grid; grid-template-columns: 88px 0.85fr 1.6fr 1fr 76px 74px 60px; align-items: start; gap: 12px; padding: 12px 14px; min-width: 900px; }
+/* UI 검토(#136) 16번: 가로 스크롤 표에서 지역 열이 고정돼 있지 않아 옆으로 넘기면
+   어느 지역 행인지 잃어버렸다 — 첫 열(지역명)을 sticky로 고정한다. */
+.compare-region-head > *:first-child, .compare-region-row > *:first-child { position: sticky; left: 0; z-index: 1; background: inherit; box-shadow: 2px 0 5px rgba(16, 25, 43, .07); }
 .compare-region-head { background: var(--green-dark); color: #cfe0f2; font-size: 11px; font-weight: 800; }
+.compare-region-scroll-hint { display: none; margin: 8px 0 0; color: var(--muted); font-size: 11px; }
 .compare-region-head small { display: block; margin-top: 2px; color: #9fc0e0; font-size: 11px; font-weight: 700; }
 .compare-region-row { border-top: 1px solid var(--line); background: #ffffff; font-size: 12.5px; }
 .compare-region-row:nth-child(odd) { background: #f4f6f9; }
@@ -731,7 +735,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 
 @media (max-width: 620px) {
   .shell { padding: 0 16px 32px; }
-  .topbar { min-height: 74px; }
+  /* UI 검토(#136) 16번: 헤더가 로고+제목+배지를 한 줄에 욱여넣어 제목이 여러 줄로
+     쪼개지던 문제 — 브랜드와 배지 영역을 각각 한 줄 전체로 내려 쌓는다. */
+  .topbar { min-height: auto; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 12px 0; }
+  .brand { flex: 1 1 100%; }
+  .brand strong { font-size: 18px; }
+  .snapshot-meta { flex: 1 1 100%; flex-wrap: wrap; }
   .snapshot-meta > span:last-child { display: none; }
   .hero { padding-top: 18px; }
   .metrics { grid-template-columns: 1fr; }
@@ -748,8 +757,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .detail-grid { grid-template-columns: 1fr; }
   .source-grid { grid-template-columns: 1fr; }
   footer { flex-direction: column; }
-  .primary-tabs { grid-template-columns: repeat(2, 1fr); grid-template-rows: none; grid-auto-flow: row; position: static; }
-  .primary-tabs button { padding: 12px 8px; font-size: 11px; }
+  /* 탭 5개를 2열로 접으면 세로로 3줄(약 330px)을 차지해 지표 카드가 화면 밖으로
+     밀렸다 — 한 줄 유지하고 가로 스크롤로 바꾼다(#136 16번). */
+  .primary-tabs { grid-template-columns: none; grid-auto-flow: column; grid-auto-columns: minmax(104px, auto); overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .primary-tabs button { padding: 12px 10px; font-size: 12px; }
   .map-card, .map-insight, .item-screen { padding: 18px; }
   .ranking { padding: 18px 14px; }
   .ranking .section-heading { gap: 10px; }
@@ -776,6 +787,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .item-card-metrics > div:last-child { border-bottom: 0; }
   .compare-region-table { overflow-x: auto; }
   .compare-region-head, .compare-region-row { min-width: 760px; grid-template-columns: 74px 0.8fr 1.5fr 0.9fr 66px 64px 52px; gap: 8px; }
+  .compare-region-scroll-hint { display: block; }
   .compare-sources { grid-template-columns: 1fr; }
 }
 
