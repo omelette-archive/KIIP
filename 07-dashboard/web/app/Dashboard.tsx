@@ -1363,7 +1363,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <div className="compare-region-rate"><b>{percent(policyRate)}</b><small>{policyApplied}/{policyCrops.length}작목</small></div>
               <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided}/{policyCrops.length}{policyDecided === policyCrops.length ? " 완료" : ""}</span>
             </div>;
-          })}</div></section>
+          })}</div>
+        <p className="compare-region-scroll-hint">← 표가 화면보다 넓습니다. 좌우로 스크롤하면 전체 열을 볼 수 있습니다(지역명 열은 고정).</p>
+      </section>
       <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><CsvDownloadButton onClick={() => downloadCsv(`대표작목TOP5대조_${csvDateStamp(dashboardUpdatedAt)}`, ["도", "대표작목(정책 지정)", "실제 등록 상표 TOP5", "일치 여부"], comparisonRows.filter((row) => row.flagshipCrop).map((row) => [displayRegionName(row.province), stripParens(row.flagshipCrop!.name), row.topRegisteredItems.map((item, index) => `${index + 1}. ${stripParens(item.name)}(${item.count}건)`).join(" / ") || "등록 상표 없음", row.flagshipMatch ? `일치 · ${row.flagshipRank + 1}위` : "불일치"]))} /></div>
         <div className="compare-flagship-table">
           <div className="compare-flagship-head"><span>도</span><span>대표작목(정책 지정)</span><span>실제 등록 상표 TOP5</span><span>일치</span></div>
