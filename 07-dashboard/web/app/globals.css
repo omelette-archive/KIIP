@@ -267,11 +267,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-label { dominant-baseline: middle; fill: #17253d; font-size: 9.5px; font-weight: 800; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(255,255,255,.92); stroke-width: 2.2px; stroke-linejoin: round; }
 .map-label-province { font-size: 12.5px; }
 .map-region-label { pointer-events: none; }
-.map-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 9px; }
+.map-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 13px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .map-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .map-legend strong { margin-left: auto; color: var(--green); }
 .legend-swatch { width: 14px; height: 9px; border: 1px solid #d2d7e0; border-radius: 3px; background: #e3e6ec; }
-.legend-swatch.low { background: #b7d3ec; }.legend-swatch.high { background: #0f5fa6; }
+/* UI 검토(#136) 13번: 값이 낮은 쪽에 몰린 실제 분포에서 연속 선형 스케일은 여러 지역이
+   같은 색으로 뭉쳤다 — 분위수(quantile) 5단계 고정색 + 범례에 실제 경계값을 표기한다.
+   지도(.map-legend)·출원율 지도(.coverage-legend) 모두 같은 구조를 쓴다. */
+.coverage-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.coverage-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.coverage-legend b { margin-left: auto; color: var(--faint); font-weight: 700; }
 .map-warning { margin: 13px 0 0; padding: 10px 12px; border-radius: 9px; background: #fff7e9; color: #795024; font-size: 9.5px; line-height: 1.55; }
 .unclassified-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 9px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; line-height: 1.6; }
 .map-insight { padding: 25px; }
@@ -407,9 +412,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-map-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .coverage-map-stage { min-height: 620px; }
 .coverage-map { width: min(100%, 900px); max-height: 720px; }
-.coverage-legend { display: grid; grid-template-columns: auto minmax(180px, 1fr) repeat(4, auto) minmax(150px, auto); align-items: center; gap: 9px; padding-top: 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10px; }
-.coverage-legend i { height: 11px; border-radius: 999px; background: linear-gradient(90deg, #dde8f4 0%, #aecbe8 25%, #6fa2d1 50%, #2f77b3 75%, #0f5fa6 100%); }
-.coverage-legend b { justify-self: end; color: var(--faint); font-weight: 700; }
 .coverage-directory .section-heading { margin-bottom: 16px; }
 .coverage-directory-heading { align-items: flex-end; }
 .coverage-directory-heading > div { display: flex; align-items: baseline; gap: 12px; }
@@ -758,9 +760,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .coverage-map-card, .coverage-directory { padding: 18px; }
   .coverage-map-actions { justify-content: flex-start; }
   .coverage-map-stage { min-height: 420px; }
-  .coverage-legend { grid-template-columns: auto 1fr auto; }
-  .coverage-legend span:nth-of-type(2), .coverage-legend span:nth-of-type(3), .coverage-legend span:nth-of-type(4) { display: none; }
-  .coverage-legend b { grid-column: 1 / -1; justify-self: start; }
   .coverage-directory .section-heading { align-items: flex-start; flex-direction: column; }
   .coverage-region-head { grid-template-columns: 1fr auto; }
   .coverage-region-head button { grid-column: 1 / -1; justify-self: start; }

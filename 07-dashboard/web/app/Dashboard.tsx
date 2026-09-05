@@ -473,7 +473,41 @@ function openKiprisPopup(applicationNumber: string) { navigator.clipboard?.write
 // 이슈 #116(2026-08-26): 출원번호 앞 2자리로 지리적표시 단체표장(44)·증명표장(48)을 구분해달라는 요청.
 const GI_MARK_LABELS: Record<string, string> = { "44": "GI 단체표장", "48": "GI 증명표장" };
 function giMarkLabel(applicationNumber?: string | null) { return applicationNumber ? GI_MARK_LABELS[applicationNumber.slice(0, 2)] || null : null; }
-function fill(value: number | null, max: number) { if (value === null) return "#e3e6ec"; const ratio = Math.max(0.12, Math.min(1, max ? value / max : 0)); return `color-mix(in srgb, #0f5fa6 ${Math.round(24 + ratio * 68)}%, #e9eef4)`; }
+// UI 검토(#136) 13번: 연속 선형 스케일(min~max를 그대로 24~92% 혼합비로 늘어뜨림)은
+// 값이 낮은 쪽에 몰리는 실제 분포(대부분 지역이 비슷하게 낮고 소수만 아주 높음)에서
+// 16개 시도 중 여러 곳이 같은 색으로 뭉쳐 순위를 구분할 수 없었다(명도 폭 0.31~0.64
+// 관측). 분위수(quantile) 5단계로 바꿔, 값의 순서(몇 번째로 높은가)로 색을 정한다 —
+// 절대값 간격이 아니라 상대 순위가 늘 고르게 5단계로 나뉜다.
+const QUANTILE_BUCKET_COUNT = 5;
+const QUANTILE_FILL_MIXES = [24, 42, 58, 75, 92];
+function quantileBreaks(values: (number | null)[], bucketCount = QUANTILE_BUCKET_COUNT): number[] {
+  const sorted = values.filter((value): value is number => typeof value === "number").sort((a, b) => a - b);
+  if (!sorted.length) return [];
+  const breaks: number[] = [];
+  for (let i = 1; i < bucketCount; i++) {
+    const idx = Math.min(sorted.length - 1, Math.floor(sorted.length * (i / bucketCount)));
+    breaks.push(sorted[idx]);
+  }
+  return breaks;
+}
+function quantileBucket(value: number, breaks: number[]): number {
+  let bucket = 0;
+  for (const cutoff of breaks) if (value > cutoff) bucket++;
+  return bucket;
+}
+function fill(value: number | null, breaks: number[]): string {
+  if (value === null) return "#e3e6ec";
+  const bucket = breaks.length ? quantileBucket(value, breaks) : 0;
+  const mix = QUANTILE_FILL_MIXES[Math.min(bucket, QUANTILE_FILL_MIXES.length - 1)];
+  return `color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)`;
+}
+// 범례에 "낮음/높음" 대신 실제 5분위 경계값을 보여준다 — 어느 색이 대략 몇 건/몇 %부터
+// 시작하는지 바로 읽을 수 있다.
+function quantileLegendSwatches(breaks: number[], formatter: (value: number) => string) {
+  return QUANTILE_FILL_MIXES.map((mix, index) => (
+    <span key={mix}><i className="legend-swatch" style={{ background: `color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)` }} />{index < breaks.length ? `~${formatter(breaks[index])}` : "최고"}</span>
+  ));
+}
 // 2026-08-21: 출원율을 텍스트로만 보여주지 말고 큰 숫자 + 원형 게이지로 한눈에
 // 보여달라는 요청(사용자) — 지도 옆 요약 패널과 지역별 출원율 탭 양쪽에서 공유한다.
 function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: { value: number | null; label?: string; size?: number; strokeWidth?: number }) {
@@ -763,7 +797,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     .sort((a, b) => b[1].trademarks - a[1].trademarks)
     .slice(0, 10);
   const provinceCompositionMax = Math.max(1, ...provinceCompositionRows.map(([, stat]) => stat.trademarks));
-  const mapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : Math.max(1, ...[...provinceStats.values()].map((stat) => mapMetric === "trademarks" ? stat.trademarks : stat.totalItems));
+  const mapBreaks = quantileBreaks(geometry.provinces.map((shape) => mapValue(shape.name)));
   const filteredRegions = useMemo(() => { const keyword = query.trim().toLocaleLowerCase("ko-KR"); return !keyword ? snapshot.regions : snapshot.regions.filter((region) => region.region.toLocaleLowerCase("ko-KR").includes(keyword) || region.items.some((item) => `${itemName(item)} ${item.noticeName || ""}`.toLocaleLowerCase("ko-KR").includes(keyword))); }, [query, snapshot.regions]);
   const groupedRegions = useMemo(() => {
     const groups = new Map<string, Region[]>();
@@ -973,7 +1007,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
   const municipalityGeometry = selectedProvince ? geometry.municipalities[selectedProvince] : null;
-  const municipalityMapMax = mapMetric === "registration" || mapMetric === "applicationCoverage" ? 1 : municipalityGeometry ? Math.max(1, ...municipalityGeometry.items.map((shape) => regionMapValue(findMunicipalityRegion(selectedProvince, shape.name)) || 0)) : 1;
+  const municipalityMapBreaks = municipalityGeometry ? quantileBreaks(municipalityGeometry.items.map((shape) => regionMapValue(findMunicipalityRegion(selectedProvince, shape.name)))) : [];
+  const provinceCoverageBreaks = quantileBreaks(geometry.provinces.map((shape) => mapValue(shape.name, "applicationCoverage")));
+  const municipalityCoverageBreaks = municipalityGeometry ? quantileBreaks(municipalityGeometry.items.map((shape) => regionMapValue(findMunicipalityRegion(selectedProvince, shape.name), "applicationCoverage"))) : [];
   const activeMapViewBox = municipalityGeometry?.viewBox || geometry.viewBox;
   const activeMapShapes = municipalityGeometry?.items || geometry.provinces;
   const activeMapLabels = positionedMapLabels(activeMapShapes, Boolean(municipalityGeometry));
@@ -1112,11 +1148,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="map-toolbar"><div className="map-metrics">{(Object.keys(MAP_LABELS) as MapMetric[]).map((key) => <button type="button" key={key} className={mapMetric === key ? "active" : ""} onClick={() => setMapMetric(key)} title={MAP_DESCRIPTIONS[key]} aria-label={`${MAP_LABELS[key]}: ${MAP_DESCRIPTIONS[key]}`}>{MAP_LABELS[key]}</button>)}</div>{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div>
           <p className="map-metric-description"><strong>{MAP_LABELS[mapMetric]}</strong><span>{MAP_DESCRIPTIONS[mapMetric]}</span></p>
           <div className="map-stage"><svg className="korea-map" viewBox={activeMapViewBox} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구 지도` : "대한민국 시도 지도"}>{municipalityGeometry ? <>
-             {municipalityGeometry.items.map((shape) => { const match = findMunicipalityRegion(selectedProvince, shape.name); const statValue = regionMapValue(match); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(statValue, municipalityMapMax) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} ${mapMetricValueLabel(statValue)}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{displayRegionName(shape.name)} · {mapMetricValueLabel(statValue)}</title></path>; })}
+             {municipalityGeometry.items.map((shape) => { const match = findMunicipalityRegion(selectedProvince, shape.name); const statValue = regionMapValue(match); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(statValue, municipalityMapBreaks) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} ${mapMetricValueLabel(statValue)}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{displayRegionName(shape.name)} · {mapMetricValueLabel(statValue)}</title></path>; })}
           </> : <>
-             {geometry.provinces.map((shape) => <path key={`${shape.name}-shape`} d={shape.d} className={selectedProvince === shape.name ? "map-shape selected" : "map-shape"} style={{ fill: fill(mapValue(shape.name), mapMax) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} ${mapValueLabel(shape.name)}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{displayRegionName(shape.name)} · {mapValueLabel(shape.name)}</title></path>)}
+             {geometry.provinces.map((shape) => <path key={`${shape.name}-shape`} d={shape.d} className={selectedProvince === shape.name ? "map-shape selected" : "map-shape"} style={{ fill: fill(mapValue(shape.name), mapBreaks) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} ${mapValueLabel(shape.name)}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{displayRegionName(shape.name)} · {mapValueLabel(shape.name)}</title></path>)}
           </>}{activeMapLabels.map((label) => label.leader ? <g className="map-region-label map-region-label-callout" key={`${label.name}-label`}><polyline points={`${label.targetX},${label.targetY} ${(label.targetX + label.x) / 2},${(label.targetY + label.y) / 2} ${label.x + 22},${label.y + 4}`} /><text x={label.x} y={label.y} className="map-label map-label-province">{label.displayName}</text></g> : <text key={`${label.name}-label`} x={label.x} y={label.y} className={municipalityGeometry ? "map-label map-label-municipality" : "map-label map-label-province"}>{label.displayName}</text>)}</svg></div>
-          <div className="map-legend"><span><i className="legend-swatch no-data" />데이터 없음</span><span><i className="legend-swatch low" />낮음</span><span><i className="legend-swatch high" />높음</span><strong>{MAP_LABELS[mapMetric]} 기준</strong></div>
+          <div className="map-legend quantile-legend"><span><i className="legend-swatch no-data" />데이터 없음</span>{quantileLegendSwatches(municipalityGeometry ? municipalityMapBreaks : mapBreaks, (value) => mapMetricValueLabel(value))}<strong>{MAP_LABELS[mapMetric]} 5분위</strong></div>
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
          <div className="ranking-stack">
@@ -1168,11 +1204,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         <div className="map-heading"><div><h2>{selectedProvince ? `${displayRegionName(selectedProvince)} 시군구 출원율` : "전국 시도별 출원율"}</h2></div><div className="coverage-map-actions">{selectedProvince && <button className="map-back" type="button" onClick={() => { setSelectedProvince(null); setSelectedMunicipality(null); }}>← 전국</button>}</div></div>
         <p className="map-metric-description"><strong>특산품 출원율</strong><span>지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수 · 명칭 확인·집계 대기도 분모에 포함합니다.</span></p>
         <div className="map-stage coverage-map-stage"><svg className="korea-map coverage-map" viewBox={activeMapViewBox} role="img" aria-label={selectedProvince ? `${selectedProvince} 시군구별 특산품 출원율 지도` : "대한민국 시도별 특산품 출원율 지도"}>{municipalityGeometry ? <>
-          {municipalityGeometry.items.map((shape) => { const match = findMunicipalityRegion(selectedProvince, shape.name); const value = regionMapValue(match, "applicationCoverage"); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-coverage-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(value, 1) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{displayRegionName(shape.name)} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
+          {municipalityGeometry.items.map((shape) => { const match = findMunicipalityRegion(selectedProvince, shape.name); const value = regionMapValue(match, "applicationCoverage"); const active = selectedMunicipality === shape.name; return <path key={`${shape.name}-coverage-shape`} d={shape.d} className={active ? "map-shape selected" : "map-shape"} style={{ fill: fill(value, municipalityCoverageBreaks) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openMunicipality(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openMunicipality(shape.name); }}><title>{displayRegionName(shape.name)} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
         </> : <>
-          {geometry.provinces.map((shape) => { const value = mapValue(shape.name, "applicationCoverage"); return <path key={`${shape.name}-coverage-shape`} d={shape.d} className="map-shape" style={{ fill: fill(value, 1) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{displayRegionName(shape.name)} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
+          {geometry.provinces.map((shape) => { const value = mapValue(shape.name, "applicationCoverage"); return <path key={`${shape.name}-coverage-shape`} d={shape.d} className="map-shape" style={{ fill: fill(value, provinceCoverageBreaks) }} tabIndex={0} role="button" aria-label={`${displayRegionName(shape.name)} 특산품 출원율 ${mapMetricValueLabel(value, "applicationCoverage")}`} onClick={() => openProvince(shape.name)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openProvince(shape.name); }}><title>{displayRegionName(shape.name)} · 특산품 출원율 {mapMetricValueLabel(value, "applicationCoverage")}</title></path>; })}
         </>}{activeMapLabels.map((label) => label.leader ? <g className="map-region-label map-region-label-callout" key={`${label.name}-coverage-label`}><polyline points={`${label.targetX},${label.targetY} ${(label.targetX + label.x) / 2},${(label.targetY + label.y) / 2} ${label.x + 22},${label.y + 4}`} /><text x={label.x} y={label.y} className="map-label map-label-province">{label.displayName}</text></g> : <text key={`${label.name}-coverage-label`} x={label.x} y={label.y} className={municipalityGeometry ? "map-label map-label-municipality" : "map-label map-label-province"}>{label.displayName}</text>)}</svg></div>
-        <div className="coverage-legend" aria-label="출원율 색상 범례"><span>0%</span><i /><span>25%</span><span>50%</span><span>75%</span><span>100%</span><b>회색은 데이터 없음</b></div>
+        <div className="coverage-legend quantile-legend" aria-label="출원율 색상 범례">{quantileLegendSwatches(municipalityGeometry ? municipalityCoverageBreaks : provinceCoverageBreaks, (value) => percent(value))}<b>회색은 데이터 없음</b></div>
         <p className="map-warning">{selectedProvince ? "특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다." : "특산품·상표 데이터가 없는 시도도 지명은 표시하며 회색으로 구분합니다. 시도를 선택하면 시군구 지도로 전환됩니다."}</p>
       </section>
       <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
