@@ -257,6 +257,22 @@ function createCollectionStore(dbPath) {
     );
   }
 
+  // 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": 이 실행에서 실제로 수집한 행만 CSV로
+  // 내보내면, 이번에 --sources에 안 넣었거나(예: 다른 소스만 갱신하는 실행) 이번 실행에서
+  // 실패한 소스의 과거 행이 CSV에서 사라진다. SQLite에는 이미 append-only로 각 원본의
+  // 현재 버전이 다 남아 있으므로(persistRecords), CSV는 "이번 실행 결과"가 아니라 "이 DB가
+  // 아는 전체 현재 상태"를 내보내는 파생 뷰여야 한다(archive=SQLite, current view=CSV).
+  const listCurrentRows = db.prepare(`
+    SELECT v.normalized_payload_json AS json
+    FROM specialty_raw_records r
+    JOIN specialty_raw_versions v
+      ON v.raw_record_id = r.id AND v.version = r.current_version
+    ORDER BY r.source_id, r.source_record_key
+  `);
+  function getCurrentRows() {
+    return listCurrentRows.all().map((row) => JSON.parse(row.json));
+  }
+
   function counts() {
     return {
       runs: Number(db.prepare("SELECT COUNT(*) AS count FROM collection_runs").get().count),
@@ -273,7 +289,7 @@ function createCollectionStore(dbPath) {
     db.close();
   }
 
-  return { path: resolvedPath, startRun, persistRecords, finishRun, counts, getRun, close };
+  return { path: resolvedPath, startRun, persistRecords, finishRun, counts, getRun, getCurrentRows, close };
 }
 
 module.exports = {

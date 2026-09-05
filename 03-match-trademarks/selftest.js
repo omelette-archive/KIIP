@@ -9,6 +9,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
+const { spawnSync } = require("child_process");
 const { parseTrademarkResponse } = require("./lib/xmlLite");
 const { createClient } = require("./lib/kiprisClient");
 const {
@@ -632,6 +633,86 @@ async function run() {
     ok("동일 검색 키 1회 호출, 다중 페이지 순회, 중단 후 다음 페이지 재개, 완료 쿼리 재사용");
   }
 
+  console.log("9-2b) runBatch — 완료 쿼리도 refreshCompleteAfterDays가 지나면 다시 수집(이슈 #137)");
+  {
+    // #137 코멘트: "complete" 쿼리를 --resume으로 영구 재사용하면, 그 검색어에 새로 출원되는
+    // 상표를 다시는 못 본다. 신선도 기한이 지나면 처음부터 다시 수집하고, 새 결과에 없는
+    // 예전 hit도 잃지 않아야 한다(정렬 순서가 바뀌어도 안전).
+    const rows = [
+      { sido: "충청남도", sigungu: "금산군", rawItemName: "금산인삼", noticeName: "인삼", niceClass: "31", status: "ok" },
+    ];
+
+    // 1차: 실제 코드로 정상적인 "complete" 체크포인트를 만든다(내부 queryKey 형식을 몰라도 됨).
+    const firstRunClient = {
+      trademarkSearch: async () => ({
+        totalCount: 2,
+        hits: [
+          { applicationNumber: "1000000001", title: "예전상표A", classificationCode: "31" },
+          { applicationNumber: "1000000002", title: "예전상표B", classificationCode: "31" },
+        ],
+      }),
+    };
+    const checkpointQueries = {};
+    const first = await runBatch(rows, firstRunClient, {
+      pageNo: 1, numOfRows: 2, maxPages: 3, maxHitsPerQuery: 10, maxRequests: 5, concurrency: 1,
+      checkpointQueries, saveCheckpoint: () => {},
+    });
+    assert.strictEqual(first.results[0].collectionStatus, "complete");
+    const [queryKey] = Object.keys(checkpointQueries);
+    assert.ok(queryKey, "체크포인트에 쿼리 키가 저장돼야 함");
+    // 시간이 오래 지나 신선도 기한을 넘긴 상태를 흉내낸다.
+    checkpointQueries[queryKey].fetchedAt = new Date(Date.now() - 40 * 86400000).toISOString();
+
+    const calledPages = [];
+    const secondRunClient = {
+      trademarkSearch: async ({ pageNo }) => {
+        calledPages.push(pageNo);
+        // 새로 수집한 결과에는 예전 hit 중 하나(1000000001)가 더 이상 없다 — 정렬이 바뀌었거나
+        // 그 사이 상태가 바뀐 상황을 흉내낸다. 신규 출원(1000000003)만 새로 보인다.
+        return {
+          totalCount: 2,
+          hits: [
+            { applicationNumber: "1000000003", title: "신규상표C", classificationCode: "31" },
+            { applicationNumber: "1000000002", title: "예전상표B", classificationCode: "31" },
+          ],
+        };
+      },
+    };
+    const savedCheckpoints = [];
+    const refreshed = await runBatch(rows, secondRunClient, {
+      pageNo: 1, numOfRows: 2, maxPages: 3, maxHitsPerQuery: 10, maxRequests: 5, concurrency: 1,
+      resume: true,
+      refreshCompleteAfterDays: 14,
+      checkpointQueries,
+      saveCheckpoint: (queries) => savedCheckpoints.push(JSON.parse(JSON.stringify(queries))),
+    });
+    assert.deepStrictEqual(calledPages, [1], "신선도 기한이 지난 완료 쿼리는 다시 API를 호출해야 함");
+    assert.strictEqual(refreshed.resumedQueryCount, 0, "재사용이 아니라 새로고침이어야 함");
+    assert.strictEqual(refreshed.requestCountThisRun, 1);
+    const hitIds = refreshed.results[0].hits.map((hit) => hit.applicationNumber).sort();
+    assert.deepStrictEqual(
+      hitIds,
+      ["1000000001", "1000000002", "1000000003"],
+      "새 수집 결과에 없는 예전 hit(1000000001)도 잃지 않고, 신규 hit(1000000003)도 반영해야 함"
+    );
+    assert.strictEqual(refreshed.results[0].collectionStatus, "complete");
+    assert.strictEqual(savedCheckpoints.length, 1, "새로고침 결과를 체크포인트에 저장해야 함");
+    assert.strictEqual(savedCheckpoints[0][queryKey].hits.length, 3);
+
+    // refreshCompleteAfterDays를 안 주면(기본 동작) 예전처럼 완료 쿼리를 그대로 재사용한다 —
+    // 이 옵션은 명시적으로 켜야만 동작하는 opt-in이어야 한다.
+    calledPages.length = 0;
+    const staleAgainQueries = JSON.parse(JSON.stringify(checkpointQueries));
+    const optedOut = await runBatch(rows, secondRunClient, {
+      pageNo: 1, numOfRows: 2, maxPages: 3, maxHitsPerQuery: 10, maxRequests: 5, concurrency: 1,
+      resume: true,
+      checkpointQueries: staleAgainQueries,
+    });
+    assert.deepStrictEqual(calledPages, [], "refreshCompleteAfterDays를 안 주면 완료 쿼리를 그대로 재사용해야 함");
+    assert.strictEqual(optedOut.resumedQueryCount, 1);
+    ok("완료 쿼리는 기본적으로 영구 재사용되지만, refreshCompleteAfterDays를 지정하면 기한이 지난 뒤 다시 수집해 신규 출원을 반영하고 예전 hit도 보존함");
+  }
+
   console.log("9-3) 부분 체크포인트 — 상한을 늘려 이어서 더 깊게 재개");
   {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-"));
@@ -660,6 +741,59 @@ async function run() {
     }), /numOfRows/, "페이지 크기 변경은 nextPage 커서 의미가 어긋나 계속 차단");
     fs.rmSync(dir, { recursive: true, force: true });
     ok("페이지 상한·hit 상한은 상향만 허용, 하향·페이지 크기 변경은 차단");
+  }
+
+  console.log("9-4) matchTrademarks CLI — --resume 없이 기존 체크포인트를 조용히 덮어쓰지 않음(이슈 #137)");
+  {
+    // #137 코멘트 "원자료 archive 삭제 금지": 체크포인트는 수십만 hit를 담은 원자료다.
+    // --resume 없이 같은 경로로 실행하면 통째로 덮어써 그동안 쌓은 수집분을 날릴 수 있었다.
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-guard-"));
+    const inputPath = path.join(dir, "normalized.csv");
+    const outPath = path.join(dir, "batch.json");
+    const checkpointPath = `${outPath}.checkpoint.json`;
+    const scriptPath = path.join(__dirname, "matchTrademarks.js");
+    // 실제 검색이 필요 없게 status=error(상위 단계 실패로 건너뜀) 행만 넣어 네트워크 호출
+    // 없이 CLI 동작(체크포인트 유무 판단)만 검증한다.
+    fs.writeFileSync(
+      inputPath,
+      [
+        "sido,sigungu,rawItemName,itemName,noticeName,niceClass,excluded,status",
+        "경기도,가평군,잣,잣,잣,31,false,error",
+      ].join("\n")
+    );
+    fs.writeFileSync(checkpointPath, JSON.stringify({
+      schemaVersion: "1.0",
+      options: { numOfRows: 20, maxPages: 5, maxHitsPerQuery: 100 },
+      queries: {},
+    }));
+
+    const blocked = spawnSync(
+      process.execPath,
+      [scriptPath, "--input", inputPath, "--out", outPath, "--apiKey", "dummy-test-key"],
+      { encoding: "utf8" }
+    );
+    assert.strictEqual(blocked.status, 1);
+    assert.match(blocked.stderr, /체크포인트가 이미 있습니다/);
+    assert.strictEqual(fs.existsSync(outPath), false, "차단됐으면 출력 파일도 생기면 안 됨");
+
+    const resumed = spawnSync(
+      process.execPath,
+      [scriptPath, "--input", inputPath, "--out", outPath, "--apiKey", "dummy-test-key", "--resume"],
+      { encoding: "utf8" }
+    );
+    assert.strictEqual(resumed.status, 0, resumed.stderr);
+    assert.doesNotMatch(resumed.stderr, /체크포인트가 이미 있습니다/);
+
+    fs.unlinkSync(outPath);
+    const overwritten = spawnSync(
+      process.execPath,
+      [scriptPath, "--input", inputPath, "--out", outPath, "--apiKey", "dummy-test-key", "--overwrite-checkpoint"],
+      { encoding: "utf8" }
+    );
+    assert.strictEqual(overwritten.status, 0, overwritten.stderr);
+
+    fs.rmSync(dir, { recursive: true, force: true });
+    ok("--resume·--overwrite-checkpoint 없이 기존 체크포인트 경로로 실행하면 거부하고, 지정하면 정상 진행함");
   }
 
   console.log("10) 배치 입력 계약 — ② 출력 필드 강제 + dry-run 계획");

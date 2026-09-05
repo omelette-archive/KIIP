@@ -101,8 +101,11 @@ GI 날짜 옵션:
 
 같은 source record key와 같은 내용으로 재실행하면 버전을 추가하지 않고 최근 확인 시각만
 갱신한다. 원문 또는 정규화 내용이 달라졌을 때만 새 버전을 추가한다. `collectedAt`만 달라진 것은
-내용 변경으로 보지 않는다. CSV는 ②단계 전달·스모크 확인용이고 SQLite가 누적 원본의 기준이다.
-요청 수는 재시도를 포함한 물리 HTTP 횟수가 아니라 페이지 단위 논리 API 요청 수다.
+내용 변경으로 보지 않는다. SQLite가 누적 원본(archive)의 기준이고, CSV는 매 실행 뒤 그
+SQLite가 아는 전체 현재 상태(모든 source record key의 최신 버전)를 내보내는 파생 뷰다 —
+이번 실행 `--sources`에 없거나 이번에 실패한 소스라도, 과거에 한 번이라도 수집됐다면 CSV에
+그대로 남는다(이슈 #137). 요청 수는 재시도를 포함한 물리 HTTP 횟수가 아니라 페이지 단위
+논리 API 요청 수다.
 
 공식 URL과 접근 조건은 [`config/sources.json`](config/sources.json), 계정·호출 제한은
 [`docs/open-api-limits.md`](../docs/open-api-limits.md)를 기준으로 관리한다.

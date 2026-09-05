@@ -45,6 +45,7 @@ function parseArgs(argv) {
     "max-registry-requests": 3,
     "registry-concurrency": 3,
     "storage-mode": "query-facts",
+    "refresh-complete-after-days": 14,
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -77,6 +78,9 @@ function printUsageAndExit(message) {
       "  --out-max-hits <n>   query_facts 출력 파일에만 적용하는 쿼리당 hit 상한(수집분은 보존)",
       "  --checkpoint <path>  배치 고유 쿼리 체크포인트 경로 (기본: <out>.checkpoint.json)",
       "  --resume             체크포인트의 완료 쿼리를 재사용하고 부분 쿼리부터 재개",
+      "  --overwrite-checkpoint --resume 없이 기존 체크포인트를 덮어쓰기 허용(기본은 거부)",
+      "  --refresh-complete-after-days <n> 완료 쿼리도 이 일수가 지나면 처음부터 다시 수집해",
+      "                       신규 출원을 반영(기본 14, 0=끔·예전처럼 완료 쿼리 영구 재사용)",
       "  --storage-mode <mode> 배치 저장 구조: query-facts(기본, hit 1회 저장) | expanded(호환용)",
       "  --include-review-required 고시명칭 미확정 행을 원물명으로 탐색(별도 실험용, 기본 꺼짐)",
       "  --dry-run            배치 입력·요청 계획만 검증하고 API는 호출하지 않음",
@@ -360,6 +364,44 @@ function hitKey(hit) {
   );
 }
 
+// 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": collectionStatus가 "complete"인 쿼리를
+// --resume으로 영구 재사용하면, 그 검색어로 KIPRIS에 새로 출원되는 상표를 다시는 못 본다
+// (완료 판정은 "그 시점 기준 결과가 다 모였다"는 뜻이지 "앞으로도 안 바뀐다"는 뜻이 아니다).
+// refreshCompleteAfterDays가 지나면 완료 쿼리도 처음부터 다시 수집해 신선도를 되찾는다.
+function isStaleCompleteQuery(saved, refreshAfterDays) {
+  const days = Number(refreshAfterDays);
+  if (!Number.isFinite(days) || days <= 0) return false;
+  const fetchedAtMs = saved?.fetchedAt ? Date.parse(saved.fetchedAt) : NaN;
+  if (!Number.isFinite(fetchedAtMs)) return false;
+  return (Date.now() - fetchedAtMs) / 86400000 >= days;
+}
+
+// 새로고침 수집 결과를 예전 결과와 합친다. KIPRIS 응답 정렬 순서가 무엇인지 문서로 확인되지
+// 않아(docs/kipris-api-notes.md 참고) "신규 출원은 앞쪽 페이지에 있다"고 가정하지 않는다 —
+// 대신 완료 쿼리를 페이지 1부터 다시 끝까지 수집해서(collectSearchPages, initial 없이) 예전
+// hit와 출원번호 기준으로 합집합을 만든다. 정렬이 바뀌어 예전에 봤던 hit가 새 수집 창에서
+// 빠지더라도 잃지 않는다. 새로고침 자체가 실패(네트워크 오류 등)하면 예전 complete 결과를
+// 그대로 유지해, 일시적 오류로 이미 확인된 데이터를 잃지 않는다.
+function mergeRefreshedCollection(saved, refreshed, maxHitsPerQuery) {
+  if (refreshed.collectionStatus === "error") return saved;
+  const seen = new Set(saved.hits.map(hitKey));
+  const merged = [...saved.hits];
+  for (const hit of refreshed.hits) {
+    const key = hitKey(hit);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push(hit);
+  }
+  const capped = Number.isFinite(maxHitsPerQuery) && merged.length > maxHitsPerQuery
+    ? merged.slice(0, maxHitsPerQuery)
+    : merged;
+  return {
+    ...refreshed,
+    hits: capped,
+    keywordTotalCount: Math.max(Number(refreshed.keywordTotalCount) || 0, Number(saved.keywordTotalCount) || 0),
+  };
+}
+
 function checkpointSeed(query, initial, startPage = 1) {
   if (!initial || !["partial", "error"].includes(initial.collectionStatus)) {
     return {
@@ -539,13 +581,23 @@ async function runBatch(rows, client, options) {
   const budget = options.requestBudget || createRequestBudget(options.maxRequests);
   const checkpointQueries = options.checkpointQueries || {};
   let resumedQueryCount = 0;
+  let refreshedQueryCount = 0;
 
   const collectedGroups = await runWithConcurrency(groups, options.concurrency, async (group) => {
     const saved = checkpointQueries[group.queryKey];
+    const isCompleteCheckpoint = options.resume && saved?.collectionStatus === "complete";
     let collected;
-    if (options.resume && saved?.collectionStatus === "complete") {
+    if (isCompleteCheckpoint && !isStaleCompleteQuery(saved, options.refreshCompleteAfterDays)) {
       collected = saved;
       resumedQueryCount++;
+    } else if (isCompleteCheckpoint) {
+      // 완료 쿼리가 신선도 기한을 넘겼다 — 이어받기가 아니라 처음부터 다시 수집해서(신규
+      // 출원을 놓치지 않도록) 예전 hit와 합집합으로 합친다.
+      const refreshed = await collectSearchPages(client, group.query, options, budget, null);
+      collected = mergeRefreshedCollection(saved, refreshed, Number(options.maxHitsPerQuery));
+      checkpointQueries[group.queryKey] = collected;
+      refreshedQueryCount++;
+      if (options.saveCheckpoint) options.saveCheckpoint(checkpointQueries, budget.used);
     } else {
       collected = await collectSearchPages(
         client,
@@ -601,6 +653,7 @@ async function runBatch(rows, client, options) {
     requestCount: (options.priorRequestCount || 0) + budget.used,
     requestCountThisRun: budget.used,
     resumedQueryCount,
+    refreshedQueryCount,
   };
 }
 
@@ -777,6 +830,10 @@ function validateNumericArgs(args) {
   if (!Number.isInteger(registryConcurrency) || registryConcurrency < 1 || registryConcurrency > 5) {
     printUsageAndExit("--registry-concurrency 는 1~5 정수여야 합니다.");
   }
+  const refreshCompleteAfterDays = Number(args["refresh-complete-after-days"]);
+  if (!Number.isInteger(refreshCompleteAfterDays) || refreshCompleteAfterDays < 0) {
+    printUsageAndExit("--refresh-complete-after-days 는 0 이상의 정수여야 합니다(0=끔).");
+  }
   return {
     numOfRows,
     pageNo,
@@ -786,6 +843,7 @@ function validateNumericArgs(args) {
     maxHitsPerQuery,
     maxRegistryRequests,
     registryConcurrency,
+    refreshCompleteAfterDays,
   };
 }
 
@@ -861,6 +919,17 @@ async function main() {
       args.checkpoint ||
         (outPathArg ? `${outPathArg}.checkpoint.json` : path.join(__dirname, "output", "batch-checkpoint.json"))
     );
+    // 이슈 #137 코멘트(2026-09-04) "원자료 archive 삭제 금지": 체크포인트는 수십만 hit를
+    // 담은 원자료 archive다(운영 실행에서 수백MB) — --resume 없이 같은 경로로 실행하면 이번
+    // 실행 예산만큼만 모은 새 체크포인트로 통째로 덮어써 그동안 쌓은 수집분을 조용히
+    // 날린다. runOperationalPipeline.js는 파일이 있으면 자동으로 --resume을 붙이지만, 이
+    // 스크립트를 직접 호출할 때는 이 안전장치가 없었다.
+    if (!args.resume && fs.existsSync(checkpointPath) && !args["overwrite-checkpoint"]) {
+      printUsageAndExit(
+        `체크포인트가 이미 있습니다: ${checkpointPath}\n` +
+        `이어서 모으려면 --resume, 기존 수집분을 버리고 새로 시작하려면 --overwrite-checkpoint를 쓰세요.`
+      );
+    }
     const checkpoint = args.resume
       ? loadCheckpoint(checkpointPath, numeric)
       : { schemaVersion: "1.0", options: numeric, requestCount: 0, queries: {} };
@@ -917,6 +986,7 @@ async function main() {
       requestCount: batch.requestCount,
       requestCountThisRun: batch.requestCountThisRun,
       resumedQueryCount: batch.resumedQueryCount,
+      refreshedQueryCount: batch.refreshedQueryCount,
       successCount: results.filter((row) => row.status === "ok").length,
       partialCount: results.filter((row) => row.collectionStatus === "partial").length,
       errorCount: results.filter((row) => row.status === "error").length,

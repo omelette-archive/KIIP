@@ -131,8 +131,17 @@ node 03-match-trademarks/matchTrademarks.js \
 쿼리만 이어서 수집한다. `collectionStatus=partial`은 오류가 아니라 실행 상한에 도달한 결과이며
 완전 모집단으로 해석하면 안 된다.
 
+체크포인트는 수십만 hit를 담은 원자료 archive라 삭제하면 안 된다 — `--resume` 없이 기존
+체크포인트 경로로 실행하면 CLI가 거부한다(우발적 덮어쓰기 방지, 이슈 #137). 정말 처음부터
+새로 시작하려면 `--overwrite-checkpoint`를 명시한다. 또한 `collectionStatus=complete`도
+"그 시점 기준 결과가 다 모였다"는 뜻일 뿐 앞으로도 안 바뀐다는 보장은 아니므로,
+`--refresh-complete-after-days`(기본 14, 0=끔)가 지난 완료 쿼리는 `--resume` 시 처음부터
+다시 수집해 신규 출원을 반영한다 — 새 결과에 없는 예전 hit도 합집합으로 보존한다(정렬 순서가
+바뀌어도 안전).
+
 주요 옵션은 `--numOfRows`, `--concurrency`, `--max-requests`, `--max-pages`,
-`--max-hits-per-query`, `--checkpoint`, `--resume`, `--dry-run`, `--area-brands`,
+`--max-hits-per-query`, `--checkpoint`, `--resume`, `--overwrite-checkpoint`,
+`--refresh-complete-after-days`, `--dry-run`, `--area-brands`,
 `--enrich-registry`, `--max-registry-requests`, `--registry-concurrency`다.
 
 배치 출력은 기본적으로 `storageMode=query_facts`를 사용한다. KIPRIS hit 배열은 고유
