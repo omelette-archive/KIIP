@@ -786,12 +786,24 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 구/군 정보가 아예 없어 시 전체로만 특산품이 잡힌다(region.sigungu === region.sido).
   // 특정 구를 클릭해도 이 "미분류" 행까지 걸러버리면 실제로 있는 데이터가 빈 화면으로
   // 보인다 — 어떤 구를 눌러도 시 전체 미분류 항목은 계속 보여준다(사용자 요청).
-  const isUnclassifiedRegion = (region: Region) => region.sigungu === region.sido;
+  // 이슈 #117 코멘트(2026-09-03) 조사 중 발견: #137 운영 파이프라인 통합 이후 스냅샷에서
+  // 구·군 데이터가 없는 행의 sigungu 표현이 region.sigungu === region.sido(예전 방식)에서
+  // sigungu: null(현재 방식, 도 단위 RDA 배정 포함)로 바뀌어 있었다 — 원래 조건은 이제 어떤
+  // 행에도 안 걸린다. 두 표현을 모두 인식하도록 넓힌다.
+  const isUnclassifiedRegion = (region: Region) => !region.sigungu || region.sigungu === region.sido;
+  // 이슈 #117 코멘트(2026-09-03): 경기도처럼 실제 시군구 데이터(가평군 등)가 있는 도에
+  // RDA 지역특화작목 도 단위 배정(#117)으로 시군구 미지정 행("경기도" 자체)이 하나 더
+  // 생기면서, 특정 시군구(가평군)를 골라도 이 도 단위 행이 OR 조건으로 계속 끼어들어
+  // "가평군"과 "경기도"가 나란히 같은 급의 카드로 보이는 문제가 있었다. isUnclassifiedRegion
+  // 폴백은 원래 대전·대구·부산 등 그 도시 전체가 구·군 데이터 자체가 없는 경우(시군구를
+  // 아무리 눌러도 실제 매칭 행이 없어 빈 화면이 되는 것을 막기 위함)만을 위한 것이었으므로,
+  // 실제 시군구 데이터가 있는 도에서는 이 폴백을 끈다.
+  const provinceHasRealMunicipalities = selectedProvince ? regionalRegions.some((region) => region.sido === selectedProvince && !isUnclassifiedRegion(region)) : false;
   // 이슈 #116(2026-09-01): 전국 단위 카탈로그(sido="전국", 지역 없는 인증 수산물·임산물
   // 132건)를 지도·요약의 "특산품 수" 모집단에 넣지 않는다 — hero·데이터 개요는 이미
   // regionItemCount(지역 귀속 행)를 쓰는데 이 지도 카운터만 snapshot.regions 전체를 세서
   // 1,937 대 1,805로 어긋나 있었다. 모집단을 regionalRegions 하나로 통일한다.
-  const visibleRegions = selectedProvince ? regionalRegions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region))) : regionalRegions;
+  const visibleRegions = selectedProvince ? regionalRegions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || (isUnclassifiedRegion(region) && !provinceHasRealMunicipalities))) : regionalRegions;
   const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
   const nationalTrendItems = useMemo(() => regionalRegions.flatMap((region) => region.items), [regionalRegions]);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
@@ -836,7 +848,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const activeMapShapes = municipalityGeometry?.items || geometry.provinces;
   const activeMapLabels = positionedMapLabels(activeMapShapes, Boolean(municipalityGeometry));
   const coverageAreaRegions = selectedProvince
-    ? snapshot.regions.filter((region) => region.sido === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || isUnclassifiedRegion(region)))
+    ? snapshot.regions.filter((region) => region.sido === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || (isUnclassifiedRegion(region) && !provinceHasRealMunicipalities)))
     : regionalRegions;
   const coverageArea = specialtyCoverage(coverageAreaRegions);
   const coverageAreaName = selectedMunicipality || selectedProvince || "전국";
@@ -851,6 +863,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     }))
     .sort((a, b) => a.label.localeCompare(b.label, "ko-KR"));
   const coverageListedItemCount = coverageBreakdown.reduce((sum, row) => sum + row.items.length, 0);
+  // 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 행("경기도" 자체)과 실제 시군구
+  // 카드(가평군 등)를 나란한 카드로 보여주면 헷갈린다는 지적 — 도 단위 항목은 별도 표시,
+  // 실제 시군구 카드는 토글(펼치기) 뒤로 숨긴다.
+  type CoverageRow = (typeof coverageBreakdown)[number];
+  function coverageCard(row: CoverageRow) {
+    return <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier}</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>;
+  }
   const trendItems = coverageAreaRegions.flatMap((region) => region.items);
   const trendApplicationTotals = sumYearCounts(trendItems, "applicationYearCounts");
   const trendRegisteredTotals = sumYearCounts(trendItems, "registrationYearCounts");
@@ -942,7 +961,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")} · {MAP_LABELS[mapMetric]}</h2>
           {mapMetric === "applicationCoverage" && <div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} label="출원율" /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>}
           {mapMetric === "registration" && <div className="rate-hero"><RateRing value={visibleRegistrationRate} label="등록률" /><div className="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 {number(visibleTrademarkCount)}건 중 등록 {number(visibleRegisteredCount)}건</small></div></div>}
-          {selectedProvince && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}
+          {selectedProvince && !provinceHasRealMunicipalities && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}
           <div className="mini-list-heading"><strong>{insightListLabel}</strong><span>최대 5개</span></div>
           <div className="mini-list">{visibleInsightItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || region.region} / {label}</strong><small>{noticeBasis(item)}{item.niceClass ? ` · NICE ${item.niceClass}류` : ""}</small></span><b>{insightItemValue(item)}</b></button>)}{visibleInsightItems.length === 0 && <p className="empty">이 지역에는 수집된 특산품이 없습니다.</p>}</div>
         </aside>
@@ -975,7 +994,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </div>
       <label className="search-field explore-search"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={regionQuery} onChange={(event) => setRegionQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
       <p className="screen-note">전국 16개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 위 시도 목록·지도·아래 목록에서 지역이나 품목을 누르면 그 지역 상세로 들어갑니다.</p>
-      {selectedProvince && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
+      {selectedProvince && !provinceHasRealMunicipalities && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
       <div className={selectedProvince ? "applications-compact-row solo" : "applications-compact-row"}>
       {!selectedProvince && <section className="province-composition"><div className="section-heading"><div><h2>광역별 상표 출원·등록 구성</h2></div><span>지역 주소 일치 출원 상위 10개</span></div><div className="composition-list">{provinceCompositionRows.map(([province, stat], index) => <button type="button" key={province} onClick={() => openProvince(province)}><span className="composition-rank">{index + 1}</span><strong>{displayRegionName(province)}</strong><span className="composition-bar"><i style={{ width: `${stat.trademarks / provinceCompositionMax * 100}%` }}><b style={{ width: `${stat.trademarks ? stat.registered / stat.trademarks * 100 : 0}%` }} /></i></span><small>출원 {number(stat.trademarks)} · 등록 {number(stat.registered)}</small></button>)}</div><p className="composition-legend"><i />출원 <b />등록</p></section>}
       <section className="trend-chart"><div className="section-heading"><div><h2>연도별 출원·등록 추이</h2></div><span>{coverageAreaDisplayName} · 실제 출원일자·등록일자 기준</span></div>
@@ -1016,7 +1035,25 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
       </div>
       <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
-        {(() => { const key = regionQuery.trim().toLocaleLowerCase("ko-KR"); const rows = key ? coverageBreakdown.filter((row) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key))) : coverageBreakdown; return rows.length === 0 ? <p className="empty">&ldquo;{regionQuery}&rdquo; 검색 결과가 없습니다.</p> : <div className="coverage-region-grid">{rows.map((row) => <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier}</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>)}</div>; })()}
+        {/* 이슈 #117 코멘트(2026-09-03): 도를 클릭하면 시군구 목록이 나오기 전에 그 도 전체의
+            특산품 유형별 출원·등록 비중을 원그래프로 먼저 보여준다. 시군구 상세로 이미 들어간
+            뒤(municipality 선택)에는 도 전체 비중이 아니라 그 시군구 항목만 봐야 하므로 뺀다. */}
+        {selectedProvince && !selectedMunicipality && <section className="province-category-shares coverage-category-shares"><div className="section-heading"><div><h2>특산품 유형별 출원·등록 비중</h2></div><span>{coverageAreaDisplayName} 전체 · 지역 주소 일치 기준</span></div><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="registeredTrademarkCount" label="등록" /></article></div></section>}
+        {(() => {
+          const key = regionQuery.trim().toLocaleLowerCase("ko-KR");
+          const rows = key ? coverageBreakdown.filter((row) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key))) : coverageBreakdown;
+          if (rows.length === 0) return <p className="empty">&ldquo;{regionQuery}&rdquo; 검색 결과가 없습니다.</p>;
+          if (!selectedProvince) return <div className="coverage-region-grid">{rows.map((row) => coverageCard(row))}</div>;
+          // 도 단위 시군구 미지정 행("경기도" 자체)은 실제 시군구 카드와 분리해서 보여준다.
+          const unclassifiedRows = rows.filter((row) => row.region && isUnclassifiedRegion(row.region));
+          const municipalityRows = rows.filter((row) => !(row.region && isUnclassifiedRegion(row.region)));
+          return <>
+            {!selectedMunicipality && unclassifiedRows.length > 0 && <div className="coverage-region-grid coverage-unclassified-grid">{unclassifiedRows.map((row) => <article className="coverage-region-card unclassified" key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)} 전체(시군구 미지정)</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div></div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{label}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier}</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>)}</div>}
+            {selectedMunicipality
+              ? <div className="coverage-region-grid">{municipalityRows.map((row) => coverageCard(row))}</div>
+              : municipalityRows.length > 0 && <details className="coverage-municipality-toggle"><summary><span>시군구별 보기</span><small>{municipalityRows.length}곳 · 클릭하면 펼쳐집니다</small></summary><div className="coverage-region-grid">{municipalityRows.map((row) => coverageCard(row))}</div></details>}
+          </>;
+        })()}
       </section>
     </section>}
 

@@ -411,6 +411,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .coverage-region-card { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #f4f6f9; }
 .coverage-region-card.selected { border-color: var(--green); background: var(--green-soft); }
+/* 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 카드("경기도" 자체)는 실제 시군구
+   카드와 다르게 보이도록 점선 테두리로 구분하고, 시군구 카드 목록은 토글 뒤에 둔다. */
+.coverage-unclassified-grid { margin-bottom: 14px; }
+.coverage-region-card.unclassified { border-style: dashed; background: #fff7ed; }
+.coverage-category-shares { margin: 0 0 20px; padding-top: 0; border-top: none; }
+.coverage-municipality-toggle { margin-top: 4px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fb; }
+.coverage-municipality-toggle summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; color: var(--green-dark); font-weight: 800; cursor: pointer; }
+.coverage-municipality-toggle summary small { color: var(--muted); font-size: 12px; font-weight: 600; }
+.coverage-municipality-toggle[open] summary { border-bottom: 1px solid var(--line); }
+.coverage-municipality-toggle > div:last-child { padding: 14px; }
 .coverage-region-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
 .coverage-region-head strong, .coverage-region-head small { display: block; }
 .coverage-region-head strong { font-size: 19px; font-weight: 800; }
