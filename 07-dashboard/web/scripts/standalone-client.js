@@ -360,9 +360,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       <div class="strategy-head"><div class="strategy-head-title"><span class="strategy-status-icon" aria-hidden="true">${briefing.isGapAlert ? "!" : "✓"}</span><strong>${esc(title)}</strong></div><span class="strategy-status-badge">${briefing.isGapAlert ? "공백 알림" : "양호"}</span></div>
       ${stats ? `<div class="strategy-stat-row">${stats}</div>` : ""}
       <ul class="business-strategy-list">${briefing.sentences.map((sentence) => `<li>${esc(displayRegionName(sentence))}</li>`).join("")}</ul>
-      <p class="business-strategy-note">⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다(${esc(briefing.templateVersion || "버전 미기록")}).${footerHtml}</p>
+      ${footerHtml ? `<p class="business-strategy-footer">${footerHtml}</p>` : ""}
     </section>`;
   };
+  // UI 검토(#136) 05번: "⑤·⑥단계 분석 결과에서..." 각주가 카드마다 반복돼 시각적 소음이
+  // 컸고, 단계 번호·템플릿 ID는 정책 담당자의 언어가 아니었다. 카드 목록·화면당 한 번만,
+  // 파이프라인 용어 없이 보여준다.
+  const businessStrategyDisclaimerHtml = (templateVersion) => `<p class="business-strategy-disclaimer" title="${esc(`규칙 기반 자동 생성 문장(AI 미사용) · 버전 ${templateVersion || "미기록"}`)}">자동 생성 문장입니다 · 생성 규칙 보기</p>`;
   // 2026-08-21: 서울·세종은 경기도에 둘러싸여 있어 화살표(연결선)로 라벨을 빼서
   // 보여줬는데, 오히려 경기도 라벨이 서울 자리와 겹쳐 어색하다는 지적(사용자) — 화살표
   // 없이 경기도 라벨만 살짝 우측 아래로 옮기고, 서울·세종은 제자리에 그대로 표시한다.
@@ -646,7 +650,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
       ${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
-      ${item.briefing && item.briefing.sentences.length > 0 ? businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략") : ""}
+      ${item.briefing && item.briefing.sentences.length > 0 ? `${businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략")}${businessStrategyDisclaimerHtml(item.briefing.templateVersion)}` : ""}
       <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="KIPRIS에서 이 상표(출원번호 ${esc(example.applicationNumber)})의 검색 결과를 새 창으로 엽니다" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 결과 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;
   }
@@ -725,7 +729,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const briefingItem = row.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences?.length)
       || row.matchedItems.find((entry) => entry.briefing?.sentences?.length);
     const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) : "";
-    const briefingHtml = briefingItem ? businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`) : "";
+    const briefingHtml = briefingItem ? `${businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`)}${businessStrategyDisclaimerHtml(briefingItem.briefing.templateVersion)}` : "";
     return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${flowHtml}${briefingHtml}`;
   }
   function itemsScreen() {
@@ -805,7 +809,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       const oks = selected.briefings.filter(({ item }) => !item.briefing.isGapAlert);
       const ordered = [...alerts, ...oks].slice(0, 6);
       const emptyNote = !selected.flow && selected.briefings.length === 0 ? '<p class="empty">이 품목은 아직 비즈니스 확장 흐름·브리핑 데이터가 없습니다.</p>' : "";
-      bodyHtml = `${emptyNote}${selected.flow ? nationwideFlowCardHtml(selected.flow, selected.name, selected.origins) : ""}<div class="strategy-sample-list">${ordered.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${displayRegionName(region.region)} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("") || (selected.flow ? '<p class="screen-note">이 품목은 지역별 브리핑이 아직 없습니다.</p>' : "")}</div>${selected.briefings.length > 6 ? `<p class="screen-note">지역별 브리핑 ${selected.briefings.length}건 중 6건 표시.</p>` : ""}`;
+      bodyHtml = `${emptyNote}${selected.flow ? nationwideFlowCardHtml(selected.flow, selected.name, selected.origins) : ""}<div class="strategy-sample-list">${ordered.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${displayRegionName(region.region)} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("") || (selected.flow ? '<p class="screen-note">이 품목은 지역별 브리핑이 아직 없습니다.</p>' : "")}</div>${ordered.length > 0 ? businessStrategyDisclaimerHtml(ordered[0].item.briefing.templateVersion) : ""}${selected.briefings.length > 6 ? `<p class="screen-note">지역별 브리핑 ${selected.briefings.length}건 중 6건 표시.</p>` : ""}`;
     } else {
       // 이슈 #119(2026-09-02): 대표 샘플을 1+1건 → 공백 알림·양호 각 5건씩 최대 10건.
       const alertRows = [];
@@ -822,9 +826,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         }
       }
       const samples = [...alertRows, ...okRows];
-      bodyHtml = `${samples.length === 0 ? '<p class="empty">아직 표시할 샘플이 없습니다.</p>' : ""}<div class="strategy-sample-list">${samples.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${displayRegionName(region.region)} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("")}</div>`;
+      bodyHtml = `${samples.length === 0 ? '<p class="empty">아직 표시할 샘플이 없습니다.</p>' : ""}<div class="strategy-sample-list">${samples.map(({ region, item }) => businessStrategyCardHtml(item.briefing, `${displayRegionName(region.region)} · ${itemName(item)}`, ` <button type="button" class="strategy-jump-link" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}">지자체별 조회에서 자세히 보기 →</button>`)).join("")}</div>${samples.length > 0 ? businessStrategyDisclaimerHtml(samples[0].item.briefing.templateVersion) : ""}`;
     }
-    return `<section class="screen-section strategy-screen"><p class="screen-note">⑤·⑥단계 분석에서 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>${selectorHtml}${notFoundHtml}${bodyHtml}</section>`;
+    return `<section class="screen-section strategy-screen"><p class="screen-note">품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>${selectorHtml}${notFoundHtml}${bodyHtml}</section>`;
   }
   function compareScreen() {
     const comparisonRows = [...provinceStats.keys()].map((province) => {
