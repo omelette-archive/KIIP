@@ -50,6 +50,10 @@ a { color: inherit; text-decoration: none; }
 /* UI 검토(#136) 02번 보조: 지금 화면(탭+지역·품목 선택)의 주소를 바로 복사하는 버튼 */
 .copy-link-button { padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--green-dark); font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; }
 .copy-link-button:hover { border-color: #7fb0dd; background: var(--green-soft); }
+/* UI 검토(#136) 03번: 랭킹·특화작목·지역별 집계 표에 CSV 내려받기 버튼 */
+.csv-download-button { flex-shrink: 0; margin-left: auto; padding: 7px 13px; border: 1px solid var(--green); border-radius: 8px; background: var(--surface); color: var(--green); font-size: 11.5px; font-weight: 800; cursor: pointer; white-space: nowrap; }
+.csv-download-button:hover { background: var(--green-soft); }
+.csv-download-button::before { content: "⬇ "; }
 
 .hero { padding: 12px 0 16px; }
 .eyebrow { margin: 0 0 10px; color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: 0.13em; }
@@ -838,4 +842,24 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media (min-width: 1280px) {
   .map-stage { min-height: 360px; }
   .ranking-stack { gap: 14px; }
+}
+
+/* UI 검토(#136) 03번: 인쇄용 스타일시트가 전혀 없어 정책 담당자가 표를 보고서로 옮기려면
+   화면을 캡처하거나 손으로 옮겨 적는 수밖에 없었다. 탭 내비게이션·검색·버튼류를 숨기고
+   표가 인쇄 페이지 폭에 맞게 늘어나도록 하는 정도로 충분하다(과한 인쇄 전용 레이아웃은
+   두지 않는다). */
+@media print {
+  .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
+  .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
+  .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider,
+  .province-municipalities summary, .coverage-municipality-toggle summary,
+  .coverage-specialty-toggle summary, footer { display: none !important; }
+  body { background: #fff; }
+  .shell { max-width: none; padding: 0; }
+  a { text-decoration: none; color: inherit; }
+  .ranking-table-wrap, .source-table-wrap, .coverage-region-grid { overflow: visible !important; max-height: none !important; }
+  table { width: 100%; table-layout: auto; }
+  /* 닫혀 있던 목록(#136 01번 아코디언)도 인쇄에는 전부 펼쳐서 담는다(원래 display 유지). */
+  .province-municipalities > div, .coverage-municipality-toggle > div { display: grid !important; }
+  .coverage-specialty-toggle > div { display: flex !important; flex-wrap: wrap !important; }
 }
