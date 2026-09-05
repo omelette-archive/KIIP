@@ -805,7 +805,9 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /전국 시도별 출원율/);
   assert.match(html, /출원 확인 특산품/);
   assert.match(html, /시도를 선택하면 시군구 지도로 전환됩니다/);
-  assert.match(html, /region\.sigungu \|\| region\.region} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
+  // 이슈 #136 코멘트(2026-09-03) 09번: 시군구 미분류 폴백은 원본 시도명을 그대로 쓰지
+  // 않고 displayRegionName으로 통합권역 표기를 거친다("전남광주통합특별시" 노출 방지).
+  assert.match(html, /region\.sigungu \|\| displayRegionName\(region\.region\)} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
   assert.doesNotMatch(html, /const uniqueItems/, "도 단위 목록에서 중복 품목을 숨겨 총 특산품 수와 목록 수가 달라지면 안 됨");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
   assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
