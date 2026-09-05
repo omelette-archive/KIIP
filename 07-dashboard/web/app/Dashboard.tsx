@@ -543,6 +543,14 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
     </section>
   );
 }
+// UI 검토(#136) 07번: "고유 상표 1건·등록률 100%는 공백 알림, 6건·등록률 17%는 양호"처럼
+// 배지 판정이 눈에 보이는 근거와 반대로 보인다는 지적 — 실제로는 출원 건수(5건 도달 시
+// 포화)와 등록률을 7:3 가중으로 종합한 결과라(05-detect-brand-gap/lib/scorer.js), 건수가
+// 적으면 등록률이 높아도 공백으로 판정될 수 있다. "AI 판정"이라는 표시는 넣지 않되(사용자
+// 지침), 배지에 이 판정 기준을 그대로 풀어서 설명한다. 또한 분모가 작을 때(5건 미만)
+// 100%·0% 같은 백분율은 과대해석을 부르므로 분수(N/M건) + "표본 적음" 표식을 덧붙인다.
+const SMALL_SAMPLE_TRADEMARK_COUNT = 5;
+const GAP_BADGE_CRITERIA = "상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합 평가합니다 — 출원 건수가 적으면 등록률이 높아도 공백 알림으로 표시될 수 있습니다.";
 function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBriefing; title: string; footer?: ReactNode }) {
   const evidence = briefing.evidence;
   const hasStats = evidence && (
@@ -550,6 +558,11 @@ function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBrief
     typeof evidence.registrationRate === "number" ||
     typeof evidence.localApplicantShare === "number"
   );
+  const uniqueCount = evidence?.uniqueTrademarkCount;
+  const isSmallSample = typeof uniqueCount === "number" && uniqueCount > 0 && uniqueCount < SMALL_SAMPLE_TRADEMARK_COUNT;
+  const registeredCount = isSmallSample && typeof uniqueCount === "number" && typeof evidence?.registrationRate === "number"
+    ? Math.round(uniqueCount * evidence.registrationRate)
+    : null;
   return (
     <section className={briefing.isGapAlert ? "business-strategy alert" : "business-strategy"}>
       <div className="strategy-head">
@@ -557,11 +570,11 @@ function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBrief
           <span className="strategy-status-icon" aria-hidden="true">{briefing.isGapAlert ? "!" : "✓"}</span>
           <strong>{title}</strong>
         </div>
-        <span className="strategy-status-badge">{briefing.isGapAlert ? "공백 알림" : "양호"}</span>
+        <span className="strategy-status-badge" title={GAP_BADGE_CRITERIA}>{briefing.isGapAlert ? "공백 알림" : "양호"}</span>
       </div>
       {hasStats && <div className="strategy-stat-row">
         {typeof evidence?.uniqueTrademarkCount === "number" && <div className="strategy-stat"><span>고유 상표</span><strong>{number(evidence.uniqueTrademarkCount)}건</strong></div>}
-        {typeof evidence?.registrationRate === "number" && <div className="strategy-stat"><span>등록률</span><strong>{percent(evidence.registrationRate)}</strong></div>}
+        {typeof evidence?.registrationRate === "number" && <div className="strategy-stat"><span>등록률{isSmallSample && <em className="small-sample-mark" title={`표본이 적어(고유 상표 ${SMALL_SAMPLE_TRADEMARK_COUNT}건 미만) 백분율보다 실제 건수로 보는 게 정확합니다.`}>표본 적음</em>}</span><strong>{isSmallSample && registeredCount !== null ? `${registeredCount}/${uniqueCount}건` : percent(evidence.registrationRate)}</strong></div>}
         {typeof evidence?.localApplicantShare === "number" && <div className="strategy-stat"><span>지역 출원인 비중</span><strong>{percent(evidence.localApplicantShare)}</strong></div>}
       </div>}
       {/* 이슈 #136 코멘트(2026-09-03) 09번: briefing.sentences는 파이프라인이 생성 시점에
