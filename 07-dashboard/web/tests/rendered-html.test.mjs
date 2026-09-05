@@ -837,7 +837,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /searchResult\.do\?tab=trademark&queryText=/);
   assert.doesNotMatch(html, /searchKeyword=\$\{encodeURIComponent\(`AN=/);
   assert.match(html, /popstate/);
-  assert.match(html, /kiipTab/);
+  // UI 검토(#136) 02번: 탭·지역·품목 선택을 쿼리스트링에 반영해 공유·북마크·뒤로가기가
+  // 되게 한다(주소창이 항상 루트 그대로였던 문제).
+  assert.match(html, /function navParamsToSearch/);
+  assert.match(html, /function applyNavToState/);
+  assert.match(html, /params\.set\("tab", nav\.tab\)/);
   // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
   assert.match(html, /const PROVINCE_COLORS = \{/);
   // 2026-08-21 사용자 재확인: 분모는 확인 완료분이 아니라 수집된 지역×특산품 전체다.

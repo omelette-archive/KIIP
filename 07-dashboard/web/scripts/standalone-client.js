@@ -946,15 +946,71 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     document.querySelectorAll("[data-strategy-sample]").forEach((button) => { button.onclick = () => { state.strategyItem = button.dataset.strategySample || ""; render(); }; });
     const strategyItemInput = document.querySelector("#strategy-item-input"); if (strategyItemInput) strategyItemInput.onchange = (event) => { state.strategyItem = event.currentTarget.value.trim(); render(); };
   }
-  // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
-  // 탭 전환마다 history 항목을 쌓아 뒤로가기가 직전 탭(없으면 요약)으로 돌아가게 한다.
+  // UI 검토(#136, 2026-09-03) 02번: 탭과 지역·품목 선택을 아무리 바꿔도 주소창은 루트
+  // 그대로였다(location.hash/search가 항상 빈 문자열) — 화면 상태를 링크로 공유·북마크할
+  // 수 없고, 뒤로가기도 history.state에만 의존했다(#119 — 주소창은 안 바뀌어 실제로 다른
+  // 화면을 봤다는 근거가 URL에 안 남음). 탭 전환마다 history 항목을 쌓던 그 로직을 확장해,
+  // 화면과 관련된 선택값을 쿼리스트링(?tab=...&region=...&item=...)에도 반영한다.
+  // React(Dashboard.tsx)의 NavParams와 같은 구조·필드명을 쓴다.
+  const VALID_NAV_TABS = ["summary", "applications", "regions", "items", "strategy", "compare", "data"];
+  const VALID_NAV_METRICS = ["trademarks", "registration", "coverage", "applicationCoverage"];
+  function parseNavParams(params) {
+    const tabParam = params.get("tab");
+    const metricParam = params.get("metric");
+    return {
+      tab: VALID_NAV_TABS.includes(tabParam) ? tabParam : "summary",
+      region: params.get("region"),
+      municipality: params.get("municipality"),
+      regionCode: params.get("regionCode") || "",
+      item: params.get("item") || "",
+      metric: VALID_NAV_METRICS.includes(metricParam) ? metricParam : "coverage",
+    };
+  }
+  function currentNavParams() {
+    return {
+      tab: state.tab,
+      region: state.tab === "regions" ? state.selectedRegionProvince : state.tab === "applications" ? state.province : null,
+      municipality: state.tab === "applications" ? state.municipality : null,
+      regionCode: state.tab === "regions" ? state.regionKey : "",
+      item: state.tab === "regions" ? state.itemId : state.tab === "items" ? state.selectedItemName : state.tab === "strategy" ? state.strategyItem : "",
+      metric: state.tab === "summary" ? state.mapMetric : "coverage",
+    };
+  }
+  function navParamsToSearch(nav) {
+    const params = new URLSearchParams();
+    params.set("tab", nav.tab);
+    if (nav.region) params.set("region", nav.region);
+    if (nav.municipality) params.set("municipality", nav.municipality);
+    if (nav.regionCode) params.set("regionCode", nav.regionCode);
+    if (nav.item) params.set("item", nav.item);
+    if (nav.metric !== "coverage") params.set("metric", nav.metric);
+    return `?${params.toString()}`;
+  }
+  function applyNavToState(nav) {
+    state.tab = nav.tab;
+    if (nav.tab === "applications") { state.province = nav.region; state.municipality = nav.municipality; }
+    else if (nav.tab === "regions") { if (nav.region) { state.selectedRegionProvince = nav.region; state.expandedRegionProvince = nav.region; } state.regionKey = nav.regionCode; state.itemId = nav.item; }
+    else if (nav.tab === "items") state.selectedItemName = nav.item;
+    else if (nav.tab === "strategy") state.strategyItem = nav.item;
+    else if (nav.tab === "summary") state.mapMetric = nav.metric;
+  }
+  // 최초 진입 시 URL을 읽어 화면 상태를 복원한다 — 아래 첫 render() 호출보다 먼저 실행돼야
+  // 첫 화면부터 URL이 가리키는 상태로 그려진다.
+  try {
+    const initialParams = new URLSearchParams(location.search);
+    if (initialParams.toString()) applyNavToState(parseNavParams(initialParams));
+  } catch (error) { /* noop */ }
   let historyReady = false;
   function syncHistory() {
-    const entry = { kiipTab: state.tab };
-    if (!historyReady) { try { history.replaceState(entry, ""); } catch (error) { /* noop */ } historyReady = true; return; }
-    if ((history.state && history.state.kiipTab) !== state.tab) { try { history.pushState(entry, ""); } catch (error) { /* noop */ } }
+    const nav = currentNavParams();
+    const search = navParamsToSearch(nav);
+    if (!historyReady) { try { history.replaceState(nav, "", search); } catch (error) { /* noop */ } historyReady = true; return; }
+    if (search !== location.search) { try { history.pushState(nav, "", search); } catch (error) { /* noop */ } }
   }
-  window.addEventListener("popstate", (event) => { state.tab = (event.state && event.state.kiipTab) || "summary"; state.regionKey = ""; state.itemId = ""; render(); });
+  window.addEventListener("popstate", (event) => {
+    applyNavToState(event.state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage" });
+    render();
+  });
   function render() {
     nav();
     document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "strategy" ? strategyScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
@@ -967,5 +1023,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   document.querySelector("#scope-label").textContent = scopeLabel;
   document.querySelector("#snapshot-id").textContent = `Snapshot ${snapshot.snapshotId} · 업데이트 ${date(dashboardUpdatedAt)}`;
   document.querySelector("#brand-home").onclick = () => { state.tab = "summary"; render(); };
+  // UI 검토(#136) 02번 보조: 지금 주소(위 URL 동기화로 현재 화면을 가리킴)를 바로 복사.
+  const copyLinkButton = document.querySelector("#copy-link-button");
+  if (copyLinkButton) copyLinkButton.onclick = () => {
+    try {
+      navigator.clipboard?.writeText(location.href);
+      copyLinkButton.textContent = "복사됨";
+      setTimeout(() => { copyLinkButton.textContent = "이 화면 링크 복사"; }, 1500);
+    } catch (error) { /* noop */ }
+  };
   render();
 }

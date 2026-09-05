@@ -565,18 +565,16 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     try { saved = localStorage.getItem("kiip-trend-size"); } catch { /* private mode 등 */ }
     if (saved && TREND_SIZES.some((size) => size.key === saved)) document.documentElement.dataset.trendSize = saved;
   }, []);
-  // 이슈 #119: 탭 이동 후 브라우저 뒤로가기를 누르면 대시보드를 완전히 벗어나던 문제 —
-  // 탭 전환마다 history 항목을 쌓아 뒤로가기가 직전 탭(없으면 요약)으로 돌아가게 한다.
-  useEffect(() => {
-    try { window.history.replaceState({ kiipTab: "summary" }, ""); } catch { /* noop */ }
-    const onPop = (event: PopStateEvent) => setTab(((event.state as { kiipTab?: Tab } | null)?.kiipTab) || "summary");
-    window.addEventListener("popstate", onPop);
-    return () => window.removeEventListener("popstate", onPop);
-  }, []);
-  useEffect(() => {
-    const current = (window.history.state as { kiipTab?: Tab } | null)?.kiipTab || "summary";
-    if (current !== tab) { try { window.history.pushState({ kiipTab: tab }, ""); } catch { /* noop */ } }
-  }, [tab]);
+  // UI 검토(#136) 02번 보조: 담당자가 특정 화면(탭+지역·품목 선택)을 보고서에 인용할 수
+  // 있도록, 지금 주소(위 URL 동기화로 이미 현재 화면을 가리킴)를 바로 복사하는 버튼.
+  const [linkCopied, setLinkCopied] = useState(false);
+  function copyCurrentLink() {
+    try {
+      navigator.clipboard?.writeText(window.location.href);
+      setLinkCopied(true);
+      window.setTimeout(() => setLinkCopied(false), 1500);
+    } catch { /* noop */ }
+  }
   const [query, setQuery] = useState("");
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
@@ -597,6 +595,81 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [selectedMunicipality, setSelectedMunicipality] = useState<string | null>(null);
   const [trendStartYear, setTrendStartYear] = useState<number | null>(null);
   const [trendEndYear, setTrendEndYear] = useState<number | null>(null);
+
+  // UI 검토(#136, 2026-09-03) 02번: 탭과 지역·품목 선택을 아무리 바꿔도 주소창은 루트
+  // 그대로였다(location.hash/search가 항상 빈 문자열) — 화면 상태를 링크로 공유·북마크할
+  // 수 없고, 뒤로가기도 history.state에만 의존했다(#119 — 주소창은 안 바뀌어 실제로 다른
+  // 화면을 봤다는 근거가 URL에 안 남음). 탭 전환마다 history 항목을 쌓던 그 로직을 확장해,
+  // 화면과 관련된 선택값을 쿼리스트링(?tab=...&region=...&item=...)에도 반영한다.
+  const VALID_NAV_TABS: Tab[] = ["summary", "applications", "regions", "items", "strategy", "compare", "data"];
+  const VALID_NAV_METRICS: MapMetric[] = ["trademarks", "registration", "coverage", "applicationCoverage"];
+  type NavParams = { tab: Tab; region: string | null; municipality: string | null; regionCode: string; item: string; metric: MapMetric };
+  function parseNavParams(params: URLSearchParams): NavParams {
+    const tabParam = params.get("tab");
+    const metricParam = params.get("metric");
+    return {
+      tab: (VALID_NAV_TABS as string[]).includes(tabParam || "") ? (tabParam as Tab) : "summary",
+      region: params.get("region"),
+      municipality: params.get("municipality"),
+      regionCode: params.get("regionCode") || "",
+      item: params.get("item") || "",
+      metric: (VALID_NAV_METRICS as string[]).includes(metricParam || "") ? (metricParam as MapMetric) : "coverage",
+    };
+  }
+  function currentNavParams(): NavParams {
+    return {
+      tab,
+      region: tab === "regions" ? selectedRegionProvince : tab === "applications" ? selectedProvince : null,
+      municipality: tab === "applications" ? selectedMunicipality : null,
+      regionCode: tab === "regions" ? selectedRegionCode : "",
+      item: tab === "regions" ? selectedItemId : tab === "items" ? selectedItemName : tab === "strategy" ? strategyItem : "",
+      metric: tab === "summary" ? mapMetric : "coverage",
+    };
+  }
+  function navParamsToSearch(nav: NavParams): string {
+    const params = new URLSearchParams();
+    params.set("tab", nav.tab);
+    if (nav.region) params.set("region", nav.region);
+    if (nav.municipality) params.set("municipality", nav.municipality);
+    if (nav.regionCode) params.set("regionCode", nav.regionCode);
+    if (nav.item) params.set("item", nav.item);
+    if (nav.metric !== "coverage") params.set("metric", nav.metric);
+    return `?${params.toString()}`;
+  }
+  function applyNavSetters(nav: NavParams) {
+    setTab(nav.tab);
+    if (nav.tab === "applications") { setSelectedProvince(nav.region); setSelectedMunicipality(nav.municipality); }
+    else if (nav.tab === "regions") { if (nav.region) { setSelectedRegionProvince(nav.region); setExpandedRegionProvince(nav.region); } setSelectedRegionCode(nav.regionCode); setSelectedItemId(nav.item); }
+    else if (nav.tab === "items") setSelectedItemName(nav.item);
+    else if (nav.tab === "strategy") setStrategyItem(nav.item);
+    else if (nav.tab === "summary") setMapMetric(nav.metric);
+  }
+  // 최초 진입 시 URL을 읽어 화면 상태를 복원하고(파싱은 항상 React 상태와 별개로 URL
+  // 문자열에서 직접 하므로, 방금 예약된 setState가 아직 반영 안 된 값을 되읽는 문제가 없다),
+  // 그 상태를 현재 history 항목에 남긴다. 이후 popstate는 저장해 둔 NavParams로 복원한다.
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const nav = parseNavParams(params);
+      if (params.toString()) applyNavSetters(nav);
+      window.history.replaceState(nav, "", navParamsToSearch(nav));
+    } catch { /* noop */ }
+    const onPop = (event: PopStateEvent) => {
+      const state = event.state as NavParams | null;
+      applyNavSetters(state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage" });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    const nav = currentNavParams();
+    const search = navParamsToSearch(nav);
+    if (search !== window.location.search) {
+      try { window.history.pushState(nav, "", search); } catch { /* noop */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, selectedProvince, selectedMunicipality, selectedRegionProvince, selectedRegionCode, selectedItemId, selectedItemName, strategyItem, mapMetric]);
 
   const regionalRegions = useMemo(() => snapshot.regions.filter((region) => region.sido !== "전국"), [snapshot.regions]);
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
@@ -961,7 +1034,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     .slice(0, 12), [strategySampleGroups]);
   const selectedStrategyGroup = strategyItemGroups.find((group) => group.name === strategyItem) || null;
   return <main className="shell">
-    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span></div></header>
+    <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => setTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><strong>지역 특산품-상표 분석·정책지원 플랫폼</strong></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span><button type="button" className="copy-link-button" onClick={copyCurrentLink}>{linkCopied ? "복사됨" : "이 화면 링크 복사"}</button></div></header>
     <nav className="primary-tabs" aria-label="대시보드 화면">{PRIMARY_NAV.map(({ key, label }) => { const active = tab === key || (key === "applications" && EXPLORE_TABS.includes(tab)); return <button type="button" key={key} className={active ? "active" : ""} aria-current={active ? "page" : undefined} onClick={() => { if (key === "applications" && EXPLORE_TABS.includes(tab)) return; setTab(key); }}>{label}</button>; })}</nav>
 
     {tab === "summary" && <>
