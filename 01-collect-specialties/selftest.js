@@ -727,6 +727,54 @@ async function run() {
     }
   }
 
+  console.log("11) collectSpecialties CLI — CSV는 이전 실행에서 수집한 다른 소스도 유지함(이슈 #137)");
+  {
+    // #137 코멘트: CSV가 "이번 실행 결과"만 담으면, 이번에 --sources에 안 넣은 소스나
+    // 이번에 실패한 소스의 과거 행이 사라진다. SQLite에는 각 원본의 현재 버전이 이미
+    // 누적돼 있으므로, CSV는 매 실행 후 "이 DB가 아는 전체 현재 상태"를 내보내야 한다.
+    const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), "kiip-collect-additive-"));
+    const outPath = path.join(tempDir, "specialties.csv");
+    const dbPath = path.join(tempDir, "specialties.sqlite");
+    const scriptPath = path.join(__dirname, "collectSpecialties.js");
+    try {
+      const run1 = spawnSync(
+        process.execPath,
+        [scriptPath, "--sources", "sejong_official_specialties", "--out", outPath, "--db", dbPath],
+        { encoding: "utf8" }
+      );
+      assert.strictEqual(run1.status, 0, run1.stderr);
+      const csv1 = fs.readFileSync(outPath, "utf8");
+      const dataLines1 = csv1.trim().split("\n").slice(1);
+      assert.strictEqual(dataLines1.length, 7, "세종 단독 실행은 7행이어야 함");
+      assert.ok(csv1.includes("복숭아"), "세종 특산품(복숭아)이 있어야 함");
+
+      // 2차 실행: 세종은 --sources에서 빼고 제주만 수집 — 세종은 이번 실행에서 API를 아예
+      // 호출하지 않았다(실패도 아니고 단순 미포함).
+      const run2 = spawnSync(
+        process.execPath,
+        [scriptPath, "--sources", "jeju_naqs_gi_specialties", "--out", outPath, "--db", dbPath],
+        { encoding: "utf8" }
+      );
+      assert.strictEqual(run2.status, 0, run2.stderr);
+      assert.match(run2.stderr, /이번 실행 수집=3행, 누적 CSV=10행/);
+      const csv2 = fs.readFileSync(outPath, "utf8");
+      const dataLines2 = csv2.trim().split("\n").slice(1);
+      assert.strictEqual(dataLines2.length, 10, "세종 7행 + 제주 3행이 유지된 채 합쳐져야 함");
+      assert.ok(csv2.includes("복숭아"), "2차 실행 --sources에 없었던 세종 특산품이 CSV에서 사라지면 안 됨");
+      assert.ok(csv2.includes("한라봉"), "2차 실행에서 새로 수집한 제주 특산품이 있어야 함");
+
+      const auditStore = createCollectionStore(dbPath);
+      try {
+        assert.deepStrictEqual(auditStore.counts(), { runs: 2, records: 10, versions: 10 });
+      } finally {
+        auditStore.close();
+      }
+      ok("두 번째 실행의 --sources에 없던 첫 실행 소스 행이 CSV에서 사라지지 않고 유지됨");
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
   console.log("\n16) 농촌진흥청 지역특화작목 69개 공식 수집원");
   {
     const collected = collectRegionalSpecialtyCrops();

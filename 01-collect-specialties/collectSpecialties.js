@@ -418,7 +418,12 @@ async function main() {
     }
 
     stored = store.persistRecords(runId, rawRecords);
-    writeOutputCsv(outPath, rows);
+    // 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": CSV는 이번 실행에서 API로 받아온 행만
+    // 담지 않는다 — 이번 실행 --sources에 안 넣었거나 이번에 실패한 소스의 과거 행이 있으면
+    // 함께 내보낸다. SQLite(archive)가 각 원본의 현재 버전을 append-only로 이미 들고 있으므로,
+    // CSV(파생 뷰)는 그 전체 현재 상태를 이 실행이 반영된 뒤 기준으로 매번 새로 뽑는다.
+    const currentRows = store.getCurrentRows();
+    writeOutputCsv(outPath, currentRows);
     const status = succeededSources === 0 ? "empty_allowed" : failedSources > 0 ? "partial" : "success";
     store.finishRun(runId, {
       status,
@@ -433,7 +438,7 @@ async function main() {
     runFinished = true;
 
     console.error(
-      `[collectSpecialties] done. total=${rows.length}, requests=${requestCount}, ` +
+      `[collectSpecialties] done. 이번 실행 수집=${rows.length}행, 누적 CSV=${currentRows.length}행, requests=${requestCount}, ` +
       `db(inserted=${stored.inserted}, updated=${stored.updated}, unchanged=${stored.unchanged}) -> ${outPath}`
     );
     console.error(`[collectSpecialties] run=${runId} -> ${dbPath}`);

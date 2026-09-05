@@ -34,6 +34,9 @@ function parseArgs(argv) {
     applicantLimit: 5000,
     ipRegistryDailyBudget: 100,
     ipRegistryLimit: 100,
+    // 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": ③ 완료 쿼리를 이 일수마다 처음부터
+    // 다시 수집해 신규 출원을 반영한다(0=끔, matchTrademarks.js와 기본값을 맞춤).
+    refreshCompleteAfterDays: 14,
   };
   const valueFlags = new Map([
     ["--run-id", "runId"],
@@ -50,6 +53,7 @@ function parseArgs(argv) {
     ["--ip-registry-daily-budget", "ipRegistryDailyBudget"],
     ["--ip-registry-limit", "ipRegistryLimit"],
     ["--regional-coverage-threshold", "regionalCoverageThreshold"],
+    ["--refresh-complete-after-days", "refreshCompleteAfterDays"],
   ]);
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
@@ -83,6 +87,10 @@ function parseArgs(argv) {
   }
   // enrichIpRegistry.js의 --limit 상한이 100이라 그 이상은 그대로 넘기면 실패한다.
   if (options.ipRegistryLimit > 100) options.ipRegistryLimit = 100;
+  options.refreshCompleteAfterDays = Number(options.refreshCompleteAfterDays);
+  if (!Number.isInteger(options.refreshCompleteAfterDays) || options.refreshCompleteAfterDays < 0) {
+    throw new Error("refreshCompleteAfterDays는 0 이상의 정수여야 합니다(0=끔).");
+  }
   if (options.regionalCoverageThreshold !== undefined) {
     const t = Number(options.regionalCoverageThreshold);
     if (!(t >= 0 && t <= 1)) throw new Error("regional-coverage-threshold는 0~1 사이여야 합니다.");
@@ -115,6 +123,8 @@ function printUsage() {
       "  --applicant-limit <n>        03b 출원인 주소 보강의 이번 실행 신규 호출 상한(기본 5000)",
       "  --ip-registry-daily-budget <n>  03c 등록원부 하루(KST) 누적 호출 상한(기본 100)",
       "  --ip-registry-limit <n>      03c 이번 실행 등록번호 호출 상한(기본 100)",
+      "  --refresh-complete-after-days <n>  ③ 완료 쿼리를 이 일수 뒤 처음부터 다시 수집해",
+      "                               신규 출원 반영(기본 14, 0=끔)",
       "",
       "주의: --dry-run 없이 실행하면 기존 단계 CLI가 외부 API를 호출합니다.",
       "     git add·commit·push와 공개 페이지 배포는 이 실행기가 아니라 워크플로가 담당합니다.",
@@ -215,6 +225,8 @@ function buildPlan(options = {}) {
     // 출력 파일에만 상한을 걸어 라이브 흔한 값(1,500)보다 깊게 유지하면서 한계 안에 든다.
     "--out-max-hits",
     String(options.outMaxHits),
+    "--refresh-complete-after-days",
+    String(options.refreshCompleteAfterDays),
   ];
   if (options.includeReviewRequired) matchArgs.push("--include-review-required");
   // #70: 농사로 지역브랜드 참조가 있으면 출원번호로 조인(nongsaro_area_brand source 복원).
