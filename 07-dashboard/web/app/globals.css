@@ -44,8 +44,8 @@ a { color: inherit; text-decoration: none; }
 .brand-button { padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
 .brand-mark { display: block; width: 56px; height: 37px; object-fit: contain; }
 .footer-logo { display: block; height: 26px; width: auto; opacity: 0.92; }
-.brand strong, .brand small { display: block; }
-.brand strong { font-size: 25px; letter-spacing: -0.035em; }
+.brand strong, .brand small, .brand h1 { display: block; }
+.brand h1 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -0.035em; }
 .brand small { margin-top: 2px; color: var(--muted); font-size: 11px; }
 .snapshot-meta { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
 .sample-badge { padding: 6px 10px; border: 1px solid #c3e0a0; border-radius: 999px; color: #3f7a1f; background: #eef7e3; font-weight: 700; }
@@ -739,7 +739,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
      쪼개지던 문제 — 브랜드와 배지 영역을 각각 한 줄 전체로 내려 쌓는다. */
   .topbar { min-height: auto; flex-wrap: wrap; align-items: flex-start; gap: 8px; padding: 12px 0; }
   .brand { flex: 1 1 100%; }
-  .brand strong { font-size: 18px; }
+  .brand h1 { font-size: 18px; }
   .snapshot-meta { flex: 1 1 100%; flex-wrap: wrap; }
   .snapshot-meta > span:last-child { display: none; }
   .hero { padding-top: 18px; }

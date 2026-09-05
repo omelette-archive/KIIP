@@ -484,8 +484,30 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   function selectedRegion() { return snapshot.regions.find((region) => regionKey(region) === state.regionKey) || null; }
   function selectedItem(region) { if (!region) return null; const official = officialRegionItems(region); return region.items.find((item) => item.specialtyId === state.itemId) || official[0] || region.items[0]; }
 
+  // UI 검토(#136) 14번: 상단 탭이 role·aria-selected·aria-controls 없는 일반 버튼이라
+  // 스크린리더에 "탭"으로 전달되지 않았다 — 서브내비(exploreSubnav 패턴)와 같은
+  // role="tablist" 구조로 맞추고, 화살표 키로 탭 사이를 이동+활성화한다(automatic
+  // activation, WAI-ARIA APG). React(Dashboard.tsx)와 같은 구조.
+  function primaryTabsKeyDown(event) {
+    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+    event.preventDefault();
+    const lastIndex = PRIMARY_NAV.length - 1;
+    const currentIndex = Math.max(0, PRIMARY_NAV.findIndex(([key]) => key === state.tab || (key === "applications" && EXPLORE_TABS.includes(state.tab))));
+    let nextIndex = currentIndex;
+    if (event.key === "ArrowRight") nextIndex = currentIndex >= lastIndex ? 0 : currentIndex + 1;
+    else if (event.key === "ArrowLeft") nextIndex = currentIndex <= 0 ? lastIndex : currentIndex - 1;
+    else if (event.key === "Home") nextIndex = 0;
+    else if (event.key === "End") nextIndex = lastIndex;
+    const nextKey = PRIMARY_NAV[nextIndex][0];
+    state.tab = nextKey;
+    render();
+    requestAnimationFrame(() => document.getElementById(`primary-tab-${nextKey}`)?.focus());
+  }
   function nav() {
-    document.querySelector("#primary-tabs").innerHTML = PRIMARY_NAV.map(([key, label]) => { const active = state.tab === key || (key === "applications" && EXPLORE_TABS.includes(state.tab)); return `<button type="button" data-tab="${key}" class="${active ? "active" : ""}" ${active ? 'aria-current="page"' : ""}>${label}</button>`; }).join("");
+    const tabsEl = document.querySelector("#primary-tabs");
+    tabsEl.setAttribute("role", "tablist");
+    tabsEl.onkeydown = primaryTabsKeyDown;
+    tabsEl.innerHTML = PRIMARY_NAV.map(([key, label]) => { const active = state.tab === key || (key === "applications" && EXPLORE_TABS.includes(state.tab)); return `<button type="button" id="primary-tab-${key}" role="tab" aria-selected="${active}" aria-controls="primary-tabpanel-${key}" tabindex="${active ? 0 : -1}" data-tab="${key}" class="${active ? "active" : ""}">${label}</button>`; }).join("");
     document.querySelectorAll("[data-tab]").forEach((button) => { button.onclick = () => { const next = button.dataset.tab; if (next === "applications" && EXPLORE_TABS.includes(state.tab)) return; state.tab = next; state.query = ""; state.itemQuery = ""; state.categoryFilter = ""; state.selectedItemName = ""; render(); }; });
   }
 
@@ -545,8 +567,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     <div class="map-card"><div class="map-heading"><div><h2>${state.province ? `${esc(displayRegionName(state.province))} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip" title="${esc(`지도 도형은 ${geometry.boundaryReference.sourceName} 제공 경계(${geometry.boundaryReference.sourceBasis})를 참고용으로 씁니다 — 제3자가 재배포하는 데이터라 향후 행정구역 개편이 지도 도형에 늦게 반영될 수 있으며, 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.`)}">참고 경계 · ${esc(geometry.boundaryReference.sourceBasis.match(/\d{4}-\d{2}-\d{2}/)?.[0] || geometry.boundaryReference.sourceName)}</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map" viewBox="${activeViewBox}" role="img" aria-label="${state.province ? `${esc(displayRegionName(state.province))} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend quantile-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span>${quantileLegendHtml(municipal ? municipalBreaks : nationalBreaks, mapValueLabel)}<strong>${mapLabels[state.mapMetric]} 5분위</strong></div></div>
     <div class="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
      <div class="ranking-stack">
-      <div class="ranking"><div class="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP ${RANKING_LIMIT}</span>${csvDownloadButtonHtml("summaryApplicationRanking")}</div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>${applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(displayRegionName(region.region))}</td><td${officialNoticeName(item) ? ` title="${esc(`고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}`)}"` : ""}>${esc(label)}</td><td>${number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></div>
-      <div class="ranking"><div class="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP ${RANKING_LIMIT}</span>${csvDownloadButtonHtml("summaryRegistrationRanking")}</div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>${registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(displayRegionName(region.region))}</td><td${officialNoticeName(item) ? ` title="${esc(`고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}`)}"` : ""}>${esc(label)}</td><td>${number(item.metrics.registeredTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></div>
+      <div class="ranking"><div class="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP ${RANKING_LIMIT}</span>${csvDownloadButtonHtml("summaryApplicationRanking")}</div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">출원 확인</th></tr></thead><tbody>${applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(displayRegionName(region.region))}</td><td${officialNoticeName(item) ? ` title="${esc(`고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}`)}"` : ""}>${esc(label)}</td><td>${number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></div>
+      <div class="ranking"><div class="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP ${RANKING_LIMIT}</span>${csvDownloadButtonHtml("summaryRegistrationRanking")}</div><div class="ranking-table-wrap"><table class="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">등록 완료</th></tr></thead><tbody>${registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => `<tr><td>${index + 1}</td><td>${esc(displayRegionName(region.region))}</td><td${officialNoticeName(item) ? ` title="${esc(`고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}`)}"` : ""}>${esc(label)}</td><td>${number(item.metrics.registeredTrademarkCount.value)}건</td></tr>`).join("")}</tbody></table></div></div>
      </div>
     </div>
     </section>
@@ -930,7 +952,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const sourceGroupRank = (sourceId) => sourceGroupOrder[sourceGroup(sourceId)] ?? 99;
     const sourceItems = (sourceId) => ({ admin_codes: "법정동 코드·행정구역명", gi: "농산물 지리적표시", nongsaro: "지역 특산물", nfqs_quality_cert: "인증 수산물(전국)", kofpi_forest_product: "임산물 품목", rda_regional_specialty_crops: "도별 지역특화작목 69개", kipris_trademark: "상표 출원·상태·일자", kipris_trademark_applicant: "출원인 주소", ip_registry: "등록번호·등록일·지정상품", kipo_notice_goods: "고시상품명칭·NICE류", nongsaro_area_brand: "지역 브랜드·출원번호" }[sourceId] || (sourceId.includes("specialties") ? "지역·품목·원문 명칭" : "원천 제공 항목"));
     const rows = snapshot.sources.filter((source) => source.sourceUrl).sort((a, b) => sourceGroupRank(a.sourceId) - sourceGroupRank(b.sourceId)).map((source) => `<tr><td><span class="source-group">${esc(sourceGroup(source.sourceId))}</span></td><th scope="row">${esc(source.sourceLabel || source.sourceId)}</th><td>${esc(sourceItems(source.sourceId))}</td><td><a href="${esc(source.sourceUrl)}" target="_blank" rel="noreferrer">공식 페이지 ↗</a></td><td>${esc(source.sourceContractVersion || "버전 미기록")}</td><td>${esc(sourceMethod(source.sourceId))}</td><td>${esc(dateOnly(latestDate(source.sourceFetchedAt, source.sourceLastVerifiedAt)))}</td></tr>`).join("");
-    return `<section class="provenance"><div class="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>${esc(snapshot.schemaVersion)}</span></div><div class="source-table-wrap"><table class="source-table"><caption class="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th>그룹</th><th>데이터명</th><th>수집 항목</th><th>출처</th><th>수집 소스</th><th>수집 방법</th><th>최근 수집 일자</th></tr></thead><tbody>${rows}<tr><td><span class="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href="${esc(geometry.boundaryReference.sourceUrl)}" target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>${esc(geometry.boundaryReference.sourceName)}</td><td>경계 파일 생성·코드 조인</td><td>${esc(boundaryDate)}</td></tr></tbody></table></div></section>`;
+    return `<section class="provenance"><div class="section-heading"><div><h2>출처와 데이터 상태</h2></div><span>${esc(snapshot.schemaVersion)}</span></div><div class="source-table-wrap"><table class="source-table"><caption class="sr-only">데이터별 출처와 수집 상태</caption><thead><tr><th scope="col">그룹</th><th scope="col">데이터명</th><th scope="col">수집 항목</th><th scope="col">출처</th><th scope="col">수집 소스</th><th scope="col">수집 방법</th><th scope="col">최근 수집 일자</th></tr></thead><tbody>${rows}<tr><td><span class="source-group">지역 정보</span></td><th scope="row">지도 경계</th><td>시도·시군구 경계 도형</td><td><a href="${esc(geometry.boundaryReference.sourceUrl)}" target="_blank" rel="noreferrer">공식 원본 ↗</a></td><td>${esc(geometry.boundaryReference.sourceName)}</td><td>경계 파일 생성·코드 조인</td><td>${esc(boundaryDate)}</td></tr></tbody></table></div></section>`;
   }
   function bind() {
     const scrollTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
@@ -1094,7 +1116,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   });
   function render() {
     nav();
-    document.querySelector("#app").innerHTML = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "strategy" ? strategyScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
+    const screenHtml = state.tab === "summary" ? summaryScreen() : state.tab === "applications" ? applicationsScreen() : state.tab === "regions" ? regionsScreen() : state.tab === "items" ? itemsScreen() : state.tab === "strategy" ? strategyScreen() : state.tab === "compare" ? compareScreen() : dataScreen();
+    const primaryTabKey = ["regions", "items"].includes(state.tab) ? "applications" : state.tab;
+    document.querySelector("#app").innerHTML = `<div role="tabpanel" id="primary-tabpanel-${primaryTabKey}" aria-labelledby="primary-tab-${primaryTabKey}">${screenHtml}</div>`;
     bind();
     syncHistory();
   }
