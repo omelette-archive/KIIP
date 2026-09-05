@@ -43,8 +43,12 @@ console.log("2) outsideShareSentence — 지역매칭 검증 여부에 따라 �
   const verifiedHighOutside = { region: "△△시", regionMatchVerified: true, localApplicantShare: 0.2 };
   const verifiedLowOutside = { region: "○○군", regionMatchVerified: true, localApplicantShare: 0.9 };
   const unverified = { region: "□□구", regionMatchVerified: false, localApplicantShare: null };
-  assert.match(outsideShareSentence(verifiedHighOutside), /지역 외 기업의 출원 비중이 높아/);
-  assert.match(outsideShareSentence(verifiedHighOutside), /80%/, "지역 외 비중은 1 - localApplicantShare");
+  // 이슈 #136 코멘트(2026-09-03) 06번: 같은 카드의 "지역 출원인 비중" 통계와 문장이
+  // 서로 다른 지표(1-x)를 말하는 것처럼 보이던 문제 — 문장도 localApplicantShare를
+  // 그대로 인용한다(20%, 80%가 아님).
+  assert.match(outsideShareSentence(verifiedHighOutside), /지역 출원인 비중이 낮아/);
+  assert.match(outsideShareSentence(verifiedHighOutside), /20%/, "문장은 localApplicantShare를 그대로 인용(통계 카드와 같은 값)");
+  assert.doesNotMatch(outsideShareSentence(verifiedHighOutside), /80%/, "역수(1-x)를 별도로 계산해 보여주지 않음");
   assert.strictEqual(outsideShareSentence(verifiedLowOutside), null, "지역 외 비중이 낮으면 문장을 만들지 않음");
   assert.strictEqual(outsideShareSentence(unverified), null, "미검증이면 절대 문장을 만들지 않음");
   assert.match(unverifiedRegionNote(unverified), /검증되지 않아/);
