@@ -49,6 +49,35 @@ function number(value: number | null | undefined) { return typeof value === "num
 function percent(value: number | null | undefined) { return typeof value === "number" ? `${Math.round(value * 100)}%` : "—"; }
 function date(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록"; }
 function dateOnly(value: string | null | undefined) { return value ? new Intl.DateTimeFormat("ko-KR", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: "Asia/Seoul" }).format(new Date(value)) : "미기록"; }
+// UI 검토(#136) 03번: CSV·엑셀 다운로드 경로가 한 곳도 없어 담당자가 화면을 캡처하거나
+// 손으로 옮겨 적는 수밖에 없었다. 화면에서 보이는 표를 그대로 CSV로 내려받는다(엑셀이
+// 한글을 깨지 않고 읽도록 UTF-8 BOM 포함). 파일명은 "표이름_기준일자.csv" 형식.
+function csvCellValue(value: string | number | null | undefined): string {
+  const text = String(value ?? "");
+  return /[",\n]/.test(text) ? `"${text.replace(/"/g, '""')}"` : text;
+}
+function downloadCsv(filenameBase: string, header: string[], rows: (string | number | null | undefined)[][]) {
+  if (typeof window === "undefined") return;
+  const lines = [header, ...rows].map((row) => row.map(csvCellValue).join(","));
+  const csv = `﻿${lines.join("\n")}\n`;
+  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${filenameBase}.csv`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(url);
+}
+function csvDateStamp(value: string | null | undefined): string {
+  if (!value) return new Date().toISOString().slice(0, 10);
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString().slice(0, 10) : parsed.toISOString().slice(0, 10);
+}
+function CsvDownloadButton({ onClick, label = "CSV 다운로드" }: { onClick: () => void; label?: string }) {
+  return <button type="button" className="csv-download-button" onClick={onClick}>{label}</button>;
+}
 function latestDate(...values: (string | null | undefined)[]) {
   return values.filter((value): value is string => Boolean(value) && Number.isFinite(Date.parse(value as string))).sort((a, b) => Date.parse(b) - Date.parse(a))[0] || null;
 }
@@ -1063,8 +1092,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
          <div className="ranking-stack">
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, region.region, label, item.metrics.uniqueTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품등록랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "등록 완료"], registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, region.region, label, item.metrics.registeredTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th>순위</th><th>지역</th><th>대표 특산품</th><th>등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{region.region}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
          </div>
         </div>
       </section>
@@ -1120,7 +1149,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>
       <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
       </div>
-      <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span></div>
+      <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span><CsvDownloadButton onClick={() => downloadCsv(`지역별집계_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특산품 수", "출원 확인", "출원율"], coverageBreakdown.map((row) => [displayRegionName(row.label), row.coverage.total, row.coverage.applied, percent(row.coverage.rate)]))} /></div>
         {/* 이슈 #117 코멘트(2026-09-03): 도를 클릭하면 시군구 목록이 나오기 전에 그 도 전체의
             특산품 유형별 출원·등록 비중을 원그래프로 먼저 보여준다. 시군구 상세로 이미 들어간
             뒤(municipality 선택)에는 도 전체 비중이 아니라 그 시군구 항목만 봐야 하므로 뺀다. */}
@@ -1254,7 +1283,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       <p className="screen-note">농촌진흥청이 2025년에 지정한 9개 도·69개 특화작목과 지역 주소 일치 상표 현황을 비교합니다.</p>
       <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
       {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}
-      <section className="compare-region-section"><div className="compare-section-head"><div><span>69개 전체 상세</span><h2>등급별 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div>
+      <section className="compare-region-section"><div className="compare-section-head"><div><span>69개 전체 상세</span><h2>등급별 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p><CsvDownloadButton onClick={() => downloadCsv(`특화작목비교_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "대표작목", "자체육성작목", "집중육성작목", "상표 출원건수(원물 기준)", "출원 비율", "출원 확인 작목 수", "전체 작목 수", "수집 진행"], comparisonRows.map((row) => { const byTier = (tier: string) => row.policyCrops.filter((crop) => crop.tier === tier).map((crop) => crop.displayName).join("·"); return [displayRegionName(row.province), byTier("대표작목"), byTier("자체육성작목"), byTier("집중육성작목"), row.policyApplicationsTotal, percent(row.policyRate), row.policyApplied, row.policyCrops.length, `${row.policyDecided}/${row.policyCrops.length}`]; }))} /></div>
         <div className="compare-region-table"><div className="compare-region-head"><span>지역</span><span>대표작목</span><span>자체육성작목</span><span>집중육성작목</span><span>상표 출원건수<small>원물 기준</small></span><span>출원 비율</span><span title="지역 특화작목 중 지역별 상표 집계를 완료한 작목 수">수집 진행</span></div>
           {comparisonRows.map(({ province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate }) => {
             const byTier = (tier: string) => policyCrops.filter((crop) => crop.tier === tier);
@@ -1269,7 +1298,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided}/{policyCrops.length}{policyDecided === policyCrops.length ? " 완료" : ""}</span>
             </div>;
           })}</div></section>
-      <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p></div>
+      <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><CsvDownloadButton onClick={() => downloadCsv(`대표작목TOP5대조_${csvDateStamp(dashboardUpdatedAt)}`, ["도", "대표작목(정책 지정)", "실제 등록 상표 TOP5", "일치 여부"], comparisonRows.filter((row) => row.flagshipCrop).map((row) => [displayRegionName(row.province), stripParens(row.flagshipCrop!.name), row.topRegisteredItems.map((item, index) => `${index + 1}. ${stripParens(item.name)}(${item.count}건)`).join(" / ") || "등록 상표 없음", row.flagshipMatch ? `일치 · ${row.flagshipRank + 1}위` : "불일치"]))} /></div>
         <div className="compare-flagship-table">
           <div className="compare-flagship-head"><span>도</span><span>대표작목(정책 지정)</span><span>실제 등록 상표 TOP5</span><span>일치</span></div>
           {comparisonRows.filter((row) => row.flagshipCrop).map(({ province, flagshipCrop, topRegisteredItems, flagshipMatch, flagshipRank }) => <div className="compare-flagship-row" key={province}>
