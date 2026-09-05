@@ -431,6 +431,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-region-summary { display: grid; justify-items: end; gap: 3px; }
 .coverage-region-summary span { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .coverage-region-summary b { line-height: 1; }
+/* UI 검토(#136) 01번: 특산품이 많은 카드(광역 전체 등)는 목록을 기본 접어 문서 높이·포커스
+   요소 수를 줄인다. summary는 항상 보이고, 펼치기 전엔 안의 버튼이 탭 순서에서 빠진다. */
+.coverage-specialty-toggle { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.coverage-specialty-toggle summary { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; cursor: pointer; color: var(--green-dark); font-weight: 800; font-size: 13px; }
+.coverage-specialty-toggle summary small { color: var(--muted); font-size: 11px; font-weight: 600; }
+.coverage-specialty-toggle .coverage-specialty-list { margin-top: 14px; padding-top: 0; border-top: none; }
 .coverage-specialty-list { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .coverage-specialty-list > span { padding: 9px 12px; border: 1px solid #d6dce6; border-radius: 9px; background: var(--surface); color: #33465c; font-size: 13px; }
 .coverage-specialty-list button { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-width: 230px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); color: var(--ink); font-size: 13px; font-weight: 700; text-align: left; cursor: pointer; }

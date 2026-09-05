@@ -867,8 +867,21 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 카드(가평군 등)를 나란한 카드로 보여주면 헷갈린다는 지적 — 도 단위 항목은 별도 표시,
   // 실제 시군구 카드는 토글(펼치기) 뒤로 숨긴다.
   type CoverageRow = (typeof coverageBreakdown)[number];
+  // UI 검토(#136, 2026-09-03) 01번: 지역·품목별 조회의 전국 목록이 광역당 특산품을 전부
+  // 펼쳐 문서 높이가 38,000px를 넘고 포커스 가능 요소가 1,900개에 달해 스크롤·키보드
+  // 이동만으로는 하단(경상남도 등)에 도달하기 어려웠다. 항목이 많은 카드(광역 전체 집계 등)는
+  // 특산품 목록을 <details>로 기본 접어, 펼치기 전까지는 DOM에는 남되 포커스·탭 순서에서
+  // 빠지도록 한다(네이티브 동작 — 별도 aria 처리 불필요).
+  const SPECIALTY_LIST_COLLAPSE_THRESHOLD = 20;
   function coverageCard(row: CoverageRow) {
-    return <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div><div className="coverage-specialty-list">{row.items.map(({ region, item, label }) => { const status = specialtyFilingStatus(item); return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier}</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>; })}</div></article>;
+    const specialtyButtons = row.items.map(({ region, item, label }) => {
+      const status = specialtyFilingStatus(item);
+      return <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span>{selectedProvince ? label : `${region.sigungu || region.region} / ${label}`}{item.regionalSpecialtyCropBadge && <em className={`crop-badge crop-badge-${item.regionalSpecialtyCropBadge.tier}`}>{item.regionalSpecialtyCropBadge.tier}</em>}</span><small className={`specialty-status ${status.filed ? "filed" : "unfiled"}`}>{status.label}</small></button>;
+    });
+    const specialtyList = row.items.length > SPECIALTY_LIST_COLLAPSE_THRESHOLD
+      ? <details className="coverage-specialty-toggle"><summary><span>특산품 {number(row.items.length)}개 보기</span><small>클릭하면 펼쳐집니다</small></summary><div className="coverage-specialty-list">{specialtyButtons}</div></details>
+      : <div className="coverage-specialty-list">{specialtyButtons}</div>;
+    return <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div>{specialtyList}</article>;
   }
   const trendItems = coverageAreaRegions.flatMap((region) => region.items);
   const trendApplicationTotals = sumYearCounts(trendItems, "applicationYearCounts");
