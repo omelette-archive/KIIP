@@ -49,11 +49,17 @@ function gapSentence(row) {
 
 // project-plan.md ⑥ 예시 문장("△△시는 지역 외 기업의 출원 비중이 높아 지역 브랜드 보호
 // 전략 검토 필요")의 고정 템플릿화. 지역 매칭이 검증된 행에서만 만든다(이슈 #11 의존).
+//
+// UI 검토(#136) 06번: 같은 카드 안 "지역 출원인 비중" 통계(localApplicantShare를 그대로
+// 표시)와 이 문장이 예전엔 서로 다른 지표처럼 보였다 — 문장이 그 값의 역수(1-x)를
+// "지역 외 기업 비중"으로 따로 계산해 보여줘서, 예컨대 지역 출원인 비중 0%·지역 외 기업
+// 비중 100%가 같은 사실의 두 표현인데도 반대로 말하는 두 수치로 읽혔다. 문장도 같은
+// localApplicantShare 값을 그대로 인용하도록 통일한다(별도 계산값을 새로 만들지 않음).
 function outsideShareSentence(row) {
   if (!row.regionMatchVerified || typeof row.localApplicantShare !== "number") return null;
   const outsideShare = 1 - row.localApplicantShare;
   if (outsideShare < OUTSIDE_SHARE_ALERT_THRESHOLD) return null;
-  return `${attachTopicMarker(row.region)} 지역 외 기업의 출원 비중이 높아(${formatPercent(outsideShare)}) 지역 브랜드 보호 전략 검토 필요.`;
+  return `${attachTopicMarker(row.region)} 지역 출원인 비중이 낮아(${formatPercent(row.localApplicantShare)}) 지역 브랜드 보호 전략 검토 필요.`;
 }
 
 function unverifiedRegionNote(row) {
