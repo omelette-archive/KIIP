@@ -506,6 +506,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .business-strategy-list li::before { content: ""; position: absolute; left: 0; top: 8px; width: 6px; height: 6px; border-radius: 999px; background: var(--green); }
 .business-strategy.alert .business-strategy-list li::before { background: var(--amber); }
 .business-strategy-note { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(16, 25, 43, .08); color: var(--muted); font-size: 9.5px; }
+/* UI 검토(#136) 05번: 카드마다 반복되던 파이프라인 각주를 화면당 한 번(생성 규칙 안내)과
+   카드별 이동 링크(footer)로 분리 */
+.business-strategy-footer { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(16, 25, 43, .08); font-size: 12px; }
+.business-strategy-disclaimer { margin: 10px 0 0; color: var(--muted); font-size: 12px; cursor: help; }
 /* 이슈 #116(2026-08-26): 품목별 비즈니스 전략 샘플 메뉴 */
 .strategy-sample-list { display: grid; gap: 16px; margin-top: 16px; }
 .strategy-sample-list .business-strategy { margin-top: 0; }
@@ -520,7 +524,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-featured-options button:hover { border-color: #aac2dc; background: var(--green-soft); }
 .strategy-featured-options button.active { border-color: var(--green); background: var(--green); color: #fff; }
 .strategy-featured-options button small { padding-left: 6px; border-left: 1px solid currentColor; color: inherit; font-size: 10px; opacity: .82; }
-.strategy-jump-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--green); font-size: 9px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+.strategy-jump-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--green); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 8px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
 .gi-mark-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #eef1fb; color: #4a4fc4; font-size: 8px; font-weight: 800; white-space: nowrap; }

@@ -569,9 +569,16 @@ function BusinessStrategyCard({ briefing, title, footer }: { briefing: ItemBrief
           렌더링과 무관하게 이미 굳어 있다 — displayRegionName은 순수 문자열 치환이라
           렌더 시점에 문장 전체에 적용해도 안전하다(재수집·재생성 없이 표기만 통일). */}
       <ul className="business-strategy-list">{briefing.sentences.map((sentence, index) => <li key={index}>{displayRegionName(sentence)}</li>)}</ul>
-      <p className="business-strategy-note">⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다({briefing.templateVersion || "버전 미기록"}).{footer}</p>
+      {footer && <p className="business-strategy-footer">{footer}</p>}
     </section>
   );
+}
+// UI 검토(#136) 05번: "⑤·⑥단계 분석 결과에서 고정 템플릿으로 생성한 문장입니다
+// (strategy-template-v0-example)" 각주가 카드마다 반복돼 시각적 소음이 컸고, 단계
+// 번호·템플릿 ID는 정책 담당자의 언어가 아니라 개발 산출물의 언어였다. 카드 목록·화면당
+// 한 번만, 파이프라인 용어 없이 보여준다. 템플릿 버전은 툴팁으로만 남긴다.
+function BusinessStrategyDisclaimer({ templateVersion }: { templateVersion?: string | null }) {
+  return <p className="business-strategy-disclaimer" title={`규칙 기반 자동 생성 문장(AI 미사용) · 버전 ${templateVersion || "미기록"}`}>자동 생성 문장입니다 · 생성 규칙 보기</p>;
 }
 // 2026-08-21: 지역별 출원 탭 특산품 목록에 출원 여부를 색으로 구분해 보여준다(사용자
 // 요청) — 출원 확인은 색이 있게, 미확인은 색이 없게. 단, 법정동코드가 미해결인
@@ -1245,7 +1252,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
             {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} origins={[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)} />}
-            {briefingItem?.briefing && <BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} />}
+            {briefingItem?.briefing && <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></>}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
         </div>
         <details className="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details>
@@ -1253,7 +1260,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </section>}
 
     {tab === "strategy" && <section className="screen-section strategy-screen">
-      <p className="screen-note">⑤·⑥단계 분석에서 생성되는 품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>
+      <p className="screen-note">품목별 비즈니스 확장 전략 브리핑입니다. 주요 샘플은 아래에서 고르고, 나머지 품목은 이름을 직접 입력해 찾을 수 있습니다.</p>
       <div className="strategy-item-selector">
         <div className="strategy-featured"><span>주요 특산품</span><div className="strategy-featured-options" role="group" aria-label="주요 특산품 바로 선택">
           <button type="button" className={!strategyItem ? "active" : ""} onClick={() => setStrategyItem("")}>대표 사례</button>
@@ -1274,6 +1281,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           title={`${displayRegionName(region.region)} · ${itemName(item)}`}
           footer={<> <button type="button" className="strategy-jump-link" onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}>지자체별 조회에서 자세히 보기 →</button></>}
         />)}</div>
+        {selectedStrategyGroup.briefings.length > 0 && <BusinessStrategyDisclaimer templateVersion={selectedStrategyGroup.briefings[0].item.briefing?.templateVersion} />}
         {selectedStrategyGroup.briefings.length === 0 && <p className="empty">이 품목은 아직 지역별 브리핑이 없습니다.</p>}
         {selectedStrategyGroup.briefings.length > 6 && <p className="screen-note">지역별 브리핑 {selectedStrategyGroup.briefings.length}건 중 6건 표시.</p>}
       </> : <>
@@ -1284,6 +1292,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           title={`${displayRegionName(region.region)} · ${itemName(item)}`}
           footer={<> <button type="button" className="strategy-jump-link" onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}>지자체별 조회에서 자세히 보기 →</button></>}
         />)}</div>
+        {briefingSamples.length > 0 && <BusinessStrategyDisclaimer templateVersion={briefingSamples[0].item.briefing?.templateVersion} />}
       </>}
     </section>}
 
@@ -1411,7 +1420,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
     {item.businessFlow && <NationwideFlowCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
-    {item.briefing && item.briefing.sentences.length > 0 && <BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" />}
+    {item.briefing && item.briefing.sentences.length > 0 && <><BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" /><BusinessStrategyDisclaimer templateVersion={item.briefing.templateVersion} /></>}
     <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{giMarkLabel(example.applicationNumber) && <span className="gi-mark-chip">{giMarkLabel(example.applicationNumber)}</span>}{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" title={`KIPRIS에서 이 상표(출원번호 ${example.applicationNumber})의 검색 결과를 새 창으로 엽니다`} onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 결과 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;
 }
