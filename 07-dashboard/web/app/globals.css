@@ -348,6 +348,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .trend-legend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; }
 .trend-legend-application { background: var(--green); }
 .trend-legend-registered { background: var(--amber); background-image: repeating-linear-gradient(90deg, var(--amber) 0 4px, transparent 4px 7px); }
+/* UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 이 차트가 전국 검색 결과
+   전체를 합산한 값이라 같은 화면의 지역 확인 출원 KPI보다 훨씬 클 수 있다는 걸 밝힌다. */
+.trend-population-note { margin: 4px 0 0; color: var(--faint); font-size: 11px; }
 /* 이슈 #118: 요약·지역·품목 화면에서 추이 그래프를 같은 모양으로 부각 — 큰 카드 + 높은 SVG */
 .trend-chart-prominent { width: 100%; margin: 22px 0 4px; }
 .trend-chart-prominent .section-heading { margin-bottom: 10px; align-items: flex-end; }
