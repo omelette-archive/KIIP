@@ -880,6 +880,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /function shareDonutHtml\(counts, label\)/);
   assert.match(html, /class="item-share-bar"/);
   assert.match(html, /class="item-share-bar-segment"/);
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 추이 차트가 전국 검색 결과
+  // 전체를 합산한 값이라 지역 확인 출원 KPI보다 훨씬 클 수 있다는 걸 차트마다 명시해야 함.
+  assert.match(html, /class="trend-population-note"/);
+  const populationNoteCount = (html.match(/class="trend-population-note"/g) || []).length;
+  assert.equal(populationNoteCount, 2, "regionTrendHtml·지역별 조회 자체 추이 차트 둘 다에 모집단 안내가 있어야 함");
   assert.match(html, /외 \$\{restCount\}개 지역/);
   // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
   assert.match(html, /const PROVINCE_COLORS = \{/);

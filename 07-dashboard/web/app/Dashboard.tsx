@@ -358,6 +358,11 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
       {trendYearLabels(years).map((year) => <text key={year} x={scale.x(year)} y={TREND_CHART.height - 5} className="trend-axis-label trend-axis-x">{year}</text>)}
     </svg>
     <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록</p>
+    {/* UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 이 차트의 연도별 건수는
+        지역×품목 검색의 전국 검색 결과 전체(applicationYearCounts)를 합산한 값이라,
+        같은 화면의 KPI(출원인 주소로 이 지역/품목이 확인된 고유 출원 수)보다 훨씬 클 수
+        있다 — 두 수치가 서로 다른 모집단이라는 걸 차트에도 명시한다. */}
+    <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
   </section>;
 }
 // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
@@ -1286,6 +1291,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             {trendYearLabels(trendYears).map((year) => <text key={`label-${year}`} x={trendScale.x(year)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{year}</text>)}
           </svg>
           <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
+          <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
         </> : <p className="empty">이 범위는 아직 연도별 출원 데이터가 수집되지 않았습니다.</p>}
       </section>
       {selectedProvince && <section className="coverage-map-card">
