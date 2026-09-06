@@ -374,6 +374,14 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             rate: optionalCount(row.rawGoodsRegionalShare.rate),
           }
         : null,
+      // #137 "공개 뷰에 collectedCount + cap 표시": ③이 --out-max-hits로 잘라낸 품목만
+      // 채워짐(그 외엔 null) — 대시보드가 "N건 수집(상한 M)" 배지를 조건부로만 그린다.
+      outputHitCap: row.outputHitCap
+        ? {
+            cap: count(row.outputHitCap, "cap"),
+            collectedCount: count(row.outputHitCap, "collectedCount"),
+          }
+        : null,
       itemVerdict: {
         source: clean(row.itemVerdictSource) || "unresolved",
         method: clean(row.itemMatchMethod) || null,

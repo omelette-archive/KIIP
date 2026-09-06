@@ -267,6 +267,12 @@ function createBucket(dimensions) {
     hits: new Map(),
     sources: new Set(),
     sourceProvenance: new Map(),
+    // #137: ③(matchTrademarks --out-max-hits)이 잘라낸 쿼리가 있으면 표시용으로 모아둔다
+    // — cap은 쿼리당 상한이라 여러 쿼리가 걸려도 합산하지 않고 최댓값만 남기고,
+    // collectedCount(실제 존재한 hit 수, 잘리기 전)는 쿼리 간 합산이 의미 있어 더한다.
+    outputHitCapMax: 0,
+    outputHitCapCollectedTotal: 0,
+    outputHitCappedQueryCount: 0,
   };
 }
 
@@ -306,6 +312,11 @@ function addEntry(bucket, entry) {
   bucket.sourceTotalCount += entryTotalCount(entry);
   const hits = Array.isArray(entry.hits) ? entry.hits : [];
   bucket.returnedHitCount += hits.length;
+  if (entry.outputHitCap && Number.isFinite(entry.outputHitCap.collectedCount)) {
+    bucket.outputHitCapMax = Math.max(bucket.outputHitCapMax, Number(entry.outputHitCap.cap) || 0);
+    bucket.outputHitCapCollectedTotal += entry.outputHitCap.collectedCount;
+    bucket.outputHitCappedQueryCount++;
+  }
   for (const hit of hits) {
     const key = trademarkKey(hit);
     if (!bucket.hits.has(key)) bucket.hits.set(key, hit);
@@ -519,14 +530,27 @@ function finalizeBucket(bucket, options) {
   }
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
 
+  const BUCKET_INTERNAL_KEYS = new Set([
+    "hits",
+    "sources",
+    "sourceProvenance",
+    "outputHitCapMax",
+    "outputHitCapCollectedTotal",
+    "outputHitCappedQueryCount",
+  ]);
   const result = {};
   for (const [key, value] of Object.entries(bucket)) {
-    if (key !== "hits" && key !== "sources" && key !== "sourceProvenance") result[key] = value;
+    if (!BUCKET_INTERNAL_KEYS.has(key)) result[key] = value;
   }
   return {
     ...result,
     sources: [...bucket.sources].sort(),
     sourceProvenance: [...bucket.sourceProvenance.values()],
+    // #137 "공개 뷰에 collectedCount + cap 표시": ③이 --out-max-hits로 잘라낸 품목만
+    // 채워지고, 나머지는 null(대시보드가 "N건 수집(상한 M)" 배지를 조건부로만 그리게).
+    outputHitCap: bucket.outputHitCappedQueryCount > 0
+      ? { cap: bucket.outputHitCapMax, collectedCount: bucket.outputHitCapCollectedTotal }
+      : null,
     uniqueTrademarkCount,
     nationwideSearchTrademarkCount: uniqueTrademarkCount,
     duplicateHitCount: Math.max(0, bucket.returnedHitCount - uniqueTrademarkCount),

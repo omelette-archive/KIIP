@@ -91,6 +91,9 @@ function detectGaps(analysis, options = {}) {
       goodsReviewRequiredHitCount: bucket.goodsReviewRequiredHitCount || 0,
       goodsMismatchHitCount: bucket.goodsMismatchHitCount || 0,
       goodsVerificationRate: bucket.goodsVerificationRate ?? null,
+      // #137 "공개 뷰에 collectedCount + cap 표시": ③이 --out-max-hits로 잘라낸 품목만
+      // 채워짐(그 외엔 null).
+      outputHitCap: bucket.outputHitCap || null,
       ...scored,
     };
   });
