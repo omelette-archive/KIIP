@@ -803,6 +803,35 @@ console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론
   ok("복합 지역명 보정, 건수·등록률·exact/contains·근거·상위 집계 재현 + 드리프트 행 건너뛰기");
 }
 
+{
+  // #137 "공개 뷰에 collectedCount + cap 표시": ③(--out-max-hits)이 남긴 outputHitCap을
+  // 결과 행까지 그대로 옮겨야 한다. 잘리지 않은 품목은 null이어야 한다(과대 노출 방지).
+  const capped = analyzeEntries([
+    {
+      sido: "전라북도",
+      sigungu: "완주군",
+      itemName: "감말랭이",
+      niceClass: "29",
+      query: { region: "전라북도 완주군", searchString: "감말랭이", regionMatch: "unverified" },
+      outputHitCap: { cap: 100, collectedCount: 137 },
+      hits: [hit("40-2024-1", "완주 감말랭이", "20240101", "등록", "unverified")],
+    },
+    {
+      sido: "전라북도",
+      sigungu: "완주군",
+      itemName: "복숭아",
+      niceClass: "31",
+      query: { region: "전라북도 완주군", searchString: "복숭아", regionMatch: "unverified" },
+      hits: [hit("40-2024-2", "완주 복숭아", "20240101", "등록", "unverified")],
+    },
+  ], { asOfYear: 2026 });
+  const cappedRow = capped.regionItems.find((row) => row.itemName === "감말랭이");
+  const uncappedRow = capped.regionItems.find((row) => row.itemName === "복숭아");
+  assert.deepStrictEqual(cappedRow.outputHitCap, { cap: 100, collectedCount: 137 });
+  assert.strictEqual(uncappedRow.outputHitCap, null, "상한에 안 걸린 품목은 null이어야 함");
+  ok("outputHitCap이 잘린 품목에만 결과 행까지 그대로 전달됨");
+}
+
 runNationwideFlowTests()
   .then(() => console.log("\n모든 자체 테스트 통과"))
   .catch((err) => {

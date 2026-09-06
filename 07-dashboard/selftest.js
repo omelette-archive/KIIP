@@ -437,4 +437,20 @@ console.log("7) 지도 도형-목표 목록 대조 통과 시에만 map.availabi
   ok("geometry가 있고 목표 목록과 정확히 대응할 때만 available로 전환, 없으면 기존 안전 기본값 유지");
 }
 
+console.log("8) 공개 뷰에 collectedCount + cap 표시(#137) — ④의 outputHitCap을 품목까지 전달");
+{
+  const cappedInput = fixture();
+  const cappedRow = cappedInput.analysis.regionItems.find((row) => row.region === "경상북도 안동시");
+  Object.assign(cappedRow, { outputHitCap: { cap: 100, collectedCount: 137 } });
+  const cappedSnapshot = buildDashboardSnapshot(cappedInput, {
+    mode: "sample",
+    generatedAt: "2026-08-22T00:00:00Z",
+  });
+  const andongItem = cappedSnapshot.regions.find((region) => region.region === "경상북도 안동시").items[0];
+  const boseongItem = cappedSnapshot.regions.find((region) => region.region === "전라남도 보성군").items[0];
+  assert.deepStrictEqual(andongItem.outputHitCap, { cap: 100, collectedCount: 137 });
+  assert.strictEqual(boseongItem.outputHitCap, null, "상한에 안 걸린 품목은 null이어야 함");
+  ok("전국 검색 결과가 저장 상한에 걸린 품목만 collectedCount/cap을 노출, 나머지는 null");
+}
+
 console.log("\n모든 자체 테스트 통과");

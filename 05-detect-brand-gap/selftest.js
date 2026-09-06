@@ -161,6 +161,28 @@ console.log("5-2) 전국 검색 hit는 지역 귀속 전 대표성·공백 점�
   ok("전국 후보 100건이 있어도 지역 inside 검증 전에는 랭킹과 점수를 생성하지 않음");
 }
 
+console.log("5-3) detectGaps — ④의 outputHitCap을 결과 행까지 그대로 전달(#137)");
+{
+  const result = detectGaps({
+    regionItems: [
+      {
+        region: "전라북도 완주군", sido: "전라북도", sigungu: "완주군", itemName: "감말랭이",
+        sources: ["농사로"], uniqueTrademarkCount: 1, registrationRate: 0.5, regionVerificationRate: 1,
+        outputHitCap: { cap: 100, collectedCount: 137 },
+      },
+      {
+        region: "전라북도 완주군", sido: "전라북도", sigungu: "완주군", itemName: "복숭아",
+        sources: ["농사로"], uniqueTrademarkCount: 1, registrationRate: 0.5, regionVerificationRate: 1,
+      },
+    ],
+  });
+  const capped = result.rows.find((row) => row.itemName === "감말랭이");
+  const uncapped = result.rows.find((row) => row.itemName === "복숭아");
+  assert.deepStrictEqual(capped.outputHitCap, { cap: 100, collectedCount: 137 });
+  assert.strictEqual(uncapped.outputHitCap, null, "상한에 안 걸린 품목은 null이어야 함");
+  ok("outputHitCap이 잘린 품목에만 결과 행까지 그대로 전달됨");
+}
+
 console.log("6) detectGaps — 입력 계약 위반 시 명확한 오류");
 {
   assert.throws(() => detectGaps({}), /regionItems/);

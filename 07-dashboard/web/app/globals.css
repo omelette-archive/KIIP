@@ -195,6 +195,8 @@ a { color: inherit; text-decoration: none; }
 .detail-grid span { color: var(--muted); font-size: 11px; }
 .detail-grid strong { display: block; margin: 14px 0 10px; font-size: 22px; letter-spacing: -0.03em; }
 .detail-grid small { color: var(--faint); font-size: 11px; line-height: 1.5; }
+/* #137 "공개 뷰에 collectedCount + cap 표시": ③ --out-max-hits로 잘린 품목에만 조건부로 뜬다. */
+.detail-grid .output-hit-cap-note { margin-top: 6px; }
 .blocking-list { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
 .blocking-list a { color: var(--amber); font-size: 11px; font-weight: 700; }
 
