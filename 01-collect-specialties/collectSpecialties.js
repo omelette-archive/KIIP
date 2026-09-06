@@ -282,9 +282,9 @@ async function collectKofpi(_adminList, warnings, options = {}) {
   }
 }
 
-async function collectRdaRegionalSpecialtyCrops(_adminList, warnings, options = {}) {
+async function collectRdaRegionalSpecialtyCrops(adminList, warnings, options = {}) {
   try {
-    const collected = collectRegionalSpecialtyCrops({ limit: options.limit });
+    const collected = collectRegionalSpecialtyCrops({ limit: options.limit, adminList });
     const rows = addSourceMetadata(collected.rows, options.sourceDefinition);
     warnings.push(
       `rda_regional_specialty_crops: ${rows.length}개 공식 작목을 도 단위 지역 특산품으로 수집`

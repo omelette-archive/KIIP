@@ -1,5 +1,7 @@
 "use strict";
 
+const { resolveSidoName } = require("../../01-collect-specialties/lib/normalize");
+
 /**
  * #70(2026-09-01): NFQS·KOFPI 보완 소스의 지역 스코프 정규화를 운영 파이프라인에 접기
  * 위해 mergeSupplementalDashboardData.js에서 그대로 옮긴 함수들이다. 예전엔 별도 병합
@@ -67,7 +69,7 @@ function normalizeNfqsGeoReviewScopes(document) {
   }
 }
 
-function expandForestRegionalResults(document, evidenceDocument) {
+function expandForestRegionalResults(document, evidenceDocument, adminList) {
   const expanded = [];
   for (const result of document.results || []) {
     if (result.input?.sourceId !== "kofpi_forest_product") {
@@ -88,12 +90,15 @@ function expandForestRegionalResults(document, evidenceDocument) {
       continue;
     }
     for (const evidence of primaryRegionEvidence) {
+      // 2024년 임산물생산조사 원자료는 "전라남도"처럼 통합 전 도명을 그대로 쓴다.
+      // 마스터가 주어지면 현재 시도명(전남광주통합특별시)으로 정규화한다.
+      const { sido } = resolveSidoName(evidence.sido, adminList);
       const regional = structuredClone(result);
       regional.inputIndex = `forest-region-${evidence.tableNumber}-${result.inputIndex}`;
       regional.input = {
         ...regional.input,
         inputIndex: regional.inputIndex,
-        sido: evidence.sido,
+        sido,
         sigungu: evidence.sigungu,
         regionCode: "",
         regionMatchMethod: evidence.evidenceType,
@@ -125,10 +130,10 @@ function expandForestRegionalResults(document, evidenceDocument) {
 /**
  * ③→④ 사이에 적용한다. document는 mutate된다.
  */
-function applySupplementalScopes(document, { forestRegionEvidence } = {}) {
+function applySupplementalScopes(document, { forestRegionEvidence, adminList } = {}) {
   normalizeNfqsFacilityScopes(document);
   normalizeNfqsGeoReviewScopes(document);
-  if (forestRegionEvidence) expandForestRegionalResults(document, forestRegionEvidence);
+  if (forestRegionEvidence) expandForestRegionalResults(document, forestRegionEvidence, adminList);
   return document;
 }
 

@@ -2,6 +2,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { resolveSidoName } = require("./normalize");
 
 const DEFAULT_DATA_PATH = path.resolve(
   __dirname,
@@ -26,24 +27,29 @@ function loadDocument(dataPath = DEFAULT_DATA_PATH) {
   return { document, entries };
 }
 
-function collectRegionalSpecialtyCrops({ limit, dataPath } = {}) {
+function collectRegionalSpecialtyCrops({ limit, dataPath, adminList } = {}) {
   const { document, entries } = loadDocument(dataPath);
   const selected = limit === undefined ? entries : entries.slice(0, limit);
   const collectedAt = new Date().toISOString();
-  const rows = selected.map((entry) => ({
-    sido: entry.sido,
-    sigungu: "",
-    regionCode: "",
-    regionMatchMethod: "official_policy_province",
-    sourceRegionName: entry.sido,
-    sourceRegionCode: "",
-    sourceItemName: entry.itemName,
-    sourceRecordUrl: document.sourceUrl,
-    sourceScope: "province_policy_specialty",
-    rawItemName: entry.itemName,
-    source: `농촌진흥청 지역특화작목(${entry.tier})`,
-    collectedAt,
-  }));
+  const rows = selected.map((entry) => {
+    // 지역특화작목 JSON은 "전라남도"처럼 통합 전 도명을 키로 쓴다. 마스터가 주어지면
+    // 여기서 바로 정규화해 다운스트림에 옛 도명이 별도 지역행으로 남는 걸 막는다.
+    const { sido, regionCode } = resolveSidoName(entry.sido, adminList);
+    return {
+      sido,
+      sigungu: "",
+      regionCode,
+      regionMatchMethod: "official_policy_province",
+      sourceRegionName: entry.sido,
+      sourceRegionCode: "",
+      sourceItemName: entry.itemName,
+      sourceRecordUrl: document.sourceUrl,
+      sourceScope: "province_policy_specialty",
+      rawItemName: entry.itemName,
+      source: `농촌진흥청 지역특화작목(${entry.tier})`,
+      collectedAt,
+    };
+  });
   const rawRecords = selected.map((entry) => ({
     sourceRecordId: `${entry.sido}|${entry.tier}|${entry.itemName}`,
     referenceYear: document.referenceYear,
