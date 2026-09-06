@@ -800,6 +800,13 @@ test("generates a self-contained standalone dashboard", async () => {
   // 2026-08-21: 서울·세종 화살표 대신 경기도 라벨만 옮기는 방식으로 변경(사용자 요청).
   assert.match(html, /경기도: \{ x: 20, y: 38 \}/, "standalone map should nudge only Gyeonggi's label instead of using leader-line arrows");
   assert.doesNotMatch(html, /const calloutLabels/, "legacy all-label callout layout must not remain in the standalone client");
+  // UI 검토(3차, 2026-09-06) N1: 분위 경계를 못 만드는 범위(예: 시군구 데이터가 전부
+  // null)에서는 범례 칸이 전부 "최고"로 반복되지 않고 아예 감춰져야 한다.
+  assert.match(
+    html,
+    /const quantileLegendHtml = \(breaks, formatter\) => breaks\.length === 0 \? "" : /,
+    "빈 breaks에서는 범례 칸을 감춰야 함(#136 3차 검토 N1)"
+  );
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
   assert.match(html, /출원 확인 특산품/);
