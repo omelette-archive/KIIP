@@ -565,24 +565,29 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    카드별 이동 링크(footer)로 분리 */
 .business-strategy-footer { margin: 12px 0 0; padding-top: 10px; border-top: 1px solid rgba(16, 25, 43, .08); font-size: 12px; }
 .business-strategy-disclaimer { margin: 10px 0 0; color: var(--muted); font-size: 12px; cursor: help; }
-/* 이슈 #116(2026-08-26): 품목별 비즈니스 전략 샘플 메뉴 */
-/* UI 검토(#136) 15번 확인 중 발견: grid-template-columns가 없어 암묵적 트랙이 카드 중
-   가장 넓은 내용(제목 등)의 max-content 폭으로 고정돼, 배지·표식 글자를 키우자(9.5px→12px)
-   360px 폭에서 카드 전체가 옆으로 삐져나갔다. 트랙을 컨테이너 폭으로 고정한다. */
-.strategy-sample-list { display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; margin-top: 16px; }
-.strategy-sample-list .business-strategy { margin-top: 0; }
-/* 이슈 #116(2026-09-01): 비즈니스 전략 탭에서 품목을 골라 조회 */
-.strategy-item-selector { display: grid; gap: 14px; margin: 4px 0 18px; }
-.strategy-item-selector label { display: inline-flex; align-items: center; gap: 8px; }
-.strategy-item-selector span { color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; }
-.strategy-item-selector select, .strategy-item-selector input { min-width: 200px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: 13px; }
-.strategy-featured { display: grid; gap: 8px; }
-.strategy-featured-options { display: flex; flex-wrap: wrap; gap: 7px; }
-.strategy-featured-options button { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 12px; font-weight: 750; cursor: pointer; }
-.strategy-featured-options button:hover { border-color: #aac2dc; background: var(--green-soft); }
-.strategy-featured-options button.active { border-color: var(--green); background: var(--green); color: #fff; }
-.strategy-featured-options button small { padding-left: 6px; border-left: 1px solid currentColor; color: inherit; font-size: 11px; opacity: .82; }
 .strategy-jump-link { margin-left: 6px; padding: 0; border: 0; background: transparent; color: var(--green); font-size: 12px; font-weight: 700; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+/* UI 검토(3차, 2026-09-06) S3: 비즈니스 전략 — 카드 나열 대신 한 줄 = 한 지역×품목인
+   표 + 오른쪽 상세 패널. 표는 province-detail-cols 그리드(지역별 조회의 추이·요약
+   2단 레이아웃)를 재사용한다. */
+.strategy-table-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; margin: 4px 0 14px; }
+.strategy-filter-field { display: inline-flex; flex-direction: column; gap: 4px; }
+.strategy-filter-field span { color: var(--muted); font-size: 12px; font-weight: 700; }
+.strategy-filter-field input { min-width: 220px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 9px; background: #fff; color: var(--ink); font-size: 13px; }
+.strategy-table-layout { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(200px, .85fr); gap: 18px; align-items: start; }
+@media (max-width: 900px) { .strategy-table-layout { grid-template-columns: 1fr; } }
+.strategy-table-wrap { overflow-x: auto; }
+.strategy-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.strategy-table th, .strategy-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+.strategy-table th { background: #f4f6f9; }
+.strategy-table th button { display: inline-flex; align-items: center; gap: 2px; padding: 0; border: 0; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 800; cursor: pointer; }
+.strategy-table th button.active, .strategy-table th button:hover { color: var(--ink); }
+.strategy-table tbody tr { cursor: pointer; }
+.strategy-table tbody tr:hover { background: #f4f6f9; }
+.strategy-table tbody tr.active { background: var(--green-soft); }
+.strategy-table tbody tr:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+.strategy-table-badge { display: inline-flex; padding: 3px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; font-weight: 800; }
+.strategy-table-badge.alert { background: var(--amber-soft); color: var(--amber); }
+.strategy-detail .business-strategy { margin-top: 0; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
 .gi-mark-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #eef1fb; color: #4a4fc4; font-size: 11px; font-weight: 800; white-space: nowrap; }
