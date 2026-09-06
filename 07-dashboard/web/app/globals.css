@@ -677,6 +677,41 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .provisional-note { margin: 11px 0 0; padding: 10px 12px; border-radius: 8px; background: var(--violet-soft); color: var(--violet); font-size: 11px; line-height: 1.5; }
 .item-empty { grid-column: 1 / -1; }.method-note { margin-top: 15px; padding: 14px 16px; box-shadow: none; background: #eef2f7; }.method-note summary { cursor: pointer; font-size: 12px; font-weight: 800; }.method-note p { margin: 8px 0 0; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
 
+/* UI 검토(3차, 2026-09-06) S4: 9개 도 × 8개 열 넓은 표 대신, 도 스트립 + 선택된 도
+   상세로 — 전체 표는 details 토글 뒤로. */
+.compare-province-detail-section { margin-top: 25px; }
+.compare-province-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 8px; }
+.compare-province-strip button { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 8px; border: 1px solid var(--line); border-radius: 12px; background: #fff; cursor: pointer; text-align: center; }
+.compare-province-strip button:hover { background: #f4f6f9; }
+.compare-province-strip button.active { border-color: var(--green); background: var(--green-soft); }
+.compare-province-strip strong { font-size: 12.5px; }
+.compare-strip-match, .compare-strip-mismatch, .compare-strip-none { padding: 3px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; white-space: nowrap; }
+.compare-strip-match { background: var(--green-soft); color: var(--green-dark); }
+.compare-strip-mismatch { background: #eef1f5; color: var(--muted); }
+.compare-strip-none { background: #f4f6f9; color: var(--faint); }
+.compare-province-detail { margin-top: 16px; padding: 22px; border: 1px solid var(--line); border-radius: 16px; background: #fff; box-shadow: var(--shadow); }
+.compare-province-tiers { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 16px; }
+.compare-province-tiers > div { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fb; }
+.compare-province-tiers span { display: block; margin-bottom: 8px; color: var(--muted); font-size: 11.5px; font-weight: 800; }
+.compare-province-tiers span small { display: block; color: var(--faint); font-weight: 600; }
+.compare-province-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; margin-top: 14px; }
+.compare-province-stats > div { padding: 14px; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fb; }
+.compare-province-stats span { display: block; color: var(--muted); font-size: 11.5px; }
+.compare-province-stats span small { display: block; color: var(--faint); font-weight: 400; }
+.compare-province-stats b { display: block; margin-top: 6px; font-size: 19px; font-weight: 800; color: var(--green-dark); }
+.compare-province-stats small { color: var(--faint); font-size: 11px; }
+.compare-province-flagship { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.compare-province-flagship h3 { margin: 0 0 6px; font-size: 14px; }
+.compare-province-flagship p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
+.compare-full-tables-toggle { margin-top: 22px; padding: 0; border: 1px solid var(--line); border-radius: 14px; background: #f8f9fb; }
+.compare-full-tables-toggle summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; color: var(--green-dark); font-weight: 800; cursor: pointer; }
+.compare-full-tables-toggle summary small { color: var(--muted); font-size: 12px; font-weight: 600; }
+.compare-full-tables-toggle > .compare-region-section:first-of-type,
+.compare-full-tables-toggle .compare-region-section { padding: 0 17px; }
+.compare-full-tables-toggle .compare-flagship-section { padding: 0 17px 17px; }
+@media (max-width: 640px) {
+  .compare-province-tiers, .compare-province-stats { grid-template-columns: 1fr; }
+}
 .compare-banner { margin-top: 25px; padding: 24px; border-left: 4px solid var(--amber); }
 .compare-banner span, .compare-banner strong { display: block; }.compare-banner span { color: var(--amber); font-size: 11px; font-weight: 800; letter-spacing: .1em; }.compare-banner strong { margin-top: 7px; font-size: 22px; }.compare-banner p { margin: 8px 0 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
 .compare-readiness { display: grid; grid-template-columns: 1fr 28px 1fr 28px 1fr; align-items: stretch; gap: 8px; margin-top: 16px; }.compare-readiness article { padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: #ffffff; }.compare-readiness article.ready { border-color: #b7cbe3; background: var(--green-soft); }.compare-readiness article.waiting { border-color: #e4cda9; background: var(--amber-soft); }.compare-readiness i { display: grid; place-items: center; color: #93a0b3; font-style: normal; }.compare-readiness span, .compare-readiness strong { display: block; }.compare-readiness span { color: var(--green); font-size: 11px; font-weight: 800; }.compare-readiness strong { margin-top: 7px; font-size: 15px; }.compare-readiness p { margin: 7px 0 0; color: var(--muted); font-size: 12px; line-height: 1.55; }
