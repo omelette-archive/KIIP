@@ -698,10 +698,16 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 화면과 관련된 선택값을 쿼리스트링(?tab=...&region=...&item=...)에도 반영한다.
   const VALID_NAV_TABS: Tab[] = ["summary", "applications", "regions", "items", "strategy", "compare", "data"];
   const VALID_NAV_METRICS: MapMetric[] = ["trademarks", "registration", "coverage", "applicationCoverage"];
-  type NavParams = { tab: Tab; region: string | null; municipality: string | null; regionCode: string; item: string; metric: MapMetric };
+  // UI 검토(3차, 2026-09-06) N3: "지역·품목별 조회"(지역별)의 연도 범위 슬라이더는 이
+  // 화면 안에 단일 인스턴스로 존재하는 공유 상태(trendStartYear/trendEndYear)라 URL에
+  // 반영할 수 있다 — 요약·지역상세·품목상세의 추이 그래프는 RegionTrend 컴포넌트별 로컬
+  // 상태(여러 인스턴스가 동시에 존재)라 이번 범위에서는 뺀다.
+  type NavParams = { tab: Tab; region: string | null; municipality: string | null; regionCode: string; item: string; metric: MapMetric; yearStart: number | null; yearEnd: number | null };
   function parseNavParams(params: URLSearchParams): NavParams {
     const tabParam = params.get("tab");
     const metricParam = params.get("metric");
+    const yearStartParam = Number(params.get("yearStart"));
+    const yearEndParam = Number(params.get("yearEnd"));
     return {
       tab: (VALID_NAV_TABS as string[]).includes(tabParam || "") ? (tabParam as Tab) : "summary",
       region: params.get("region"),
@@ -709,6 +715,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       regionCode: params.get("regionCode") || "",
       item: params.get("item") || "",
       metric: (VALID_NAV_METRICS as string[]).includes(metricParam || "") ? (metricParam as MapMetric) : "coverage",
+      yearStart: Number.isFinite(yearStartParam) && params.get("yearStart") ? yearStartParam : null,
+      yearEnd: Number.isFinite(yearEndParam) && params.get("yearEnd") ? yearEndParam : null,
     };
   }
   function currentNavParams(): NavParams {
@@ -719,6 +727,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       regionCode: tab === "regions" ? selectedRegionCode : "",
       item: tab === "regions" ? selectedItemId : tab === "items" ? selectedItemName : tab === "strategy" ? strategyItem : "",
       metric: tab === "summary" ? mapMetric : "coverage",
+      yearStart: tab === "applications" ? trendStartYear : null,
+      yearEnd: tab === "applications" ? trendEndYear : null,
     };
   }
   function navParamsToSearch(nav: NavParams): string {
@@ -729,11 +739,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     if (nav.regionCode) params.set("regionCode", nav.regionCode);
     if (nav.item) params.set("item", nav.item);
     if (nav.metric !== "coverage") params.set("metric", nav.metric);
+    if (nav.yearStart !== null) params.set("yearStart", String(nav.yearStart));
+    if (nav.yearEnd !== null) params.set("yearEnd", String(nav.yearEnd));
     return `?${params.toString()}`;
   }
   function applyNavSetters(nav: NavParams) {
     setTab(nav.tab);
-    if (nav.tab === "applications") { setSelectedProvince(nav.region); setSelectedMunicipality(nav.municipality); }
+    if (nav.tab === "applications") { setSelectedProvince(nav.region); setSelectedMunicipality(nav.municipality); setTrendStartYear(nav.yearStart); setTrendEndYear(nav.yearEnd); }
     else if (nav.tab === "regions") { if (nav.region) { setSelectedRegionProvince(nav.region); setExpandedRegionProvince(nav.region); } setSelectedRegionCode(nav.regionCode); setSelectedItemId(nav.item); }
     else if (nav.tab === "items") setSelectedItemName(nav.item);
     else if (nav.tab === "strategy") setStrategyItem(nav.item);
@@ -751,7 +763,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     } catch { /* noop */ }
     const onPop = (event: PopStateEvent) => {
       const state = event.state as NavParams | null;
-      applyNavSetters(state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage" });
+      applyNavSetters(state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage", yearStart: null, yearEnd: null });
     };
     window.addEventListener("popstate", onPop);
     return () => window.removeEventListener("popstate", onPop);
@@ -761,10 +773,27 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     const nav = currentNavParams();
     const search = navParamsToSearch(nav);
     if (search !== window.location.search) {
-      try { window.history.pushState(nav, "", search); } catch { /* noop */ }
+      // 연도 범위 슬라이더는 드래그 중 포인터 이동마다 값이 바뀐다 — 그때마다 history
+      // 항목을 새로 쌓으면(pushState) 뒤로가기 한 번에 드래그 중간값 하나만 되돌아가는
+      // 상황이 된다. 연도 범위만 바뀐 경우는 현재 항목을 갱신(replaceState)하고, 탭·지역
+      // 등 실제 내비게이션은 그대로 pushState로 back 스택에 남긴다.
+      const prevNav = window.history.state as NavParams | null;
+      const onlyYearChanged = Boolean(
+        prevNav &&
+        prevNav.tab === nav.tab &&
+        prevNav.region === nav.region &&
+        prevNav.municipality === nav.municipality &&
+        prevNav.regionCode === nav.regionCode &&
+        prevNav.item === nav.item &&
+        prevNav.metric === nav.metric
+      );
+      try {
+        if (onlyYearChanged) window.history.replaceState(nav, "", search);
+        else window.history.pushState(nav, "", search);
+      } catch { /* noop */ }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tab, selectedProvince, selectedMunicipality, selectedRegionProvince, selectedRegionCode, selectedItemId, selectedItemName, strategyItem, mapMetric]);
+  }, [tab, selectedProvince, selectedMunicipality, selectedRegionProvince, selectedRegionCode, selectedItemId, selectedItemName, strategyItem, mapMetric, trendStartYear, trendEndYear]);
 
   const regionalRegions = useMemo(() => snapshot.regions.filter((region) => region.sido !== "전국"), [snapshot.regions]);
   const totals = useMemo(() => snapshot.regions.reduce((acc, region) => { region.items.forEach((item) => { if (item.metrics.uniqueTrademarkCount.availability === "available") { acc.availableItems += 1; acc.trademarks += item.metrics.uniqueTrademarkCount.value || 0; acc.registered += item.metrics.registeredTrademarkCount.value || 0; } acc.review += item.metrics.goodsReviewCandidateCount.value || 0; }); return acc; }, { trademarks: 0, registered: 0, review: 0, availableItems: 0 }), [snapshot.regions]);
