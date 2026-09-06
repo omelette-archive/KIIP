@@ -968,10 +968,11 @@ test("generates a self-contained standalone dashboard", async () => {
   // 상태에서 향후 확장 제안을 이어가도록 화면 구조를 단순화한다.
   assert.doesNotMatch(html, /지역 출원 미확인|function gapsScreen\(\)|id="gap-search"/);
   assert.match(html, /미출원\(검토중\)/);
-  // #136: 비즈니스 전략의 주요 품목은 잘 안 보이는 select 대신 즉시 누르는 토글로 제공.
-  assert.match(html, /class="strategy-featured-options"/);
-  assert.match(html, /data-strategy-sample=/);
-  assert.doesNotMatch(html, /<select id="strategy-item">/);
+  // UI 검토(3차, 2026-09-06) S3: 비즈니스 전략 — 카드 나열 대신 지역×품목 표 + 상세 패널.
+  assert.match(html, /class="strategy-table"/);
+  assert.match(html, /data-strategy-row=/);
+  assert.match(html, /data-strategy-sort=/);
+  assert.doesNotMatch(html, /class="strategy-featured-options"|data-strategy-sample=/, "카드 나열용 주요 특산품 토글은 표로 교체돼야 함");
   assert.match(html, /특화작목 비교/);
   assert.doesNotMatch(html, /class="compare-readiness"/);
   assert.match(html, /공식 원본 반영 완료/);
