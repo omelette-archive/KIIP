@@ -324,7 +324,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   // UI 검토(3차, 2026-09-06) N1: 분위 경계를 만들 수 없으면(breaks=[]) 칸마다 "최고"만
   // 반복돼 의미가 없다 — 이 경우는 범례 칸 자체를 감춘다("데이터 없음" 칩만 남는다).
-  const quantileLegendHtml = (breaks, formatter) => breaks.length === 0 ? "" : QUANTILE_FILL_MIXES.map((mix, index) => `<span><i class="legend-swatch" style="background:color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)"></i>${index < breaks.length ? `~${esc(formatter(breaks[index]))}` : "최고"}</span>`).join("");
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "지도 범례": 상한값만 나열하지 않고 각 칸을
+  // 양끝 구간으로 표기(예: "23~41개"). 첫 칸은 상한만, 마지막 칸은 그 앞 경계부터 "이상".
+  const quantileLegendHtml = (breaks, formatter) => breaks.length === 0 ? "" : QUANTILE_FILL_MIXES.map((mix, index) => `<span><i class="legend-swatch" style="background:color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)"></i>${index < breaks.length ? (index === 0 ? `~${esc(formatter(breaks[index]))}` : `${esc(formatter(breaks[index - 1]))}~${esc(formatter(breaks[index]))}`) : `${esc(formatter(breaks[breaks.length - 1]))} 이상`}</span>`).join("");
   // 2026-08-21: 출원율을 텍스트로만 보여주지 말고 큰 숫자 + 원형 게이지로 보여달라는
   // 요청 — Dashboard.tsx의 RateRing과 동일한 로직을 HTML 문자열로 만든다.
   const rateRing = (value, label = "출원율", size = 128, strokeWidth = 12) => {
