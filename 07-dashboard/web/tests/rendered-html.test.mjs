@@ -820,7 +820,9 @@ test("generates a self-contained standalone dashboard", async () => {
   const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   // 2026-08-21: 전국 지도 화살표(연결선)를 없애고 경기도 라벨만 옮기는 방식으로
   // 바꿨다(사용자 요청) — 화살표용 CSS/폴리라인이 더 이상 없어야 한다.
-  assert.doesNotMatch(html, /map-region-label-callout|<polyline/, "standalone map should no longer draw leader-line arrows");
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 품목 목록 스파크라인이 정당하게
+  // <polyline>을 새로 쓰기 시작해서, 이 회귀 가드는 예전 지도 화살표 전용 클래스만 본다.
+  assert.doesNotMatch(html, /map-region-label-callout/, "standalone map should no longer draw leader-line arrows");
   assert.match(html, /const mapLabelMarkup = \(shapes, municipality\)/, "standalone map should render every geometry label regardless of data availability");
   // 2026-08-21: 서울·세종 화살표 대신 경기도 라벨만 옮기는 방식으로 변경(사용자 요청).
   assert.match(html, /경기도: \{ x: 20, y: 38 \}/, "standalone map should nudge only Gyeonggi's label instead of using leader-line arrows");
@@ -883,6 +885,11 @@ test("generates a self-contained standalone dashboard", async () => {
   // 이슈 #119: 품목별 조회를 마스터-디테일(목록에서 선택 → 상세)로 개편.
   assert.match(html, /class="item-explorer"/);
   assert.match(html, /data-select-item=/);
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 이름·유형·지역 수·건수 텍스트 세
+  // 줄을 한 줄로 압축하고, 유형·지역 수는 title 툴팁으로, 오른쪽엔 스파크라인을 둔다.
+  assert.match(html, /const sparklinePoints = \(items\) => \{/, "스파크라인 계산 함수가 있어야 함");
+  assert.match(html, /class="item-list-spark"/);
+  assert.doesNotMatch(html, /class="item-list-meta"/, "유형·지역 수 줄은 title 툴팁으로 옮겨 목록에서는 빠져야 함");
   assert.match(html, /지역 확인 전 전국 검색 후보/);
   assert.match(html, /ITEM_ROW_LIMIT = 100/);
   assert.match(html, /상표 출원 건수 상위/);
