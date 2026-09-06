@@ -191,6 +191,20 @@ function trendYearLabels(years: number[]) {
   const step = Math.ceil(years.length / 6);
   return years.filter((_, index) => index % step === 0 || index === years.length - 1);
 }
+// UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 품목 목록에서 고르기 전에도 대략적인
+// 추세가 보이도록 48×14px 스파크라인을 그린다 — 정확한 값은 고른 뒤 상세의 추이 차트
+// (이동평균 + 값 표)로 확인하므로, 여기서는 형태만 가볍게 전달한다(축·격자선 없음).
+const SPARKLINE_WIDTH = 48;
+const SPARKLINE_HEIGHT = 14;
+function sparklinePoints(items: Item[]): string | null {
+  const totals = sumYearCounts(items, "applicationYearCounts");
+  const years = Object.keys(totals).map(Number).sort((a, b) => a - b);
+  if (years.length < 2) return null;
+  const values = years.map((year) => totals[year] || 0);
+  const max = Math.max(1, ...values);
+  const stepX = SPARKLINE_WIDTH / (years.length - 1);
+  return values.map((value, index) => `${(index * stepX).toFixed(1)},${(SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT).toFixed(1)}`).join(" ");
+}
 // UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 51년 원자료를 매년 원 마커로
 // 다 찍으면(2계열×연도수) 추세가 톱니에 묻힌다 — 5년 이동평균을 주 시각으로 삼고, 원본은
 // 옅게 남긴다(추이는 완만하게, 원자료 노이즈는 여전히 확인 가능). 트레일링 윈도우(해당
@@ -1436,10 +1450,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <aside className="item-list-panel">
             <div className="item-list-head"><strong>{categoryFilter ? (availableCategories.find((category) => category.code === categoryFilter)?.label || "품목") : "전체 품목"}</strong><span>{itemRows.length}개</span></div>
             <ul className="item-list">
-              {visibleItemRows.map((row) => { const decidedRegions = row.availableRegions.length; return <li key={row.name}>
-                <button type="button" className={selectedItemRow?.name === row.name ? "active" : ""} onClick={() => selectItemAndScroll(row.name)}>
+              {visibleItemRows.map((row) => { const decidedRegions = row.availableRegions.length; const spark = sparklinePoints(row.matchedItems); return <li key={row.name}>
+                <button type="button" className={selectedItemRow?.name === row.name ? "active" : ""} title={`${row.category ? `${row.category.label} · ` : ""}${row.regions.length}개 지역`} onClick={() => selectItemAndScroll(row.name)}>
                   <span className="item-list-name">{row.name}</span>
-                  <span className="item-list-meta">{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역</span>
+                  {spark && <svg className="item-list-spark" viewBox={`0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}`} aria-hidden="true"><polyline points={spark} /></svg>}
                   <b>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</b>
                 </button>
               </li>; })}

@@ -606,12 +606,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-list-head span { color: var(--faint); font-size: 11px; white-space: nowrap; }
 .item-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 6px; max-height: 640px; overflow-y: auto; list-style: none; }
 .item-list li.empty { padding: 16px 12px; color: var(--muted); font-size: 12px; }
-.item-list button { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
+/* UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 이름·유형·지역 수·건수 텍스트
+   세 줄을 한 줄로 압축하고, 오른쪽에 스파크라인을 둔다(유형·지역 수는 title 툴팁으로
+   이동 — 정보 손실 없이 행 높이만 줄인다). */
+.item-list button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 9px 10px; border: 1px solid transparent; border-radius: 9px; background: transparent; text-align: left; cursor: pointer; }
 .item-list button:hover { background: #f4f6f9; }
 .item-list button.active { border-color: var(--green); background: var(--green-soft); }
-.item-list-name { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
-.item-list-meta { grid-column: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
-.item-list button b { grid-column: 2; grid-row: 1 / 3; align-self: center; color: var(--green-dark); font-size: 12px; white-space: nowrap; }
+.item-list-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 700; color: var(--ink); }
+.item-list-spark { flex-shrink: 0; width: 48px; height: 14px; }
+.item-list-spark polyline { fill: none; stroke: var(--green); stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
+.item-list button b { flex-shrink: 0; color: var(--green-dark); font-size: 12px; white-space: nowrap; }
 .item-detail-panel { min-width: 0; min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .item-detail-panel > .empty { color: var(--muted); font-size: 13px; }
 .item-detail-panel .item-card-head > div { display: block; }
@@ -1044,6 +1048,19 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       }
     }
     return totals;
+  };
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 48×14px 스파크라인(축·격자선 없음,
+  // 형태만 가볍게). React Dashboard.tsx의 sparklinePoints와 동일 로직.
+  const SPARKLINE_WIDTH = 48;
+  const SPARKLINE_HEIGHT = 14;
+  const sparklinePoints = (items) => {
+    const totals = sumYearCounts(items, "applicationYearCounts");
+    const years = Object.keys(totals).map(Number).sort((a, b) => a - b);
+    if (years.length < 2) return null;
+    const values = years.map((year) => totals[year] || 0);
+    const max = Math.max(1, ...values);
+    const stepX = SPARKLINE_WIDTH / (years.length - 1);
+    return values.map((value, index) => `${(index * stepX).toFixed(1)},${(SPARKLINE_HEIGHT - (value / max) * SPARKLINE_HEIGHT).toFixed(1)}`).join(" ");
   };
   const TREND_CHART = { width: 960, height: 220, padLeft: 46, padRight: 16, padTop: 14, padBottom: 28 };
   const trendScales = (startYear, endYear, maxValue) => {
@@ -1814,7 +1831,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   function itemsScreen() {
     const rows = itemRows(); const ITEM_ROW_LIMIT = 100; const visibleRows = rows.slice(0, ITEM_ROW_LIMIT);
     const selected = visibleRows.find((row) => row.name === state.selectedItemName) || visibleRows[0] || null;
-    const listHtml = visibleRows.map((row) => { const decidedRegions = row.availableRegions.length; return `<li><button type="button" data-select-item="${esc(row.name)}" class="${selected && selected.name === row.name ? "active" : ""}"><span class="item-list-name">${esc(row.name)}</span><span class="item-list-meta">${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역</span><b>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</b></button></li>`; }).join("") || '<li class="empty">검색 결과가 없습니다.</li>';
+    const listHtml = visibleRows.map((row) => {
+    const decidedRegions = row.availableRegions.length;
+    const spark = sparklinePoints(row.matchedItems);
+    const sparkHtml = spark ? `<svg class="item-list-spark" viewBox="0 0 ${SPARKLINE_WIDTH} ${SPARKLINE_HEIGHT}" aria-hidden="true"><polyline points="${spark}"></polyline></svg>` : "";
+    const title = `${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역`;
+    return `<li><button type="button" data-select-item="${esc(row.name)}" class="${selected && selected.name === row.name ? "active" : ""}" title="${title}"><span class="item-list-name">${esc(row.name)}</span>${sparkHtml}<b>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</b></button></li>`;
+  }).join("") || '<li class="empty">검색 결과가 없습니다.</li>';
     const categoryLabel = state.categoryFilter ? (availableCategories().find((category) => category.code === state.categoryFilter)?.label || "품목") : "전체 품목";
     // 이슈 #119: 품목별 조회를 지역별 조회와 같은 순서로 — 서브토글 → 유형 칩 → 검색창 → 설명 → 탐색.
     return `<section class="screen-section">${exploreSubnavHtml("item")}<div class="item-category-filter region-quick-filter" role="group" aria-label="품목 유형 필터"><button type="button" data-category-filter="" class="${state.categoryFilter === "" ? "active" : ""}">전체</button>${availableCategories().map((category) => `<button type="button" data-category-filter="${esc(category.code)}" class="${state.categoryFilter === category.code ? "active" : ""}">${esc(category.label)}</button>`).join("")}</div><label class="search-field explore-search"><span class="sr-only">품목 또는 지역 검색</span><input type="search" id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><p class="screen-note">위에서 유형을 고르고 왼쪽 목록에서 품목을 선택하면 그 품목의 상세만 오른쪽에 나옵니다. ${rows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `검색 결과 ${rows.length}개`}</p><div class="item-screen"><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-explorer"><aside class="item-list-panel"><div class="item-list-head"><strong>${esc(categoryLabel)}</strong><span>${rows.length}개</span></div><ul class="item-list">${listHtml}</ul></aside><div class="item-detail-panel">${itemDetailHtml(selected)}</div></div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
