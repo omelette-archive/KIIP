@@ -422,6 +422,19 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-directory-heading h2 { margin: 0; font-size: 23px; }
 .coverage-directory-heading > span { font-size: 12px; }
 .coverage-region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음) 전용 압축 목록 — 지역명·건수만, 특산품
+   버튼은 그 도를 선택한 뒤에만 그린다(P2: 목록은 고르는 장치). */
+.coverage-region-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; }
+.coverage-region-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 16px; width: 100%; padding: 11px 18px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; font-size: 12.5px; cursor: pointer; }
+.coverage-region-list-row:last-child { border-bottom: 0; }
+.coverage-region-list-row:hover, .coverage-region-list-row:focus-visible { background: var(--panel); }
+.coverage-region-list-row strong { font-size: 13.5px; }
+.coverage-region-list-row span { color: var(--muted); white-space: nowrap; }
+.coverage-region-list-row b { color: var(--green-dark); min-width: 44px; text-align: right; }
+@media (max-width: 640px) {
+  .coverage-region-list-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .coverage-region-list-row span:first-of-type { display: none; }
+}
 .coverage-region-card { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #f4f6f9; }
 .coverage-region-card.selected { border-color: var(--green); background: var(--green-soft); }
 /* 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 카드("경기도" 자체)는 실제 시군구
@@ -1502,6 +1515,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         : `<div class="coverage-specialty-list">${specialtyButtonsHtml}</div>`;
       return `<article class="coverage-region-card ${state.municipality && row.label === state.municipality ? "selected" : ""}"><div class="coverage-region-head"><div><strong>${esc(displayRegionName(row.label))}</strong><small>특산품 ${number(row.coverage.total)}개</small></div><div class="coverage-region-summary"><span>출원 확인 특산품 ${number(row.coverage.applied)}개</span><b>${percent(row.coverage.rate)}</b></div>${!state.province ? `<button type="button" data-province="${esc(row.label)}">지도에서 보기</button>` : ""}</div>${specialtyListHtml}</article>`;
     };
+    // UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음) 전용 압축 목록 — 지역명·건수만, 특산품
+    // 버튼은 그 도를 선택한 뒤에만 그린다(P2: 목록은 고르는 장치).
+    const coverageListRowHtml = (row) => `<button type="button" class="coverage-region-list-row" data-province="${esc(row.label)}"><strong>${esc(displayRegionName(row.label))}</strong><span>특산품 ${number(row.coverage.total)}개</span><span>출원 확인 ${number(row.coverage.applied)}개</span><b>${percent(row.coverage.rate)}</b></button>`;
     const compositionRows = [...provinceStats.entries()].filter(([, stat]) => stat.trademarks > 0).sort((a, b) => b[1].trademarks - a[1].trademarks).slice(0, 10);
     const compositionMax = Math.max(1, ...compositionRows.map(([, stat]) => stat.trademarks));
     // 이슈 #119: 전국 지도는 요약 탭에 이미 있어(같은 selectedProvince 상태 공유) 이 화면의
@@ -1546,7 +1562,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         const key = state.regionQuery.trim().toLocaleLowerCase("ko-KR");
         const rows = key ? breakdown.filter((row) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key))) : breakdown;
         if (rows.length === 0) return `<p class="empty">&ldquo;${esc(state.regionQuery)}&rdquo; 검색 결과가 없습니다.</p>`;
-        if (!state.province) return `<div class="coverage-region-grid">${rows.map((row) => coverageCardHtml(row)).join("")}</div>`;
+        if (!state.province) {
+          return key
+            ? `<div class="coverage-region-grid">${rows.map((row) => coverageCardHtml(row)).join("")}</div>`
+            : `<div class="coverage-region-list">${rows.map((row) => coverageListRowHtml(row)).join("")}</div>`;
+        }
         // 도 단위 시군구 미지정 행("경기도" 자체)은 실제 시군구 카드와 분리해서 보여준다.
         const unclassifiedRows = rows.filter((row) => row.region && isUnclassifiedRegion(row.region));
         const municipalityRows = rows.filter((row) => !(row.region && isUnclassifiedRegion(row.region)));

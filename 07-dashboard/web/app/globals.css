@@ -422,6 +422,19 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-directory-heading h2 { margin: 0; font-size: 23px; }
 .coverage-directory-heading > span { font-size: 12px; }
 .coverage-region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+/* UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음) 전용 압축 목록 — 지역명·건수만, 특산품
+   버튼은 그 도를 선택한 뒤에만 그린다(P2: 목록은 고르는 장치). */
+.coverage-region-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 14px; overflow: hidden; background: #fff; }
+.coverage-region-list-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto auto; align-items: center; gap: 16px; width: 100%; padding: 11px 18px; border: 0; border-bottom: 1px solid var(--line); background: transparent; color: var(--ink); text-align: left; font-size: 12.5px; cursor: pointer; }
+.coverage-region-list-row:last-child { border-bottom: 0; }
+.coverage-region-list-row:hover, .coverage-region-list-row:focus-visible { background: var(--panel); }
+.coverage-region-list-row strong { font-size: 13.5px; }
+.coverage-region-list-row span { color: var(--muted); white-space: nowrap; }
+.coverage-region-list-row b { color: var(--green-dark); min-width: 44px; text-align: right; }
+@media (max-width: 640px) {
+  .coverage-region-list-row { grid-template-columns: minmax(0, 1fr) auto; row-gap: 2px; }
+  .coverage-region-list-row span:first-of-type { display: none; }
+}
 .coverage-region-card { padding: 22px; border: 1px solid var(--line); border-radius: 14px; background: #f4f6f9; }
 .coverage-region-card.selected { border-color: var(--green); background: var(--green-soft); }
 /* 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 카드("경기도" 자체)는 실제 시군구
