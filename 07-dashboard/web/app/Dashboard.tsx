@@ -776,6 +776,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // UI 검토(3차, 2026-09-06) S4: 특화작목 비교 — 9개 도 × 8개 열 넓은 표 대신, 도 9칸
   // 스트립에서 하나를 고르면 그 도만 상세로 보여준다(전체 표는 토글 뒤에 남김).
   const [selectedCompareProvince, setSelectedCompareProvince] = useState<string | null>(null);
+  // UI 검토(3차, 2026-09-06) S2: 요약 화면 출원/등록 랭킹 표 2개를 전환 탭 하나로.
+  const [summaryRankingMetric, setSummaryRankingMetric] = useState<"application" | "registration">("application");
   const [regionQuery, setRegionQuery] = useState("");
   // 이슈 #116: 품목별 조회에서 목록의 다른 품목을 고르면 오른쪽 상세가 바뀌는데,
   // 스크롤 위치가 이전 상세를 읽던 자리(중간·하단)에 그대로 남아 새 상세의 맨 위가
@@ -1144,13 +1146,20 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 같은 순위표에 섞어, 광역 단위 항목이 TOP10 중 다섯 칸을 차지하는 등 단위가 다른 값을
   // 나란히 비교하는 문제가 있었다. 이 랭킹은 기초자치단체 단위 비교가 목적이라 광역 단위
   // 미지정 항목은 뺀다(다른 화면의 "시군구 미지정" 표시로는 계속 확인 가능).
-  const rankingCandidates = regionalRegions.flatMap((region) => {
+  const rankingCandidatesAll = regionalRegions.flatMap((region) => {
     if (isUnclassifiedRegion(region)) return [];
     return region.items.flatMap((item) => {
       const label = officialItemLabel(item);
       return label ? [{ region, item, label }] : [];
     });
   });
+  // UI 검토(3차, 2026-09-06) S2: "지도 선택 → 우측 전체 갱신" — 지도에서 시도/시군구를
+  // 고르면 랭킹도 그 범위로 좁혀진다(지금까지는 지도만 바뀌고 랭킹은 항상 전국 고정).
+  const rankingCandidates = selectedMunicipality
+    ? rankingCandidatesAll.filter(({ region }) => region.sigungu === selectedMunicipality)
+    : selectedProvince
+      ? rankingCandidatesAll.filter(({ region }) => region.sido === selectedProvince)
+      : rankingCandidatesAll;
   const applicationRankingRows = [...rankingCandidates]
     .filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
@@ -1318,7 +1327,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           출원율·등록률 링만 왼쪽 열에 남기고, 특산품 수·상표 건수 단독 카드는 뺀다. */}
       <section className="summary-row" aria-label="핵심 지표·지도·출원 랭킹">
         <aside className="map-insight">
-          <section className="metrics metrics-inset" aria-label="핵심 지표"><article><span>전국 특산품 수</span><strong>{number(nationalSpecialtyCoverage.total)}</strong><small>{snapshot.coverage.observedRegionCount}개 지역 · 지역×특산품 수집 항목</small></article><article><span>특산품 출원율</span><strong>{percent(nationalSpecialtyCoverage.rate)}</strong><small>출원 확인 {number(nationalSpecialtyCoverage.applied)}개</small></article><article><span>출원인 주소 확보율</span><strong>{pipeline ? percent(pipeline.applicantRegionVerification.rate) : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)} · 미확보 ${number(pipeline.applicantRegionVerification.unverified)}` : "주소 수집 전"}</small></article><article><span>지역별 출원 수 표시 가능</span><strong>{pipeline ? `${number(pipeline.regionalMetricGate.availableRegionItemCount)} / ${number(gateTotal)}` : number(totals.availableItems)}</strong><small>지역×특산품 집계 가능 항목</small></article></section>
+          {/* UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장. "전국 특산품 수"·"지역별 출원 수
+              표시 가능"(항상 100%에 가까워 정보량이 적음)은 빼고, 나머지 둘은 완료율이
+              아니라 공백(해야 할 일) 중심으로 다시 쓴다 — B1 "출원율 63%" 대신 "공백
+              품목 N개"를 주어로. */}
+          <section className="metrics metrics-inset" aria-label="핵심 지표"><article><span>출원 확인 안 된 특산품(공백)</span><strong>{number(Math.max(0, nationalSpecialtyCoverage.total - nationalSpecialtyCoverage.applied))}개</strong><small>전체 수집 {number(nationalSpecialtyCoverage.total)}개 중 미출원</small></article><article><span>출원인 주소 미확보</span><strong>{pipeline ? `${number(pipeline.applicantRegionVerification.unverified)}건` : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)}건` : "주소 수집 전"}</small></article></section>
           <h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")} · {MAP_LABELS[mapMetric]}</h2>
           {mapMetric === "applicationCoverage" && <div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} label="출원율" /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>}
           {mapMetric === "registration" && <div className="rate-hero"><RateRing value={visibleRegistrationRate} label="등록률" /><div className="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 {number(visibleTrademarkCount)}건 중 등록 {number(visibleRegisteredCount)}건</small></div></div>}
@@ -1336,10 +1349,30 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           </>}{activeMapLabels.map((label) => label.leader ? <g className="map-region-label map-region-label-callout" key={`${label.name}-label`}><polyline points={`${label.targetX},${label.targetY} ${(label.targetX + label.x) / 2},${(label.targetY + label.y) / 2} ${label.x + 22},${label.y + 4}`} /><text x={label.x} y={label.y} className="map-label map-label-province">{label.displayName}</text></g> : <text key={`${label.name}-label`} x={label.x} y={label.y} className={municipalityGeometry ? "map-label map-label-municipality" : "map-label map-label-province"}>{label.displayName}</text>)}</svg></div>
           <div className="map-legend quantile-legend"><span><i className="legend-swatch no-data" />데이터 없음</span>{quantileLegendSwatches(municipalityGeometry ? municipalityMapBreaks : mapBreaks, (value) => mapMetricValueLabel(value))}<strong>{MAP_LABELS[mapMetric]} 5분위</strong></div>
         </div>
+        {/* UI 검토(3차, 2026-09-06) S2: 출원/등록 랭킹 표 2개를 전환 탭 하나로 합치고,
+            지도에서 시도/시군구를 고르면 이 랭킹도 그 범위로 좁혀진다(rankingCandidates가
+            이미 selectedProvince/selectedMunicipality를 반영). */}
         <div className="ranking-columns" aria-label="지역 주소 일치 출원·등록 랭킹">
          <div className="ranking-stack">
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 출원 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.uniqueTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">출원 확인</th></tr></thead><tbody>{applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
-          <div className="ranking"><div className="section-heading"><div><h2>지역·대표 특산품 등록 랭킹</h2></div><span>TOP {RANKING_LIMIT}</span><CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품등록랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "등록 완료"], registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.registeredTrademarkCount.value ?? 0]))} /></div><div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">등록 완료</th></tr></thead><tbody>{registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}</tbody></table></div></div>
+          <div className="ranking">
+            <div className="section-heading">
+              <div><h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")} 대표 특산품 랭킹</h2></div>
+              <span>TOP {RANKING_LIMIT}</span>
+            </div>
+            <div className="ranking-metric-toggle" role="tablist" aria-label="출원·등록 전환">
+              <button type="button" role="tab" aria-selected={summaryRankingMetric === "application"} className={summaryRankingMetric === "application" ? "active" : ""} onClick={() => setSummaryRankingMetric("application")}>출원</button>
+              <button type="button" role="tab" aria-selected={summaryRankingMetric === "registration"} className={summaryRankingMetric === "registration" ? "active" : ""} onClick={() => setSummaryRankingMetric("registration")}>등록</button>
+              {summaryRankingMetric === "application"
+                ? <CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.uniqueTrademarkCount.value ?? 0]))} />
+                : <CsvDownloadButton onClick={() => downloadCsv(`지역대표특산품등록랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "등록 완료"], registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.registeredTrademarkCount.value ?? 0]))} />}
+            </div>
+            <div className="ranking-table-wrap"><table className="ranking-table"><thead><tr><th scope="col">순위</th><th scope="col">지역</th><th scope="col">대표 특산품</th><th scope="col">{summaryRankingMetric === "application" ? "출원 확인" : "등록 완료"}</th></tr></thead><tbody>
+              {summaryRankingMetric === "application"
+                ? applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`app-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.uniqueTrademarkCount.value)}건</td></tr>)
+                : registrationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => <tr key={`reg-${regionKey(region)}-${item.specialtyId || index}`}><td>{index + 1}</td><td>{displayRegionName(region.region)}</td><td title={officialNoticeName(item) ? `고시명칭 ${item.noticeName}${item.niceClass ? ` · NICE ${item.niceClass}류` : ""}` : undefined}>{label}</td><td>{number(item.metrics.registeredTrademarkCount.value)}건</td></tr>)}
+              {(summaryRankingMetric === "application" ? applicationRankingRows : registrationRankingRows).length === 0 && <tr><td colSpan={4} className="empty">이 범위에는 {summaryRankingMetric === "application" ? "출원" : "등록"} 확인 항목이 없습니다.</td></tr>}
+            </tbody></table></div>
+          </div>
          </div>
         </div>
       </section>

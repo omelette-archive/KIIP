@@ -88,11 +88,11 @@ test("renders the data-connected Korean dashboard", async () => {
     html.indexOf(">출원율</button>") < html.indexOf(">등록률</button>"),
     "지도 지표는 특산품 수, 상표 건수, 출원율, 등록률 순서여야 함",
   );
-  // 2026-09-01(#116): "전국 검색 고유 상표 후보 174,078" 지표 칸을 요약에서 제거하고
-  // 첫 칸을 "전국 특산품 수"로 교체(스테이크홀더 요청). 그 원시 수치는 데이터 개요 탭에만 둔다.
-  assert.match(html, /전국 특산품 수/);
+  // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장, 완료율이 아니라 공백(해야 할 일) 중심
+  // 서술로("전국 특산품 수"·"지역별 출원 수 표시 가능"은 제거, 그 값은 데이터 개요 탭에만).
+  assert.match(html, /출원 확인 안 된 특산품\(공백\)/);
   assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
-  assert.match(html, /출원인 주소 확보율/);
+  assert.match(html, /출원인 주소 미확보/);
   assert.match(html, /전국 지역 브랜드 지도/);
   // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
   // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
@@ -114,11 +114,16 @@ test("renders the data-connected Korean dashboard", async () => {
   // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
   assert.match(mapInsight, /class="metrics metrics-inset"/, "요약 핵심 지표 바는 지도 옆 왼쪽 열로 이동해야 함");
   assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
+  // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장(항상 100%에 가까운 "전국 특산품 수"·
+  // "지역별 출원 수 표시 가능"은 정보량이 적어 제거).
+  assert.doesNotMatch(mapInsight, /전국 특산품 수|지역별 출원 수 표시 가능/, "정보량이 적은 KPI 2장은 요약에서 빠져야 함");
+  const metricsInsetArticleCount = (mapInsight.match(/<article>/g) || []).length;
+  assert.equal(metricsInsetArticleCount, 2, "요약 핵심 지표는 2장이어야 함(4장→2장)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
-  assert.match(standaloneHtml, /class="metrics metrics-inset"><article><span>전국 특산품 수/);
+  assert.match(standaloneHtml, /class="metrics metrics-inset"><article><span>출원 확인 안 된 특산품\(공백\)/);
   assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
   assert.match(standaloneHtml, /dashboardUpdatedAt = latestDate\([\s\S]*metric\.calculatedAt/);
   assert.match(standaloneHtml, /dateOnly\(latestDate\(source\.sourceFetchedAt, source\.sourceLastVerifiedAt\)\)/);
@@ -201,10 +206,12 @@ test("uses every collected region-item specialty as the application-rate denomin
   assert.equal(coverage.pending, 0);
   assert.equal(Math.round(coverage.rate * 100), 63);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
-  // 2026-09-01(#116): 요약 첫 칸을 "전국 특산품 수"로 바꿈. 분모와 출원 확인 수가
-  // 모두 요약 탭에 노출돼야 한다.
-  assert.match(visibleTextHtml, new RegExp(`전국 특산품 수[\\s\\S]{0,60}${localeNumber(coverage.total)}`));
-  assert.match(visibleTextHtml, new RegExp(`출원 확인 ${localeNumber(coverage.applied)}개`));
+  // 2026-09-01(#116): 요약 첫 칸에 분모(전체 수집 수)와 출원 확인 수가 모두 노출돼야
+  // 한다는 요구사항. 2026-09-06 S2 재설계로 문구는 완료율("전국 특산품 수")에서
+  // 공백 중심("출원 확인 안 된 특산품(공백)")으로 바뀌었지만, 분모(total)와 그로부터
+  // 유도되는 미출원 수(gap = total - applied)는 여전히 함께 노출된다.
+  assert.match(visibleTextHtml, new RegExp(`전체 수집 ${localeNumber(coverage.total)}개 중 미출원`));
+  assert.match(visibleTextHtml, new RegExp(`출원 확인 안 된 특산품\\(공백\\)[\\s\\S]{0,40}${localeNumber(coverage.total - coverage.applied)}개`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
   // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
   assert.doesNotMatch(html, /출원율 계산/);
@@ -298,29 +305,27 @@ test("renders tab navigation and separate application/registration ranking table
   assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
-  assert.match(html, /지역·대표 특산품 출원 랭킹/, "출원 랭킹 섹션이 있어야 함");
-  assert.match(html, /지역·대표 특산품 등록 랭킹/, "등록 랭킹 섹션이 있어야 함");
+  // UI 검토(3차, 2026-09-06) S2: 출원 랭킹 표·등록 랭킹 표 2개를 전환 탭 하나로 합쳤다 —
+  // 초기 SSR(기본값 "출원")에는 표가 하나만 있고, 전환 탭 버튼 2개가 있어야 한다.
+  assert.match(html, /대표 특산품 랭킹/, "랭킹 섹션 제목이 있어야 함");
+  assert.match(html, /class="ranking-metric-toggle"/, "출원·등록 전환 탭이 있어야 함");
   assert.doesNotMatch(html, /class="ranking-toggle"|TOP 50/, "TOP10/50 토글은 제거돼야 함(고정 TOP 10)");
   const rankingTableCount = (html.match(/class="ranking-table"/g) || []).length;
-  assert.equal(rankingTableCount, 2, "출원·등록 랭킹 테이블이 각각 하나씩, 총 두 개 있어야 함");
+  assert.equal(rankingTableCount, 1, "초기 SSR에는 전환 탭 기본값(출원)의 표 하나만 있어야 함");
 
-  const appHeadingIndex = html.indexOf("지역·대표 특산품 출원 랭킹");
-  const regHeadingIndex = html.indexOf("지역·대표 특산품 등록 랭킹");
-  assert.ok(appHeadingIndex >= 0 && regHeadingIndex > appHeadingIndex, "출원 랭킹이 등록 랭킹보다 먼저 나와야 함");
+  const appHeadingIndex = html.indexOf('class="ranking-columns"');
   const appTbody = html.slice(html.indexOf("<tbody>", appHeadingIndex), html.indexOf("</tbody>", appHeadingIndex));
-  const regTbody = html.slice(html.indexOf("<tbody>", regHeadingIndex), html.indexOf("</tbody>", regHeadingIndex));
 
   // UI 검토(3차, 2026-09-06) N2: 기초자치단체(예: "전남·광주 통합권역 영광군")와 광역 단위
   // 시군구 미지정 항목(그 자체인 "전남·광주 통합권역")이 같은 랭킹에 섞이면 안 된다 —
   // 광역 단위 미지정 행은 이 랭킹에서 제외돼야 한다.
   assert.doesNotMatch(appTbody, /<td>전남·광주 통합권역<\/td>/, "출원 랭킹에 광역 단위 미지정 행이 섞이면 안 됨");
-  assert.doesNotMatch(regTbody, /<td>전남·광주 통합권역<\/td>/, "등록 랭킹에 광역 단위 미지정 행이 섞이면 안 됨");
 
   // 품목명은 정규화된 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
   // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
-  // 조인 검증용일 뿐 대표 특산품이 아니다. 각 랭킹이 실제로 해당 지표(출원 확인 건수 /
-  // 등록 완료 건수) 내림차순으로 정렬되는지 확인한다. 단, 지역 귀속이 막힌 스냅샷이면
-  // 전국 검색 후보로 억지 순위를 만들지 않고 빈 랭킹을 유지해야 한다(#50).
+  // 조인 검증용일 뿐 대표 특산품이 아니다. 랭킹이 실제로 해당 지표(출원 확인 건수)
+  // 내림차순으로 정렬되는지 확인한다. 단, 지역 귀속이 막힌 스냅샷이면 전국 검색 후보로
+  // 억지 순위를 만들지 않고 빈 랭킹을 유지해야 한다(#50).
   // Dashboard.tsx의 랭킹은 officialItemLabel(item)이 있는 행만 후보로 쓴다(matchingBasis가
   // notice_name_and_nice_class 또는 raw_item_goods_matched인 확정 품목만) — 고시명칭이
   // 미확정인 raw_item_name_unclassified 행(예: 지역특화작목 도 단위 원물명 검색, #117)은
@@ -345,11 +350,14 @@ test("renders tab navigation and separate application/registration ranking table
   const firstAppRanking = [...rankingCandidates]
     .filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0))[0];
-  const firstRegRanking = [...rankingCandidates]
-    .filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available")
-    .sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0))[0];
   checkFirstRow(appTbody.slice(0, appTbody.indexOf("</tr>")), firstAppRanking);
-  checkFirstRow(regTbody.slice(0, regTbody.indexOf("</tr>")), firstRegRanking);
+
+  // 등록 랭킹은 전환 탭을 눌러야 나오는 클라이언트 상태라 이 SSR HTML에는 없다 — standalone
+  // 소스에서 동일한 정렬·필드(registrationRankingRows, registeredTrademarkCount) 로직이
+  // 실제로 쓰이는지 구조로 확인한다.
+  const standaloneSummarySource = (await readFile(new URL("../../dashboard.html", import.meta.url), "utf8"));
+  assert.match(standaloneSummarySource, /registrationRankingRows/, "등록 랭킹 데이터 계산이 있어야 함");
+  assert.match(standaloneSummarySource, /state\.summaryRankingMetric === "registration"/, "전환 탭이 등록 상태를 실제로 분기해야 함");
 });
 
 test("renders matching criteria once, on the data overview tab, not on the summary tab", async () => {
