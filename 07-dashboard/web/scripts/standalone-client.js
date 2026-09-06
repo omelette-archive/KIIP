@@ -24,7 +24,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   const compareProvince = (a, b) => provinceRank(a) - provinceRank(b) || displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR");
   const firstRegionProvince = [...new Set(snapshot.regions.map((region) => region.sido).filter((sido) => sido && sido !== "전국"))].sort(compareProvince)[0] || null;
-  const state = { tab: "summary", query: "", regionQuery: "", itemQuery: "", categoryFilter: "", selectedItemName: "", strategyItem: "", selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null, summaryTrendStartYear: null, summaryTrendEndYear: null };
+  const state = { tab: "summary", query: "", regionQuery: "", itemQuery: "", categoryFilter: "", selectedItemName: "", strategyItem: "", selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null, summaryTrendStartYear: null, summaryTrendEndYear: null, itemSort: "trademarks", itemShowAll: false };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
@@ -885,7 +885,17 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${flowHtml}${briefingHtml}`;
   }
   function itemsScreen() {
-    const rows = itemRows(); const ITEM_ROW_LIMIT = 100; const visibleRows = rows.slice(0, ITEM_ROW_LIMIT);
+    const rows = itemRows(); const ITEM_ROW_LIMIT = 100;
+    // UI 검토(3차, 2026-09-06) S5: 정렬 기준 선택 + "전체 보기"로 285개 전체 도달 가능.
+    const sortedRows = (() => {
+      if (state.itemSort === "trademarks") return rows; // 이미 출원 건수 내림차순
+      const copy = [...rows];
+      if (state.itemSort === "regions") copy.sort((a, b) => b.regions.length - a.regions.length || b.trademarks - a.trademarks);
+      else if (state.itemSort === "registrationRate") copy.sort((a, b) => (b.trademarks ? b.registered / b.trademarks : -1) - (a.trademarks ? a.registered / a.trademarks : -1) || b.trademarks - a.trademarks);
+      else if (state.itemSort === "name") copy.sort((a, b) => a.name.localeCompare(b.name, "ko-KR"));
+      return copy;
+    })();
+    const visibleRows = state.itemShowAll ? sortedRows : sortedRows.slice(0, ITEM_ROW_LIMIT);
     const selected = visibleRows.find((row) => row.name === state.selectedItemName) || visibleRows[0] || null;
     const listHtml = visibleRows.map((row) => {
     const decidedRegions = row.availableRegions.length;
@@ -896,7 +906,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   }).join("") || '<li class="empty">검색 결과가 없습니다.</li>';
     const categoryLabel = state.categoryFilter ? (availableCategories().find((category) => category.code === state.categoryFilter)?.label || "품목") : "전체 품목";
     // 이슈 #119: 품목별 조회를 지역별 조회와 같은 순서로 — 서브토글 → 유형 칩 → 검색창 → 설명 → 탐색.
-    return `<section class="screen-section">${exploreSubnavHtml("item")}<div class="item-category-filter region-quick-filter" role="group" aria-label="품목 유형 필터"><button type="button" data-category-filter="" class="${state.categoryFilter === "" ? "active" : ""}">전체</button>${availableCategories().map((category) => `<button type="button" data-category-filter="${esc(category.code)}" class="${state.categoryFilter === category.code ? "active" : ""}">${esc(category.label)}</button>`).join("")}</div><label class="search-field explore-search"><span class="sr-only">품목 또는 지역 검색</span><input type="search" id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><p class="screen-note">위에서 유형을 고르고 왼쪽 목록에서 품목을 선택하면 그 품목의 상세만 오른쪽에 나옵니다. ${rows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `검색 결과 ${rows.length}개`}</p><div class="item-screen"><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-explorer"><aside class="item-list-panel"><div class="item-list-head"><strong>${esc(categoryLabel)}</strong><span>${rows.length}개</span></div><ul class="item-list">${listHtml}</ul></aside><div class="item-detail-panel">${itemDetailHtml(selected)}</div></div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
+    return `<section class="screen-section">${exploreSubnavHtml("item")}<div class="item-category-filter region-quick-filter" role="group" aria-label="품목 유형 필터"><button type="button" data-category-filter="" class="${state.categoryFilter === "" ? "active" : ""}">전체</button>${availableCategories().map((category) => `<button type="button" data-category-filter="${esc(category.code)}" class="${state.categoryFilter === category.code ? "active" : ""}">${esc(category.label)}</button>`).join("")}</div><div class="item-search-row"><label class="search-field explore-search"><span class="sr-only">품목 또는 지역 검색</span><input type="search" id="item-search" value="${esc(state.itemQuery)}" placeholder="품목명 또는 지역명 검색"></label><label class="item-sort-field"><span class="sr-only">정렬 기준</span><select id="item-sort-select">${[["trademarks", "출원 건수순"], ["regions", "지역 수순"], ["registrationRate", "등록률순"], ["name", "가나다순"]].map(([value, label]) => `<option value="${value}"${state.itemSort === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div><p class="screen-note">위에서 유형을 고르고 왼쪽 목록에서 품목을 선택하면 그 품목의 상세만 오른쪽에 나옵니다. ${!state.itemShowAll && rows.length > ITEM_ROW_LIMIT ? `상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${rows.length}개` : `전체 ${rows.length}개`}</p><div class="item-screen"><div class="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div><div class="item-explorer"><aside class="item-list-panel"><div class="item-list-head"><strong>${esc(categoryLabel)}</strong><span>${rows.length}개</span></div><ul class="item-list">${listHtml}</ul>${!state.itemShowAll && rows.length > ITEM_ROW_LIMIT ? `<button type="button" id="item-show-all" class="item-list-show-all">전체 ${number(rows.length)}개 보기 →</button>` : ""}</aside><div class="item-detail-panel">${itemDetailHtml(selected)}</div></div><details class="method-note"><summary>품목명 집계 기준 보기</summary><p>고시명칭·NICE류가 확정된 품목만 공식 명칭으로 묶습니다. 아직 고시명칭이 확정되지 않은 원물명은 지역별 상세 화면에 원문 그대로 보존합니다.</p></details></div></section>`;
   }
   function dataScreen() {
     if (!pipeline) return '<section class="screen-section"><p class="empty">파이프라인 개요 데이터가 없습니다.</p></section>';
@@ -911,6 +921,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     let composing = false;
     const commit = (value) => {
       state[stateKey] = value;
+      // UI 검토(3차, 2026-09-06) S5: 검색어를 바꾸면 새 결과 기준으로 다시 상위 100개부터.
+      if (stateKey === "itemQuery") state.itemShowAll = false;
       render();
       const nextInput = document.querySelector(selector);
       if (nextInput) {
@@ -1142,7 +1154,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     bindSearchInput("#region-search", "query");
     bindSearchInput("#region-directory-search", "regionQuery");
     bindSearchInput("#item-search", "itemQuery");
-    document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; render(); }; });
+    document.querySelectorAll("[data-category-filter]").forEach((button) => { button.onclick = () => { state.categoryFilter = button.dataset.categoryFilter; state.selectedItemName = ""; state.itemShowAll = false; render(); }; });
+    const itemSortSelect = document.querySelector("#item-sort-select");
+    if (itemSortSelect) itemSortSelect.onchange = (event) => { state.itemSort = event.currentTarget.value; render(); };
+    const itemShowAllButton = document.querySelector("#item-show-all");
+    if (itemShowAllButton) itemShowAllButton.onclick = () => { state.itemShowAll = true; render(); };
     document.querySelectorAll("[data-select-item]").forEach((button) => { button.onclick = () => { state.selectedItemName = button.dataset.selectItem; render(); scrollTop(); }; });
     document.querySelectorAll("[data-strategy-sample]").forEach((button) => { button.onclick = () => { state.strategyItem = button.dataset.strategySample || ""; render(); }; });
     // UI 검토(#136) 03번: 각 화면 함수가 등록해 둔(currentCsvExporters) 내보내기 함수를

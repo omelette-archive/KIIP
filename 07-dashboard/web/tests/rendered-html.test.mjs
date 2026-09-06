@@ -892,7 +892,15 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /class="item-list-meta"/, "유형·지역 수 줄은 title 툴팁으로 옮겨 목록에서는 빠져야 함");
   assert.match(html, /지역 확인 전 전국 검색 후보/);
   assert.match(html, /ITEM_ROW_LIMIT = 100/);
-  assert.match(html, /상표 출원 건수 상위/);
+  // UI 검토(3차, 2026-09-06) S5: 정렬 기준을 바꿀 수 있게 됐으므로, 안내 문구가 "상표
+  // 출원 건수 상위"로 고정 서술하면 안 된다(다른 정렬일 땐 사실과 다름) — 정렬과
+  // 무관한 일반 문구("상위 N개")여야 함.
+  assert.doesNotMatch(html, /상표 출원 건수 상위/, "정렬 기준과 무관한 일반 문구여야 함(다른 정렬을 고르면 틀린 서술이 됨)");
+  assert.match(html, /상위 \$\{ITEM_ROW_LIMIT\}개 표시/);
+  assert.match(html, /class="item-sort-field"/, "정렬 드롭다운이 있어야 함");
+  assert.match(html, /전체 보기|itemShowAll/, "전체 285개에 도달할 수 있는 장치가 있어야 함");
+  assert.match(html, /\["trademarks", "출원 건수순"\], \["regions", "지역 수순"\], \["registrationRate", "등록률순"\], \["name", "가나다순"\]/, "정렬 옵션 4종(출원 건수·지역 수·등록률·가나다)이 있어야 함");
+  assert.match(html, /id="item-show-all"/, "전체 보기 버튼이 있어야 함");
   assert.match(html, /class="item-regions-detail"/);
   assert.doesNotMatch(html, /class="item-table-head"|표의 수치 읽는 법/);
   // 이슈 #116: KIPRIS 링크는 tab=trademark&queryText(상세검색 창만 열림)가 아니라
