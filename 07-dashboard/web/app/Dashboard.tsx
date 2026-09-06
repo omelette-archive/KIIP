@@ -764,6 +764,14 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [itemQuery, setItemQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [selectedItemName, setSelectedItemName] = useState("");
+  // UI 검토(3차, 2026-09-06) S5: 품목별 조회 — 정렬 기준 선택 + "상위 100개만" 제한을
+  // 사용자가 직접 풀 수 있게(무한 스크롤 대신 버튼 한 번으로 전체를 펼치는 쪽을 택함 —
+  // 285개는 스크롤 목록 안에서 그대로 렌더링해도 무리 없는 규모라 페이지네이션 없이 단순하게).
+  const [itemSort, setItemSort] = useState<"trademarks" | "regions" | "registrationRate" | "name">("trademarks");
+  const [itemShowAll, setItemShowAll] = useState(false);
+  // 검색어·유형 필터를 바꾸면 새 결과 기준으로 다시 상위 100개부터 보여준다(이전 필터의
+  // "전체 보기" 상태가 관계없는 새 필터에 그대로 남지 않도록).
+  useEffect(() => { setItemShowAll(false); }, [itemQuery, categoryFilter]);
   const [strategyItem, setStrategyItem] = useState("");
   const [regionQuery, setRegionQuery] = useState("");
   // 이슈 #116: 품목별 조회에서 목록의 다른 품목을 고르면 오른쪽 상세가 바뀌는데,
@@ -1024,9 +1032,18 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 이슈 #117: 표는 지역(행정표준코드) 순서로 정렬한다.
   }).filter((row) => row.policyCrops.length > 0).sort((a, b) => compareProvince(a.province, b.province)), [provinceStats, snapshot.regions]);
   // 검토가 덜 끝난 상태에서도 전체 목록을 다 보여주기보다, 상표 출원 건수가 많은
-  // 순으로 상위 100개만 우선 보여준다(2026-08-19 결정).
+  // 순으로 상위 100개만 우선 보여준다(2026-08-19 결정) — UI 검토(3차) S5: "전체 보기"로
+  // 직접 풀 수 있게 하고, 정렬 기준도 고를 수 있게 한다.
   const ITEM_ROW_LIMIT = 100;
-  const visibleItemRows = itemRows.slice(0, ITEM_ROW_LIMIT);
+  const itemSortedRows = useMemo(() => {
+    if (itemSort === "trademarks") return itemRows; // 이미 출원 건수 내림차순(위 useMemo)
+    const rows = [...itemRows];
+    if (itemSort === "regions") rows.sort((a, b) => b.regions.length - a.regions.length || b.trademarks - a.trademarks);
+    else if (itemSort === "registrationRate") rows.sort((a, b) => (b.trademarks ? b.registered / b.trademarks : -1) - (a.trademarks ? a.registered / a.trademarks : -1) || b.trademarks - a.trademarks);
+    else if (itemSort === "name") rows.sort((a, b) => a.name.localeCompare(b.name, "ko-KR"));
+    return rows;
+  }, [itemRows, itemSort]);
+  const visibleItemRows = itemShowAll ? itemSortedRows : itemSortedRows.slice(0, ITEM_ROW_LIMIT);
   // 이슈 #119(품목별 조회 개편): 한 화면에 여러 품목 상세를 펼치지 않고, 왼쪽 목록에서
   // 하나를 고르면 오른쪽에 그 품목만 상세로 보여준다. 선택이 현재 목록에서 빠지면
   // 목록 첫 항목으로 되돌린다.
@@ -1442,8 +1459,17 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "items" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       {exploreSubnav("item")}
       <div className="item-category-filter region-quick-filter" role="group" aria-label="품목 유형 필터"><button type="button" className={categoryFilter === "" ? "active" : ""} onClick={() => setCategoryFilter("")}>전체</button>{availableCategories.map((category) => <button type="button" key={category.code} className={categoryFilter === category.code ? "active" : ""} onClick={() => setCategoryFilter(category.code)}>{category.label}</button>)}</div>
-      <label className="search-field explore-search"><span className="sr-only">품목 또는 지역 검색</span><input type="search" value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
-      <p className="screen-note">품목별 확인 지역과 상표 출원·등록 현황을 제공합니다. {itemRows.length > ITEM_ROW_LIMIT ? `상표 출원 건수 상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${itemRows.length}개` : `검색 결과 ${itemRows.length}개`}</p>
+      <div className="item-search-row">
+        <label className="search-field explore-search"><span className="sr-only">품목 또는 지역 검색</span><input type="search" value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
+        {/* UI 검토(3차, 2026-09-06) S5: 정렬 기준을 고를 수 있게(검색 옆, P3: 칩·검색·정렬은 항상 같은 자리). */}
+        <label className="item-sort-field"><span className="sr-only">정렬 기준</span><select value={itemSort} onChange={(event) => setItemSort(event.target.value as typeof itemSort)}>
+          <option value="trademarks">출원 건수순</option>
+          <option value="regions">지역 수순</option>
+          <option value="registrationRate">등록률순</option>
+          <option value="name">가나다순</option>
+        </select></label>
+      </div>
+      <p className="screen-note">품목별 확인 지역과 상표 출원·등록 현황을 제공합니다. {!itemShowAll && itemRows.length > ITEM_ROW_LIMIT ? `상위 ${ITEM_ROW_LIMIT}개 표시 · 전체 ${itemRows.length}개` : `전체 ${itemRows.length}개`}</p>
       <div className="item-screen">
         <div className="item-reading-guide"><strong>수치 구분</strong><span><b>지역 확인 출원</b> 출원인 주소가 해당 지역과 일치</span><span><b>전국 검색</b> 아직 지역 확인 전인 별도 모집단</span></div>
         <div className="item-explorer">
@@ -1459,6 +1485,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               </li>; })}
               {visibleItemRows.length === 0 && <li className="empty">검색 결과가 없습니다.</li>}
             </ul>
+            {!itemShowAll && itemRows.length > ITEM_ROW_LIMIT && <button type="button" className="item-list-show-all" onClick={() => setItemShowAll(true)}>전체 {number(itemRows.length)}개 보기 →</button>}
           </aside>
           <div className="item-detail-panel">{selectedItemRow ? (() => { const row = selectedItemRow; const decidedRegions = row.availableRegions.length; const pendingRegions = Math.max(0, row.regions.length - decidedRegions); const nationwideOnly = Math.max(0, row.trademarksDisplay - row.trademarks); const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
             // 이슈 #116(2026-09-01): 마스터-디테일 개편(29fb843) 때 빠진 비즈니스 확장 흐름·전략
