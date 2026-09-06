@@ -251,12 +251,24 @@ function shareConicGradient(segments: { name: string; pct: number }[]) {
   });
   return `conic-gradient(${stops.join(", ")})`;
 }
+// UI 검토(3차, 2026-09-06) 시각화 교체안: "경북 21% · 전남광주 19% · 경남 13% · 경기
+// 12% · 기타 36%" 식 다섯 줄 텍스트 대신, 높이 14px 100% 스택 바 한 줄 + 상위 3개만
+// 인라인 라벨로 압축한다. 전체 분포는 막대의 title 툴팁(세그먼트별)과 접근성 라벨로
+// 여전히 확인할 수 있다.
 function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>; label: string }) {
   const { segments, total } = provinceShareSegments(counts);
   if (!total) return <div className="item-share empty"><p className="empty">아직 지역 확인 출원이 없습니다.</p></div>;
-  return <div className="item-share">
-    <div className="item-share-donut" style={{ background: shareConicGradient(segments) }} role="img" aria-label={`${label} 광역 단위 출원 비중`} />
-    <ul className="item-share-legend">{segments.map((segment) => <li key={segment.name}><i style={{ background: shareSegmentColor(segment.name) }} /><span className="item-share-region">{displayRegionName(segment.name)}</span><b>{percent(segment.pct)}</b></li>)}</ul>
+  const topSegments = segments.slice(0, 3);
+  const restCount = segments.length - topSegments.length;
+  const summary = segments.map((segment) => `${displayRegionName(segment.name)} ${percent(segment.pct)}`).join(", ");
+  return <div className="item-share-bar-wrap">
+    <div className="item-share-bar" role="img" aria-label={`${label} 광역 단위 출원 비중: ${summary}`}>
+      {segments.map((segment) => <span key={segment.name} className="item-share-bar-segment" style={{ width: `${percent(segment.pct)}`, background: shareSegmentColor(segment.name) }} title={`${displayRegionName(segment.name)} ${percent(segment.pct)}`} />)}
+    </div>
+    <ul className="item-share-bar-legend">
+      {topSegments.map((segment) => <li key={segment.name}><i style={{ background: shareSegmentColor(segment.name) }} />{displayRegionName(segment.name)} {percent(segment.pct)}</li>)}
+      {restCount > 0 && <li className="item-share-bar-more">외 {restCount}개 지역</li>}
+    </ul>
   </div>;
 }
 
