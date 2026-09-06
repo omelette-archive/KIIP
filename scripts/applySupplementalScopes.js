@@ -13,6 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 const { applySupplementalScopes } = require("./lib/supplementalScopes");
+const { loadAdminCodes } = require("../01-collect-specialties/lib/adminCodes");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_FOREST_REGIONS = path.join(ROOT, "02-normalize-items", "data", "kofpi-primary-regions-2024.json");
@@ -46,8 +47,9 @@ function main() {
   const forestPath = path.resolve(args["forest-regions"] || DEFAULT_FOREST_REGIONS);
   const forestRegionEvidence = fs.existsSync(forestPath) ? readJson(forestPath) : null;
 
+  const adminList = loadAdminCodes();
   const before = (document.results || []).length;
-  applySupplementalScopes(document, { forestRegionEvidence });
+  applySupplementalScopes(document, { forestRegionEvidence, adminList });
   const after = (document.results || []).length;
 
   const outPath = path.resolve(args.out);

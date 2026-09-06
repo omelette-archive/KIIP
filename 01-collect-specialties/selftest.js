@@ -789,6 +789,26 @@ async function run() {
     ok("69개 전량과 도 단위 정책 범위를 보존");
   }
 
+  console.log("\n16-1) 농촌진흥청 지역특화작목 — 통합 전 도명(전라남도) 정규화(전남광주통합특별시)");
+  {
+    const adminList = loadAdminCodes();
+    const collected = collectRegionalSpecialtyCrops({ adminList });
+    assert.ok(
+      collected.rows.every((row) => row.sido !== "전라남도"),
+      "마스터가 주어지면 통합 전 도명이 남아있으면 안 됨"
+    );
+    assert.ok(
+      collected.rows.some((row) => row.sido === "전남광주통합특별시"),
+      "전라남도 소속 작목이 통합 후 도명으로 정규화돼야 함"
+    );
+    const withoutAdminList = collectRegionalSpecialtyCrops();
+    assert.ok(
+      withoutAdminList.rows.some((row) => row.sido === "전라남도"),
+      "마스터를 안 주면 원문 도명을 그대로 보존(하위호환)해야 함"
+    );
+    ok("마스터가 주어지면 통합 전 도명이 현재 시도명으로 정규화됨");
+  }
+
   console.log("\n모든 자체 테스트 통과");
 }
 

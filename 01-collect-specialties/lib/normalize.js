@@ -246,6 +246,21 @@ function resolveRegionInput(regionText, adminList, regionCode = "") {
   return { sido: "", sigungu: cleanRegionText(regionText), matched: false };
 }
 
+/**
+ * 시군구 없이 시도명만 정규화한다(대상 지역의 시군구는 이미 신뢰할 수 있는 별도
+ * 출처에서 왔고, 통합·개칭 전 시도명만 바로잡으면 되는 경우용 — 지역특화작목·임산물
+ * 주산지 근거처럼 "전라남도"류 옛 시도명이 소스 데이터에 그대로 박혀 있는 경우).
+ * 마스터가 없으면(선택적 인자라 selftest 등에서 생략 가능) 원문을 그대로 둔다.
+ */
+function resolveSidoName(sido, adminList) {
+  if (!adminList || adminList.length === 0) return { sido, regionCode: "" };
+  const resolved = resolveRegionInput(sido, adminList);
+  if (resolved.matched && !resolved.sigungu) {
+    return { sido: resolved.sido, regionCode: resolved.regionCode || "" };
+  }
+  return { sido, regionCode: "" };
+}
+
 function splitRegion(regionText, adminList, regionCode = "") {
   const resolved = resolveRegionInput(regionText, adminList, regionCode);
   if (resolved.matched) {
@@ -445,6 +460,7 @@ module.exports = {
   resolveRegionByCode,
   resolveRegion,
   resolveRegionInput,
+  resolveSidoName,
   splitRegion,
   toRows,
   fromGiRegistrations,
