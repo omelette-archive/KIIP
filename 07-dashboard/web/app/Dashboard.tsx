@@ -1053,6 +1053,19 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       : <div className="coverage-specialty-list">{specialtyButtons}</div>;
     return <article className={selectedMunicipality && row.label === selectedMunicipality ? "coverage-region-card selected" : "coverage-region-card"} key={row.key}><div className="coverage-region-head"><div><strong>{displayRegionName(row.label)}</strong><small>특산품 {number(row.coverage.total)}개</small></div><div className="coverage-region-summary"><span>출원 확인 특산품 {number(row.coverage.applied)}개</span><b>{percent(row.coverage.rate)}</b></div>{!selectedProvince && <button type="button" onClick={() => openProvince(row.label)}>지도에서 보기</button>}</div>{specialtyList}</article>;
   }
+  // UI 검토(3차, 2026-09-06) S1: 전국 뷰가 16개 도의 특산품 항목(최대 348개 원소·도합
+  // 1,800개+ 버튼)을 미리 다 그려 문서 높이 4,266px·DOM 노드 6,188개까지 불어났다. 목록은
+  // "고르는 장치"여야지 콘텐츠가 아니다(P2) — 검색 중이 아니면 지역명·건수만 보이는 압축
+  // 목록으로 바꾸고, 특산품 목록은 그 도를 선택한 뒤에만 그린다. 검색 중에는(품목명으로
+  // 어느 지역에 있는지 찾는 용도) 기존처럼 일치 항목을 포함한 카드를 그대로 보여준다.
+  function coverageListRow(row: CoverageRow) {
+    return <button type="button" className="coverage-region-list-row" key={row.key} onClick={() => openProvince(row.label)}>
+      <strong>{displayRegionName(row.label)}</strong>
+      <span>특산품 {number(row.coverage.total)}개</span>
+      <span>출원 확인 {number(row.coverage.applied)}개</span>
+      <b>{percent(row.coverage.rate)}</b>
+    </button>;
+  }
   const trendItems = coverageAreaRegions.flatMap((region) => region.items);
   const trendApplicationTotals = sumYearCounts(trendItems, "applicationYearCounts");
   const trendRegisteredTotals = sumYearCounts(trendItems, "registrationYearCounts");
@@ -1248,7 +1261,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           const key = regionQuery.trim().toLocaleLowerCase("ko-KR");
           const rows = key ? coverageBreakdown.filter((row) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key))) : coverageBreakdown;
           if (rows.length === 0) return <p className="empty">&ldquo;{regionQuery}&rdquo; 검색 결과가 없습니다.</p>;
-          if (!selectedProvince) return <div className="coverage-region-grid">{rows.map((row) => coverageCard(row))}</div>;
+          if (!selectedProvince) {
+            return key
+              ? <div className="coverage-region-grid">{rows.map((row) => coverageCard(row))}</div>
+              : <div className="coverage-region-list">{rows.map((row) => coverageListRow(row))}</div>;
+          }
           // 도 단위 시군구 미지정 행("경기도" 자체)은 실제 시군구 카드와 분리해서 보여준다.
           const unclassifiedRows = rows.filter((row) => row.region && isUnclassifiedRegion(row.region));
           const municipalityRows = rows.filter((row) => !(row.region && isUnclassifiedRegion(row.region)));

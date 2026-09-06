@@ -807,6 +807,14 @@ test("generates a self-contained standalone dashboard", async () => {
     /const quantileLegendHtml = \(breaks, formatter\) => breaks\.length === 0 \? "" : /,
     "빈 breaks에서는 범례 칸을 감춰야 함(#136 3차 검토 N1)"
   );
+  // UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음)는 16개 도의 특산품 항목을 미리 다
+  // 그리는 카드 그리드 대신, 지역명·건수만 보이는 압축 목록으로 렌더링해야 한다.
+  assert.match(html, /const coverageListRowHtml = \(row\) =>/, "전국 뷰 전용 압축 목록 렌더 함수가 있어야 함");
+  assert.match(
+    html,
+    /if \(!state\.province\) \{\s*return key\s*\? `<div class="coverage-region-grid">/,
+    "검색 중일 때만 카드 그리드로, 그 외엔 압축 목록으로 렌더링해야 함"
+  );
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
   assert.match(html, /출원 확인 특산품/);

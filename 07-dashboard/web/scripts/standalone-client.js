@@ -605,6 +605,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         : `<div class="coverage-specialty-list">${specialtyButtonsHtml}</div>`;
       return `<article class="coverage-region-card ${state.municipality && row.label === state.municipality ? "selected" : ""}"><div class="coverage-region-head"><div><strong>${esc(displayRegionName(row.label))}</strong><small>특산품 ${number(row.coverage.total)}개</small></div><div class="coverage-region-summary"><span>출원 확인 특산품 ${number(row.coverage.applied)}개</span><b>${percent(row.coverage.rate)}</b></div>${!state.province ? `<button type="button" data-province="${esc(row.label)}">지도에서 보기</button>` : ""}</div>${specialtyListHtml}</article>`;
     };
+    // UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음) 전용 압축 목록 — 지역명·건수만, 특산품
+    // 버튼은 그 도를 선택한 뒤에만 그린다(P2: 목록은 고르는 장치).
+    const coverageListRowHtml = (row) => `<button type="button" class="coverage-region-list-row" data-province="${esc(row.label)}"><strong>${esc(displayRegionName(row.label))}</strong><span>특산품 ${number(row.coverage.total)}개</span><span>출원 확인 ${number(row.coverage.applied)}개</span><b>${percent(row.coverage.rate)}</b></button>`;
     const compositionRows = [...provinceStats.entries()].filter(([, stat]) => stat.trademarks > 0).sort((a, b) => b[1].trademarks - a[1].trademarks).slice(0, 10);
     const compositionMax = Math.max(1, ...compositionRows.map(([, stat]) => stat.trademarks));
     // 이슈 #119: 전국 지도는 요약 탭에 이미 있어(같은 selectedProvince 상태 공유) 이 화면의
@@ -649,7 +652,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         const key = state.regionQuery.trim().toLocaleLowerCase("ko-KR");
         const rows = key ? breakdown.filter((row) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key))) : breakdown;
         if (rows.length === 0) return `<p class="empty">&ldquo;${esc(state.regionQuery)}&rdquo; 검색 결과가 없습니다.</p>`;
-        if (!state.province) return `<div class="coverage-region-grid">${rows.map((row) => coverageCardHtml(row)).join("")}</div>`;
+        if (!state.province) {
+          return key
+            ? `<div class="coverage-region-grid">${rows.map((row) => coverageCardHtml(row)).join("")}</div>`
+            : `<div class="coverage-region-list">${rows.map((row) => coverageListRowHtml(row)).join("")}</div>`;
+        }
         // 도 단위 시군구 미지정 행("경기도" 자체)은 실제 시군구 카드와 분리해서 보여준다.
         const unclassifiedRows = rows.filter((row) => row.region && isUnclassifiedRegion(row.region));
         const municipalityRows = rows.filter((row) => !(row.region && isUnclassifiedRegion(row.region)));
