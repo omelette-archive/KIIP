@@ -523,10 +523,14 @@ function fill(value: number | null, breaks: number[]): string {
 // UI 검토(3차, 2026-09-06) N1: 선택 범위(예: 서울 시군구)에 값 있는 지역이 하나도 없어
 // 분위 경계 자체를 만들 수 없으면(breaks=[]) 칸마다 "최고"만 반복돼 의미가 없다 — 이
 // 경우는 범례를 아예 감춘다("데이터 없음" 칩만 호출부에 남는다).
+// UI 검토(3차, 2026-09-06) 시각화 교체안 "지도 범례": 상한값만 나열하면("~41개") 그
+// 칸의 실제 값 범위(그 앞 칸 상한보다 얼마나 큰지)가 안 보인다 — 각 칸을 양끝 구간으로
+// 표기한다(예: "23~41개"). 첫 칸은 하한을 모르니 상한만, 마지막 칸은 상한이 없으니
+// 그 앞 경계부터 "이상"으로 연다.
 function quantileLegendSwatches(breaks: number[], formatter: (value: number) => string) {
   if (breaks.length === 0) return null;
   return QUANTILE_FILL_MIXES.map((mix, index) => (
-    <span key={mix}><i className="legend-swatch" style={{ background: `color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)` }} />{index < breaks.length ? `~${formatter(breaks[index])}` : "최고"}</span>
+    <span key={mix}><i className="legend-swatch" style={{ background: `color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)` }} />{index < breaks.length ? (index === 0 ? `~${formatter(breaks[index])}` : `${formatter(breaks[index - 1])}~${formatter(breaks[index])}`) : `${formatter(breaks[breaks.length - 1])} 이상`}</span>
   ));
 }
 // 2026-08-21: 출원율을 텍스트로만 보여주지 말고 큰 숫자 + 원형 게이지로 한눈에

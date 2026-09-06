@@ -813,6 +813,18 @@ test("generates a self-contained standalone dashboard", async () => {
     /const quantileLegendHtml = \(breaks, formatter\) => breaks\.length === 0 \? "" : /,
     "빈 breaks에서는 범례 칸을 감춰야 함(#136 3차 검토 N1)"
   );
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "지도 범례": 상한값만 나열하지 않고 각 칸을
+  // 양끝 구간으로("23~41개") 표기, 마지막 칸은 "N 이상"으로 열어야 함.
+  assert.match(
+    html,
+    /\$\{esc\(formatter\(breaks\[index - 1\]\)\)\}~\$\{esc\(formatter\(breaks\[index\]\)\)\}/,
+    "가운데 칸은 앞 경계~현재 경계 구간으로 표기해야 함"
+  );
+  assert.match(
+    html,
+    /\$\{esc\(formatter\(breaks\[breaks\.length - 1\]\)\)\} 이상/,
+    "마지막 칸은 '최고' 대신 그 앞 경계부터 '이상'으로 열어야 함"
+  );
   // UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음)는 16개 도의 특산품 항목을 미리 다
   // 그리는 카드 그리드 대신, 지역명·건수만 보이는 압축 목록으로 렌더링해야 한다.
   assert.match(html, /const coverageListRowHtml = \(row\) =>/, "전국 뷰 전용 압축 목록 렌더 함수가 있어야 함");
