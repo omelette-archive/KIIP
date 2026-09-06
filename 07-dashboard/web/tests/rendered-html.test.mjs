@@ -310,6 +310,12 @@ test("renders tab navigation and separate application/registration ranking table
   const appTbody = html.slice(html.indexOf("<tbody>", appHeadingIndex), html.indexOf("</tbody>", appHeadingIndex));
   const regTbody = html.slice(html.indexOf("<tbody>", regHeadingIndex), html.indexOf("</tbody>", regHeadingIndex));
 
+  // UI 검토(3차, 2026-09-06) N2: 기초자치단체(예: "전남·광주 통합권역 영광군")와 광역 단위
+  // 시군구 미지정 항목(그 자체인 "전남·광주 통합권역")이 같은 랭킹에 섞이면 안 된다 —
+  // 광역 단위 미지정 행은 이 랭킹에서 제외돼야 한다.
+  assert.doesNotMatch(appTbody, /<td>전남·광주 통합권역<\/td>/, "출원 랭킹에 광역 단위 미지정 행이 섞이면 안 됨");
+  assert.doesNotMatch(regTbody, /<td>전남·광주 통합권역<\/td>/, "등록 랭킹에 광역 단위 미지정 행이 섞이면 안 됨");
+
   // 품목명은 정규화된 대표 특산품이어야 한다(2026-08-11 확정) — 예전 샘플은
   // buildAreaBrandValidationInput.js의 브랜드명("데일리")을 그대로 썼는데, 이는 지역브랜드
   // 조인 검증용일 뿐 대표 특산품이 아니다. 각 랭킹이 실제로 해당 지표(출원 확인 건수 /

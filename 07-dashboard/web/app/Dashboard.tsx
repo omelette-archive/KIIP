@@ -1000,10 +1000,18 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     return filed > 0 ? `출원 확인 · ${number(filed)}건` : "미출원(검토중)";
   }
   const RANKING_LIMIT = 10;
-  const rankingCandidates = regionalRegions.flatMap((region) => region.items.flatMap((item) => {
-    const label = officialItemLabel(item);
-    return label ? [{ region, item, label }] : [];
-  }));
+  // UI 검토(3차, 2026-09-06) N2: "지역·대표 특산품 출원 랭킹"이 기초자치단체(예: "전남·광주
+  // 통합권역 영광군")와 광역 단위 시군구 미지정 항목(예: "전남·광주 통합권역" 그 자체)을
+  // 같은 순위표에 섞어, 광역 단위 항목이 TOP10 중 다섯 칸을 차지하는 등 단위가 다른 값을
+  // 나란히 비교하는 문제가 있었다. 이 랭킹은 기초자치단체 단위 비교가 목적이라 광역 단위
+  // 미지정 항목은 뺀다(다른 화면의 "시군구 미지정" 표시로는 계속 확인 가능).
+  const rankingCandidates = regionalRegions.flatMap((region) => {
+    if (isUnclassifiedRegion(region)) return [];
+    return region.items.flatMap((item) => {
+      const label = officialItemLabel(item);
+      return label ? [{ region, item, label }] : [];
+    });
+  });
   const applicationRankingRows = [...rankingCandidates]
     .filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available")
     .sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));

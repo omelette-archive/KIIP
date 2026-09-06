@@ -1454,7 +1454,12 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const nationalBreaks = quantileBreaks(geometry.provinces.map((shape) => provinceValue(shape.name)));
     const municipalBreaks = municipal ? quantileBreaks(municipal.items.map((shape) => regionValue(findMunicipalityRegion(state.province, shape.name)))) : [];
     const RANKING_LIMIT = 10;
-    const rankingCandidates = regionalRegions.flatMap((region) => region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; }));
+    // UI 검토(3차, 2026-09-06) N2: 기초자치단체와 광역 단위 시군구 미지정 항목을 같은
+    // 순위표에 섞지 않는다 — 광역 단위 미지정 항목은 뺀다.
+    const rankingCandidates = regionalRegions.flatMap((region) => {
+      if (isUnclassifiedRegion(region)) return [];
+      return region.items.flatMap((item) => { const label = officialItemLabel(item); return label ? [{ region, item, label }] : []; });
+    });
     const applicationRankingRows = [...rankingCandidates].filter(({ item }) => item.metrics.uniqueTrademarkCount.availability === "available").sort((a, b) => (b.item.metrics.uniqueTrademarkCount.value || 0) - (a.item.metrics.uniqueTrademarkCount.value || 0));
     const registrationRankingRows = [...rankingCandidates].filter(({ item }) => item.metrics.registeredTrademarkCount.availability === "available").sort((a, b) => (b.item.metrics.registeredTrademarkCount.value || 0) - (a.item.metrics.registeredTrademarkCount.value || 0));
     currentCsvExporters.summaryApplicationRanking = () => downloadCsv(`지역대표특산품출원랭킹_${csvDateStamp(dashboardUpdatedAt)}`, ["순위", "지역", "대표 특산품", "출원 확인"], applicationRankingRows.slice(0, RANKING_LIMIT).map(({ region, item, label }, index) => [index + 1, displayRegionName(region.region), label, item.metrics.uniqueTrademarkCount.value ?? 0]));
