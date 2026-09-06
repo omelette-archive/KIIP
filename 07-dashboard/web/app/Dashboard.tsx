@@ -191,6 +191,35 @@ function trendYearLabels(years: number[]) {
   const step = Math.ceil(years.length / 6);
   return years.filter((_, index) => index % step === 0 || index === years.length - 1);
 }
+// UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 51년 원자료를 매년 원 마커로
+// 다 찍으면(2계열×연도수) 추세가 톱니에 묻힌다 — 5년 이동평균을 주 시각으로 삼고, 원본은
+// 옅게 남긴다(추이는 완만하게, 원자료 노이즈는 여전히 확인 가능). 트레일링 윈도우(해당
+// 연도까지 최근 5개년)를 쓴다 — 아직 안 지난 미래 연도를 끌어써서 왜곡하지 않기 위함.
+// 히스토리가 전체 연도 범위(fullStart~fullEnd)를 그대로 반영하도록, 화면에 보이는
+// 부분범위(years)가 아니라 항상 연속된 전체 캘린더 연도 배열로 계산해야 한다 — 그래야
+// 사용자가 범위를 좁혀도(예: 최근 5년만 보기) 이동평균이 그 이전 실제 이력을 반영한다.
+const TREND_MOVING_AVERAGE_WINDOW = 5;
+function movingAverageSeries(totals: Record<number, number>, contiguousYears: number[], windowSize: number): Record<number, number> {
+  const result: Record<number, number> = {};
+  for (let i = 0; i < contiguousYears.length; i++) {
+    const windowStart = Math.max(0, i - windowSize + 1);
+    const windowYears = contiguousYears.slice(windowStart, i + 1);
+    const sum = windowYears.reduce((total, year) => total + (totals[year] || 0), 0);
+    result[contiguousYears[i]] = sum / windowYears.length;
+  }
+  return result;
+}
+// 표시 중인 연도 범위 안에서 이동평균이 가장 높은 연도(정점)를 찾는다 — 동률이면 먼저
+// 나온(더 이른) 연도를 남긴다.
+function trendPeakYear(series: Record<number, number>, years: number[]): number | null {
+  let peakYear: number | null = null;
+  let peakValue = -Infinity;
+  for (const year of years) {
+    const value = series[year] || 0;
+    if (value > peakValue) { peakValue = value; peakYear = year; }
+  }
+  return peakYear;
+}
 function trendHandlePercent(year: number, fullStart: number, fullEnd: number) {
   if (fullEnd <= fullStart) return 0;
   return ((year - fullStart) / (fullEnd - fullStart)) * 100;
@@ -346,18 +375,37 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
   for (let year = start; year <= end; year++) years.push(year);
   const max = Math.max(1, ...years.map((year) => Math.max(applicationTotals[year] || 0, registrationTotals[year] || 0)));
   const scale = trendScales(start, end, max);
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 5년 이동평균을 주 시각(굵은 선 +
+  // 면적)으로 삼고, 원자료는 옅게 남긴다. 이동평균은 전체 연도 범위(fullStart~fullEnd)의
+  // 연속 캘린더 연도로 계산해, 보기 범위를 좁혀도 그 이전 실제 이력을 반영한다.
+  const fullYearsContiguous: number[] = [];
+  for (let year = fullStart; year <= fullEnd; year++) fullYearsContiguous.push(year);
+  const applicationMA = movingAverageSeries(applicationTotals, fullYearsContiguous, TREND_MOVING_AVERAGE_WINDOW);
+  const registrationMA = movingAverageSeries(registrationTotals, fullYearsContiguous, TREND_MOVING_AVERAGE_WINDOW);
+  const mostRecentYear = years[years.length - 1];
+  const applicationPeakYear = trendPeakYear(applicationMA, years);
+  const registrationPeakYear = trendPeakYear(registrationMA, years);
+  const applicationMarkerYears = [...new Set([applicationPeakYear, mostRecentYear].filter((year): year is number => year !== null))];
+  const registrationMarkerYears = [...new Set([registrationPeakYear, mostRecentYear].filter((year): year is number => year !== null))];
   return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{trendSubtitle}</span></div>
     {adjustable && <TrendRangeControl idPrefix="summary-trend" fullStart={fullStart} fullEnd={fullEnd} start={start} end={end} onStartChange={setSelectedStart} onEndChange={setSelectedEnd} />}
-    <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${displayName} ${start}년부터 ${end}년까지 출원·등록 추이`}>
-      {[0, 0.5, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 7} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
-      <path d={`${trendLinePath(years, applicationTotals, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
-      <path d={trendLinePath(years, registrationTotals, scale)} className="trend-line trend-line-registered" />
-      <path d={trendLinePath(years, applicationTotals, scale)} className="trend-line trend-line-application" />
-      {years.map((year) => <circle key={`application-${year}`} cx={scale.x(year)} cy={scale.y(applicationTotals[year] || 0)} r="2.8" className="trend-point trend-point-application"><title>{year}년 출원 {number(applicationTotals[year] || 0)}건</title></circle>)}
-      {years.map((year) => <circle key={`registration-${year}`} cx={scale.x(year)} cy={scale.y(registrationTotals[year] || 0)} r="2.8" className="trend-point trend-point-registered"><title>{year}년 등록 {number(registrationTotals[year] || 0)}건</title></circle>)}
+    <svg className="trend-svg" viewBox={`0 0 ${TREND_CHART.width} ${TREND_CHART.height}`} role="img" aria-label={`${displayName} ${start}년부터 ${end}년까지 출원·등록 추이(5년 이동평균)`}>
+      {[0, 0.25, 0.5, 0.75, 1].map((fraction) => { const value = Math.round(max * fraction); const yPos = scale.y(value); return <g key={fraction}><line x1={TREND_CHART.padLeft} x2={TREND_CHART.width - TREND_CHART.padRight} y1={yPos} y2={yPos} className="trend-gridline" /><text x={TREND_CHART.padLeft - 7} y={yPos} className="trend-axis-label trend-axis-y">{number(value)}</text></g>; })}
+      <path d={`${trendLinePath(years, applicationMA, scale)}L${scale.x(end).toFixed(1)},${scale.baseY}L${scale.x(start).toFixed(1)},${scale.baseY}Z`} className="trend-area" />
+      <path d={trendLinePath(years, registrationTotals, scale)} className="trend-line trend-line-raw trend-line-registered-raw" />
+      <path d={trendLinePath(years, applicationTotals, scale)} className="trend-line trend-line-raw trend-line-application-raw" />
+      <path d={trendLinePath(years, registrationMA, scale)} className="trend-line trend-line-registered" />
+      <path d={trendLinePath(years, applicationMA, scale)} className="trend-line trend-line-application" />
+      {applicationMarkerYears.map((year) => <circle key={`application-${year}`} cx={scale.x(year)} cy={scale.y(applicationMA[year] || 0)} r="3.4" className="trend-point trend-point-application"><title>{year}년 출원 {number(applicationTotals[year] || 0)}건(5년 평균 {number(Math.round(applicationMA[year] || 0))}건){year === applicationPeakYear ? " · 정점" : ""}{year === mostRecentYear ? " · 최근" : ""}</title></circle>)}
+      {registrationMarkerYears.map((year) => <circle key={`registration-${year}`} cx={scale.x(year)} cy={scale.y(registrationMA[year] || 0)} r="3.4" className="trend-point trend-point-registered"><title>{year}년 등록 {number(registrationTotals[year] || 0)}건(5년 평균 {number(Math.round(registrationMA[year] || 0))}건){year === registrationPeakYear ? " · 정점" : ""}{year === mostRecentYear ? " · 최근" : ""}</title></circle>)}
+      {/* 정점과 최근 연도가 같으면(상승 추세 등) 라벨이 겹치므로 하나로 합친다. */}
+      {/* 정점·최근 라벨은 y좌표가 가까울 때(추세가 완만한 구간) 겹치지 않도록 정점 쪽을
+          한 단 더 위로 띄운다(고정 2단 오프셋 — x가 가까운 경우에도 항상 분리됨). */}
+      {applicationPeakYear !== null && applicationPeakYear !== mostRecentYear && <text x={scale.x(applicationPeakYear)} y={Math.max(11, scale.y(applicationMA[applicationPeakYear] || 0) - 22)} className="trend-marker-label trend-marker-label-application" textAnchor="middle">정점 {applicationPeakYear}</text>}
+      {mostRecentYear !== undefined && <text x={scale.x(mostRecentYear)} y={Math.max(11, scale.y(applicationMA[mostRecentYear] || 0) - 8)} className="trend-marker-label trend-marker-label-application" textAnchor="end">{applicationPeakYear === mostRecentYear ? "정점·최근 " : "최근 "}{number(applicationTotals[mostRecentYear] || 0)}건</text>}
       {trendYearLabels(years).map((year) => <text key={year} x={scale.x(year)} y={TREND_CHART.height - 5} className="trend-axis-label trend-axis-x">{year}</text>)}
     </svg>
-    <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록</p>
+    <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원(5년 평균)<span className="trend-legend-swatch trend-legend-registered" />등록(5년 평균)<span className="trend-legend-swatch trend-legend-swatch-raw" />연도별 실제값</p>
     {/* UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 이 차트의 연도별 건수는
         지역×품목 검색의 전국 검색 결과 전체(applicationYearCounts)를 합산한 값이라,
         같은 화면의 KPI(출원인 주소로 이 지역/품목이 확인된 고유 출원 수)보다 훨씬 클 수

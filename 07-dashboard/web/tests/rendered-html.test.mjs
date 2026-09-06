@@ -753,8 +753,27 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   assert.match(
     standaloneHtml,
-    /등록\(등록원부 보강 완료 건\)/,
+    /등록원부 보강 완료 건/,
     "등록 계열이 실제 등록일자와 등록원부 보강 범위를 사용한다는 점을 화면에 밝혀야 함",
+  );
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 51년 원 마커 대신 5년 이동평균을
+  // 주 시각으로, 원자료는 옅은 선으로, 마커는 정점·최근 연도만 표시해야 한다.
+  assert.match(
+    standaloneHtml,
+    /const movingAverageSeries = \(totals, contiguousYears, windowSize\) => \{/,
+    "5년 이동평균 계산 함수가 있어야 함",
+  );
+  assert.match(
+    standaloneHtml,
+    /const windowStart = Math\.max\(0, i - windowSize \+ 1\);/,
+    "트레일링 윈도우(해당 연도까지 최근 N개년)로 계산해야 함 — 미래 값을 끌어써서 왜곡하면 안 됨",
+  );
+  assert.match(standaloneHtml, /class="trend-line trend-line-raw trend-line-application-raw"/, "원자료 선(옅게)이 있어야 함");
+  assert.match(standaloneHtml, /class="trend-marker-label trend-marker-label-application"/, "정점·최근 라벨이 있어야 함");
+  assert.match(
+    standaloneHtml,
+    /\[0, 0\.25, 0\.5, 0\.75, 1\]\.map\(\(fraction\)/,
+    "y축 눈금이 5개(0/25/50/75/100%)여야 함",
   );
 });
 
@@ -976,4 +995,33 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /비즈니스 확장 흐름/);
   assert.match(html, /nationwideFlowCardHtml/);
   assert.doesNotMatch(html, />AI 판정</);
+});
+
+test("computes a correct trailing 5-year moving average for the trend chart", async () => {
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 구조 확인(위 테스트)만으로는
+  // 이동평균 산식 자체가 맞는지 보장하지 못한다 — 실제 배포되는 함수를 추출해 손계산값과
+  // 직접 대조한다(트레일링 윈도우: 해당 연도까지 최근 N개년, 미래를 끌어쓰지 않음).
+  const html = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  const match = html.match(
+    /const movingAverageSeries = \(totals, contiguousYears, windowSize\) => \{[\s\S]*?\n {2}\};/
+  );
+  assert.ok(match, "movingAverageSeries 함수 정의를 dashboard.html에서 찾을 수 있어야 함");
+  const fnSource = match[0].replace(/^const movingAverageSeries = /, "").replace(/;\s*$/, "");
+  // eslint-disable-next-line no-new-func
+  const movingAverageSeries = new Function(`return (${fnSource})`)();
+  const totals = { 2020: 10, 2021: 20, 2022: 0, 2023: 40, 2024: 50, 2025: 100 };
+  const years = [2020, 2021, 2022, 2023, 2024, 2025];
+  const result = movingAverageSeries(totals, years, 5);
+  assert.deepStrictEqual(result, {
+    2020: 10,      // [10]
+    2021: 15,      // [10,20]
+    2022: 10,      // [10,20,0]
+    2023: 17.5,    // [10,20,0,40]
+    2024: 24,      // [10,20,0,40,50]
+    2025: 42,      // [20,0,40,50,100] — 5년 창이 밀려 2020년은 빠짐
+  }, "트레일링 5년 이동평균이 손계산값과 정확히 일치해야 함");
+  // 창 크기보다 이력이 짧은 연도(맨 앞)는 있는 값만으로 평균 내야 하고(0으로 채우지 않음),
+  // 누락 연도(값 없음)는 0건으로 취급해야 한다(반영 안 하고 건너뛰면 평균이 부풀려짐).
+  const sparse = movingAverageSeries({ 2020: 100 }, [2019, 2020, 2021], 5);
+  assert.deepStrictEqual(sparse, { 2019: 0, 2020: 50, 2021: 100 / 3 });
 });

@@ -344,6 +344,14 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .trend-point { cursor: pointer; stroke: #fff; stroke-width: 1.2; }
 .trend-point-application { fill: var(--green); }
 .trend-point-registered { fill: var(--amber); }
+/* UI 검토(3차, 2026-09-06) 시각화 교체안 "연도별 추이": 5년 이동평균(굵은 선 + 면적)을
+   주 시각으로 삼고, 연도별 실제값은 옅은 선으로만 남긴다 — 51년치 원 마커를 매년 찍는
+   대신 정점·최근 연도만 강조 마커+라벨로 표시한다(마우스 호버 title은 그대로 유지). */
+.trend-line-raw { stroke-width: 1.1; opacity: .38; }
+.trend-line-application-raw { stroke: var(--green); }
+.trend-line-registered-raw { stroke: var(--amber); stroke-dasharray: 3 3; }
+.trend-legend-swatch-raw { background: var(--faint); opacity: .5; }
+.trend-marker-label { font-size: 10.5px; font-weight: 800; fill: var(--green-dark); }
 .trend-legend { display: flex; align-items: center; gap: 6px 16px; margin: 10px 0 0; color: var(--muted); font-size: 11px; }
 .trend-legend-swatch { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 5px; }
 .trend-legend-application { background: var(--green); }
