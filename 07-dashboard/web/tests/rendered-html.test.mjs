@@ -802,9 +802,13 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.doesNotMatch(html, /const calloutLabels/, "legacy all-label callout layout must not remain in the standalone client");
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
   assert.match(html, /function applicationsScreen\(\)/, "standalone dashboard should ship the separate regional application-rate screen");
-  assert.match(html, /전국 시도별 출원율/);
   assert.match(html, /출원 확인 특산품/);
-  assert.match(html, /시도를 선택하면 시군구 지도로 전환됩니다/);
+  // 이슈 #119(지도 중복 정리): 전국 지도는 요약 탭에만 있고, 지역·품목별 조회의 전국
+  // (미선택) 뷰에서는 coverage-map-card를 아예 그리지 않는다 — 광역 구성표에 요약 탭
+  // 지도로 가는 링크만 둔다. 지도는 시도를 실제로 좁혔을 때만(state.province) 나온다.
+  assert.match(html, /state\.province \? `<section class="coverage-map-card">/, "전국(미선택) 뷰에서는 지도 카드를 그리지 않아야 함");
+  assert.match(html, /지도로 보기\(요약\) →/, "광역 구성표에 요약 탭 지도로 가는 링크가 있어야 함");
+  assert.match(html, /시군구별 특산품 출원율 지도/);
   // 이슈 #136 코멘트(2026-09-03) 09번: 시군구 미분류 폴백은 원본 시도명을 그대로 쓰지
   // 않고 displayRegionName으로 통합권역 표기를 거친다("전남광주통합특별시" 노출 방지).
   assert.match(html, /region\.sigungu \|\| displayRegionName\(region\.region\)} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
