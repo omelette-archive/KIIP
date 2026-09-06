@@ -880,8 +880,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /공식 원본 반영 완료/);
   assert.match(html, /등급별 특화작목 출원 현황/);
   assert.match(html, /대표작목 9 · 집중육성작목 18 · 자체육성작목 42/);
-  // 이슈 #117(2026-09-02): 표 컬럼을 지역/대표/자체육성/집중육성/출원건수/비율/상태로 재구성.
-  assert.match(html, /<span>대표작목<\/span><span>자체육성작목<\/span><span>집중육성작목<\/span>/);
+  // 이슈 #117(2026-08-31, 2026-09-02 재요청): 표 컬럼 라벨을 "특화작목(대표/자체육성/집중육성)"·
+  // "집계상태"로 요청과 맞춘다(컬럼 순서·의미는 이미 요청대로였고 라벨만 남아 있었음).
+  assert.match(html, /<span>특화작목<small>대표<\/small><\/span><span>특화작목<small>자체육성<\/small><\/span><span>특화작목<small>집중육성<\/small><\/span>/);
+  assert.match(html, /특화작물의<small>상표 출원 비율<\/small>/);
+  assert.match(html, />집계상태</);
   assert.match(html, /출원이 1건 이상 확인된 작목 비율/);
   assert.match(html, /policyCrops\.length/);
   assert.doesNotMatch(html, /비교 기준 원본 확보 전|원본 대기/);
