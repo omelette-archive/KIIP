@@ -363,6 +363,13 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
         같은 화면의 KPI(출원인 주소로 이 지역/품목이 확인된 고유 출원 수)보다 훨씬 클 수
         있다 — 두 수치가 서로 다른 모집단이라는 걸 차트에도 명시한다. */}
     <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
+    {/* UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": 그래프 점의 정확한 값이 <title>
+        마우스 호버로만 확인 가능했다 — 키보드·스크린리더·복사(CSV)로도 확인할 수 있게
+        값 표 토글을 추가한다. */}
+    <details className="trend-value-table-toggle">
+      <summary><span>값 표로 보기</span><CsvDownloadButton onClick={() => downloadCsv(`${displayName}_연도별출원등록추이_${csvDateStamp(undefined)}`, ["연도", "출원", "등록"], years.map((year) => [year, applicationTotals[year] || 0, registrationTotals[year] || 0]))} /></summary>
+      <div className="trend-value-table-wrap"><table className="trend-value-table"><thead><tr><th scope="col">연도</th><th scope="col">출원</th><th scope="col">등록</th></tr></thead><tbody>{years.map((year) => <tr key={year}><td>{year}</td><td>{number(applicationTotals[year] || 0)}</td><td>{number(registrationTotals[year] || 0)}</td></tr>)}</tbody></table></div>
+    </details>
   </section>;
 }
 // item.noticeName은 고시명칭이 확정 안 된 행에도 채워져 있다(③ 검색에 쓴 원물명 검색어를
@@ -1296,6 +1303,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           </svg>
           <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
           <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
+          <details className="trend-value-table-toggle">
+            <summary><span>값 표로 보기</span><CsvDownloadButton onClick={() => downloadCsv(`${coverageAreaDisplayName}_연도별출원등록추이_${csvDateStamp(dashboardUpdatedAt)}`, ["연도", "출원", "등록"], trendYears.map((year) => [year, trendApplicationTotals[year] || 0, trendRegisteredTotals[year] || 0]))} /></summary>
+            <div className="trend-value-table-wrap"><table className="trend-value-table"><thead><tr><th scope="col">연도</th><th scope="col">출원</th><th scope="col">등록</th></tr></thead><tbody>{trendYears.map((year) => <tr key={year}><td>{year}</td><td>{number(trendApplicationTotals[year] || 0)}</td><td>{number(trendRegisteredTotals[year] || 0)}</td></tr>)}</tbody></table></div>
+          </details>
         </> : <p className="empty">이 범위는 아직 연도별 출원 데이터가 수집되지 않았습니다.</p>}
       </section>
       {selectedProvince && <section className="coverage-map-card">

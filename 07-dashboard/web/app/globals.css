@@ -351,6 +351,15 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 이 차트가 전국 검색 결과
    전체를 합산한 값이라 같은 화면의 지역 확인 출원 KPI보다 훨씬 클 수 있다는 걸 밝힌다. */
 .trend-population-note { margin: 4px 0 0; color: var(--faint); font-size: 11px; }
+/* UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": 그래프 점의 정확한 값을 마우스
+   호버(<title>)뿐 아니라 키보드·스크린리더·복사(CSV)로도 확인할 수 있게 값 표 토글. */
+.trend-value-table-toggle { margin-top: 10px; padding: 0; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); }
+.trend-value-table-toggle summary { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 13px; color: var(--green-dark); font-size: 12px; font-weight: 700; cursor: pointer; }
+.trend-value-table-wrap { max-height: 260px; overflow-y: auto; padding: 0 13px 12px; }
+.trend-value-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.trend-value-table th, .trend-value-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: right; }
+.trend-value-table th:first-child, .trend-value-table td:first-child { text-align: left; }
+.trend-value-table th { position: sticky; top: 0; color: var(--muted); font-size: 11px; font-weight: 800; background: var(--panel); }
 /* 이슈 #118: 요약·지역·품목 화면에서 추이 그래프를 같은 모양으로 부각 — 큰 카드 + 높은 SVG */
 .trend-chart-prominent { width: 100%; margin: 22px 0 4px; }
 .trend-chart-prominent .section-heading { margin-bottom: 10px; align-items: flex-end; }

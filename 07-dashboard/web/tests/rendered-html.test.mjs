@@ -897,6 +897,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /class="trend-population-note"/);
   const populationNoteCount = (html.match(/class="trend-population-note"/g) || []).length;
   assert.equal(populationNoteCount, 2, "regionTrendHtml·지역별 조회 자체 추이 차트 둘 다에 모집단 안내가 있어야 함");
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": <title> 마우스 호버 툴팁만이 아니라
+  // 값 표 토글(키보드·스크린리더·CSV로도 확인 가능)이 추이 차트마다 있어야 함.
+  const valueTableToggleCount = (html.match(/class="trend-value-table-toggle"/g) || []).length;
+  assert.equal(valueTableToggleCount, 2, "regionTrendHtml·지역별 조회 자체 추이 차트 둘 다에 값 표 토글이 있어야 함");
+  assert.match(html, /class="trend-value-table"/);
   assert.match(html, /외 \$\{restCount\}개 지역/);
   // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
   assert.match(html, /const PROVINCE_COLORS = \{/);
