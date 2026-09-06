@@ -503,7 +503,11 @@ function fill(value: number | null, breaks: number[]): string {
 }
 // 범례에 "낮음/높음" 대신 실제 5분위 경계값을 보여준다 — 어느 색이 대략 몇 건/몇 %부터
 // 시작하는지 바로 읽을 수 있다.
+// UI 검토(3차, 2026-09-06) N1: 선택 범위(예: 서울 시군구)에 값 있는 지역이 하나도 없어
+// 분위 경계 자체를 만들 수 없으면(breaks=[]) 칸마다 "최고"만 반복돼 의미가 없다 — 이
+// 경우는 범례를 아예 감춘다("데이터 없음" 칩만 호출부에 남는다).
 function quantileLegendSwatches(breaks: number[], formatter: (value: number) => string) {
+  if (breaks.length === 0) return null;
   return QUANTILE_FILL_MIXES.map((mix, index) => (
     <span key={mix}><i className="legend-swatch" style={{ background: `color-mix(in srgb, #0f5fa6 ${mix}%, #e9eef4)` }} />{index < breaks.length ? `~${formatter(breaks[index])}` : "최고"}</span>
   ));
