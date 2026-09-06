@@ -87,11 +87,13 @@ jobs:
             --ip-registry-daily-budget "${{ github.event.inputs.ip_registry_daily_budget || '100' }}"
 
       - name: Commit and push promoted dashboard
+        id: commit
         if: success()
         shell: bash
         run: |
           if git diff --quiet -- 07-dashboard/dashboard.html 07-dashboard/web/public/data/dashboard-snapshot.json; then
             echo "게시할 변경 없음(스냅샷 동일)."
+            echo "published=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git config user.name "github-actions[bot]"
@@ -99,6 +101,53 @@ jobs:
           git add 07-dashboard/dashboard.html 07-dashboard/web/public/data/dashboard-snapshot.json
           git commit -m "chore(pipeline): 운영 실행 ${{ steps.runid.outputs.value }} 스냅샷 게시"
           git push origin HEAD:${GITHUB_REF_NAME}
+          echo "published=true" >> "$GITHUB_OUTPUT"
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # #137 "배포 전 키 diff 보고": 07d_reconcile이 매 실행 남기는
+      # public-snapshot-reconcile-report.json(added/retained/revived/tombstoned)을
+      # 사람이 매번 러너 디스크를 열어보지 않아도 되도록 커밋 코멘트로 남긴다.
+      - name: Post reconcile report as commit comment
+        if: success() && steps.commit.outputs.published == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require("fs");
+            const path = require("path");
+            const reportPath = path.join(
+              process.env.KIIP_OPERATIONAL_ROOT,
+              "runs",
+              "${{ steps.runid.outputs.value }}",
+              "public-snapshot-reconcile-report.json"
+            );
+            if (!fs.existsSync(reportPath)) {
+              console.log(`reconcile report 없음(첫 배포이거나 07d 미실행): ${reportPath}`);
+              return;
+            }
+            const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+            const c = report.counts || {};
+            const body = [
+              `## 07d_reconcile 배포 전 키 diff 요약 (run ${{ steps.runid.outputs.value }})`,
+              ``,
+              `이전 스냅샷 \`${report.previousSnapshotId || "(없음)"}\` → 이번 \`${report.nextSnapshotId || "(없음)"}\``,
+              ``,
+              `| 구분 | 건수 |`,
+              `|---|---|`,
+              `| 유지(retained) | ${c.retained ?? "—"} |`,
+              `| 신규(added) | ${c.added ?? "—"} |`,
+              `| 지표 floor 유지(metricFloorRetained) | ${c.metricFloorRetained ?? "—"} |`,
+              `| last-known-good 복원(revivedLastKnownGood) | ${c.revivedLastKnownGood ?? "—"} |`,
+              `| 전국→지역 이동(relocatedNationwideToRegional) | ${c.relocatedNationwideToRegional ?? "—"} |`,
+              `| tombstone으로 제거(removedWithTombstone) | ${c.removedWithTombstone ?? "—"} |`,
+              ``,
+              report.blocked ? `⚠️ ${report.blockReason}` : "대량 실종 없음 — 정상 배포.",
+            ].join("\n");
+            await github.rest.repos.createCommitComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              commit_sha: "${{ steps.commit.outputs.sha }}",
+              body,
+            });
 
       - name: Open failure issue
         if: failure()
