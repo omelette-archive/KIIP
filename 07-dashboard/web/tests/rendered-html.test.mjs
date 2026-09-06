@@ -874,6 +874,13 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /params\.set\("yearStart", String\(nav\.yearStart\)\)/);
   assert.match(html, /params\.set\("yearEnd", String\(nav\.yearEnd\)\)/);
   assert.match(html, /const onlyYearChanged = Boolean\(/, "연도만 바뀐 변경은 replaceState로 처리하는 분기가 있어야 함");
+  // UI 검토(3차, 2026-09-06) 시각화 교체안: "경북 21% · 전남광주 19% · ..." 다섯 줄 텍스트를
+  // 100% 스택 바 한 줄 + 상위 3개 인라인 라벨로 압축(광역 단위 출원 비중 전용 —
+  // 특산품 유형별 비중 도넛은 그대로 둠).
+  assert.match(html, /function shareDonutHtml\(counts, label\)/);
+  assert.match(html, /class="item-share-bar"/);
+  assert.match(html, /class="item-share-bar-segment"/);
+  assert.match(html, /외 \$\{restCount\}개 지역/);
   // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
   assert.match(html, /const PROVINCE_COLORS = \{/);
   // 2026-08-21 사용자 재확인: 분모는 확인 완료분이 아니라 수집된 지역×특산품 전체다.

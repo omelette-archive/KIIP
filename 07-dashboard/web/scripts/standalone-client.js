@@ -189,11 +189,18 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     });
     return `conic-gradient(${stops.join(", ")})`;
   }
+  // UI 검토(3차, 2026-09-06) 시각화 교체안: "경북 21% · 전남광주 19% · ..." 식 다섯 줄
+  // 텍스트 대신 14px 높이 100% 스택 바 한 줄 + 상위 3개만 인라인 라벨로 압축.
   function shareDonutHtml(counts, label) {
     const { segments, total } = provinceShareSegments(counts);
     if (!total) return '<div class="item-share empty"><p class="empty">아직 지역 확인 출원이 없습니다.</p></div>';
-    const legend = segments.map((segment) => `<li><i style="background:${provinceColor(segment.name)}"></i><span class="item-share-region">${esc(displayRegionName(segment.name))}</span><b>${percent(segment.pct)}</b></li>`).join("");
-    return `<div class="item-share"><div class="item-share-donut" style="background:${shareConicGradient(segments)}" role="img" aria-label="${esc(label)} 광역 단위 출원 비중"></div><ul class="item-share-legend">${legend}</ul></div>`;
+    const bar = segments.map((segment) => `<span class="item-share-bar-segment" style="width:${percent(segment.pct)};background:${provinceColor(segment.name)}" title="${esc(`${displayRegionName(segment.name)} ${percent(segment.pct)}`)}"></span>`).join("");
+    const topSegments = segments.slice(0, 3);
+    const restCount = segments.length - topSegments.length;
+    const legend = topSegments.map((segment) => `<li><i style="background:${provinceColor(segment.name)}"></i>${esc(displayRegionName(segment.name))} ${percent(segment.pct)}</li>`).join("")
+      + (restCount > 0 ? `<li class="item-share-bar-more">외 ${restCount}개 지역</li>` : "");
+    const summary = esc(segments.map((segment) => `${displayRegionName(segment.name)} ${percent(segment.pct)}`).join(", "));
+    return `<div class="item-share-bar-wrap"><div class="item-share-bar" role="img" aria-label="${esc(label)} 광역 단위 출원 비중: ${summary}">${bar}</div><ul class="item-share-bar-legend">${legend}</ul></div>`;
   }
   const CATEGORY_SHARE_COLORS = ["#0f5fa6", "#d97706", "#11865b", "#7c3aed", "#c2416c", "#0e7490", "#6b7f18", "#64748b"];
   const categoryShareColor = (name) => { let hash = 0; for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) >>> 0; return CATEGORY_SHARE_COLORS[hash % CATEGORY_SHARE_COLORS.length]; };
