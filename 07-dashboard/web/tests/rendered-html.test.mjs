@@ -982,6 +982,14 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /class="compare-flagship-section"/);
   assert.match(html, /도별 대표작목 vs 실제 등록 상표 TOP5/);
   assert.match(html, /compare-flagship-match|compare-flagship-mismatch/);
+  // UI 검토(3차, 2026-09-06) S4: 9개 도 × 8개 열 넓은 표 대신, 도 스트립 + 선택된 도
+  // 상세를 기본 화면으로 삼고 전체 표는 details 토글 뒤로 옮겨야 함.
+  assert.match(html, /class="compare-province-strip"/, "도 선택 스트립이 있어야 함");
+  assert.match(html, /data-compare-province=/, "도 스트립 버튼이 있어야 함");
+  assert.match(html, /class="compare-province-detail"/, "선택된 도의 상세 패널이 있어야 함");
+  assert.match(html, /class="compare-full-tables-toggle"/, "9개 도 전체 표는 토글 뒤에 있어야 함");
+  assert.match(html, /9개 도 전체 표로 보기/);
+  assert.match(html, /compare-strip-match|compare-strip-mismatch/, "도 스트립에 일치\/불일치 표식이 있어야 함");
   assert.match(html, /데이터 개요/);
   assert.match(html, /수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다\./);
   assert.match(html, /고유 특산품명/);
