@@ -869,6 +869,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /function navParamsToSearch/);
   assert.match(html, /function applyNavToState/);
   assert.match(html, /params\.set\("tab", nav\.tab\)/);
+  // UI 검토(3차, 2026-09-06) N3: 지역별 화면의 연도 범위도 yearStart/yearEnd로 URL에
+  // 반영돼야 하고, 드래그 중 연속 변경은 pushState 스팸 없이 replaceState로 처리돼야 함.
+  assert.match(html, /params\.set\("yearStart", String\(nav\.yearStart\)\)/);
+  assert.match(html, /params\.set\("yearEnd", String\(nav\.yearEnd\)\)/);
+  assert.match(html, /const onlyYearChanged = Boolean\(/, "연도만 바뀐 변경은 replaceState로 처리하는 분기가 있어야 함");
   // 광역 단위 출원 비중 색상 고정 배정(차트마다 같은 지역 = 같은 색)
   assert.match(html, /const PROVINCE_COLORS = \{/);
   // 2026-08-21 사용자 재확인: 분모는 확인 완료분이 아니라 수집된 지역×특산품 전체다.

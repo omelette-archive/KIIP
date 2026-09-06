@@ -1984,9 +1984,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // React(Dashboard.tsx)의 NavParams와 같은 구조·필드명을 쓴다.
   const VALID_NAV_TABS = ["summary", "applications", "regions", "items", "strategy", "compare", "data"];
   const VALID_NAV_METRICS = ["trademarks", "registration", "coverage", "applicationCoverage"];
+  // UI 검토(3차, 2026-09-06) N3: 지역별 화면의 연도 범위(state.trendStartYear/trendEndYear)는
+  // 이 화면 안에 단일 인스턴스로 존재하는 공유 상태라 URL에 반영한다 — 요약·지역상세·
+  // 품목상세의 추이(summaryTrendStartYear 등)는 여러 인스턴스가 동시에 있을 수 있어 뺀다.
   function parseNavParams(params) {
     const tabParam = params.get("tab");
     const metricParam = params.get("metric");
+    const yearStartParam = Number(params.get("yearStart"));
+    const yearEndParam = Number(params.get("yearEnd"));
     return {
       tab: VALID_NAV_TABS.includes(tabParam) ? tabParam : "summary",
       region: params.get("region"),
@@ -1994,6 +1999,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       regionCode: params.get("regionCode") || "",
       item: params.get("item") || "",
       metric: VALID_NAV_METRICS.includes(metricParam) ? metricParam : "coverage",
+      yearStart: Number.isFinite(yearStartParam) && params.get("yearStart") ? yearStartParam : null,
+      yearEnd: Number.isFinite(yearEndParam) && params.get("yearEnd") ? yearEndParam : null,
     };
   }
   function currentNavParams() {
@@ -2004,6 +2011,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       regionCode: state.tab === "regions" ? state.regionKey : "",
       item: state.tab === "regions" ? state.itemId : state.tab === "items" ? state.selectedItemName : state.tab === "strategy" ? state.strategyItem : "",
       metric: state.tab === "summary" ? state.mapMetric : "coverage",
+      yearStart: state.tab === "applications" ? state.trendStartYear : null,
+      yearEnd: state.tab === "applications" ? state.trendEndYear : null,
     };
   }
   function navParamsToSearch(nav) {
@@ -2014,11 +2023,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     if (nav.regionCode) params.set("regionCode", nav.regionCode);
     if (nav.item) params.set("item", nav.item);
     if (nav.metric !== "coverage") params.set("metric", nav.metric);
+    if (nav.yearStart !== null && nav.yearStart !== undefined) params.set("yearStart", String(nav.yearStart));
+    if (nav.yearEnd !== null && nav.yearEnd !== undefined) params.set("yearEnd", String(nav.yearEnd));
     return `?${params.toString()}`;
   }
   function applyNavToState(nav) {
     state.tab = nav.tab;
-    if (nav.tab === "applications") { state.province = nav.region; state.municipality = nav.municipality; }
+    if (nav.tab === "applications") { state.province = nav.region; state.municipality = nav.municipality; state.trendStartYear = nav.yearStart ?? null; state.trendEndYear = nav.yearEnd ?? null; }
     else if (nav.tab === "regions") { if (nav.region) { state.selectedRegionProvince = nav.region; state.expandedRegionProvince = nav.region; } state.regionKey = nav.regionCode; state.itemId = nav.item; }
     else if (nav.tab === "items") state.selectedItemName = nav.item;
     else if (nav.tab === "strategy") state.strategyItem = nav.item;
@@ -2035,10 +2046,28 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const nav = currentNavParams();
     const search = navParamsToSearch(nav);
     if (!historyReady) { try { history.replaceState(nav, "", search); } catch (error) { /* noop */ } historyReady = true; return; }
-    if (search !== location.search) { try { history.pushState(nav, "", search); } catch (error) { /* noop */ } }
+    if (search === location.search) return;
+    // 연도 범위 슬라이더는 드래그 중 포인터 이동마다 render()가 다시 불려 값이 계속
+    // 바뀐다 — 그때마다 history 항목을 새로 쌓으면(pushState) 뒤로가기 한 번에 드래그
+    // 중간값 하나만 되돌아가는 상황이 된다. 연도 범위만 바뀐 경우는 현재 항목을
+    // 갱신(replaceState)하고, 탭·지역 등 실제 내비게이션은 그대로 pushState로 남긴다.
+    const prevNav = history.state;
+    const onlyYearChanged = Boolean(
+      prevNav &&
+      prevNav.tab === nav.tab &&
+      prevNav.region === nav.region &&
+      prevNav.municipality === nav.municipality &&
+      prevNav.regionCode === nav.regionCode &&
+      prevNav.item === nav.item &&
+      prevNav.metric === nav.metric
+    );
+    try {
+      if (onlyYearChanged) history.replaceState(nav, "", search);
+      else history.pushState(nav, "", search);
+    } catch (error) { /* noop */ }
   }
   window.addEventListener("popstate", (event) => {
-    applyNavToState(event.state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage" });
+    applyNavToState(event.state || { tab: "summary", region: null, municipality: null, regionCode: "", item: "", metric: "coverage", yearStart: null, yearEnd: null });
     render();
   });
   function render() {
