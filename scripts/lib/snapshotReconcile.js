@@ -50,6 +50,31 @@ function regionItemKey(region, item) {
   ].join(UNIT_SEP);
 }
 
+/** 고시명칭 레벨 특산품 identity(지역 무관). 07-dashboard/lib/snapshot.js의 canonicalItem과
+ * 같은 규칙(noticeName||itemName 소문자 + niceClass 앞 0 제거)이라 같은 specialtyId를 만든다.
+ * 여러 원물명이 한 고시명칭에 매핑되므로(파프리카·풋고추·꽈리고추 → "신선한 고추" 31),
+ * 한 지역에서 원물명이 파프리카→풋고추로 바뀌어도 특산품 자체는 유지된 것으로 본다. */
+function specialtyKey(item) {
+  const name = clean(item.noticeName) || clean(item.itemName);
+  if (!name) return null;
+  const niceClass = clean(item.niceClass).replace(/^0+(?=\d)/, "");
+  return `${name.toLowerCase()}${UNIT_SEP}${niceClass}`;
+}
+
+/** 지역 라벨 → 그 지역이 이미 담고 있는 고시명칭 특산품 키 집합. */
+function regionSpecialtyIndex(snapshot) {
+  const byRegion = new Map();
+  for (const region of snapshot.regions || []) {
+    const set = new Set();
+    for (const item of region.items || []) {
+      const key = specialtyKey(item);
+      if (key) set.add(key);
+    }
+    byRegion.set(clean(region.region), set);
+  }
+  return byRegion;
+}
+
 /** 품목명만(지역 무관) 정규화 집합 — "전국 → 특정 지역"으로 이동한 항목을 실종으로
  * 오판하지 않으려고 쓴다. */
 function itemNameSet(snapshot) {
@@ -187,6 +212,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
   // 2) 이전엔 있고 신규엔 없는 키: tombstone이 있으면 제거를 허용, 없으면 되살린다.
   const nextRegionByName = new Map((nextSnapshot.regions || []).map((region) => [clean(region.region), region]));
   const nextNames = itemNameSet(nextSnapshot);
+  const nextRegionSpecialties = regionSpecialtyIndex(nextSnapshot);
   const relocated = [];
   for (const [key, prev] of prevIndex) {
     if (nextIndex.has(key)) continue;
@@ -207,6 +233,13 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
     const prevName = normalizeItemName(prev.item.itemName || prev.item.noticeName);
     if (isNationwidePrev && nextNames.has(prevName)) {
       relocated.push({ key: keyToLabel(key), reason: "nationwide_catalog_now_regional" });
+      continue;
+    }
+    // 같은 지역에 같은 고시명칭 특산품이 다른 원물명으로 이미 있으면(파프리카→풋고추 등)
+    // 실종이 아니다 — 되살리면 같은 specialtyId가 한 지역에 둘이 돼 감사가 막힌다.
+    const prevSpecialty = specialtyKey(prev.item);
+    if (prevSpecialty && nextRegionSpecialties.get(clean(prev.region.region))?.has(prevSpecialty)) {
+      relocated.push({ key: keyToLabel(key), reason: "specialty_kept_under_different_item_name" });
       continue;
     }
     // 삭제로 보지 않는다 — 이전 항목을 되살려 last-known-good 유지(missing ≠ deletion).

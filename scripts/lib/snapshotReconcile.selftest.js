@@ -155,6 +155,28 @@ console.log("snapshotReconcile 자체 테스트");
   ok("전국 카탈로그 -> 특정 지역 이동은 실종이 아님");
 }
 
+// 7) 같은 지역·같은 고시명칭인데 원물명만 바뀌면(파프리카 -> 풋고추, 둘 다 "신선한 고추" 31)
+//    실종이 아님 — 되살리면 같은 specialtyId가 한 지역에 둘이 돼 감사가 막힌다.
+{
+  const paprika = { ...item("파프리카", { niceClass: "31", unique: 5 }), noticeName: "신선한 고추" };
+  const putgochu = { ...item("풋고추", { niceClass: "31", unique: 8 }), noticeName: "신선한 고추" };
+  const previous = snapshot("prev", [
+    { region: "경상남도 고성군", sido: "경상남도", sigungu: "고성군", items: [paprika] },
+  ]);
+  const next = snapshot("next", [
+    { region: "경상남도 고성군", sido: "경상남도", sigungu: "고성군", items: [putgochu] },
+  ]);
+  const { report } = reconcilePublicSnapshot(next, previous, [], { massRevivalLimit: 50 });
+  assert.strictEqual(report.counts.revivedLastKnownGood, 0, "고시명칭이 유지되면 원물명 변경은 실종이 아님");
+  // 다른 지역에서 그 고시명칭이 없으면 정상적으로 되살린다(회귀 방지)
+  const next2 = snapshot("next2", [
+    { region: "경상북도 문경시", sido: "경상북도", sigungu: "문경시", items: [item("사과", { niceClass: "31", unique: 3 })] },
+  ]);
+  const { report: r2 } = reconcilePublicSnapshot(next2, previous, [], { massRevivalLimit: 50 });
+  assert.strictEqual(r2.counts.revivedLastKnownGood, 1, "그 지역에 해당 고시명칭이 아예 없으면 되살린다");
+  ok("같은 지역·같은 고시명칭의 원물명 변경은 실종이 아님");
+}
+
 // unionYearCounts 단위
 assert.deepStrictEqual(unionYearCounts({ "2020": 5, "2021": 3 }, { "2021": 7, "2022": 1 }), { "2020": 5, "2021": 7, "2022": 1 });
 assert.strictEqual(regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣(청정)" }), regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣" }));
