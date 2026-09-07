@@ -249,12 +249,22 @@ function trendYearAtPointer(clientX: number, track: HTMLElement, fullStart: numb
 // 이슈 #136(2026-09-07): 추이 그래프가 1954년부터 시작해 최근 데이터가 오른쪽 끝에 몰려
 // 보기 어렵다는 피드백. 슬라이더가 있는(adjustable) 그래프는 명시 선택이 없으면 최근 20년을
 // 기본 구간으로 열고, 슬라이더로 전체까지 넓힐 수 있게 한다.
-const DEFAULT_TREND_SPAN_YEARS = 20;
-function defaultTrendStart(fullStart: number, fullEnd: number) {
-  return Math.max(fullStart, fullEnd - (DEFAULT_TREND_SPAN_YEARS - 1));
+// 이슈 #136(2026-09-07): 상표 데이터가 1954년까지 거슬러 올라가지만 2000년 이전은
+// 표본이 희박해 그래프 왼쪽이 대부분 바닥에 붙어 최근 추세를 읽기 어렵다는 지적이
+// 반복됐다. 추이 그래프의 표시 범위(슬라이더 하한 포함)를 2000년으로 고정하고,
+// 기본 구간도 2000년~최근 전체를 연다(협업자 2026-09-07 "그냥 2000년 이후만").
+const TREND_FLOOR_YEAR = 2000;
+function flooredTrendStart(sortedYears: number[]): number {
+  if (sortedYears.length === 0) return TREND_FLOOR_YEAR;
+  const dataStart = sortedYears[0];
+  const dataEnd = sortedYears[sortedYears.length - 1];
+  return dataEnd >= TREND_FLOOR_YEAR ? Math.max(TREND_FLOOR_YEAR, dataStart) : dataStart;
+}
+function defaultTrendStart(fullStart: number) {
+  return fullStart;
 }
 function clampTrendRange(startYear: number | null, endYear: number | null, fullStart: number, fullEnd: number, recentDefault = false) {
-  const fallbackStart = recentDefault ? defaultTrendStart(fullStart, fullEnd) : fullStart;
+  const fallbackStart = recentDefault ? defaultTrendStart(fullStart) : fullStart;
   const start = Math.max(fullStart, Math.min(startYear ?? fallbackStart, fullEnd));
   const end = Math.max(start, Math.min(endYear ?? fullEnd, fullEnd));
   return { start, end };
@@ -409,7 +419,7 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
   const [selectedStart, setSelectedStart] = useState<number | null>(null);
   const [selectedEnd, setSelectedEnd] = useState<number | null>(null);
   if (allYears.length === 0) return <section className={wrapClass}><div className="section-heading"><div><h2>{heading}</h2></div><span>{displayName}</span></div><p className="empty">{emptyLabel}</p></section>;
-  const fullStart = allYears[0];
+  const fullStart = flooredTrendStart(allYears);
   const fullEnd = allYears[allYears.length - 1];
   const { start, end } = clampTrendRange(adjustable ? selectedStart : null, adjustable ? selectedEnd : null, fullStart, fullEnd, adjustable);
   const years: number[] = [];
@@ -420,7 +430,7 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
   // 면적)으로 삼고, 원자료는 옅게 남긴다. 이동평균은 전체 연도 범위(fullStart~fullEnd)의
   // 연속 캘린더 연도로 계산해, 보기 범위를 좁혀도 그 이전 실제 이력을 반영한다.
   const fullYearsContiguous: number[] = [];
-  for (let year = fullStart; year <= fullEnd; year++) fullYearsContiguous.push(year);
+  for (let year = allYears[0]; year <= fullEnd; year++) fullYearsContiguous.push(year);
   const applicationMA = movingAverageSeries(applicationTotals, fullYearsContiguous, TREND_MOVING_AVERAGE_WINDOW);
   const registrationMA = movingAverageSeries(registrationTotals, fullYearsContiguous, TREND_MOVING_AVERAGE_WINDOW);
   const mostRecentYear = years[years.length - 1];
@@ -1261,7 +1271,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const trendApplicationTotals = sumYearCounts(trendItems, "applicationYearCounts");
   const trendRegisteredTotals = sumYearCounts(trendItems, "registrationYearCounts");
   const trendAllYears = [...new Set([...Object.keys(trendApplicationTotals), ...Object.keys(trendRegisteredTotals)])].map(Number).sort((a, b) => a - b);
-  const trendFullStart = trendAllYears[0] ?? new Date().getFullYear();
+  const trendFullStart = trendAllYears.length ? flooredTrendStart(trendAllYears) : new Date().getFullYear();
   const trendFullEnd = trendAllYears[trendAllYears.length - 1] ?? new Date().getFullYear();
   // 지역을 바꾸면 이전 지역의 시작 연도가 새 지역 범위보다 앞설 수 있다. 양 끝을 현재
   // 데이터 범위에 모두 고정해 핸들이 트랙 바깥(음수 %)으로 사라지지 않게 한다(#136).
