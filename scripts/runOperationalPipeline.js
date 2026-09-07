@@ -249,6 +249,13 @@ function buildPlan(options = {}) {
       []
     ),
     nodeStage(
+      "00c_archive_check",
+      "원자료 archive(검색 체크포인트·수집 SQLite)가 직전 성공 실행 이후 사유 없이 줄지 않았는지 확인",
+      "scripts/verifyArchiveIntegrity.js",
+      ["--state-dir", stateDir, "--phase", "before"],
+      []
+    ),
+    nodeStage(
       "01_collect",
       "특산품 수집과 누적 SQLite 갱신(GI·농사로·세종·제주·서귀포 + NFQS·KOFPI·RDA 보완)",
       "01-collect-specialties/collectSpecialties.js",
@@ -452,6 +459,13 @@ function buildPlan(options = {}) {
         files.reconcileReport,
       ],
       [files.snapshot, files.reconcileReport]
+    ),
+    nodeStage(
+      "07e_archive_check",
+      "이번 실행 뒤 archive 지표를 재확인하고 통과 시 high-water mark를 갱신",
+      "scripts/verifyArchiveIntegrity.js",
+      ["--state-dir", stateDir, "--phase", "after", "--update"],
+      []
     ),
     nodeStage(
       "validate",

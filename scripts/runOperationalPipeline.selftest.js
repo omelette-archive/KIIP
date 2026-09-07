@@ -30,6 +30,7 @@ try {
   assert.deepStrictEqual(plan.stages.map((stage) => stage.id), [
     "00_preflight",
     "00_cleanup_outputs",
+    "00c_archive_check",
     "01_collect",
     "02_normalize",
     "01b_area_brands",
@@ -44,9 +45,18 @@ try {
     "07b_supplemental_attach",
     "07c_nationwide_flow",
     "07d_reconcile",
+    "07e_archive_check",
     "validate",
     "render_candidate",
   ]);
+  // #137: archive 무결성 스테이지 — 수집 앞(before)·reconcile 뒤(after, high-water 갱신)
+  const beforeCheck = plan.stages.find((s) => s.id === "00c_archive_check");
+  assert.ok(beforeCheck.args.includes("--phase") && beforeCheck.args.includes("before"));
+  assert.ok(plan.stages.findIndex((s) => s.id === "00c_archive_check") < plan.stages.findIndex((s) => s.id === "01_collect"));
+  const afterCheck = plan.stages.find((s) => s.id === "07e_archive_check");
+  assert.ok(afterCheck.args.includes("after") && afterCheck.args.includes("--update"));
+  assert.ok(plan.stages.findIndex((s) => s.id === "07d_reconcile") < plan.stages.findIndex((s) => s.id === "07e_archive_check"));
+  assert.ok(plan.stages.findIndex((s) => s.id === "07e_archive_check") < plan.stages.findIndex((s) => s.id === "validate"));
   // #70: ① 수집은 소스를 명시 고정한다(collectSpecialties 기본값 변동과 무관하게 결정론적)
   const collectStage = plan.stages.find((stage) => stage.id === "01_collect");
   assert.ok(collectStage.args.includes("--sources"));
@@ -150,12 +160,12 @@ try {
   });
   assert.strictEqual(result.ok, false);
   assert.strictEqual(result.failedStage, "02_normalize");
-  assert.deepStrictEqual(invoked, ["00_preflight", "00_cleanup_outputs", "01_collect", "02_normalize"]);
+  assert.deepStrictEqual(invoked, ["00_preflight", "00_cleanup_outputs", "00c_archive_check", "01_collect", "02_normalize"]);
   assert.strictEqual(result.manifest.status, "failed");
   assert.strictEqual(result.manifest.stages[0].status, "succeeded");
-  assert.strictEqual(result.manifest.stages[2].status, "succeeded");
-  assert.strictEqual(result.manifest.stages[3].status, "failed");
-  assert.strictEqual(result.manifest.stages[4].status, "pending");
+  assert.strictEqual(result.manifest.stages[3].status, "succeeded");
+  assert.strictEqual(result.manifest.stages[4].status, "failed");
+  assert.strictEqual(result.manifest.stages[5].status, "pending");
   assert.strictEqual(fs.existsSync(plan.files.dashboardCandidate), false);
   assert.strictEqual(JSON.parse(fs.readFileSync(plan.files.manifest, "utf8")).status, "failed");
 

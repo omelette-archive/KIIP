@@ -139,6 +139,15 @@ node 03-match-trademarks/matchTrademarks.js \
 다시 수집해 신규 출원을 반영한다 — 새 결과에 없는 예전 hit도 합집합으로 보존한다(정렬 순서가
 바뀌어도 안전).
 
+운영 파이프라인은 여기서 한 걸음 더 나아가 archive 축소 자체를 막는다.
+`scripts/verifyArchiveIntegrity.js`가 `<state-dir>/archive-highwater.json`에 지금까지
+관측한 최대치(수집 SQLite 원본레코드 수, 검색 체크포인트 쿼리 수·complete 수)를 남기고,
+매 실행마다 `00c_archive_check`(수집 앞)·`07e_archive_check`(reconcile 뒤) 스테이지가
+현재값이 그보다 사유 없이 줄었는지 확인해 줄었으면 **exit 2로 파이프라인을 멈춘다**.
+의도된 제거는 `01-collect-specialties/data/source-record-tombstones.json`에 사유를 남기면
+그 수만큼 감소가 허용된다. `--refresh-complete-after-days`로 소수의 complete가 partial로
+바뀌는 것은 허용 폭(기본 25) 안에서 통과한다.
+
 주요 옵션은 `--numOfRows`, `--concurrency`, `--max-requests`, `--max-pages`,
 `--max-hits-per-query`, `--checkpoint`, `--resume`, `--overwrite-checkpoint`,
 `--refresh-complete-after-days`, `--dry-run`, `--area-brands`,

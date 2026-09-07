@@ -1,0 +1,5 @@
+{
+  "schemaVersion": "source-record-tombstones-v1",
+  "note": "수집 SQLite(archive)에서 원본 소스레코드를 제거해도 되는 명시적 사유(권리 소멸·공식 삭제·확인된 정책 변경). scripts/verifyArchiveIntegrity.js가 archive 축소를 막을 때, 여기 든 항목 수만큼의 감소는 사유 있는 것으로 보고 허용한다. 키는 `${sourceId}\\u001f${sourceRecordKey}`. 지역×품목(파생 뷰) 단위 제거는 04-analyze-brand/data/specialty-tombstones.json에 따로 있다.",
+  "tombstones": []
+}
