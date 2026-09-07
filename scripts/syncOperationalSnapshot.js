@@ -10,6 +10,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { writeFileAtomic } = require("./lib/atomicWrite");
 
 function parseArgs(argv) {
   const args = {};
@@ -56,10 +57,7 @@ function main() {
     throw new Error("운영 게시 승격은 mode=full 스냅샷만 허용합니다.");
   }
 
-  fs.mkdirSync(path.dirname(targetPath), { recursive: true });
-  const temporary = `${targetPath}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
-  fs.renameSync(temporary, targetPath);
+  writeFileAtomic(targetPath, `${JSON.stringify(snapshot, null, 2)}\n`);
   console.error(`[syncOperationalSnapshot] ${snapshot.snapshotId} -> ${targetPath}`);
 }
 

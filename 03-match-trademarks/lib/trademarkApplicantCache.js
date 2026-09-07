@@ -1,8 +1,8 @@
 "use strict";
 
 const fs = require("fs");
-const path = require("path");
 const { CONTRACT_VERSION } = require("./trademarkApplicantClient");
+const { writeFileAtomic } = require("../../scripts/lib/atomicWrite");
 
 const CACHE_SCHEMA_VERSION = "trademark-applicant-region-cache-v1";
 
@@ -33,10 +33,7 @@ function saveCache(filePath, entries, updatedAt = new Date().toISOString()) {
       "출원인 이름·특허고객번호·전체 상세주소는 저장하지 않고 시도·시군구와 조회 종료 상태만 보존",
     entries: Object.fromEntries([...entries.entries()].sort(([a], [b]) => a.localeCompare(b))),
   };
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(document, null, 2) + "\n", "utf8");
-  fs.renameSync(tempPath, filePath);
+  writeFileAtomic(filePath, JSON.stringify(document, null, 2) + "\n");
 }
 
 module.exports = { CACHE_SCHEMA_VERSION, loadCache, saveCache };

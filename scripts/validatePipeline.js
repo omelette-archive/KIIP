@@ -303,6 +303,7 @@ function main() {
   runNode("공개 스냅샷 reconcile 자체 테스트", ["scripts/lib/snapshotReconcile.selftest.js"]);
   runNode("보완 스코프 정규화 자체 테스트", ["scripts/lib/supplementalScopes.selftest.js"]);
   runNode("archive 무결성 자체 테스트", ["scripts/verifyArchiveIntegrity.selftest.js"]);
+  runNode("원자적 파일 쓰기 자체 테스트", ["scripts/lib/atomicWrite.selftest.js"]);
   runNode("GitHub Pages 산출물 허브 생성", ["scripts/testArtifactSite.js"]);
   for (const phase of ["01", "02", "03", "04", "05", "06", "07"]) {
     const directory = fs

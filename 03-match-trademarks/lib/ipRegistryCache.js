@@ -1,8 +1,8 @@
 "use strict";
 
 const fs = require("fs");
-const path = require("path");
 const { IP_REGISTRY_SOURCE_METADATA } = require("./ipRegistryClient");
+const { writeFileAtomic } = require("../../scripts/lib/atomicWrite");
 
 const CACHE_SCHEMA_VERSION = "ip-registry-cache-v1";
 
@@ -43,10 +43,7 @@ function saveCache(filePath, entries, updatedAt = new Date().toISOString()) {
       "전체 도로명·상세주소는 저장하지 않고 행정구역 시도·시군구와 지정상품만 보존",
     entries: sortedEntries,
   };
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(document, null, 2) + "\n", "utf8");
-  fs.renameSync(tempPath, filePath);
+  writeFileAtomic(filePath, JSON.stringify(document, null, 2) + "\n");
 }
 
 module.exports = {

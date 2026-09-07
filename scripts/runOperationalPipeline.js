@@ -9,6 +9,7 @@
 const fs = require("fs");
 const path = require("path");
 const { spawnSync } = require("child_process");
+const { writeFileAtomic } = require("./lib/atomicWrite");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OPERATION_ROOT = path.join(ROOT, ".kiip-operations");
@@ -563,10 +564,7 @@ function publicPlan(plan) {
 }
 
 function writeManifest(filePath, manifest) {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const temporary = `${filePath}.tmp`;
-  fs.writeFileSync(temporary, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
-  fs.renameSync(temporary, filePath);
+  writeFileAtomic(filePath, `${JSON.stringify(manifest, null, 2)}\n`);
 }
 
 function runStageCommand(stage) {

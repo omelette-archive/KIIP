@@ -1,7 +1,7 @@
 "use strict";
 
 const fs = require("fs");
-const path = require("path");
+const { writeFileAtomic } = require("../../scripts/lib/atomicWrite");
 
 // 제공기관의 실제 계정 상한·초기화 시각은 확정되지 않았다(#52).
 // 이 모듈은 프로젝트의 보수적 운영 기준으로 KST 달력일 단위 예산을 관리한다.
@@ -45,10 +45,7 @@ function loadBudgetState(filePath, now = new Date()) {
 
 function saveBudgetState(filePath, state) {
   if (!filePath) return;
-  fs.mkdirSync(path.dirname(filePath), { recursive: true });
-  const tempPath = `${filePath}.tmp`;
-  fs.writeFileSync(tempPath, JSON.stringify(state, null, 2) + "\n", "utf8");
-  fs.renameSync(tempPath, filePath);
+  writeFileAtomic(filePath, JSON.stringify(state, null, 2) + "\n");
 }
 
 function isResumeBlocked(state, now = new Date()) {
