@@ -229,6 +229,9 @@ async function run() {
       { item: "돼지고기", niceClass: "29", similarGroupCode: "G0701" },
       { item: "쌀", niceClass: "30", similarGroupCode: "G020101" },
       { item: "신선한 시금치", niceClass: "31", similarGroupCode: "G0202" },
+      { item: "신선한 대두", niceClass: "31", similarGroupCode: "G020101" },
+      { item: "보존처리한 대추", niceClass: "29", similarGroupCode: "G0204" },
+      { item: "녹차", niceClass: "30", similarGroupCode: "G0501" },
     ]);
     const expected = new Map([
       ["파프리카", "신선한 고추"],
@@ -252,6 +255,10 @@ async function run() {
       ["녹돈", "돼지고기"],
       ["고성오대미", "쌀"],
       ["섬초", "신선한 시금치"],
+      ["콩", "신선한 대두"],
+      ["장류콩", "신선한 대두"],
+      ["대추", "보존처리한 대추"],
+      ["차·커피", "녹차"],
     ]);
     for (const [rawItemName, noticeName] of expected) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
@@ -262,7 +269,7 @@ async function run() {
       assert.strictEqual(result.confidence, "1.0000", rawItemName);
       assert.strictEqual(result.verdictSource, "human_approved_alias", rawItemName);
     }
-    for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대추", "대봉감", "칡소", "한라봉", "천혜향", "대파", "우엉"]) {
+    for (const rawItemName of ["단감", "잡곡", "오미자", "매실", "대봉감", "칡소", "한라봉", "천혜향", "대파", "우엉"]) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);
       assert.strictEqual(result.status, "review_required", `${rawItemName}은 미승인 상태여야 함`);
     }
