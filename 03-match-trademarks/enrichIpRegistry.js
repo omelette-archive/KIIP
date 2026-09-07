@@ -122,6 +122,13 @@ function main() {
   }
   let completedThisRun = 0;
   let nextBudgetState = { ...budgetState };
+  // 예산 상태는 매 요청마다 디스크에 쓰면(수천 요청 × 동기 write+rename, Windows는 백신
+  // 스캔까지) 이벤트 루프가 막혀 03c가 사실상 정지한다(2026-09-08, 4000요청에 14시간).
+  // 인메모리 callsUsed는 매번 정확히 올리되, 디스크 반영은 N건마다 + 종료 시 1회로 묶는다.
+  // 프로세스가 중간에 죽어 최대 N건의 예산 회계가 유실돼도, 해당 등록번호는 이미 캐시에
+  // 저장돼 재조회되지 않으므로 낭비는 무시할 수준이다(일일 예산은 넉넉함).
+  const BUDGET_SAVE_EVERY = 25;
+  let requestsSinceBudgetSave = 0;
   const client = effectiveLimit === 0
     ? { getMarkHistory: async () => { throw new Error("cache-only 실행에서 API가 호출됐습니다."); } }
     : createClient();
@@ -130,10 +137,11 @@ function main() {
     concurrency,
     cacheEntries,
     onRequest: () => {
-      // API 호출을 시작하기 전에 예약량을 저장한다. 프로세스가 중간 종료돼도
-      // 이미 사용한 호출이 다음 실행에서 다시 배정되지 않는다.
       nextBudgetState = { ...nextBudgetState, callsUsed: nextBudgetState.callsUsed + 1 };
-      saveBudgetState(budgetStatePath, nextBudgetState);
+      if (++requestsSinceBudgetSave >= BUDGET_SAVE_EVERY) {
+        requestsSinceBudgetSave = 0;
+        saveBudgetState(budgetStatePath, nextBudgetState);
+      }
     },
     onRateLimit: (_error, detectedAt = new Date(), kind = "daily") => {
       nextBudgetState = recordRateLimit(nextBudgetState, detectedAt, kind);

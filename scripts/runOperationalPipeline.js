@@ -341,8 +341,10 @@ function buildPlan(options = {}) {
         String(options.ipRegistryLimit ?? 3000),
         "--concurrency",
         "2",
+        // 캐시(수십MB) 저장은 동기 write+rename이라 이벤트 루프를 막는다. 너무 잦으면
+        // 03c가 느려진다(2026-09-08) — 크래시 복원력과 절충해 250건마다 저장한다.
         "--checkpoint-every",
-        "50",
+        "250",
       ],
       [files.registryEnriched, state.ipRegistryCache, state.ipRegistryBudget]
     ),
