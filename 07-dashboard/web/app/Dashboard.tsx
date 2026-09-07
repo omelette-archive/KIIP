@@ -315,11 +315,30 @@ function ProvinceShareDonut({ counts, label }: { counts: Record<string, number>;
   </div>;
 }
 
-const CATEGORY_SHARE_COLORS = ["#0f5fa6", "#d97706", "#11865b", "#7c3aed", "#c2416c", "#0e7490", "#6b7f18", "#64748b"];
+// 12개 카테고리(02-normalize-items/data/item-categories-v1.json)마다 고정 색을 배정한다.
+// 해시로 색을 고르던 방식은 충돌이 잦아 한 지역에서 여러 유형이 같은 파란색으로 나왔다
+// (2026-09-07 피드백). 색상은 서로 다른 색상환 위치를 쓰되 명도·채도는 비슷하게 맞춘다.
+const CATEGORY_SHARE_COLOR_BY_LABEL: Record<string, string> = {
+  "곡물": "#caa02c",
+  "채소": "#4a9d4e",
+  "과일": "#e0533b",
+  "특용작물": "#8b5cf6",
+  "임산물": "#127a68",
+  "축산물": "#9c4a1e",
+  "수산물": "#2f6fe0",
+  "가공식품": "#d63384",
+  "주류": "#0f9bd0",
+  "화훼": "#d02fb8",
+  "공예품": "#5b7186",
+  "기타": "#94a3b8",
+};
+const CATEGORY_SHARE_FALLBACK = ["#caa02c", "#4a9d4e", "#e0533b", "#8b5cf6", "#127a68", "#9c4a1e", "#2f6fe0", "#d63384", "#0f9bd0", "#d02fb8", "#5b7186", "#94a3b8"];
 function categoryShareColor(name: string) {
+  if (CATEGORY_SHARE_COLOR_BY_LABEL[name]) return CATEGORY_SHARE_COLOR_BY_LABEL[name];
+  if (name === "기타 유형") return CATEGORY_SHARE_COLOR_BY_LABEL["기타"];
   let hash = 0;
   for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) >>> 0;
-  return CATEGORY_SHARE_COLORS[hash % CATEGORY_SHARE_COLORS.length];
+  return CATEGORY_SHARE_FALLBACK[hash % CATEGORY_SHARE_FALLBACK.length];
 }
 function categoryShareSegments(items: Item[], field: "uniqueTrademarkCount" | "registeredTrademarkCount") {
   const counts: Record<string, number> = {};

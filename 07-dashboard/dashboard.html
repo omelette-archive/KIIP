@@ -1255,8 +1255,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const summary = esc(segments.map((segment) => `${displayRegionName(segment.name)} ${percent(segment.pct)}`).join(", "));
     return `<div class="item-share-bar-wrap"><div class="item-share-bar" role="img" aria-label="${esc(label)} 광역 단위 출원 비중: ${summary}">${bar}</div><ul class="item-share-bar-legend">${legend}</ul></div>`;
   }
-  const CATEGORY_SHARE_COLORS = ["#0f5fa6", "#d97706", "#11865b", "#7c3aed", "#c2416c", "#0e7490", "#6b7f18", "#64748b"];
-  const categoryShareColor = (name) => { let hash = 0; for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) >>> 0; return CATEGORY_SHARE_COLORS[hash % CATEGORY_SHARE_COLORS.length]; };
+  // 12개 카테고리마다 고정 색(2026-09-07 피드백: 해시 색 배정은 충돌이 잦아 한 지역에서
+  // 여러 유형이 같은 파란색으로 나왔다). Dashboard.tsx CATEGORY_SHARE_COLOR_BY_LABEL과 동일.
+  const CATEGORY_SHARE_COLOR_BY_LABEL = { "곡물": "#caa02c", "채소": "#4a9d4e", "과일": "#e0533b", "특용작물": "#8b5cf6", "임산물": "#127a68", "축산물": "#9c4a1e", "수산물": "#2f6fe0", "가공식품": "#d63384", "주류": "#0f9bd0", "화훼": "#d02fb8", "공예품": "#5b7186", "기타": "#94a3b8" };
+  const CATEGORY_SHARE_FALLBACK = ["#caa02c", "#4a9d4e", "#e0533b", "#8b5cf6", "#127a68", "#9c4a1e", "#2f6fe0", "#d63384", "#0f9bd0", "#d02fb8", "#5b7186", "#94a3b8"];
+  const categoryShareColor = (name) => { if (CATEGORY_SHARE_COLOR_BY_LABEL[name]) return CATEGORY_SHARE_COLOR_BY_LABEL[name]; if (name === "기타 유형") return CATEGORY_SHARE_COLOR_BY_LABEL["기타"]; let hash = 0; for (let index = 0; index < name.length; index++) hash = (hash * 31 + name.charCodeAt(index)) >>> 0; return CATEGORY_SHARE_FALLBACK[hash % CATEGORY_SHARE_FALLBACK.length]; };
   function categoryShareDonutHtml(items, field, label) {
     const counts = {};
     items.forEach((item) => { const metric = item.metrics[field]; if (metric.availability !== "available" || !metric.value) return; const category = item.category?.label || "기타"; counts[category] = (counts[category] || 0) + metric.value; });
