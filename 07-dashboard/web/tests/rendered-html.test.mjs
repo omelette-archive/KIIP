@@ -746,8 +746,11 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   assert.match(standaloneHtml, /id="summary-trend-start-input"/);
   assert.match(standaloneHtml, /id="summary-trend-range-handle-start"/);
   assert.match(standaloneHtml, /adjustable: true/);
-  assert.match(standaloneHtml, /const clampTrendRange = \(startYear, endYear, fullStart, fullEnd\) => \{/);
-  assert.match(standaloneHtml, /Math\.max\(fullStart, Math\.min\(startYear \?\? fullStart, fullEnd\)\)/);
+  assert.match(standaloneHtml, /const clampTrendRange = \(startYear, endYear, fullStart, fullEnd, \{ recentDefault = false \} = \{\}\) => \{/);
+  // #136(2026-09-07): 슬라이더 있는 추이 그래프는 기본 구간을 최근 20년으로 연다(전체는 슬라이더로 확장).
+  assert.match(standaloneHtml, /const fallbackStart = recentDefault \? defaultTrendStart\(fullStart, fullEnd\) : fullStart;/);
+  assert.match(standaloneHtml, /Math\.max\(fullStart, Math\.min\(startYear \?\? fallbackStart, fullEnd\)\)/);
+  assert.match(standaloneHtml, /recentDefault: options\.adjustable/);
   // 2026-09-02(#116): 지도를 맨 위 전체 폭으로 크게 두고, 그 아래에 광역 구성·추이·요약을
   // 한 행으로 배치한다. 추이 그래프는 소스 순서상 지도 카드보다 먼저 나온다(DOM 순서 유지).
   assert.ok(

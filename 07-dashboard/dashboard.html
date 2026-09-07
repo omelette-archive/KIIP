@@ -1158,8 +1158,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     if (fullEnd <= fullStart) return 0;
     return ((year - fullStart) / (fullEnd - fullStart)) * 100;
   };
-  const clampTrendRange = (startYear, endYear, fullStart, fullEnd) => {
-    const start = Math.max(fullStart, Math.min(startYear ?? fullStart, fullEnd));
+  // 이슈 #136(2026-09-07): 추이 그래프가 1954년부터 시작해 최근 데이터가 오른쪽 끝에
+  // 몰려 보기 어렵다는 피드백. 슬라이더가 있는(adjustable) 그래프는 명시 선택이 없으면
+  // 최근 20년을 기본 구간으로 열고, 슬라이더로 전체 구간까지 넓힐 수 있게 한다.
+  const DEFAULT_TREND_SPAN_YEARS = 20;
+  const defaultTrendStart = (fullStart, fullEnd) => Math.max(fullStart, fullEnd - (DEFAULT_TREND_SPAN_YEARS - 1));
+  const clampTrendRange = (startYear, endYear, fullStart, fullEnd, { recentDefault = false } = {}) => {
+    const fallbackStart = recentDefault ? defaultTrendStart(fullStart, fullEnd) : fullStart;
+    const start = Math.max(fullStart, Math.min(startYear ?? fallbackStart, fullEnd));
     const end = Math.max(start, Math.min(endYear ?? fullEnd, fullEnd));
     return { start, end };
   };
@@ -1180,7 +1186,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const allYears = [...new Set([...Object.keys(applicationTotals), ...Object.keys(registrationTotals)])].map(Number).sort((a, b) => a - b);
     if (!allYears.length) return `<section class="${wrapClass}"><div class="section-heading"><div><h2>${esc(heading)}</h2></div><span>${esc(displayName)}</span></div><p class="empty">${esc(emptyLabel)}</p></section>`;
     const fullStart = allYears[0], fullEnd = allYears[allYears.length - 1];
-    const range = clampTrendRange(options.adjustable ? state.summaryTrendStartYear : null, options.adjustable ? state.summaryTrendEndYear : null, fullStart, fullEnd);
+    const range = clampTrendRange(options.adjustable ? state.summaryTrendStartYear : null, options.adjustable ? state.summaryTrendEndYear : null, fullStart, fullEnd, { recentDefault: options.adjustable });
     const start = range.start, end = range.end;
     const years = [];
     for (let year = start; year <= end; year++) years.push(year);
@@ -1711,7 +1717,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const trendFullStart = trendAllYears[0] ?? new Date().getFullYear();
     const trendFullEnd = trendAllYears[trendAllYears.length - 1] ?? new Date().getFullYear();
     // 다른 시도로 이동해도 이전 기간 값이 트랙 밖으로 벗어나지 않도록 현재 데이터 범위에 고정한다.
-    const { start: trendStart, end: trendEnd } = clampTrendRange(state.trendStartYear, state.trendEndYear, trendFullStart, trendFullEnd);
+    const { start: trendStart, end: trendEnd } = clampTrendRange(state.trendStartYear, state.trendEndYear, trendFullStart, trendFullEnd, { recentDefault: true });
     const trendYears = [];
     for (let year = trendStart; year <= trendEnd; year++) trendYears.push(year);
     const trendMax = Math.max(1, ...trendYears.map((year) => Math.max(trendApplicationTotals[year] || 0, trendRegisteredTotals[year] || 0)));
@@ -1783,7 +1789,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const applications = available.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0);
     const registrations = available.reduce((sum, item) => sum + (item.metrics.registeredTrademarkCount.value || 0), 0);
     const municipalityHtml = municipalities.length ? municipalities.map((region) => { const rowCoverage = specialtyCoverage([region]); return `<button type="button" data-region="${esc(regionKey(region))}"><strong>${esc(region.sigungu)}</strong><small>특산품 ${rowCoverage.total}개 · 출원 확인 ${rowCoverage.applied}개</small></button>`; }).join("") : '<p class="empty">시군구 단위로 구분된 원본 자료가 없습니다.</p>';
-    return `<div class="detail-panel province-detail"><div class="detail-heading"><div><p class="eyebrow">광역 기본 보기</p><h2>${esc(displayRegionName(province))}</h2><p>광역 전체와 시군구 ${municipalities.length}곳의 특산품·상표 현황 합계</p></div><span class="state">광역 집계</span></div>${trendSizeControlHtml}<div class="province-detail-cols">${regionTrendHtml({ region: province, items })}<div class="detail-grid province-summary-grid"><article><span>전체 수집 특산품</span><strong>${number(coverage.total)}개</strong><small>광역·시군구 지역×품목 합계</small></article><article><span>출원 확인 특산품</span><strong>${number(coverage.applied)}개</strong><small>전체 특산품 출원율 ${percent(coverage.rate)}</small></article><article><span>지역 주소 일치 출원</span><strong>${number(applications)}건</strong><small>등록 완료 ${number(registrations)}건</small></article></div></div><section class="province-category-shares"><div class="section-heading"><div><h2>특산품 유형별 출원·등록 비중</h2></div><span>광역 전체 · 지역 주소 일치 기준</span></div><div class="province-category-share-grid"><article><h3>출원 비중</h3>${categoryShareDonutHtml(items, "uniqueTrademarkCount", "출원")}</article><article><h3>등록 비중</h3>${categoryShareDonutHtml(items, "registeredTrademarkCount", "등록")}</article></div></section><details class="province-municipalities"><summary><span>세부 시군구 보기</span><small>${municipalities.length}곳 · 클릭하면 품목별 상세로 전환</small></summary><div>${municipalityHtml}</div></details></div>`;
+    return `<div class="detail-panel province-detail"><div class="detail-heading"><div><p class="eyebrow">광역 기본 보기</p><h2>${esc(displayRegionName(province))}</h2><p>광역 전체와 시군구 ${municipalities.length}곳의 특산품·상표 현황 합계</p></div><span class="state">광역 집계</span></div>${trendSizeControlHtml}<div class="province-detail-cols">${regionTrendHtml({ region: province, items }, "연도별 출원·등록 추이", undefined, { adjustable: true })}<div class="detail-grid province-summary-grid"><article><span>전체 수집 특산품</span><strong>${number(coverage.total)}개</strong><small>광역·시군구 지역×품목 합계</small></article><article><span>출원 확인 특산품</span><strong>${number(coverage.applied)}개</strong><small>전체 특산품 출원율 ${percent(coverage.rate)}</small></article><article><span>지역 주소 일치 출원</span><strong>${number(applications)}건</strong><small>등록 완료 ${number(registrations)}건</small></article></div></div><section class="province-category-shares"><div class="section-heading"><div><h2>특산품 유형별 출원·등록 비중</h2></div><span>광역 전체 · 지역 주소 일치 기준</span></div><div class="province-category-share-grid"><article><h3>출원 비중</h3>${categoryShareDonutHtml(items, "uniqueTrademarkCount", "출원")}</article><article><h3>등록 비중</h3>${categoryShareDonutHtml(items, "registeredTrademarkCount", "등록")}</article></div></section><details class="province-municipalities"><summary><span>세부 시군구 보기</span><small>${municipalities.length}곳 · 클릭하면 품목별 상세로 전환</small></summary><div>${municipalityHtml}</div></details></div>`;
   }
   function regionDetail(region, item) {
     // 이슈 #136 코멘트(2026-09-03) 09번: region.region은 원본 시도명을 그대로 이어붙인
