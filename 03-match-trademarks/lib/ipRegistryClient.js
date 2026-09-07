@@ -46,10 +46,31 @@ function withCompatibilityFields(record, item = {}) {
   };
 }
 
+// data.go.kr 게이트웨이(apis.data.go.kr)는 정상 응답과 다른 봉투로 오류를 준다:
+// { OpenAPI_ServiceResponse: { cmmMsgHeader: { errMsg, returnAuthMsg, returnReasonCode } } }
+// 여기서 "초당 요청제한"(PER_SECOND, 몇 초면 회복)과 "일일 요청제한"(하루 종일 대기)을
+// 구분한다 — 지금까지는 둘 다 KST 자정까지 냉각해서 등록원부 수집이 사실상 멈춰 있었다.
+function gatewayError(parsed) {
+  const header = parsed?.OpenAPI_ServiceResponse?.cmmMsgHeader;
+  if (!header || typeof header !== "object") return null;
+  const errMsg = clean(header.errMsg);
+  const authMsg = clean(header.returnAuthMsg);
+  const reasonCode = clean(header.returnReasonCode);
+  const perSecond = /PER_SECOND/i.test(errMsg) || /초당/.test(authMsg);
+  const rateLimited = perSecond || /LIMITED_NUMBER_OF_SERVICE_REQUESTS|요청제한|요청 초과|일일/i.test(`${errMsg} ${authMsg}`);
+  const error = new Error(`등록원부 게이트웨이 오류 [${reasonCode || errMsg || "UNKNOWN"}] ${authMsg || errMsg || "메시지 없음"}`);
+  error.gateway = true;
+  error.rateLimited = rateLimited;
+  error.rateLimitKind = rateLimited ? (perSecond ? "per_second" : "daily") : null;
+  return error;
+}
+
 function parseMarkHistoryResponse(parsed) {
   if (!parsed || typeof parsed !== "object") {
     throw new Error("등록원부 응답이 JSON 객체가 아닙니다.");
   }
+  const gwError = gatewayError(parsed);
+  if (gwError) throw gwError;
   const resultCode = clean(parsed.resultCode);
   const resultMsg = clean(parsed.resultMsg);
   if (!new Set(["0", "00", "000"]).has(resultCode)) {
@@ -116,12 +137,28 @@ function createClient({
   baseUrl = process.env.IP_REGISTRY_API_BASE_URL || DEFAULT_BASE_URL,
   fetchImpl,
   onRequest,
+  // apis.data.go.kr 등록원부는 "초당 요청제한"이 걸린다(실측: ~8req/s 이하는 안전, ~20req/s는
+  // 즉시 429). 요청 시작 간격을 최소 이 값으로 벌려 초당 제한을 애초에 안 건드린다.
+  // 동시성(mapConcurrent)이 있어도 이 게이트를 공유한다.
+  minRequestIntervalMs = 150,
 } = {}) {
   if (!apiKey) {
     throw new Error("등록원부 API 인증키가 필요합니다. .env 의 IP_REGISTRY_API_KEY를 설정하세요.");
   }
 
+  const gap = Math.max(0, Number(minRequestIntervalMs) || 0);
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+  let throttleChain = Promise.resolve();
+  // 각 호출은 직전 호출의 순번이 열릴 때까지 기다리고, 체인은 그 뒤 gap ms 만큼 더 진행한다
+  // → 호출 시작 간격이 최소 gap ms로 벌어진다(동시성이 있어도 이 체인 하나를 공유).
+  const throttleGate = () => {
+    const myTurn = throttleChain;
+    throttleChain = myTurn.then(() => sleep(gap));
+    return myTurn;
+  };
+
   async function getMarkHistory(input) {
+    await throttleGate();
     const registrationNumber =
       input && typeof input === "object" ? input.registrationNumber : input;
     const normalized = normalizeRegistrationNumber(registrationNumber);
@@ -136,20 +173,28 @@ function createClient({
       { headers: { Accept: "application/json" } },
       fetchImpl
     );
-    if (!response.ok) throw new Error(`getMarkHistory: API 오류 (${response.status})`);
     let parsed;
+    let httpErrorStatus = response.ok ? null : response.status;
     if (typeof response.text === "function") {
       const text = await response.text();
-      if (!text.trim()) throw new Error("getMarkHistory: 빈 응답");
+      if (!text.trim()) { if (httpErrorStatus) { const e = new Error(`getMarkHistory: API 오류 (${httpErrorStatus})`); if (httpErrorStatus === 429) { e.rateLimited = true; e.rateLimitKind = "per_second"; } throw e; } throw new Error("getMarkHistory: 빈 응답"); }
       try {
         parsed = JSON.parse(text.replace(/^\uFEFF/, ""));
       } catch {
+        if (httpErrorStatus) { const e = new Error(`getMarkHistory: API 오류 (${httpErrorStatus})`); if (httpErrorStatus === 429) { e.rateLimited = true; e.rateLimitKind = "per_second"; } throw e; }
         throw new Error("getMarkHistory: JSON이 아닌 응답");
       }
     } else if (typeof response.json === "function") {
       parsed = await response.json();
     } else {
       throw new Error("getMarkHistory: JSON 응답을 읽을 수 없습니다.");
+    }
+    const gwError = gatewayError(parsed);
+    if (gwError) throw gwError;
+    if (httpErrorStatus) {
+      const e = new Error(`getMarkHistory: API 오류 (${httpErrorStatus})`);
+      if (httpErrorStatus === 429) { e.rateLimited = true; e.rateLimitKind = "per_second"; }
+      throw e;
     }
     return parseMarkHistoryResponse(parsed);
   }
@@ -163,6 +208,7 @@ module.exports = {
   IP_REGISTRY_SOURCE_METADATA,
   asArray,
   createClient,
+  gatewayError,
   normalizeRegistrationNumber,
   parseMarkHistoryResponse,
   summarizeMarkHistory,

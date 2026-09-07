@@ -13,10 +13,21 @@ const APPLICANT_REGION_MATCH_VERSION = "ip-registry-applicant-region-v2-aliases"
 const GOODS_MATCH_VERSION = "ip-registry-designated-goods-v1-exact-only-confirmed";
 
 function isRateLimitError(error) {
-  return /(?:\b429\b|rate[ _-]?limit|요청\s*(?:횟수|건수).*초과|일일.*초과)/i.test(
+  if (error && error.rateLimited) return true;
+  return /(?:\b429\b|rate[ _-]?limit|요청\s*(?:횟수|건수).*초과|일일.*초과|PER_SECOND|초당)/i.test(
     error instanceof Error ? error.message : String(error || "")
   );
 }
+
+// per_second: 몇 초면 회복하는 초당 제한 → 짧게 쉬고 재시도. daily: 진짜 일일 할당량 소진 →
+// 회로 차단 + 자정까지 냉각. 종류를 모르면 보수적으로 daily로 본다(#52).
+function rateLimitKind(error) {
+  if (error && error.rateLimitKind) return error.rateLimitKind;
+  const text = error instanceof Error ? error.message : String(error || "");
+  return /PER_SECOND|초당/i.test(text) ? "per_second" : "daily";
+}
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 function clean(value) {
   return value === undefined || value === null
@@ -608,8 +619,8 @@ async function enrichDocument(document, client, options = {}) {
   const concurrency = Number(options.concurrency ?? 1);
   const cacheEntries = options.cacheEntries instanceof Map ? options.cacheEntries : new Map();
   const adminList = options.adminList || loadAdminCodes();
-  if (!Number.isInteger(limit) || limit < 0 || limit > 100) {
-    throw new Error("limit은 0~100 정수여야 합니다.");
+  if (!Number.isInteger(limit) || limit < 0 || limit > 20000) {
+    throw new Error("limit은 0~20000 정수여야 합니다.");
   }
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
     throw new Error("concurrency는 1~5 정수여야 합니다.");
@@ -633,36 +644,45 @@ async function enrichDocument(document, client, options = {}) {
       };
     }
     if (typeof options.onRequest === "function") options.onRequest(registrationNumber);
-    try {
-      const record = await client.getMarkHistory({ registrationNumber });
-      if (record.found) {
-        cacheEntries.set(registrationNumber, {
-          status: "complete",
-          fetchedAt,
-          record: sanitizeRegistryRecordForCache(record, adminList),
-        });
-        if (typeof options.onCacheUpdate === "function") options.onCacheUpdate(registrationNumber);
-      }
-      return {
-        registrationNumber,
-        status: record.found ? "complete" : "not_found",
-        record,
-        requested: true,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      if (isRateLimitError(error)) {
-        rateLimitError = message;
-        if (typeof options.onRateLimit === "function") {
-          options.onRateLimit(error, new Date());
+    // 초당 제한(per_second)은 클라이언트 스로틀(minRequestIntervalMs)로 거의 안 뜨지만,
+    // 그래도 뜨면 회로를 끊지 않고 몇 초 쉬고 재시도한다. 일일 제한(daily)만 즉시 회로 차단.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const record = await client.getMarkHistory({ registrationNumber });
+        if (record.found) {
+          cacheEntries.set(registrationNumber, {
+            status: "complete",
+            fetchedAt,
+            record: sanitizeRegistryRecordForCache(record, adminList),
+          });
+          if (typeof options.onCacheUpdate === "function") options.onCacheUpdate(registrationNumber);
         }
+        return {
+          registrationNumber,
+          status: record.found ? "complete" : "not_found",
+          record,
+          requested: true,
+        };
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        if (isRateLimitError(error)) {
+          const kind = rateLimitKind(error);
+          if (kind === "per_second" && attempt < 3) {
+            await sleep(1500 * (attempt + 1));
+            continue;
+          }
+          rateLimitError = message;
+          if (typeof options.onRateLimit === "function") {
+            options.onRateLimit(error, new Date(), kind);
+          }
+        }
+        return {
+          registrationNumber,
+          status: "error",
+          error: message,
+          requested: true,
+        };
       }
-      return {
-        registrationNumber,
-        status: "error",
-        error: message,
-        requested: true,
-      };
     }
   });
   const fetchedByNumber = new Map(

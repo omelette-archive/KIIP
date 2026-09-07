@@ -56,8 +56,15 @@ function isResumeBlocked(state, now = new Date()) {
   return now.getTime() < new Date(state.resumeNotBefore).getTime();
 }
 
-function recordRateLimit(state, now = new Date()) {
-  return { ...state, rateLimitedAt: now.toISOString(), resumeNotBefore: nextKstMidnightIso(now) };
+// 초당 제한(per_second)은 몇 초면 풀리므로 짧게(기본 90초)만 재개를 미루고, 일일 제한
+// (daily)이나 종류 미상이면 예전처럼 KST 자정까지 미룬다(#52). 예전엔 전부 자정 처리라
+// 초당 제한 한 번에 등록원부 수집이 하루 종일 멈췄다.
+function recordRateLimit(state, now = new Date(), kind = "daily") {
+  const resumeNotBefore =
+    kind === "per_second"
+      ? new Date(now.getTime() + 90 * 1000).toISOString()
+      : nextKstMidnightIso(now);
+  return { ...state, rateLimitedAt: now.toISOString(), rateLimitKind: kind, resumeNotBefore };
 }
 
 function remainingBudget(state, dailyBudget) {

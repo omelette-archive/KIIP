@@ -32,8 +32,11 @@ function parseArgs(argv) {
     maxHitsPerQuery: 3000,
     outMaxHits: 1800,
     applicantLimit: 5000,
-    ipRegistryDailyBudget: 100,
-    ipRegistryLimit: 100,
+    // 등록원부(apis.data.go.kr)는 "초당" 제한이라 클라이언트 스로틀(minRequestIntervalMs
+    // ~150ms)로 이미 안전하다 — 예전 100/run은 초당 제한을 자정 냉각으로 오해한 데서 온
+    // 과도한 보수값이었다. 미수집 7만+ 백로그를 실질적으로 줄이려면 크게 잡는다.
+    ipRegistryDailyBudget: 6000,
+    ipRegistryLimit: 3000,
     // 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": ③ 완료 쿼리를 이 일수마다 처음부터
     // 다시 수집해 신규 출원을 반영한다(0=끔, matchTrademarks.js와 기본값을 맞춤).
     refreshCompleteAfterDays: 14,
@@ -85,8 +88,8 @@ function parseArgs(argv) {
       throw new Error(`${key}는 1 이상의 정수여야 합니다.`);
     }
   }
-  // enrichIpRegistry.js의 --limit 상한이 100이라 그 이상은 그대로 넘기면 실패한다.
-  if (options.ipRegistryLimit > 100) options.ipRegistryLimit = 100;
+  // enrichIpRegistry.js --limit 상한은 20000.
+  if (options.ipRegistryLimit > 20000) options.ipRegistryLimit = 20000;
   options.refreshCompleteAfterDays = Number(options.refreshCompleteAfterDays);
   if (!Number.isInteger(options.refreshCompleteAfterDays) || options.refreshCompleteAfterDays < 0) {
     throw new Error("refreshCompleteAfterDays는 0 이상의 정수여야 합니다(0=끔).");
@@ -121,8 +124,8 @@ function printUsage() {
       "  --max-hits-per-query <n>     ③ 검색 조합별 수집 상한(기본 3000, 체크포인트 저장)",
       "  --out-max-hits <n>           ③ 출력 파일 조합별 hit 상한(기본 1800, 수집분은 보존)",
       "  --applicant-limit <n>        03b 출원인 주소 보강의 이번 실행 신규 호출 상한(기본 5000)",
-      "  --ip-registry-daily-budget <n>  03c 등록원부 하루(KST) 누적 호출 상한(기본 100)",
-      "  --ip-registry-limit <n>      03c 이번 실행 등록번호 호출 상한(기본 100)",
+      "  --ip-registry-daily-budget <n>  03c 등록원부 하루(KST) 누적 호출 상한(기본 6000)",
+      "  --ip-registry-limit <n>      03c 이번 실행 등록번호 호출 상한(기본 3000)",
       "  --refresh-complete-after-days <n>  ③ 완료 쿼리를 이 일수 뒤 처음부터 다시 수집해",
       "                               신규 출원 반영(기본 14, 0=끔)",
       "",
@@ -332,9 +335,9 @@ function buildPlan(options = {}) {
         "--budget-state",
         state.ipRegistryBudget,
         "--daily-budget",
-        String(options.ipRegistryDailyBudget ?? 100),
+        String(options.ipRegistryDailyBudget ?? 6000),
         "--limit",
-        String(options.ipRegistryLimit ?? 100),
+        String(options.ipRegistryLimit ?? 3000),
         "--concurrency",
         "2",
         "--checkpoint-every",
@@ -526,8 +529,8 @@ function buildPlan(options = {}) {
     inputs: {
       rawGoodsReview,
       applicantLimit: options.applicantLimit ?? 5000,
-      ipRegistryDailyBudget: options.ipRegistryDailyBudget ?? 100,
-      ipRegistryLimit: options.ipRegistryLimit ?? 100,
+      ipRegistryDailyBudget: options.ipRegistryDailyBudget ?? 6000,
+      ipRegistryLimit: options.ipRegistryLimit ?? 3000,
     },
     stages,
     publication: {

@@ -41,7 +41,8 @@ function usage(message) {
       "",
       "옵션:",
       "  --out <path>        출력 경로 (기본: output/ip-registry-enriched.json)",
-      "  --limit <n>         등록번호 최대 호출 수 (기본 3, 최대 100)",
+      "  --limit <n>         등록번호 최대 호출 수 (기본 3, 최대 20000). 클라이언트가 초당 제한을",
+      "                     안 건드리게 요청 간격을 벌리므로(minRequestIntervalMs) 크게 잡아도 안전",
       "  --concurrency <n>   동시 호출 수 (기본 1, 최대 5)",
       "  --cache <path>      등록번호별 영속 캐시 (기본: output/ip-registry-cache.json)",
       "  --no-cache          영속 캐시를 읽거나 저장하지 않음",
@@ -74,8 +75,8 @@ function main() {
     usage("--checkpoint-every\uB294 1~10000 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   }
   const limit = Number(args.limit);
-  if (!Number.isInteger(limit) || limit < 1 || limit > 100) {
-    usage("--limit\uC740 1~100 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
+  if (!Number.isInteger(limit) || limit < 1 || limit > 20000) {
+    usage("--limit\uC740 1~20000 \uC815\uC218\uC5EC\uC57C \uD569\uB2C8\uB2E4.");
   }
   const concurrency = Number(args.concurrency);
   if (!Number.isInteger(concurrency) || concurrency < 1 || concurrency > 5) {
@@ -133,8 +134,8 @@ function main() {
       nextBudgetState = { ...nextBudgetState, callsUsed: nextBudgetState.callsUsed + 1 };
       saveBudgetState(budgetStatePath, nextBudgetState);
     },
-    onRateLimit: (_error, detectedAt = new Date()) => {
-      nextBudgetState = recordRateLimit(nextBudgetState, detectedAt);
+    onRateLimit: (_error, detectedAt = new Date(), kind = "daily") => {
+      nextBudgetState = recordRateLimit(nextBudgetState, detectedAt, kind);
       saveBudgetState(budgetStatePath, nextBudgetState);
     },
     onCacheUpdate: () => {

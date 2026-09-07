@@ -5,7 +5,7 @@ const assert = require("assert");
 const fs = require("fs");
 const os = require("os");
 const path = require("path");
-const { createClient, parseMarkHistoryResponse } = require("./lib/ipRegistryClient");
+const { createClient, parseMarkHistoryResponse, gatewayError } = require("./lib/ipRegistryClient");
 const { parseArgs: parseIpRegistryArgs } = require("./enrichIpRegistry");
 const {
   enrichDocument,
@@ -311,6 +311,13 @@ async function runIpRegistryTests() {
     const limited = recordRateLimit(reloadedSameDay, noon2026);
     assert.strictEqual(limited.resumeNotBefore, "2026-08-11T15:00:00.000Z");
     assert.strictEqual(isResumeBlocked(limited, noon2026), true);
+    // #52 후속: 초당 제한(per_second)은 90초만 미루고 자정 냉각 안 함.
+    const perSecond = recordRateLimit(reloadedSameDay, noon2026, "per_second");
+    assert.strictEqual(perSecond.rateLimitKind, "per_second");
+    assert.strictEqual(perSecond.resumeNotBefore, new Date(noon2026.getTime() + 90000).toISOString());
+    assert.strictEqual(isResumeBlocked(perSecond, new Date(noon2026.getTime() + 91000)), false, "90초 뒤 재개 가능");
+    // 종류 미상은 보수적으로 daily(자정)로 처리.
+    assert.strictEqual(recordRateLimit(reloadedSameDay, noon2026).resumeNotBefore, "2026-08-11T15:00:00.000Z");
     assert.strictEqual(
       isResumeBlocked(limited, new Date("2026-08-11T15:00:01.000Z")),
       false,
