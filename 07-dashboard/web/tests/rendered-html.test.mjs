@@ -205,7 +205,7 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 1156->1168(병합·07d metricFloor로 상향).
   assert.equal(coverage.total, 1825);
   assert.equal(coverage.decided, 1825);
-  assert.equal(coverage.applied, 1168);
+  assert.equal(coverage.applied, 1165);
   assert.equal(coverage.pending, 0);
   assert.equal(Math.round(coverage.rate * 100), 64);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
@@ -293,7 +293,7 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   const pepperCandidates = candidates.filter(({ item }) => item.noticeName?.includes("고추"));
   assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
   // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 available 0건 후보가 86 -> 211로 늘었다.
-  assert.equal(excluded.length, 217, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  assert.equal(excluded.length, 226, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
   assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
@@ -334,9 +334,12 @@ test("renders tab navigation and separate application/registration ranking table
   // 미확정인 raw_item_name_unclassified 행(예: 지역특화작목 도 단위 원물명 검색, #117)은
   // 상표 건수가 커도 화면 랭킹에서 제외되므로 테스트도 같은 조건으로 걸러야 한다.
   const OFFICIAL_MATCHING_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
+  // 화면 랭킹(standalone-client.js)은 시군구 미지정(광역 단위) 행을 제외한다 — 지역특화작목
+  // 도 단위 행(#117)이 고시명칭 확정으로 승격돼도 이 랭킹에는 안 들어간다.
+  const isUnclassifiedRegion = (region) => !region.sigungu || region.sigungu === region.sido;
   const rankingCandidates = snapshot.regions
     .flatMap((region) => region.items.map((item) => ({ region, item })))
-    .filter(({ item }) => OFFICIAL_MATCHING_BASES.has(item.matchingBasis));
+    .filter(({ region, item }) => !isUnclassifiedRegion(region) && OFFICIAL_MATCHING_BASES.has(item.matchingBasis));
   const checkFirstRow = (firstRow, ranking) => {
     if (ranking) {
       assert.match(firstRow, />1<\/td>/, "1위 순번이 실제로 매겨져야 함");
@@ -410,7 +413,7 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
   assert.equal(snapshot.pipelineStatus.stage, "alpha");
-  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 1028);
+  assert.equal(snapshot.pipelineStatus.uniqueQueryCounts.total, 993);
   // 2026-08-20: 246개 partial 쿼리 중 232개(1라운드 183개 + 2라운드 49개, 사과·포도·
   // 오리 등)를 재수집하면서 지역×품목 표시 가능 건수와 출원인 주소 확인 건수가 함께 늘었다.
   // 이후 원물+지정상품 매칭(212개)이 추가로 일부 항목을 blocked -> available로 바꿔
@@ -425,7 +428,7 @@ test("ships a valid dashboard snapshot", async () => {
   // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1826->1825.
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1825);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 95113);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 87319);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -440,27 +443,27 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 107);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 21);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 21);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 207);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 137);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 70);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 12770);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 80497);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 80497);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 203);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 132);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 71);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 12744);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 61972);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 61972);
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.nfqsGeographicalIndication, {
     registeredCount: 24,
     regionalizedCount: 23,
     regionReviewCount: 1,
     liveVerifiedAt: "2026-08-26",
   });
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 37);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 78341);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 38);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 72590);
   // 이슈 #117(2026-08-31): 농촌진흥청 지역특화작목 69개 공식 수집원 병합 메타데이터.
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops, {
     officialCount: 69,
     representativeCount: 9,
     intensiveCount: 18,
     selfDirectedCount: 42,
-    dashboardBadgeCount: 194,
+    dashboardBadgeCount: 167,
     regionalScope: "province",
     liveVerifiedAt: "2026-08-26",
   });

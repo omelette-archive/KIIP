@@ -119,9 +119,24 @@ function unionYearCounts(previous, next) {
  * 신규 item의 지역 지표가 이전보다 낮으면 이전 값을 유지한다.
  * @returns {{item: object, retained: boolean, retainedFields: string[]}}
  */
+// 판정 기준이 원물명 전 식품류 검색(raw_item_name_unclassified) → 고시명칭+NICE류 확정
+// (notice_name_and_nice_class / raw_item_goods_matched)으로 바뀌면 검색 모집단 자체가
+// 좁아진 것이므로(#50 동음이의어 노이즈 제거), 지표가 줄어드는 게 정상이다 — floor를
+// 적용하면 옛 노이즈 섞인 값을 계속 붙들게 된다(#117).
+const CONFIRMED_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
+function isMethodologyUpgrade(previousItem, nextItem) {
+  const prev = String(previousItem.matchingBasis || "");
+  const next = String(nextItem.matchingBasis || "");
+  return prev === "raw_item_name_unclassified" && CONFIRMED_BASES.has(next);
+}
+
 function retainMetricFloor(previousItem, nextItem, context) {
   const retainedFields = [];
   const item = nextItem;
+
+  if (isMethodologyUpgrade(previousItem, nextItem)) {
+    return { item, retained: false, retainedFields, methodologyUpgrade: true };
+  }
 
   const metricNames = ["uniqueTrademarkCount", "registeredTrademarkCount", "confirmedGoodsMatchCount"];
   for (const name of metricNames) {
@@ -197,16 +212,19 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
   const tombstoneByLabel = new Map([...tombstoneByKey.entries()].map(([key, entry]) => [clean(key), entry]));
 
   let metricFloorRetained = 0;
+  let methodologyUpgraded = 0;
   const revivedLastKnownGood = [];
   const removedWithTombstone = [];
 
-  // 1) 양쪽에 있는 키: 지표 floor 유지(절대 감소 금지).
+  // 1) 양쪽에 있는 키: 지표 floor 유지(절대 감소 금지). 단 판정 기준이 원물명 검색 →
+  //    고시명칭 확정으로 승격된 건 모집단이 좁아진 것이라 감소를 허용한다(#117).
   const context = { previousSnapshotId: previousSnapshot.snapshotId, retainedAt };
   for (const [key, { item: nextItem }] of nextIndex) {
     const prev = prevIndex.get(key);
     if (!prev) continue;
-    const { retained } = retainMetricFloor(prev.item, nextItem, context);
+    const { retained, methodologyUpgrade } = retainMetricFloor(prev.item, nextItem, context);
     if (retained) metricFloorRetained++;
+    if (methodologyUpgrade) methodologyUpgraded++;
   }
 
   // 2) 이전엔 있고 신규엔 없는 키: tombstone이 있으면 제거를 허용, 없으면 되살린다.
@@ -269,6 +287,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
     previousSnapshotId: previousSnapshot.snapshotId || null,
     reconciledAt: retainedAt,
     metricFloorRetained,
+    methodologyUpgraded,
     revivedLastKnownGood: revivedLastKnownGood.length,
     relocatedNationwideToRegional: relocatedNationwide,
     relocatedSpecialtyRename,
@@ -295,6 +314,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
         retained: prevIndex.size - removedWithTombstone.length - revivedLastKnownGood.length - relocated.length,
         added: [...nextIndex.keys()].filter((key) => !prevIndex.has(key)).length,
         metricFloorRetained,
+        methodologyUpgraded,
         revivedLastKnownGood: revivedLastKnownGood.length,
         relocatedNationwideToRegional: relocatedNationwide,
         relocatedSpecialtyRename,

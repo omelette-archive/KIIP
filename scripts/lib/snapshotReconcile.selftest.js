@@ -141,6 +141,26 @@ console.log("snapshotReconcile 자체 테스트");
   ok("미분류 -> 고시명칭 매칭 승격은 삭제로 보지 않음");
 }
 
+// 5b) 판정 기준이 원물명 검색 -> 고시명칭 확정으로 승격되면 지표 감소를 허용(#117)
+{
+  const previous = snapshot("prev", [
+    { region: "전남광주통합특별시", sido: "전남광주통합특별시", sigungu: "", items: [
+      { ...item("고구마", { niceClass: null, unique: 141, registered: 20 }), matchingBasis: "raw_item_name_unclassified" },
+    ] },
+  ]);
+  const next = snapshot("next", [
+    { region: "전남광주통합특별시", sido: "전남광주통합특별시", sigungu: "", items: [
+      { ...item("고구마", { niceClass: "31", unique: 79, registered: 11 }), matchingBasis: "notice_name_and_nice_class", noticeName: "신선한 고구마" },
+    ] },
+  ]);
+  const { report } = reconcilePublicSnapshot(next, previous, [], { massRevivalLimit: 50 });
+  assert.strictEqual(next.regions[0].items[0].metrics.uniqueTrademarkCount.value, 79, "고시명칭 확정 후 좁아진 값을 그대로 씀(floor 미적용)");
+  assert.ok(!next.regions[0].items[0].metrics.uniqueTrademarkCount.retainedFromPrevious, "retainedFromPrevious가 붙지 않음");
+  assert.strictEqual(report.counts.metricFloorRetained, 0);
+  assert.strictEqual(report.counts.methodologyUpgraded, 1);
+  ok("원물명 검색 -> 고시명칭 확정 승격은 지표 감소 허용");
+}
+
 // 6) 전국 카탈로그가 지역 행으로 이동하면 되살리지 않음(중복 방지)
 {
   const previous = snapshot("prev", [
