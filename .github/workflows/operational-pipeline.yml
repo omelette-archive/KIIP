@@ -138,6 +138,7 @@ jobs:
               `| 지표 floor 유지(metricFloorRetained) | ${c.metricFloorRetained ?? "—"} |`,
               `| last-known-good 복원(revivedLastKnownGood) | ${c.revivedLastKnownGood ?? "—"} |`,
               `| 전국→지역 이동(relocatedNationwideToRegional) | ${c.relocatedNationwideToRegional ?? "—"} |`,
+              `| 같은 고시명칭 원물명 변경(relocatedSpecialtyRename) | ${c.relocatedSpecialtyRename ?? "—"} |`,
               `| tombstone으로 제거(removedWithTombstone) | ${c.removedWithTombstone ?? "—"} |`,
               ``,
               report.blocked ? `⚠️ ${report.blockReason}` : "대량 실종 없음 — 정상 배포.",

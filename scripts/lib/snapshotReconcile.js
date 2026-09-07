@@ -261,13 +261,17 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
     revivedLastKnownGood.push({ key: keyToLabel(key), lastSeenSnapshotId: previousSnapshot.snapshotId || null });
   }
 
+  const relocatedNationwide = relocated.filter((r) => r.reason === "nationwide_catalog_now_regional").length;
+  const relocatedSpecialtyRename = relocated.filter((r) => r.reason === "specialty_kept_under_different_item_name").length;
+
   nextSnapshot.pipelineStatus = nextSnapshot.pipelineStatus || {};
   nextSnapshot.pipelineStatus.publicSnapshotReconcile = {
     previousSnapshotId: previousSnapshot.snapshotId || null,
     reconciledAt: retainedAt,
     metricFloorRetained,
     revivedLastKnownGood: revivedLastKnownGood.length,
-    relocatedNationwideToRegional: relocated.length,
+    relocatedNationwideToRegional: relocatedNationwide,
+    relocatedSpecialtyRename,
     removedWithTombstone: removedWithTombstone.length,
   };
 
@@ -292,7 +296,8 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
         added: [...nextIndex.keys()].filter((key) => !prevIndex.has(key)).length,
         metricFloorRetained,
         revivedLastKnownGood: revivedLastKnownGood.length,
-        relocatedNationwideToRegional: relocated.length,
+        relocatedNationwideToRegional: relocatedNationwide,
+        relocatedSpecialtyRename,
         removedWithTombstone: removedWithTombstone.length,
       },
       revivedLastKnownGood,

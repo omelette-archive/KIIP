@@ -200,11 +200,14 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 판정이 늘었다. #12(normalized_exact만 확정)·#116 partial 게이트·regionalCoverageThreshold
   // 0.6도 함께 반영. 정식 통합(#137)에서 NFQS 전국 카탈로그 skip 버그 수정 + 07d_reconcile
   // (직전 공개 스냅샷과 max/union — 지역 상표 수치는 절대 감소하지 않음).
-  assert.equal(coverage.total, 1826);
-  assert.equal(coverage.decided, 1826);
-  assert.equal(coverage.applied, 1156);
+  // 2026-09-07: #151 전라남도 통합 도명 중복 정리(tombstone 14건) + query.region 정규화로
+  // 임산물 주산지 확장 행이 농사로 행과 병합(장흥 표고 등) → 분모 1826->1825, 확정 출원
+  // 1156->1168(병합·07d metricFloor로 상향).
+  assert.equal(coverage.total, 1825);
+  assert.equal(coverage.decided, 1825);
+  assert.equal(coverage.applied, 1168);
   assert.equal(coverage.pending, 0);
-  assert.equal(Math.round(coverage.rate * 100), 63);
+  assert.equal(Math.round(coverage.rate * 100), 64);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   // 2026-09-01(#116): 요약 첫 칸에 분모(전체 수집 수)와 출원 확인 수가 모두 노출돼야
   // 한다는 요구사항. 2026-09-06 S2 재설계로 문구는 완료율("전국 특산품 수")에서
@@ -419,7 +422,8 @@ test("ships a valid dashboard snapshot", async () => {
   // 1648->1688로 늘었다.
   // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집으로 지역 판정이 1688->1812, 출원인 주소
   // 확인이 77,312->92,305로 늘었다.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1826);
+  // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1826->1825.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1825);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
   assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 95113);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
@@ -431,10 +435,11 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kofpi_forest_product"));
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
   // 2026-09-04(#70): 지역 특산품 1805->1827(깊은 재수집) + 전국 카탈로그 132 = 1959.
-  assert.equal(snapshot.coverage.catalogItemCount, 1933);
+  // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1933->1932, 주산지 근거 27->21(전남 6건 tombstone).
+  assert.equal(snapshot.coverage.catalogItemCount, 1932);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 107);
-  assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 26);
-  assert.equal(snapshot.coverage.regionalEvidenceRows, 27);
+  assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 21);
+  assert.equal(snapshot.coverage.regionalEvidenceRows, 21);
   assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 207);
   assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 137);
   assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 70);
@@ -447,8 +452,8 @@ test("ships a valid dashboard snapshot", async () => {
     regionReviewCount: 1,
     liveVerifiedAt: "2026-08-26",
   });
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 35);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 78343);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 37);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 78341);
   // 이슈 #117(2026-08-31): 농촌진흥청 지역특화작목 69개 공식 수집원 병합 메타데이터.
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops, {
     officialCount: 69,
@@ -479,21 +484,19 @@ test("ships a valid dashboard snapshot", async () => {
   assert.equal(regionalGeoItems.length, 23);
   assert.ok(snapshot.warnings.some((warning) => warning.includes("지역 검토대기")));
   // 2026-09-04(#137): KOFPI 주산지 근거가 있는 임산물은 이제 전국이 아니라 해당 지역 행에
-  // regionalEvidence로 붙는다. 26품목 27행이고, 지역 행이라 regionalMetricEligible=true.
+  // regionalEvidence로 붙는다. 지역 행이라 regionalMetricEligible=true.
+  // 2026-09-07(#151): 전라남도 통합 도명 tombstone 6건(장흥 표고·광양 고사리/수액·고흥 취나물·
+  //   장성 잔디·해남 야생화) + query.region 정규화로 장흥 표고가 농사로 행과 병합 → 27행 -> 21행.
   const forestEvidenceItems = snapshot.regions.filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.regionalEvidence?.length).map((item) => ({ region: region.region, item })));
-  // 26개 고유 임산물(표고는 두 지역에 각각 한 행)이라 행 수는 27.
-  assert.equal(forestEvidenceItems.length, 27);
-  assert.equal(new Set(forestEvidenceItems.map(({ item }) => item.itemName)).size, 26);
-  assert.equal(forestEvidenceItems.reduce((sum, { item }) => sum + item.regionalEvidence.length, 0), 27);
+  assert.equal(forestEvidenceItems.length, 21);
+  assert.equal(new Set(forestEvidenceItems.map(({ item }) => item.itemName)).size, 21);
+  assert.equal(forestEvidenceItems.reduce((sum, { item }) => sum + item.regionalEvidence.length, 0), 21);
   assert.deepEqual(forestEvidenceItems.filter(({ item }) => item.itemName === "밤").map(({ region }) => region), ["충청남도 부여군"]);
   assert.deepEqual(
     forestEvidenceItems.filter(({ item }) => item.itemName === "표고").map(({ region }) => region).sort(),
-    ["전라남도 장흥군", "충청남도 부여군"],
+    ["충청남도 부여군"],
   );
-  // 2026-08-25: extractForestProductionPrimaryRegions.py의 ALIASES에 "고로쇠"→"수액"을
-  // 추가해 표27(고로쇠, 전남 광양시)이 더 이상 unmatchedSourceTables로 빠지지 않는다(#114 리뷰).
-  assert.deepEqual(forestEvidenceItems.filter(({ item }) => item.itemName === "수액").map(({ region }) => region), ["전라남도 광양시"]);
   // 2026-08-25(#114 리뷰): Dashboard.tsx에만 있고 standalone-client.js에는 없던
   // "공식 생산 주산지 근거" 안내 문구를 두 구현이 다시 같은 내용을 보여주도록 맞췄다.
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
@@ -519,15 +522,16 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(items.some((item) => item.trademarkExamples?.some((example) => example.title)));
   const availableItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available");
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
-  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1842
-  // (지역 게이트 availableRegionItemCount 1826 + 전국 카탈로그 중 available 16건).
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1842, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1842.
+  // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1842 -> 1841.
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1841, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
-  assert.equal(regionalForestItems.length, 27);
-  // 깊은 재수집으로 임산물 27개 전부 available, 지역 출원 합계 121 -> 297.
-  assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 27);
+  // 2026-09-07(#151): 전라남도 통합 도명 tombstone 6건으로 27 -> 21. 지역 출원 합계 297은
+  // 유지(빠진 6건은 잔디·야생화·고사리·수액·취나물·표고로 대부분 지역 상표가 없거나 병합됨).
+  assert.equal(regionalForestItems.length, 21);
+  assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 21);
   assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 297);
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");

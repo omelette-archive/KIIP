@@ -168,6 +168,8 @@ console.log("snapshotReconcile 자체 테스트");
   ]);
   const { report } = reconcilePublicSnapshot(next, previous, [], { massRevivalLimit: 50 });
   assert.strictEqual(report.counts.revivedLastKnownGood, 0, "고시명칭이 유지되면 원물명 변경은 실종이 아님");
+  assert.strictEqual(report.counts.relocatedSpecialtyRename, 1);
+  assert.strictEqual(report.counts.relocatedNationwideToRegional, 0);
   // 다른 지역에서 그 고시명칭이 없으면 정상적으로 되살린다(회귀 방지)
   const next2 = snapshot("next2", [
     { region: "경상북도 문경시", sido: "경상북도", sigungu: "문경시", items: [item("사과", { niceClass: "31", unique: 3 })] },
