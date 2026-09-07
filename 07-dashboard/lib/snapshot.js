@@ -364,6 +364,13 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         row.registrationYearCounts && Object.keys(row.registrationYearCounts).length
           ? row.registrationYearCounts
           : null,
+      // #118 최근 동향 리더보드: 월 단위 집계(analyzer가 asOfYear-2년 1월부터만 채움).
+      applicationMonthCounts: row.applicationMonthCounts && Object.keys(row.applicationMonthCounts).length
+        ? row.applicationMonthCounts
+        : null,
+      registrationMonthCounts: row.registrationMonthCounts && Object.keys(row.registrationMonthCounts).length
+        ? row.registrationMonthCounts
+        : null,
       // #110: 지역 출원 지표(uniqueTrademarkCount 등)와 완전히 분리된 참고 지표 —
       // 가공품·서비스류를 뺀 원물류(29·30·31류) 전국 후보 중 이 지역 주소와 일치하는
       // 비율. 기존 분자·분모에는 절대 섞지 않는다.

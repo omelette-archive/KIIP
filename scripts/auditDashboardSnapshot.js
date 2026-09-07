@@ -147,6 +147,21 @@ function auditSnapshot(snapshot) {
         );
       }
 
+      // #118: 월 단위 집계 키는 YYYY-MM 형식이고 유효 월이어야 한다.
+      for (const field of ["applicationMonthCounts", "registrationMonthCounts"]) {
+        const counts = item[field];
+        if (counts == null) continue;
+        for (const key of Object.keys(counts)) {
+          if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(key) || !Number.isInteger(counts[key]) || counts[key] < 0) {
+            addError("invalid_month_count_key", `${field} keys must be YYYY-MM with a non-negative integer count`, {
+              example: compactRow(region, item),
+              key,
+            });
+            break;
+          }
+        }
+      }
+
       const metric = item?.metrics?.uniqueTrademarkCount;
       if (!metric || typeof metric.availability !== "string") {
         addError("missing_regional_metric", "uniqueTrademarkCount metric and availability are required", {

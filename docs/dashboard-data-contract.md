@@ -65,7 +65,11 @@ UI 아이디에이션 참고: <https://local-k-tm.pages.dev/>
 
 - 원본 품목명, 표준 품목명, 고시명칭, NICE류
 - 제목: `안동시 / 사과`; 건수: `사과 관련 상표 출원 N건`; 근거: `고시명칭 신선한 사과 · NICE 31류`
-- 고유 상표 수, 등록률, 상태 분포, 연도별 추이
+- 고유 상표 수, 등록률, 상태 분포, 연도별 추이(`applicationYearCounts`/`registrationYearCounts`)
+- 월 단위 추이(`applicationMonthCounts`/`registrationMonthCounts`, #118) — 키는 `YYYY-MM`,
+  분석 시점 기준 `asOfYear-2`년 1월부터만 채운다(스냅샷 비대화 방지). 값이 없으면 `null`.
+  전국 키워드 검색 결과 모집단 기준이라 지역 귀속 확인 건수(`uniqueTrademarkCount`)와는
+  다른 모집단이다.
 - 최근 상표명·출원번호·출원일·상태
 - 상표명(예: `사과애`)은 대표 특산품명을 대체하지 않고 `관련 출원 상표 사례` 목록에 표시한다.
 - 각 상표 사례에는 가능한 경우 지정상품 매칭 방식과 근거 명칭을 붙인다. `normalized_exact`만

@@ -19,6 +19,18 @@ function applicationYear(value) {
   return year >= 1800 && year <= 2200 ? year : null;
 }
 
+// 이슈 #118: 최근 동향 리더보드용 월 단위 집계. YYYYMMDD → "YYYY-MM". 연 단위(applicationYear)와
+// 같은 검증 범위. 유효 월(01~12)이 아니면 null.
+function applicationMonth(value) {
+  // "20240304"·"2024-03-04" 양쪽을 받는다 — 숫자만 남기고 앞 6자리를 YYYYMM으로 본다.
+  const digits = clean(value).replace(/\D/g, "");
+  if (digits.length < 6) return null;
+  const year = Number(digits.slice(0, 4));
+  const month = Number(digits.slice(4, 6));
+  if (year < 1800 || year > 2200 || month < 1 || month > 12) return null;
+  return `${digits.slice(0, 4)}-${digits.slice(4, 6)}`;
+}
+
 // 이슈 #110(2026-08-24 사용자 요청): 고추·오이·사과·딸기·한우처럼 흔한 원물명은 전국
 // 검색 결과가 #50이 막은 동음이의어 노이즈라 지역 출원 통계(uniqueTrademarkCount)에는
 // 못 쓴다. 대신 "가공품·서비스류를 뺀 원물류(29·30·31류) 전국 후보 중 이 지역 주소와
@@ -372,6 +384,8 @@ function finalizeBucket(bucket, options) {
   };
   const yearCounts = new Map();
   const registrationYearCounts = new Map();
+  const applicationMonthTally = new Map();
+  const registrationMonthTally = new Map();
   let invalidApplicationDateCount = 0;
   let invalidRegistrationDateCount = 0;
   let applicantAddressEvidenceCount = 0;
@@ -427,6 +441,10 @@ function finalizeBucket(bucket, options) {
       goodsEvidence: Array.isArray(hit.goodsEvidence) ? hit.goodsEvidence.slice(0, 3) : [],
     });
     const year = applicationYear(hit.applicationDate);
+    const applicationMonthKey = applicationMonth(hit.applicationDate);
+    if (applicationMonthKey) {
+      applicationMonthTally.set(applicationMonthKey, (applicationMonthTally.get(applicationMonthKey) || 0) + 1);
+    }
     if (year === null) {
       invalidApplicationDateCount++;
     } else {
@@ -441,16 +459,19 @@ function finalizeBucket(bucket, options) {
         });
       }
     }
-    const registrationYear = applicationYear(
-      hit.registrationDate ?? hit.registryEvidence?.registrationDate
-    );
-    if (clean(hit.registrationDate ?? hit.registryEvidence?.registrationDate)) {
+    const registrationDateRaw = hit.registrationDate ?? hit.registryEvidence?.registrationDate;
+    const registrationYear = applicationYear(registrationDateRaw);
+    if (clean(registrationDateRaw)) {
       if (registrationYear === null) invalidRegistrationDateCount++;
       else {
         registrationYearCounts.set(
           registrationYear,
           (registrationYearCounts.get(registrationYear) || 0) + 1
         );
+        const registrationMonthKey = applicationMonth(registrationDateRaw);
+        if (registrationMonthKey) {
+          registrationMonthTally.set(registrationMonthKey, (registrationMonthTally.get(registrationMonthKey) || 0) + 1);
+        }
       }
     }
   }
@@ -528,6 +549,19 @@ function finalizeBucket(bucket, options) {
   for (const year of [...registrationYearCounts.keys()].sort((a, b) => a - b)) {
     registrationYearCountsResult[String(year)] = registrationYearCounts.get(year);
   }
+  // #118 최근 동향 리더보드: 월 단위 집계는 최근 구간만 스냅샷에 싣는다(전체 월을 실으면
+  // 1961년부터 품목당 수백 키라 스냅샷이 비대해진다). 경계는 asOfYear-2년 1월 — 리더보드의
+  // "최근 1·3·6·12개월" 창을 모두 덮으면서 결정론적이다.
+  const monthCutoff = `${options.asOfYear - 2}-01`;
+  const trimMonths = (tally) => {
+    const out = {};
+    for (const key of [...tally.keys()].sort()) {
+      if (key >= monthCutoff) out[key] = tally.get(key);
+    }
+    return out;
+  };
+  const applicationMonthCounts = trimMonths(applicationMonthTally);
+  const registrationMonthCounts = trimMonths(registrationMonthTally);
   recentBrands.sort((a, b) => clean(b.applicationDate).localeCompare(clean(a.applicationDate)));
 
   const BUCKET_INTERNAL_KEYS = new Set([
@@ -575,6 +609,9 @@ function finalizeBucket(bucket, options) {
       : null,
     applicationYearCounts,
     registrationYearCounts: registrationYearCountsResult,
+    applicationMonthCounts,
+    registrationMonthCounts,
+    monthCountsSince: monthCutoff,
     invalidRegistrationDateCount,
     recentPeriod: { startYear: recentStart, endYear: recentEnd, count: recentApplicationCount },
     previousPeriod: { startYear: previousStart, endYear: previousEnd, count: previousApplicationCount },
@@ -913,6 +950,7 @@ module.exports = {
   ANALYSIS_VERSION,
   analyzeEntries,
   applicationYear,
+  applicationMonth,
   goodsMatchCategory,
   ipRegistryStatusCategory,
   normalizeInput,

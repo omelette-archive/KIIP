@@ -5,6 +5,7 @@ const assert = require("assert");
 const {
   analyzeEntries,
   applicationYear,
+  applicationMonth,
   regionCategory,
   selectTrademarkExamples,
   statusCategory,
@@ -81,6 +82,10 @@ const input = [
 console.log("1) 필드 정규화");
 assert.strictEqual(applicationYear("2024-01-02"), 2024);
 assert.strictEqual(applicationYear("날짜없음"), null);
+assert.strictEqual(applicationMonth("20240102"), "2024-01");
+assert.strictEqual(applicationMonth("2024-03-04"), "2024-03");
+assert.strictEqual(applicationMonth("20241399"), null, "13월은 무효");
+assert.strictEqual(applicationMonth(""), null);
 assert.strictEqual(statusCategory("등록결정"), "registered");
 assert.strictEqual(statusCategory("출원공고"), "pending");
 assert.strictEqual(statusCategory("거절"), "inactive");
@@ -116,7 +121,13 @@ assert.deepStrictEqual(andongApple.regionalMetricBlockingReasons, [
   "collection_incomplete",
 ]);
 assert.strictEqual(andongApple.invalidApplicationDateCount, 1);
-ok("오류·0건 포함, 출원번호 중복 제거, 상태별 집계");
+// #118 월 단위 집계: asOfYear 2026 → 2024-01 이후만. 2023-01(2024 이전)은 빠지고,
+// 2025-01(중복 제거된 1건)·2024-03(1건)만 남는다.
+assert.strictEqual(andongApple.monthCountsSince, "2024-01");
+assert.deepStrictEqual(andongApple.applicationMonthCounts, { "2024-03": 1, "2025-01": 1 });
+assert.deepStrictEqual(andongApple.registrationMonthCounts, {}, "registrationDate 필드가 없으면 빈 객체");
+assert.deepStrictEqual(result.summary.applicationMonthCounts, { "2024-03": 1, "2025-01": 1 }, "요약은 출원번호 기준 중복 제거(포천 사과 hit이 안동과 같은 40-2025-1)");
+ok("오류·0건 포함, 출원번호 중복 제거, 상태별 집계, 월 단위 집계");
 
 console.log("2-1) 원물류(29·30·31류) 전국 후보 지역 주소 일치 비율(#110, 지역 통계와 분리된 참고 지표)");
 assert.deepStrictEqual(andongApple.rawGoodsRegionalShare, {
