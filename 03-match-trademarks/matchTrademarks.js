@@ -178,12 +178,19 @@ function makeBatchQuery(row, options = {}) {
   ].includes(row.sourceScope);
   if (!region && !nationwideCatalog) return { skipReason: "지역 정보 없음" };
 
+  const notice = String(row.noticeName || "").trim();
+
   if (row.status === "ok" && [
     "nfqs_quality_cert",
     "nfqs_geographical_indication",
     "kofpi_forest_product",
     "rda_regional_specialty_crops",
   ].includes(row.sourceId)) {
+    // #117: RDA 지역특화작목이 ②에서 고시명칭·NICE류로 확정됐으면 그걸로 검색한다
+    // (도 단위 상표 검증 정확도↑). 확정 못 한 건 종전대로 원물명 전 식품류 검색.
+    if (row.sourceId === "rda_regional_specialty_crops" && notice && String(row.niceClass || "").trim()) {
+      return { region: region || null, item: notice, classCode: row.niceClass, sourceScope: row.sourceScope || "regional" };
+    }
     const item = String(row.itemName || row.rawItemName || "").trim();
     if (!item) return { skipReason: "공식 수집원 품목명 없음" };
     return {
@@ -194,7 +201,6 @@ function makeBatchQuery(row, options = {}) {
     };
   }
 
-  const notice = String(row.noticeName || "").trim();
   if (row.status === "ok") {
     if (!notice) return { skipReason: "② 단계 고시명칭 미확정" };
     if (!String(row.niceClass || "").trim()) return { skipReason: "② 단계 NICE류 미확정" };

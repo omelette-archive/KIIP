@@ -175,7 +175,11 @@ function normalizeByRules(row, dictionary, { topK = 5 } = {}) {
     : cleanItemName(row.rawItemName, row);
   if (!itemName) return reviewResult(base, "", [], "정제할 품목명이 없음");
 
-  if (["nfqs_quality_cert", "nfqs_geographical_indication", "kofpi_forest_product", "rda_regional_specialty_crops"].includes(row.sourceId)) {
+  // NFQS·KOFPI는 공식 카탈로그명이 곧 검색어라 고시명칭 매칭을 건너뛴다. RDA 지역특화작목은
+  // 예외 — 도 단위 상표 검증에 NICE류 타겟팅이 크게 도움이 되므로(#117), 아래 별칭·exact·
+  // 신선한/미가공 규칙을 태워서 매칭 가능한 건 고시명칭으로 확정하고, 안 되는 건 종전대로
+  // 원물명 검색(review_required)으로 남긴다.
+  if (["nfqs_quality_cert", "nfqs_geographical_indication", "kofpi_forest_product"].includes(row.sourceId)) {
     return {
       ...base,
       itemName,

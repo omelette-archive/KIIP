@@ -403,6 +403,7 @@ async function run() {
       makeBatchQuery({ sido: "경상북도", sigungu: "안동시", itemName: "상큼愛", status: "ok" }).skipReason,
       /고시명칭 미확정/
     );
+    // #117: 지역특화작목이 고시명칭 미확정이면 도 단위 원문명 전 식품류 검색.
     assert.deepStrictEqual(
       makeBatchQuery({
         sido: "경기도",
@@ -413,6 +414,20 @@ async function run() {
         sourceScope: "province_policy_specialty",
       }),
       { region: "경기도", item: "선인장·다육식물", classCode: null, sourceScope: "province_policy_specialty" }
+    );
+    // #117: 고시명칭·NICE류가 확정된 지역특화작목은 그걸로 검색(도 단위 검증 정확도↑).
+    assert.deepStrictEqual(
+      makeBatchQuery({
+        sido: "제주특별자치도",
+        sigungu: "",
+        itemName: "감귤",
+        noticeName: "신선한 감귤",
+        niceClass: "31",
+        status: "ok",
+        sourceId: "rda_regional_specialty_crops",
+        sourceScope: "province_policy_specialty",
+      }),
+      { region: "제주특별자치도", item: "신선한 감귤", classCode: "31", sourceScope: "province_policy_specialty" }
     );
     // 2026-09-04(#70): NFQS 품질인증수산물은 지역 없이 수집되지만(인증사업장 소재지≠산지)
     // "전국 카탈로그" scope라 스킵하지 않고 전국 검색해야 한다. 03d가 "전국 지역 미제공"으로

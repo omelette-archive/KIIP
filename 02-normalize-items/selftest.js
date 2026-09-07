@@ -188,20 +188,28 @@ async function run() {
     ok("고시명칭 후보가 없어도 임산물DB백과에 등재된 이름이면 검토 사유에 학명·과명 참고 근거를 덧붙임(지역×품목 행은 새로 안 만듦)");
   }
 
-  console.log("5-2a) 농촌진흥청 지역특화작목은 공식명칭을 보존");
+  console.log("5-2a) 농촌진흥청 지역특화작목도 고시명칭 매칭에 태운다(#117)");
   {
-    const normalized = normalizeByRules({
-      sido: "경기도",
-      sigungu: "",
-      rawItemName: "선인장·다육식물",
-      source: "농촌진흥청 지역특화작목(대표작목)",
-      sourceId: "rda_regional_specialty_crops",
-    }, [], { topK: 5 });
-    assert.strictEqual(normalized.status, "ok");
-    assert.strictEqual(normalized.itemName, "선인장·다육식물");
-    assert.strictEqual(normalized.matchMethod, "source_catalog_item");
-    assert.strictEqual(normalized.verdictSource, "official_source_catalog");
-    ok("복합 작목명을 임의로 분해하거나 고시명칭으로 변형하지 않음");
+    const dict = makeDictionary([
+      { item: "신선한 감귤", niceClass: "31", similarGroupCode: "G0211" },
+    ]);
+    // 고시명칭에 대응 원물이 있으면(신선한 X) 확정한다 — NICE류 타겟팅으로 도 단위 검증 정확도↑.
+    const matched = normalizeByRules({
+      sido: "제주특별자치도", sigungu: "", rawItemName: "감귤",
+      source: "농촌진흥청 지역특화작목", sourceId: "rda_regional_specialty_crops",
+    }, dict, { topK: 5 });
+    assert.strictEqual(matched.noticeName, "신선한 감귤");
+    assert.strictEqual(matched.niceClass, "31");
+    assert.strictEqual(matched.matchMethod, "rule_fresh");
+    // 대응 원물이 없는 복합·범주명은 임의 분해·변형 없이 검토대기(원물명 검색)로 남긴다.
+    const unresolved = normalizeByRules({
+      sido: "경기도", sigungu: "", rawItemName: "선인장·다육식물",
+      source: "농촌진흥청 지역특화작목(대표작목)", sourceId: "rda_regional_specialty_crops",
+    }, dict, { topK: 5 });
+    assert.strictEqual(unresolved.status, "review_required");
+    assert.strictEqual(unresolved.itemName, "선인장·다육식물");
+    assert.strictEqual(unresolved.noticeName, "");
+    ok("고시명칭 대응 원물은 확정, 없는 복합·범주명은 원물명 검색으로 유지");
   }
 
   console.log("5-1) 사용자 승인 별칭 — 승인 묶음만 공식 고시명칭으로 자동 확정");
