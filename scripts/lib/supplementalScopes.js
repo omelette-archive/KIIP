@@ -91,8 +91,11 @@ function expandForestRegionalResults(document, evidenceDocument, adminList) {
     }
     for (const evidence of primaryRegionEvidence) {
       // 2024년 임산물생산조사 원자료는 "전라남도"처럼 통합 전 도명을 그대로 쓴다.
-      // 마스터가 주어지면 현재 시도명(전남광주통합특별시)으로 정규화한다.
+      // 마스터가 주어지면 현재 시도명(전남광주통합특별시)으로 정규화한다. input.sido 뿐 아니라
+      // query.region까지 정규화해야 ④ 분석이 이 행을 통합 도명 기준으로 버킷팅한다 — 안 하면
+      // 같은 지역×품목을 다른 소스(농사로 등)가 이미 다루고 있을 때 정규화 후 중복 키가 된다.
       const { sido } = resolveSidoName(evidence.sido, adminList);
+      const normalizedRegion = [sido, evidence.sigungu].filter(Boolean).join(" ").trim() || evidence.region;
       const regional = structuredClone(result);
       regional.inputIndex = `forest-region-${evidence.tableNumber}-${result.inputIndex}`;
       regional.input = {
@@ -112,7 +115,7 @@ function expandForestRegionalResults(document, evidenceDocument, adminList) {
       };
       regional.query = {
         ...(regional.query || {}),
-        region: evidence.region,
+        region: normalizedRegion,
         regionMatch: "official_primary_region_evidence",
       };
       expanded.push(regional);
