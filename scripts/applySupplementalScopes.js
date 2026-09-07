@@ -12,6 +12,7 @@
 
 const fs = require("fs");
 const path = require("path");
+const { writeJsonStreaming } = require("./lib/streamJsonWrite");
 const { applySupplementalScopes } = require("./lib/supplementalScopes");
 const { loadAdminCodes } = require("../01-collect-specialties/lib/adminCodes");
 
@@ -37,7 +38,7 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(path.resolve(file), "utf8").replace(/^﻿/, ""));
 }
 
-function main() {
+async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h || !args.input || !args.out) {
     console.error("사용법: node scripts/applySupplementalScopes.js --input <③ JSON> --out <경로> [--forest-regions <json>]");
@@ -53,20 +54,18 @@ function main() {
   const after = (document.results || []).length;
 
   const outPath = path.resolve(args.out);
-  fs.mkdirSync(path.dirname(outPath), { recursive: true });
-  fs.writeFileSync(outPath, `${JSON.stringify(document, null, 2)}\n`, "utf8");
+  // 03c 산출물(수백MB)을 그대로 다시 쓰므로 큰 컬렉션만 항목 단위로 스트리밍한다(03c OOM 대응).
+  await writeJsonStreaming(outPath, document);
   console.error(
     `[applySupplementalScopes] results ${before} -> ${after} (KOFPI 주산지 확장 포함) -> ${outPath}`
   );
 }
 
 if (require.main === module) {
-  try {
-    main();
-  } catch (error) {
+  main().catch((error) => {
     console.error(`[applySupplementalScopes] 실패: ${error.message}`);
     process.exit(1);
-  }
+  });
 }
 
 module.exports = { parseArgs, main };

@@ -4,6 +4,7 @@
 const fs = require("fs");
 const path = require("path");
 const { loadEnv } = require("./lib/loadEnv");
+const { writeJsonStreaming } = require("../scripts/lib/streamJsonWrite");
 const { createClient } = require("./lib/ipRegistryClient");
 const { enrichDocument, registryNumbers } = require("./lib/ipRegistryEnricher");
 const { loadCache, saveCache } = require("./lib/ipRegistryCache");
@@ -145,7 +146,7 @@ function main() {
         console.error(`[enrichIpRegistry] checkpoint new=${completedThisRun}, cache=${cacheEntries.size}`);
       }
     },
-  }).then((output) => {
+  }).then(async (output) => {
     if (cachePath) saveCache(cachePath, cacheEntries);
     const summary = output.ipRegistryEnrichment;
     // 커스텀 클라이언트가 onRateLimit 훅을 건너뛴 경우에도 최종 상태에 차단 시점을 남긴다.
@@ -168,8 +169,9 @@ function main() {
       executionRequestLimit: effectiveLimit,
       blockedReason,
     };
-    fs.mkdirSync(path.dirname(outPath), { recursive: true });
-    fs.writeFileSync(outPath, JSON.stringify(output, null, 2) + "\n", "utf8");
+    // 큰 입력(수백MB)에서 `JSON.stringify(output, null, 2)` 한 방은 피크 메모리가
+    // 5~8GB까지 튀어 OOM(2026-09-07). 큰 컬렉션만 항목 단위로 스트리밍한다.
+    await writeJsonStreaming(outPath, output);
     console.error(
       `[enrichIpRegistry] status=${summary.status}, requested=${summary.requestedRegistrationCount}, ` +
         `complete=${summary.completeRegistrationCount}, error=${summary.errorRegistrationCount}, ` +

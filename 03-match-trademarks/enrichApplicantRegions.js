@@ -7,49 +7,13 @@ const { loadEnv } = require("./lib/loadEnv");
 const { createClient } = require("./lib/trademarkApplicantClient");
 const { applicationNumbers, enrichApplicantRegions } = require("./lib/trademarkApplicantEnricher");
 const { loadCache, saveCache } = require("./lib/trademarkApplicantCache");
+const { writeJsonStreaming } = require("../scripts/lib/streamJsonWrite");
 
 loadEnv();
 
-// 2026-08-20: 병합 입력이 커지면(수백MB) JSON.stringify(output) 자체가 V8 문자열 길이
-// 한도를 넘어 "Invalid string length"로 실패한다(compact로 바꿔도 마찬가지). queryFacts·
-// results처럼 큰 컬렉션만 항목 단위로 나눠 스트리밍 쓰기하면, 각 JSON.stringify 호출은
-// 항목 하나(수 KB~수백KB) 크기로 끝나 한도를 넘지 않는다. 값은 완전히 동일하다.
-function writeJsonStreaming(outPath, obj) {
-  const stream = fs.createWriteStream(outPath, { encoding: "utf8" });
-  const write = (chunk) => stream.write(chunk);
-  write("{");
-  let firstTopKey = true;
-  for (const [key, value] of Object.entries(obj)) {
-    if (!firstTopKey) write(",");
-    firstTopKey = false;
-    write(`${JSON.stringify(key)}:`);
-    if (key === "queryFacts" && value && typeof value === "object") {
-      write("{");
-      let first = true;
-      for (const [qKey, fact] of Object.entries(value)) {
-        if (!first) write(",");
-        first = false;
-        write(`${JSON.stringify(qKey)}:${JSON.stringify(fact)}`);
-      }
-      write("}");
-    } else if (key === "results" && Array.isArray(value)) {
-      write("[");
-      let first = true;
-      for (const row of value) {
-        if (!first) write(",");
-        first = false;
-        write(JSON.stringify(row));
-      }
-      write("]");
-    } else {
-      write(JSON.stringify(value));
-    }
-  }
-  write("}\n");
-  return new Promise((resolve, reject) => {
-    stream.end((err) => (err ? reject(err) : resolve()));
-  });
-}
+// 병합 입력이 커지면(수백MB) `JSON.stringify(output)` 한 방은 V8 문자열 길이 한도
+// ("Invalid string length")나 피크 메모리(2026-09-07 03c OOM)에 걸린다. queryFacts·
+// results 같은 큰 컬렉션만 항목 단위로 스트리밍하는 공통 헬퍼로 처리한다(값은 동일, pretty 없음).
 
 function parseArgs(argv) {
   const args = { limit: 10, concurrency: 1, "checkpoint-every": 100 };

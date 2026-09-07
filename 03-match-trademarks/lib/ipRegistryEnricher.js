@@ -751,15 +751,17 @@ async function enrichDocument(document, client, options = {}) {
 
   // query_facts 저장 방식은 각 고유 쿼리의 hits를 한 번만(지역행마다 복제하지 않고) 보강한다
   // — results는 그대로 두고 queryFacts만 갱신해 압축 저장 구조를 유지한다.
+  // 수백MB 입력에서 queryFacts 전체를 Object.fromEntries로 복제하면 피크 메모리가 2배로
+  // 튀어 03c OOM(2026-09-07). fact.hits만 제자리에서 교체해 한 fact 분량만 추가로 산다.
   const isQueryFacts = document.storageMode === "query_facts" && document.queryFacts;
-  const queryFacts = isQueryFacts
-    ? Object.fromEntries(
-        Object.entries(document.queryFacts).map(([key, fact]) => [
-          key,
-          { ...fact, hits: enrichHits(fact.hits, fact.query) },
-        ])
-      )
-    : undefined;
+  let queryFacts;
+  if (isQueryFacts) {
+    queryFacts = document.queryFacts;
+    for (const key of Object.keys(queryFacts)) {
+      const fact = queryFacts[key];
+      fact.hits = enrichHits(fact.hits, fact.query);
+    }
+  }
   const results = isQueryFacts
     ? document.results
     : document.results.map((entry) => ({ ...entry, hits: enrichHits(entry.hits, entry.query) }));
