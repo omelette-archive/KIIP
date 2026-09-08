@@ -434,6 +434,34 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 일반상표(40)는 대다수라 칩으로 달면 정보가 되지 않는다 — 단체·증명표장만 남긴다.
   const giMarkLabel = (applicationNumber) => { const label = markTypeOf(applicationNumber); return label && label !== "일반상표" ? label : null; };
   // trademarkExamples는 최근 10건 표본이므로 "표본에서 확인된 수"로만 쓴다.
+  // 2026-09-08(사용자): "지리적표시권, 지리적표시 단체표장, 지리적표시 증명표장 보유 여부는
+  // 확인이 안되나? 같이 보여주면 좋은데" — 셋은 근거도 제도도 다르므로 한 줄에 나란히 두되
+  // 출처를 각각 밝힌다.
+  //
+  //  ① 지리적표시 등록 : 농수산물 품질관리법. 농관원·산림청·수산물품질관리원이 등록하며
+  //                      상표권이 아니다. 그 GI 목록에서 수집된 품목인지로 판정한다.
+  //  ② 단체표장(44)   : 상표법. 출원번호 앞 두 자리로 판정.
+  //  ③ 증명표장(48)   : 상표법. 같음.
+  //
+  // ②·③은 trademarkExamples(표본)에서만 세므로 하한이다. ①은 품목이 GI 목록에 있다는
+  // 뜻이지 이 지역이 그 등록권자라는 뜻은 아니다 — 문구로 못박는다.
+  const GI_REGISTRY_SOURCES = new Set(["nfqs_geographical_indication", "naqs_gi_specialties", "jeju_naqs_gi_specialties"]);
+  const giRegistryHit = (item) => (item.sources || []).some((source) => GI_REGISTRY_SOURCES.has(source));
+  function giHoldingsHtml(item, examples) {
+    const registry = giRegistryHit(item);
+    const collective = examples.filter((example) => String(example.applicationNumber || "").startsWith("44")).length;
+    const certification = examples.filter((example) => String(example.applicationNumber || "").startsWith("48")).length;
+    const cell = (label, held, detail, hint) =>
+      `<em class="gi-holding ${held ? "held" : "none"}" title="${esc(hint)}"><b>${esc(label)}</b><span>${esc(detail)}</span></em>`;
+    return `<div class="gi-holdings-row"><strong>지리적표시</strong><span class="gi-holdings">`
+      + cell("지리적표시 등록", registry, registry ? "품목 등록됨" : "미확인",
+             "농수산물 품질관리법에 따른 지리적표시 등록(농관원·산림청·수산물품질관리원). 상표권이 아닙니다. 이 품목이 GI 목록에 있다는 뜻이며, 이 지역이 등록권자라는 뜻은 아닙니다.")
+      + cell("단체표장", collective > 0, collective > 0 ? `${number(collective)}건` : "없음",
+             "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+      + cell("증명표장", certification > 0, certification > 0 ? `${number(certification)}건` : "없음",
+             "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+      + `</span><small>등록은 농수산물 품질관리법(상표권 아님), 단체·증명표장은 상표법 — 서로 다른 제도입니다</small></div>`;
+  }
   const markTypeBreakdown = (examples) => {
     const counts = new Map();
     for (const example of examples) { const label = markTypeOf(example.applicationNumber) || "기타"; counts.set(label, (counts.get(label) || 0) + 1); }
@@ -1224,7 +1252,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
         ${typeof item.metrics.localApplicantCount?.value === "number" ? `<article><span>권리주체</span><strong>${number(item.metrics.localApplicantCount.value)}곳</strong><small>${typeof item.metrics.producerApplicantShare?.value === "number" ? `생산자단체·지자체 ${percent(item.metrics.producerApplicantShare.value)}` : "지역 확인된 출원의 고유 출원인 수"}</small></article>` : ""}${(() => { const rights = rightsStatusOf(item); return `<article class="rights-status rights-status-${rights.key}"><span>권리 상태</span><strong>${esc(rights.label)}</strong><small>${esc(rights.note)}</small></article>`; })()}<article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
-      ${examples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(examples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>예시 ${number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : ""}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
+      ${examples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(examples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>예시 ${number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : ""}${giHoldingsHtml(item, examples)}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
       ${item.briefing && item.briefing.sentences.length > 0 ? `${businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략", "", nationwideReach(item))}${businessStrategyDisclaimerHtml(item.briefing.templateVersion)}` : ""}
       <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${goodsStageLabel(example.goodsEvidence) ? `<span class="goods-stage-chip" title="${esc("지정상품 명칭으로 판정한 밸류체인 단계입니다. 류가 아니라 지정상품 기준입니다.")}">${esc(goodsStageLabel(example.goodsEvidence))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="KIPRIS에서 이 상표(출원번호 ${esc(example.applicationNumber)})의 검색 결과를 새 창으로 엽니다" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 결과 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;
@@ -1504,10 +1532,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const REPORT_SERVICE_FLOOR = 35;
   // 같은 색인을 전국(regionalRegions)으로도, 고른 시도의 행만으로도 만든다 —
   // 두 색인의 차이가 곧 "전국은 갔는데 이 지역은 아직"이다.
+  // 「신선한 토마토」의 지정상품 문안은 「토마토」를 담고 있다 — 수식 접두어를 떼야 맞물린다.
+  const TEMPLATE_SLOT = "{품목}";
+  const bareItemName = (name) => String(name || "").replace(/^(신선한|미가공|말린|건조된|생)\s*/, "").replace(/\s+/g, "");
   function buildExpansionIndex(regions) {
     const byItem = new Map();     // 품목명 -> { category, classes: Map<류, {count, goods:Set}> }
     const byClass = new Map();    // 류 -> { items: Map<품목명, Set<지정상품>>, count }
     const byCategory = new Map(); // 유형코드 -> Map<류, Set<품목명>>
+    const byTemplate = new Map(); // 류 -> Map<문안틀, Set<쓴 품목>>
     for (const region of regions) {
       for (const item of region.items) {
         const name = officialItemLabel(item);
@@ -1523,6 +1555,25 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
             own.count += 1;
             if (goods) own.goods.add(goods);
             entry.classes.set(code, own);
+
+            // 2026-09-08(사용자): "맞춤형 추천을 해줘야지.. 류에 해당하는 적절한 지정상품으로"
+            // 남의 품목 지정상품을 예시로 보여 주는 대신, 그 문안에서 품목명만 빼내 틀로 만들고
+            // 고른 품목 이름을 끼워 제안한다. 「가공된감」 → 「가공된{품목}」 → 「가공된수박」.
+            // 지어낸 문구가 아니라 실제 등록된 표현을 그대로 옮겨 쓰는 것이다.
+            const bare = bareItemName(name);
+            if (bare && goods.includes(bare)) {
+              const shape = goods.split(bare).join(TEMPLATE_SLOT);
+              // 「{품목}」만 남는 틀은 정보가 없고, 괄호가 붙은 틀은 특정 지역·원료를 한정하는
+              // 조건절이라(「생막걸리(강원도양구군에서재배된{품목}가함유된것에한함)」) 남의 품목에
+              // 옮겨 붙일 수 없다.
+              if (shape !== TEMPLATE_SLOT && !/[()（）[\]]/.test(shape)) {
+                const perClass = byTemplate.get(code) || new Map();
+                const users = perClass.get(shape) || new Set();
+                users.add(bare);
+                perClass.set(shape, users);
+                byTemplate.set(code, perClass);
+              }
+            }
 
             const shared = byClass.get(code) || { items: new Map(), count: 0 };
             shared.count += 1;
@@ -1546,7 +1597,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       }
       byCategory.set(code, map);
     }
-    return { byItem, byClass, byCategory };
+    return { byItem, byClass, byCategory, byTemplate };
   }
   let nationalIndexCache = null;
   const expansionIndex = () => (nationalIndexCache = nationalIndexCache || buildExpansionIndex(regionalRegions));
@@ -1598,6 +1649,28 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 지역을 고르면 ⑤절이 붙는다. 그 지역 행만으로 만든 색인과 전국 색인을 견주어
   // "전국 특산품은 도달했는데 이 지역은 아직 비어 있는 상품류"를 지역 공백으로 보여 주고,
   // 그 지역 다른 특산품의 서비스류 등록례를 지역 창업 선례로 붙인다.
+  // 한 상품류에서 널리 쓰인 문안 틀에 이 품목 이름을 끼워 제안을 만든다. 여러 품목이 쓴
+  // 틀일수록 그 류의 표준 표현에 가깝다.
+  //
+  // 한 품목만 쓴 틀은 그 품목에만 말이 되는 경우가 많아 옮겨 붙이면 헛소리가 된다
+  // (「장뇌산삼주」→「장뇌수박」, 「도자기제접시」→「수박제접시」, 「담배대용품」→「수박대용품」).
+  // 두 품목 이상이 실제로 쓴 틀만 제안한다 — 놓치는 제안이 생기더라도(40류 「{품목}가공업」은
+  // 한 건뿐이라 빠진다) 말이 안 되는 제안을 내놓는 것보다 낫다. 제안이 하나도 없으면
+  // 그 줄은 근거만 보여 준다.
+  const SUGGEST_MIN_USERS = 2;
+  function suggestGoods(index, code, itemName, limit) {
+    const bare = bareItemName(itemName);
+    const perClass = index.byTemplate.get(code);
+    if (!bare || !perClass) return [];
+    return [...perClass.entries()]
+      .filter(([, users]) => users.size >= SUGGEST_MIN_USERS && !(users.size === 1 && users.has(bare)))
+      .sort((a, b) => b[1].size - a[1].size || a[0].length - b[0].length)
+      .slice(0, limit)
+      .map(([shape]) => shape.split(TEMPLATE_SLOT).join(bare));
+  }
+  const suggestionHtml = (list) => list.length
+    ? `<small class="expansion-suggest"><b>제안</b> ${list.map((text) => `「${esc(text)}」`).join(" · ")}</small>`
+    : "";
   function regionSectionHtml(row, province, index) {
     const rows = regionalRegions.filter((region) => provinceOf(region) === province);
     if (!rows.length) return "";
@@ -1640,7 +1713,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       ? `<ol class="expansion-list">${missing.slice(0, 6).map((code) => `<li><span class="expansion-class">${esc(niceClassLabel(code))}</span><span class="expansion-why">전국에는 있고 이 지역엔 없음</span></li>`).join("")}</ol>`
       : `<p class="empty">${esc(withSubjectJosa(row.name))} 전국에서 도달한 상품류를 이 지역도 모두 갖고 있습니다.</p>`;
     const svcHtml = localSvc.length
-      ? `<ol class="expansion-list svc">${localSvc.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">이 지역 선례</span><small>예: ${esc(r.show.lead)} 「${esc(r.show.goods)}」</small></li>`).join("")}</ol>`
+      ? `<ol class="expansion-list svc">${localSvc.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">이 지역 선례</span><small class="expansion-basis">근거 ${esc(r.show.lead)} 「${esc(r.show.goods)}」</small></li>`).join("")}</ol>`
       : `<p class="empty">이 지역 특산품 중 서비스류(35류 이상)를 확보한 사례가 아직 없습니다 — 지역 창업 영역이 통째로 비어 있습니다.</p>`;
 
     return `<article class="expansion-region"><h3>⑤ ${esc(displayRegionName(province))} 관점</h3>`
@@ -1700,7 +1773,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     }
     peerRows.splice(6);
     const peerHtml = peerRows.length
-      ? `<ol class="expansion-list">${peerRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">${esc(r.scope)} ${number(r.peers)}개 품목이 이미 확보</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      ? `<ol class="expansion-list">${peerRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">${esc(r.scope)} ${number(r.peers)}개 품목이 이미 확보</span>${suggestionHtml(suggestGoods(index, r.code, row.name, 3))}${r.goods ? `<small class="expansion-basis">근거 ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
       : `<p class="empty">같은 유형 품목들이 확보한 상품류를 이 품목도 모두 갖고 있습니다.</p>`;
 
     // ③ 이색 확장 사례 — 전국에서 도달한 품목이 가장 적은 류
@@ -1713,7 +1786,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       .slice(0, 5)
       .map((r) => ({ code: r.code, itemCount: r.itemCount, lead: r.show.lead, goods: r.show.goods }));
     const rareHtml = rare.length
-      ? `<ol class="expansion-list rare">${rare.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 중 ${number(r.itemCount)}개 품목만 도달</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      ? `<ol class="expansion-list rare">${rare.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 중 ${number(r.itemCount)}개 품목만 도달</span>${suggestionHtml(suggestGoods(index, r.code, row.name, 2))}${r.goods ? `<small class="expansion-basis">근거 ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
       : `<p class="empty">이 품목이 이미 대부분의 상품류에 도달해 있습니다.</p>`;
 
     // ④ 서비스·지역 창업
@@ -1729,7 +1802,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       ? `이 품목은 ${serviceCodes.map((c) => esc(niceClassLabel(c))).join(" · ")}를 이미 확보했습니다. 남은 서비스 구간은 아래와 같습니다.`
       : `이 품목은 <b>서비스류 출원이 한 건도 없습니다</b> — 직판·체험·관광·가공 위탁 같은 지역 창업 영역을 아직 아무도 권리화하지 않았다는 뜻입니다.`;
     const svcHtml = svcRows.length
-      ? `<ol class="expansion-list svc">${svcRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 상표 ${number(r.count)}건이 이 구간에</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      ? `<ol class="expansion-list svc">${svcRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 상표 ${number(r.count)}건이 이 구간에</span>${suggestionHtml(suggestGoods(index, r.code, row.name, 3))}${r.goods ? `<small class="expansion-basis">근거 ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
       : `<p class="empty">전국 특산품 상표에서도 아직 서비스류 사례가 확인되지 않았습니다.</p>`;
 
     return `<section class="expansion-report">
@@ -1742,7 +1815,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><h3>④ 서비스 · 지역 창업</h3><p class="expansion-hint">${svcHead}</p>${svcHtml}</article>
         ${province ? regionSectionHtml(row, province, index) : ""}
       </div>
-      <p class="expansion-caveat">이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
+      <p class="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
     </section>`;
   }
   function strategyFlowHtml() {
