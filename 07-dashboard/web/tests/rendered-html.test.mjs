@@ -761,6 +761,10 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   // "전국" 중복 제거(섹션·스코프 노트가 이미 전국임을 밝힘).
   assert.match(standaloneHtml, /<section class="summary-recent">/);
   assert.match(standaloneHtml, /"연도별 출원·등록 추이", "전국 · 실제 출원일자·등록일자 기준"/);
+  // 사용자 요청(2026-09-08, #180): "최근 동향" 헤딩 옆 부연 span과 단계별 지역 도넛(#119)은
+  // PR #181 머지 때 한 번 롤백됐다(#183에서 복구). 재발 방지용 가드.
+  assert.doesNotMatch(standaloneHtml, /전국 규모 · 지역 귀속 확인 전/, "최근 동향 헤딩 옆 부연 span은 제거된 상태여야 함");
+  assert.match(standaloneHtml, /class="flow-region-donut/, "#119 단계별 상위 지역 도넛(StageRegionDonut) 렌더 경로가 있어야 함");
   assert.match(
     standaloneHtml,
     /\$\{regionTrendHtml\(region, "지역 연도별 출원·등록 추이"[\s\S]*class="item-tabs word-cloud"/,
