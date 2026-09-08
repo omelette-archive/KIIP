@@ -1511,6 +1511,64 @@ function CategoryDetailRow({ row }: { row: { label: string; trademarks: number; 
     {rest > 0 && <p className="screen-note">출원 건수 상위 {number(CATEGORY_DETAIL_LIMIT)}개 표시 · 나머지 {number(rest)}개</p>}
   </div></td></tr>;
 }
+// 2026-09-08(사용자): "빈칸에 검색할 때 스페이스 하지 말고 단어 넣고 엔터치면 검색이
+// 되었으면 좋겠어." 한 글자마다 검색하면 한글은 음절이 완성될 때마다 목록 전체가 다시
+// 그려져 조합이 끊긴다 — 「한라봉」을 치면 한·라·봉 세 번이다. 타이핑 중에는 자기 값만
+// 들고 있다가 엔터에서만 위로 올린다. 칸을 벗어날 때(blur)도 한 번 올려, 엔터를 안 치고
+// 다른 곳을 눌러도 입력한 내용이 사라지지 않게 한다. standalone의 bindSearchInput과 동일.
+function SearchInput({ value, onSubmit, placeholder, className, label }: {
+  value: string; onSubmit: (next: string) => void; placeholder: string; className: string; label: string;
+}) {
+  const [draft, setDraft] = useState(value);
+  // 바깥에서 검색어가 바뀌면(칩 클릭·화면 전환 등) 입력칸도 따라간다. effect가 아니라
+  // 렌더 중에 맞춘다 — effect로 하면 한 번 그린 뒤 다시 그려 깜빡이고, 린트도 막는다.
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (value !== syncedValue) { setSyncedValue(value); setDraft(value); }
+  const commit = () => { if (draft !== value) onSubmit(draft); };
+  return <label className={className}>
+    <span className="sr-only">{label}</span>
+    <input
+      type="search"
+      value={draft}
+      placeholder={placeholder}
+      onChange={(event) => {
+        const next = event.target.value;
+        setDraft(next);
+        // 지우기(X 버튼·전체 삭제)는 엔터를 기다릴 이유가 없다 — 바로 되돌린다.
+        if (next === "") onSubmit("");
+      }}
+      onKeyDown={(event) => {
+        // 한글 조합 중의 엔터는 후보 확정이지 검색 요청이 아니다.
+        if (event.key !== "Enter" || event.nativeEvent.isComposing) return;
+        event.preventDefault();
+        commit();
+      }}
+      onBlur={commit}
+    />
+  </label>;
+}
+// 전략 표 필터는 라벨이 보이는 형태라 SearchInput(sr-only 라벨)과 구조가 달라 따로 둔다.
+// 커밋 시점(엔터·blur)은 같다.
+function StrategyFilterInput({ id, value, onSubmit }: { id: string; value: string; onSubmit: (next: string) => void }) {
+  const [draft, setDraft] = useState(value);
+  const [syncedValue, setSyncedValue] = useState(value);
+  if (value !== syncedValue) { setSyncedValue(value); setDraft(value); }
+  const commit = () => { if (draft !== value) onSubmit(draft); };
+  return <input
+    id={id}
+    type="search"
+    value={draft}
+    placeholder="지역명 또는 품목명 · 엔터로 검색"
+    onChange={(event) => {
+      const next = event.target.value;
+      setDraft(next);
+      // 지우기(X 버튼·전체 삭제)는 엔터를 기다릴 이유가 없다 — 바로 되돌린다.
+      if (next === "") onSubmit("");
+    }}
+    onKeyDown={(event) => { if (event.key !== "Enter" || event.nativeEvent.isComposing) return; event.preventDefault(); commit(); }}
+    onBlur={commit}
+  />;
+}
 function ExpansionRegionSection({ regions, name, province, index }: { regions: Region[]; name: string; province: string; index: ExpansionIndex }) {
   const rows = regions.filter((region) => provinceOf(region) === province);
   if (!rows.length) return null;
@@ -2865,7 +2923,7 @@ const STRATEGY_CHIP_LIMIT = 12;
           품목별 조회와 같은 자리·같은 모양으로 둔다. */}
       <div className="explore-toolbar">
         <div className="item-search-row">
-          <label className="search-field explore-search"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={regionQuery} onChange={(event) => setRegionQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
+          <SearchInput className="search-field explore-search" label="지역 또는 품목 검색" placeholder="지역 또는 품목 검색 · 엔터로 검색" value={regionQuery} onSubmit={setRegionQuery} />
           <label className="item-sort-field"><span className="sr-only">정렬 기준</span><select value={regionSort} onChange={(event) => setRegionSort(event.target.value as typeof regionSort)}><option value="gap">공백 많은 순</option>
             <option value="name">가나다순</option>
             <option value="coverage">출원율순</option>
@@ -3120,7 +3178,7 @@ const STRATEGY_CHIP_LIMIT = 12;
       <section className="workspace" aria-label="지역별 상세 조회">
         <aside className="region-panel">
           <div className="panel-heading"><div><h2>지자체 목록</h2></div><span>시도 {groupedRegions.length}곳 · 시군구 {filteredRegions.length}곳</span></div>
-          <label className="search-field"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
+          <SearchInput className="search-field" label="지역 또는 품목 검색" placeholder="지역 또는 품목 검색 · 엔터로 검색" value={query} onSubmit={setQuery} />
           <div className="province-list">{groupedRegions.map(({ province, regions }) => {
             const expanded = Boolean(query.trim()) || expandedRegionProvince === province;
             const coverage = specialtyCoverage(regions);
@@ -3144,7 +3202,7 @@ const STRATEGY_CHIP_LIMIT = 12;
       {/* 이슈 #136(2026-09-07): 토글·검색·정렬을 한 줄로 묶어 머리말 높이를 줄인다. */}
       <div className="explore-toolbar">
         <div className="item-search-row">
-          <label className="search-field explore-search"><span className="sr-only">품목 또는 지역 검색</span><input type="search" value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
+          <SearchInput className="search-field explore-search" label="품목 또는 지역 검색" placeholder="품목명 또는 지역명 검색 · 엔터로 검색" value={itemQuery} onSubmit={setItemQuery} />
           {/* UI 검토(3차, 2026-09-06) S5: 정렬 기준을 고를 수 있게(검색 옆, P3: 칩·검색·정렬은 항상 같은 자리). */}
           <label className="item-gap-filter" title="집계가 끝난 지역 중 확인된 출원이 0건인 곳이 있는 품목만"><input type="checkbox" checked={itemGapOnly} onChange={(event) => { setItemGapOnly(event.target.checked); setSelectedItemName(""); }} /><span>공백만 보기</span></label>
           <label className="item-sort-field"><span className="sr-only">정렬 기준</span><select value={itemSort} onChange={(event) => setItemSort(event.target.value as typeof itemSort)}>
@@ -3282,7 +3340,7 @@ const STRATEGY_CHIP_LIMIT = 12;
             </div>
             </div>
             <div className="strategy-picker-inputs">
-            <label className="search-field strategy-item-search"><span className="sr-only">품목 직접 검색</span><input type="search" value={strategyItemQuery} placeholder={`품목명 직접 입력 · 전체 ${strategyFlowRows.length}개`} onChange={(event) => { setStrategyItemQuery(event.target.value); setStrategyItem(""); }} /></label>
+            <SearchInput className="search-field strategy-item-search" label="품목 직접 검색" placeholder={`품목명 직접 입력 · 전체 ${strategyFlowRows.length}개 · 엔터로 검색`} value={strategyItemQuery} onSubmit={(next) => { setStrategyItemQuery(next); setStrategyItem(""); }} />
             <label className="search-field strategy-region-select"><span className="sr-only">지역 선택</span><select value={strategyRegion} onChange={(event) => setStrategyRegion(event.target.value)}><option value="">지역 선택 안 함 (전국 기준)</option>{strategyProvinces.map((province) => <option key={province} value={province}>{displayRegionName(province)}</option>)}</select></label>
             </div>
           </div>
@@ -3308,7 +3366,7 @@ const STRATEGY_CHIP_LIMIT = 12;
       {strategyRows.length === 0 && <p className="empty">아직 표시할 브리핑이 없습니다.</p>}
       {strategyRows.length > 0 && <>
         <div className="strategy-table-toolbar">
-          <label className="strategy-filter-field"><span>지역·품목 검색</span><input type="search" value={strategyFilter} placeholder="지역명 또는 품목명" onChange={(event) => setStrategyFilter(event.target.value)} /></label>
+          <label className="strategy-filter-field" htmlFor="strategy-filter-input"><span>지역·품목 검색</span><StrategyFilterInput id="strategy-filter-input" value={strategyFilter} onSubmit={setStrategyFilter} /></label>
           <label className="strategy-policy-filter"><input type="checkbox" checked={strategyPolicyOnly} onChange={(event) => setStrategyPolicyOnly(event.target.checked)} /><span>특화작목만</span><b>{number(strategyRows.filter((row) => row.isTopPriority).length)}건 최우선</b></label><CsvDownloadButton onClick={() => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], strategyRowsFiltered.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", row.isGapAlert ? "공백 알림" : "양호"]))} />
         </div>
         <div className="strategy-table-layout">

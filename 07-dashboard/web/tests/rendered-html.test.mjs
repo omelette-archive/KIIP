@@ -944,7 +944,13 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /region\.sigungu \|\| displayRegionName\(region\.region\)} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
   assert.doesNotMatch(html, /const uniqueItems/, "도 단위 목록에서 중복 품목을 숨겨 총 특산품 수와 목록 수가 달라지면 안 됨");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
-  assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
+  // 2026-09-08(사용자 "단어 넣고 엔터치면 검색이 되었으면"): 한 글자마다 검색하던 걸
+  // 엔터에서만 검색하도록 바꿨다. 타이핑 중에는 아예 다시 그리지 않으므로 조합이 끊길
+  // 일이 없다 — 대신 엔터가 조합 확정용일 때는 검색으로 치지 않아야 한다.
+  assert.match(html, /input\.oninput = \(event\) => \{\s*pending = event\.currentTarget\.value;/, "타이핑 중에는 state를 건드리지 않고 입력값만 담아 둬야 함");
+  assert.match(html, /if \(event\.key !== "Enter" \|\| event\.isComposing\) return;/, "엔터에서만 검색하고, 한글 조합 확정 엔터는 무시해야 함");
+  assert.match(html, /input\.onblur = commit;/, "엔터 없이 칸을 벗어나도 입력한 내용이 반영돼야 함");
+  assert.doesNotMatch(html, /input\.oncompositionend/, "조합 완료마다 검색하던 경로는 없어야 함");
   assert.match(html, /row\.searchTerms\.some\(\(term\) => term && term\.toLocaleLowerCase\("ko-KR"\)\.includes\(keyword\)\)/, "품목 검색은 공식 표시명 외 원물명·고시명칭도 검색해야 함");
   assert.match(html, /<title>지역 특산품-상표 분석·정책지원 플랫폼<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
