@@ -1596,9 +1596,9 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
                 <button type="button" className={leaderMetric === "application" ? "active" : ""} aria-pressed={leaderMetric === "application"} onClick={() => setLeaderMetric("application")}>출원</button>
                 <button type="button" className={leaderMetric === "registration" ? "active" : ""} aria-pressed={leaderMetric === "registration"} onClick={() => setLeaderMetric("registration")}>등록</button>
               </div>
-              <span className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} · 직전 대비 {monthRangeLabel(leaderboard.priorKeys)}</span>
             </div>
           </div>
+          <p className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} 집계 · 급증은 직전 {monthRangeLabel(leaderboard.priorKeys)}과 비교</p>
           <div className="leader-grid leader-grid-primary">
             <article className="leader-card">
               <div className="leader-card-head"><h4>출원 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
