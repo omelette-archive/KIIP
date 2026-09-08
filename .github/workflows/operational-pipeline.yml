@@ -10,6 +10,11 @@ on:
   schedule:
     # 매주 월요일 02:00 KST (일요일 17:00 UTC)
     - cron: "0 17 * * 0"
+    # 2026-09-08(사용자 "정기 수집해줘"): 출원인 주소가 168,367건 중 88,133건(52%)만
+    # 붙어 있고, 주 1회 5,000건씩으로는 남은 80,234건을 소화하는 데 16주가 걸린다.
+    # 수요일 02:00 KST를 한 번 더 넣어 주 2회로 돌린다(약 8주). 더 늘리려면 계정
+    # 일일 한도(#52)를 먼저 확인해야 한다 — 429가 나면 실행이 통째로 중단된다.
+    - cron: "0 17 * * 2"
   workflow_dispatch:
     inputs:
       max_requests:
@@ -19,7 +24,9 @@ on:
       applicant_limit:
         description: "③b 출원인 주소 보강 신규 호출 상한"
         required: false
-        default: "5000"
+        # 2026-09-08: 5,000 → 12,000. 미확보 80,234건을 주 2회 × 12,000으로 약 4주에
+        # 소화한다. 한 번에 더 올리지 않는 이유는 위 cron 주석과 같다.
+        default: "12000"
       ip_registry_daily_budget:
         description: "③c 등록원부 하루 누적 호출 상한"
         required: false
@@ -83,7 +90,7 @@ jobs:
             --runs-dir "${KIIP_OPERATIONAL_ROOT}/runs" \
             --state-dir "${KIIP_OPERATIONAL_ROOT}/state" \
             --max-requests "${{ github.event.inputs.max_requests || '400' }}" \
-            --applicant-limit "${{ github.event.inputs.applicant_limit || '5000' }}" \
+            --applicant-limit "${{ github.event.inputs.applicant_limit || '12000' }}" \
             --ip-registry-daily-budget "${{ github.event.inputs.ip_registry_daily_budget || '100' }}"
 
       - name: Commit and push promoted dashboard

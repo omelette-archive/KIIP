@@ -108,16 +108,27 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
   const matches = [...new Set(evidence.map((row) => row.match))];
   const confidences = [...new Set(evidence.map((row) => row.confidence))];
   if (matches.length !== 1 || confidences.length !== 1) {
-    // #118(hyojeonglim-blip, 2026-09-02): 공동출원인·공동권리자 주소가 서로 달라도,
-    // 그중 지역 생산 주체형(영농조합·협동조합·지자체 등)이 해당 지역(inside)이면 그
-    // 지역에 출원이 있는 것으로 인정한다 — 전원 일치가 아니라고 무조건 빼지 않는다.
+    // #118(2026-09-02): 공동출원인 중 지역 생산 주체형(영농조합·협동조합·지자체)이
+    // inside면 그 지역 출원으로 인정한다.
     const producerInside = evidence.find((row) => row.producerOrg && row.match === "inside");
     if (producerInside) {
-      return {
-        match: "inside",
-        confidence: "producer_org_coapplicant_inside",
-        evidence,
-      };
+      return { match: "inside", confidence: "producer_org_coapplicant_inside", evidence };
+    }
+    // 2026-09-08(사용자): "공동출원인인 경우 더블 카운트로 각 지역별로 집계하되,
+    // 상표출원수는 unique한 출원번호 기준으로." 공동출원인은 그 상표가 여러 지역에
+    // 실제로 걸쳐 있는 것이지 주소가 틀린 게 아니다. 지금까지는 전원 일치가 아니면
+    // unverified로 통째로 버려 두 지역 모두에서 사라졌다 — 이제 출원인 중 하나라도
+    // 이 지역이면 이 지역 출원으로 센다. 같은 상표가 A·B 지역 양쪽에서 집계되지만
+    // (의도된 더블 카운트), 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서
+    // 부풀지 않는다. 전국 합계를 낼 때는 지역별 합이 아니라 고유 출원번호로 세야 한다.
+    if (matches.includes("inside")) {
+      return { match: "inside", confidence: "coapplicant_inside", evidence };
+    }
+    // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
+    // 남아 있으면 그가 이 지역일 수 있으므로 보류하고, 전원 주소가 읽혔는데 아무도
+    // 이 지역이 아닐 때만 외부로 확정한다.
+    if (!matches.includes("unverified")) {
+      return { match: "outside", confidence: "coapplicant_outside", evidence };
     }
     return {
       match: "unverified",

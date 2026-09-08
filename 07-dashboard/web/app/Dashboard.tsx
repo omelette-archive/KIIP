@@ -1488,6 +1488,29 @@ function SampleReports() {
     {SAMPLE_EXPANSION_REPORTS.map((sample) => <SampleReportCard key={sample.name} sample={sample} />)}
   </details>;
 }
+// 유형 한 줄을 펼치면 그 유형의 품목을 출원 건수 순으로 보여 준다. 막대는 유형 안에서
+// 차지하는 비중이고, 출원이 0건인 품목은 건수 대신 공백 지역 수를 적는다 — 이 화면의
+// 목적이 공백 발굴이므로 0건을 빈칸으로 두지 않는다. standalone의 categoryDetailHtml과 동일.
+const CATEGORY_DETAIL_LIMIT = 12;
+type CategoryDetailEntry = { label: string; regions: number; applied: number; pending: number; trademarks: number; registered: number; gaps: number };
+function CategoryDetailRow({ row }: { row: { label: string; trademarks: number; items: Map<string, CategoryDetailEntry> } }) {
+  const items = [...row.items.values()].sort((a, b) => b.trademarks - a.trademarks || b.regions - a.regions || a.label.localeCompare(b.label, "ko-KR"));
+  const shown = items.slice(0, CATEGORY_DETAIL_LIMIT);
+  const rest = items.length - shown.length;
+  const max = Math.max(1, ...items.map((entry) => entry.trademarks));
+  return <tr className="category-detail-row"><td colSpan={8}><div className="category-detail">
+    <div className="category-detail-head"><strong>{row.label} 세부 품목</strong><span>품목 {number(items.length)}개 · 지역 확인 출원 {number(row.trademarks)}건 기준 비중</span></div>
+    <ol className="category-detail-list">{shown.map((entry) => <li key={entry.label}>
+      <span className="category-detail-name">{entry.label}</span>
+      <span className="category-detail-bar"><i style={{ width: `${Math.round(entry.trademarks / max * 100)}%` }} /></span>
+      <span className="category-detail-value">{entry.trademarks
+        ? `${number(entry.trademarks)}건 · ${percent(row.trademarks ? entry.trademarks / row.trademarks : 0)}`
+        : <em className="category-detail-gap">공백 {number(entry.gaps || entry.regions)}개 지역</em>}</span>
+      <small>{number(entry.regions)}개 지역{entry.registered ? ` · 등록 ${number(entry.registered)}건` : ""}{entry.pending ? ` · 집계 대기 ${number(entry.pending)}` : ""}</small>
+    </li>)}</ol>
+    {rest > 0 && <p className="screen-note">출원 건수 상위 {number(CATEGORY_DETAIL_LIMIT)}개 표시 · 나머지 {number(rest)}개</p>}
+  </div></td></tr>;
+}
 function ExpansionRegionSection({ regions, name, province, index }: { regions: Region[]; name: string; province: string; index: ExpansionIndex }) {
   const rows = regions.filter((region) => provinceOf(region) === province);
   if (!rows.length) return null;
@@ -2399,19 +2422,30 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 출원율 분모는 수집된 지역×품목 전체이고(명칭 확인·집계 대기 포함), 등록률 분모는
   // 지역 확인 출원 건수다 — 두 비율의 모집단이 다르므로 열을 붙여 쓰지 않는다.
   const categoryStats = useMemo(() => {
-    const rows = new Map<string, { label: string; total: number; applied: number; pending: number; trademarks: number; registered: number; noRights: number }>();
+    type CatDetail = { label: string; regions: number; applied: number; pending: number; trademarks: number; registered: number; gaps: number };
+    const rows = new Map<string, { label: string; total: number; applied: number; pending: number; trademarks: number; registered: number; noRights: number; items: Map<string, CatDetail> }>();
     for (const region of coverageAreaRegions) {
       for (const item of region.items) {
         const label = item.category?.label || "미분류";
-        const row = rows.get(label) || { label, total: 0, applied: 0, pending: 0, trademarks: 0, registered: 0, noRights: 0 };
+        const row = rows.get(label) || { label, total: 0, applied: 0, pending: 0, trademarks: 0, registered: 0, noRights: 0, items: new Map<string, CatDetail>() };
         row.total += 1;
         const metric = item.metrics.uniqueTrademarkCount;
-        if (metric.availability !== "available") row.pending += 1;
+        // 2026-09-08(사용자): "품목 클릭하면 세부품목별 비중도 나오면 좋겠는데" — 유형 안에서
+        // 어떤 품목이 그 숫자를 만들고 있는지 같은 기준으로 쪼갠다. 한 품목이 여러 지역에
+        // 걸쳐 있으면 지역 수만큼 행이 있으므로 품목명으로 묶어 합산한다.
+        const itemLabel = item.noticeName || item.itemName || "이름 미확인";
+        const detail = row.items.get(itemLabel) || { label: itemLabel, regions: 0, applied: 0, pending: 0, trademarks: 0, registered: 0, gaps: 0 };
+        detail.regions += 1;
+        if (metric.availability !== "available") { row.pending += 1; detail.pending += 1; }
         else if ((metric.value || 0) > 0) {
           row.applied += 1;
           row.trademarks += metric.value || 0;
           row.registered += item.metrics.registeredTrademarkCount.value || 0;
-        } else row.noRights += 1;
+          detail.applied += 1;
+          detail.trademarks += metric.value || 0;
+          detail.registered += item.metrics.registeredTrademarkCount.value || 0;
+        } else { row.noRights += 1; detail.gaps += 1; }
+        row.items.set(itemLabel, detail);
         rows.set(label, row);
       }
     }
@@ -2420,6 +2454,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .sort((a, b) => b.total - a.total);
   }, [coverageAreaRegions]);
   const categoryStatsMaxRate = Math.max(0.01, ...categoryStats.map((row) => row.coverageRate || 0));
+  const [categoryStatsPick, setCategoryStatsPick] = useState("");
   // 2026-09-08: 광역 × 품목 유형 교차표. "어느 지역이 어느 유형에 강한가/약한가"는
   // 목록을 아무리 봐도 안 보이는데 K-브랜드 후보를 고를 때 가장 먼저 필요한 그림이다.
   // 색은 출원율 하나만 싣는 순차 단일 색(브랜드 블루) 5단계이고, 값은 셀 안에 숫자로도
@@ -2913,8 +2948,10 @@ const STRATEGY_CHIP_LIMIT = 12;
         <div className="tablewrap-scroll">
           <table className="category-stats-table">
             <thead><tr><th scope="col">유형</th><th scope="col">수집</th><th scope="col">출원 확인</th><th scope="col">무권리</th><th scope="col">출원율</th><th scope="col">지역 확인 출원</th><th scope="col">등록</th><th scope="col">등록률</th></tr></thead>
-            <tbody>{categoryStats.map((row) => <tr key={row.label} title={`${row.label} · 수집 ${number(row.total)}개 중 출원 확인 ${number(row.applied)}개${row.pending ? ` · 집계 대기 ${number(row.pending)}개` : ""}`}>
-              <th scope="row">{row.label}</th>
+            <tbody>{categoryStats.map((row) => <Fragment key={row.label}>
+              <tr className={categoryStatsPick === row.label ? "category-stats-row open" : "category-stats-row"} tabIndex={0} role="button" aria-expanded={categoryStatsPick === row.label} onClick={() => setCategoryStatsPick(categoryStatsPick === row.label ? "" : row.label)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setCategoryStatsPick(categoryStatsPick === row.label ? "" : row.label); } }} title={`${row.label} · 수집 ${number(row.total)}개 중 출원 확인 ${number(row.applied)}개${row.pending ? ` · 집계 대기 ${number(row.pending)}개` : ""}`}>
+
+              <th scope="row"><i className="category-caret" aria-hidden="true" />{row.label}</th>
               <td className="num">{number(row.total)}</td>
               <td className="num">{number(row.applied)}</td>
               <td className="num">{row.noRights ? number(row.noRights) : "—"}</td>
@@ -2922,7 +2959,9 @@ const STRATEGY_CHIP_LIMIT = 12;
               <td className="num">{row.trademarks ? number(row.trademarks) : "—"}</td>
               <td className="num">{row.registered ? number(row.registered) : "—"}</td>
               <td className="num">{row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td>
-            </tr>)}</tbody>
+              </tr>
+              {categoryStatsPick === row.label && <CategoryDetailRow row={row} />}
+            </Fragment>)}</tbody>
           </table>
         </div>
         {selectedProvince && !selectedMunicipality && <div className="category-stats-donuts"><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="registeredTrademarkCount" label="등록" /></article></div></div>}
