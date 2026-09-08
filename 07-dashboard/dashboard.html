@@ -733,6 +733,25 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .compare-province-stats span small { display: block; color: var(--faint); font-weight: 400; }
 .compare-province-stats b { display: block; margin-top: 6px; font-size: 19px; font-weight: 800; color: var(--green-dark); }
 .compare-province-stats small { color: var(--faint); font-size: 11px; }
+/* 이슈 #119(협업자 2026-09-02): 육성 작목 vs 출원 활발 품목 3갈래 대조. */
+.compare-match-block { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.compare-match-block .section-heading h3 { margin: 0; font-size: 15px; letter-spacing: -0.02em; }
+.compare-match-block .section-heading > span { color: var(--faint); font-size: 11px; }
+.compare-match-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.compare-match-card { display: flex; flex-direction: column; padding: 13px 14px 10px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 12px; background: var(--surface); }
+.compare-match-card.match { border-left-color: var(--green); }
+.compare-match-card.dormant { border-left-color: var(--amber); }
+.compare-match-card.unlisted { border-left-color: var(--violet); }
+.compare-match-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.compare-match-head h4 { margin: 0; font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; }
+.compare-match-head span { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
+.compare-match-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.compare-match-list li { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 12px; }
+.compare-match-list li + li { border-top: 1px solid var(--line); }
+.compare-match-list li > span { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-match-list li > b { margin-left: auto; font-size: 12px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.compare-match-note { margin: 12px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
+@media (max-width: 900px) { .compare-match-grid { grid-template-columns: 1fr; } }
 .compare-province-flagship { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .compare-province-flagship h3 { margin: 0 0 6px; font-size: 14px; }
 .compare-province-flagship p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }
@@ -1189,6 +1208,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const LEADER_FRESH_LIMIT = 3;
   // #119: 비즈니스 전략 탭 주요 품목 칩 개수. 나머지는 수기 검색(협업자 요청 2026-09-02).
   const STRATEGY_CHIP_LIMIT = 12;
+  // #119: 육성 vs 출원 활발 3갈래 목록 각 최대 개수.
+  const COMPARE_MATCH_LIMIT = 5;
   const leaderMinBase = (months) => Math.max(6, months * 2);
   const ymKey = (year, monthIndex0) => `${year}-${String(monthIndex0 + 1).padStart(2, "0")}`;
   const leaderEndMonth = (generatedAt) => { const d = new Date(generatedAt); const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1); return { year: prev.getFullYear(), monthIndex0: prev.getMonth() }; };
@@ -2314,6 +2335,15 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const toolbarHtml = `<div class="strategy-table-toolbar"><label class="strategy-filter-field"><span>지역·품목 검색</span><input type="search" id="strategy-filter-input" value="${esc(state.strategyFilter)}" placeholder="지역명 또는 품목명"></label>${csvDownloadButtonHtml("strategyTable")}</div>`;
     return `<section class="screen-section strategy-screen">${flowHtml}<details class="strategy-table-toggle"><summary><span>지역×품목 공백 알림 표 전체 보기</span><small>${rows.length}건</small></summary>${toolbarHtml}<div class="strategy-table-layout">${tableHtml}<aside class="strategy-detail">${detailHtml}</aside></div></details></section>`;
   }
+  // 이슈 #119(협업자 2026-09-02): 육성 작목 vs 출원 활발 품목 3갈래 대조. Dashboard.tsx와 동일.
+  function matchBlockHtml(row) {
+    if (!row) return "";
+    const cropLi = (crop, count) => `<li><span>${esc(crop.displayName)}<em class="crop-badge crop-badge-${esc(crop.tier)}">${esc(crop.tier)}</em></span><b>${count}</b></li>`;
+    const activeHtml = row.policyActive.length === 0 ? '<p class="empty">해당 작목이 없습니다.</p>' : `<ol class="compare-match-list">${row.policyActive.map((c) => cropLi(c, number(c.applications) + "건")).join("")}</ol>`;
+    const dormantHtml = row.policyDormant.length === 0 ? '<p class="empty">집계 완료 작목은 모두 출원이 확인됐습니다.</p>' : `<ol class="compare-match-list">${row.policyDormant.map((c) => cropLi(c, "0건")).join("")}</ol>`;
+    const unlistedHtml = row.unlistedActive.length === 0 ? '<p class="empty">육성 작목 밖에서 출원이 확인된 품목이 없습니다.</p>' : `<ol class="compare-match-list">${row.unlistedActive.map((r) => `<li><span>${esc(r.displayName)}</span><b>${number(r.count)}건</b></li>`).join("")}</ol>`;
+    return `<section class="compare-match-block"><div class="section-heading"><div><h3>육성 작목 vs 상표 출원이 활발한 품목</h3></div><span>${esc(displayRegionName(row.province))} · 지역 주소 일치 출원 기준</span></div><div class="compare-match-grid"><article class="compare-match-card match"><div class="compare-match-head"><h4>육성 + 출원 활발</h4><span>정책·시장 일치</span></div>${activeHtml}</article><article class="compare-match-card dormant"><div class="compare-match-head"><h4>육성 중, 출원 없음</h4><span>브랜드화 지원 검토</span></div>${dormantHtml}</article><article class="compare-match-card unlisted"><div class="compare-match-head"><h4>출원 활발, 육성 대상 아님</h4><span>지정 검토 대상</span></div>${unlistedHtml}</article></div><p class="compare-match-note">농촌진흥청 특화작목(대표·집중육성·자체육성) 지정 여부와 실제 상표 출원을 대조합니다. 세 번째 칸은 이 도에서 상표 출원은 활발한데 특화작목으로 지정되지 않은 품목으로, 지정 범위 재검토 신호로 볼 수 있습니다.</p></section>`;
+  }
   function compareScreen() {
     const comparisonRows = [...provinceStats.keys()].map((province) => {
       const regions = snapshot.regions.filter((region) => (region.sido || region.region) === province);
@@ -2344,7 +2374,20 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       const flagshipCrop = policyCrops.find((crop) => crop.tier === "대표작목") || null;
       const flagshipRank = flagshipCrop ? topRegisteredItems.findIndex((row) => row.name === flagshipCrop.name) : -1;
       const flagshipMatch = flagshipRank >= 0;
-      return { province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate: policyCrops.length ? policyApplied / policyCrops.length : null, topRegisteredItems, flagshipCrop, flagshipMatch, flagshipRank };
+      // 이슈 #119: 육성 작목 전체 vs 출원 활발 품목 3갈래 대조. Dashboard.tsx와 동일.
+      const appliedByName = new Map();
+      for (const region of regions) for (const item of region.items) {
+        const name = officialItemLabel(item);
+        if (!name || item.metrics.uniqueTrademarkCount.availability !== "available") continue;
+        appliedByName.set(name, (appliedByName.get(name) || 0) + (item.metrics.uniqueTrademarkCount.value || 0));
+      }
+      // 육성 작목명은 괄호 부기가 붙어 있고(예: "벼(경기미)") 품목 라벨은 고시명칭("벼")이라,
+      // 원문·괄호 제거형을 모두 제외 집합에 넣어야 같은 품목이 양쪽 칸에 겹치지 않는다.
+      const policyNames = new Set(policyCrops.flatMap((crop) => [crop.name, stripParens(crop.name)]));
+      const policyActive = policyCrops.filter((crop) => crop.applications > 0).sort((a, b) => b.applications - a.applications).slice(0, COMPARE_MATCH_LIMIT);
+      const policyDormant = policyCrops.filter((crop) => crop.decided && crop.applications === 0).slice(0, COMPARE_MATCH_LIMIT);
+      const unlistedActive = [...appliedByName.entries()].filter(([name, count]) => count > 0 && !policyNames.has(name) && !policyNames.has(stripParens(name))).sort((a, b) => b[1] - a[1]).slice(0, COMPARE_MATCH_LIMIT).map(([name, count]) => ({ name, displayName: stripParens(name), count }));
+      return { province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate: policyCrops.length ? policyApplied / policyCrops.length : null, topRegisteredItems, flagshipCrop, flagshipMatch, flagshipRank, policyActive, policyDormant, unlistedActive };
     }).filter((row) => row.policyCrops.length > 0).sort((a, b) => compareProvince(a.province, b.province));
     const flagshipRowsHtml = comparisonRows.filter((row) => row.flagshipCrop).map(({ province, flagshipCrop, topRegisteredItems, flagshipMatch, flagshipRank }) => `<div class="compare-flagship-row"><strong>${esc(displayRegionName(province))}</strong><div class="compare-flagship-name">${esc(stripParens(flagshipCrop.name))}</div><ol class="compare-top5-list">${topRegisteredItems.length === 0 ? '<li class="empty">등록 상표 없음</li>' : topRegisteredItems.map((row, index) => `<li class="${row.name === flagshipCrop.name ? "match" : ""}">${index + 1}. ${esc(stripParens(row.name))} <b>${number(row.count)}건</b></li>`).join("")}</ol><span class="${flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}">${flagshipMatch ? `일치 · ${flagshipRank + 1}위` : "불일치"}</span></div>`).join("");
     const flagshipMatchCount = comparisonRows.filter((row) => row.flagshipMatch).length;
@@ -2360,7 +2403,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const activeProvince = state.compareProvince && comparisonRows.some((row) => row.province === state.compareProvince) ? state.compareProvince : comparisonRows[0]?.province || null;
     const activeRow = comparisonRows.find((row) => row.province === activeProvince) || null;
     const stripHtml = `<div class="compare-province-strip" role="group" aria-label="도 선택">${comparisonRows.map((row) => `<button type="button" data-compare-province="${esc(row.province)}" class="${activeProvince === row.province ? "active" : ""}"><strong>${esc(displayRegionName(row.province))}</strong><span class="${row.flagshipCrop ? (row.flagshipMatch ? "compare-strip-match" : "compare-strip-mismatch") : "compare-strip-none"}">${row.flagshipCrop ? (row.flagshipMatch ? "일치" : "불일치") : "대표작목 없음"}</span></button>`).join("")}</div>`;
-    const detailHtml = activeRow ? `<div class="compare-province-detail"><div class="compare-section-head"><div><span>${activeRow.policyDecided}/${activeRow.policyCrops.length} 집계 완료</span><h2>${esc(displayRegionName(activeRow.province))} 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div><div class="compare-province-tiers"><div><span>특화작목<small>대표</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "대표작목"))}</div><div><span>특화작목<small>자체육성</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "자체육성작목"))}</div><div><span>특화작목<small>집중육성</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "집중육성작목"))}</div></div><div class="compare-province-stats"><div><span>상표 출원건수<small>원물 기준</small></span><b>${number(activeRow.policyApplicationsTotal)}건</b></div><div><span>특화작물의 상표 출원 비율</span><b>${percent(activeRow.policyRate)}</b><small>${activeRow.policyApplied}/${activeRow.policyCrops.length}작목</small></div></div>${activeRow.flagshipCrop ? `<div class="compare-province-flagship"><h3>대표작목 vs 실제 등록 상표 TOP5</h3><p><b>${esc(stripParens(activeRow.flagshipCrop.name))}</b>(대표작목)이 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><ol class="compare-top5-list">${activeRow.topRegisteredItems.length === 0 ? '<li class="empty">등록 상표 없음</li>' : activeRow.topRegisteredItems.map((row, index) => `<li class="${row.name === activeRow.flagshipCrop.name ? "match" : ""}">${index + 1}. ${esc(stripParens(row.name))} <b>${number(row.count)}건</b></li>`).join("")}</ol><span class="${activeRow.flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}">${activeRow.flagshipMatch ? `일치 · ${activeRow.flagshipRank + 1}위` : "불일치"}</span></div>` : ""}</div>` : "";
+    const detailHtml = activeRow ? `<div class="compare-province-detail"><div class="compare-section-head"><div><span>${activeRow.policyDecided}/${activeRow.policyCrops.length} 집계 완료</span><h2>${esc(displayRegionName(activeRow.province))} 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div><div class="compare-province-tiers"><div><span>특화작목<small>대표</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "대표작목"))}</div><div><span>특화작목<small>자체육성</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "자체육성작목"))}</div><div><span>특화작목<small>집중육성</small></span>${tierCellHtml(activeRow.policyCrops.filter((c) => c.tier === "집중육성작목"))}</div></div><div class="compare-province-stats"><div><span>상표 출원건수<small>원물 기준</small></span><b>${number(activeRow.policyApplicationsTotal)}건</b></div><div><span>특화작물의 상표 출원 비율</span><b>${percent(activeRow.policyRate)}</b><small>${activeRow.policyApplied}/${activeRow.policyCrops.length}작목</small></div></div>${activeRow.flagshipCrop ? `<div class="compare-province-flagship"><h3>대표작목 vs 실제 등록 상표 TOP5</h3><p><b>${esc(stripParens(activeRow.flagshipCrop.name))}</b>(대표작목)이 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><ol class="compare-top5-list">${activeRow.topRegisteredItems.length === 0 ? '<li class="empty">등록 상표 없음</li>' : activeRow.topRegisteredItems.map((row, index) => `<li class="${row.name === activeRow.flagshipCrop.name ? "match" : ""}">${index + 1}. ${esc(stripParens(row.name))} <b>${number(row.count)}건</b></li>`).join("")}</ol><span class="${activeRow.flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}">${activeRow.flagshipMatch ? `일치 · ${activeRow.flagshipRank + 1}위` : "불일치"}</span></div>` : ""}${matchBlockHtml(activeRow)}</div>` : "";
     return `<section class="screen-section"><p class="screen-note">농촌진흥청이 2025년에 지정한 9개 도·69개 특화작목과 지역 주소 일치 상표 현황을 비교합니다.</p><div class="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 임의로 배분하지 않습니다.</p></div><section class="compare-province-detail-section">${stripHtml}${detailHtml}</section><details class="compare-full-tables-toggle"><summary><span>9개 도 전체 표로 보기</span><small>클릭하면 펼쳐집니다</small></summary>${regionSectionHtml}${flagshipSectionHtml}</details><div class="compare-sources"><article><span>공식 근거</span><strong>농촌진흥청 2025년도 지역특화작목 현황</strong><p>제1차 종합계획(2021~2025) 종료 시점의 69개 배정을 사용합니다.</p></article><article><span>지역 판정</span><strong>출원인 주소를 도 단위로 대조</strong><p>검색 상한은 집계 대기로 구분합니다.</p></article></div></section>`;
   }
 

@@ -192,6 +192,8 @@ const LEADER_ACCEL_MIN_GROWTH = 1.3;
 const LEADER_FRESH_LIMIT = 3;
 // #119: 비즈니스 전략 탭의 "주요 품목" 칩 개수. 나머지는 수기 검색으로(협업자 요청).
 const STRATEGY_CHIP_LIMIT = 12;
+// #119: 특화작목 비교의 "육성 vs 출원 활발" 세 갈래 목록 각 최대 개수.
+const COMPARE_MATCH_LIMIT = 5;
 // 급증·등록전환 순위가 표본이 작은 품목(창 기간 출원 1~2건)으로 왜곡되지 않도록
 // 창 길이에 비례한 최소 출원 건수 컷오프를 둔다(#118 열린 질문).
 function leaderMinBase(months: number) { return Math.max(6, months * 2); }
@@ -1180,7 +1182,27 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     const flagshipCrop = policyCrops.find((crop) => crop.tier === "대표작목") || null;
     const flagshipRank = flagshipCrop ? topRegisteredItems.findIndex((row) => row.name === flagshipCrop.name) : -1;
     const flagshipMatch = flagshipRank >= 0;
-    return { province, coverage, names, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate: policyCrops.length ? policyApplied / policyCrops.length : null, topRegisteredItems, flagshipCrop, flagshipMatch, flagshipRank };
+    // 이슈 #119(협업자 2026-09-02): "지역이 육성하는 특산물과 상표 출원이 활발한 특산물을
+    // 비교할 필요는 있을 것 같아." 대표작목 1개 vs 등록 TOP5 대조(위)는 최우선 지정만 보는
+    // 반쪽이라, 육성 작목 전체(대표+집중육성+자체육성)와 실제 출원 활발 품목을 세 갈래로
+    // 대조한다 — 특히 세 번째(육성 대상 아닌데 출원 활발)가 정책 미포착 신호다.
+    const appliedByName = new Map<string, number>();
+    regions.forEach((region) => region.items.forEach((item) => {
+      const name = officialItemLabel(item);
+      if (!name || item.metrics.uniqueTrademarkCount.availability !== "available") return;
+      appliedByName.set(name, (appliedByName.get(name) || 0) + (item.metrics.uniqueTrademarkCount.value || 0));
+    }));
+    // 육성 작목명은 괄호 부기가 붙어 있고(예: "벼(경기미)") 품목 라벨은 고시명칭("벼")이라,
+    // 원문과 괄호 제거형을 모두 제외 집합에 넣어야 같은 품목이 양쪽 칸에 겹치지 않는다.
+    const policyNames = new Set(policyCrops.flatMap((crop) => [crop.name, stripParens(crop.name)]));
+    const policyActive = policyCrops.filter((crop) => crop.applications > 0).sort((a, b) => b.applications - a.applications).slice(0, COMPARE_MATCH_LIMIT);
+    const policyDormant = policyCrops.filter((crop) => crop.decided && crop.applications === 0).slice(0, COMPARE_MATCH_LIMIT);
+    const unlistedActive = [...appliedByName.entries()]
+      .filter(([name, count]) => count > 0 && !policyNames.has(name) && !policyNames.has(stripParens(name)))
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, COMPARE_MATCH_LIMIT)
+      .map(([name, count]) => ({ name, displayName: stripParens(name), count }));
+    return { province, coverage, names, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate: policyCrops.length ? policyApplied / policyCrops.length : null, topRegisteredItems, flagshipCrop, flagshipMatch, flagshipRank, policyActive, policyDormant, unlistedActive };
   // 이슈 #117: 표는 지역(행정표준코드) 순서로 정렬한다.
   }).filter((row) => row.policyCrops.length > 0).sort((a, b) => compareProvince(a.province, b.province)), [provinceStats, snapshot.regions]);
   // 검토가 덜 끝난 상태에서도 전체 목록을 다 보여주기보다, 상표 출원 건수가 많은
@@ -1987,6 +2009,27 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               <span className={activeRow.flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}>{activeRow.flagshipMatch ? `일치 · ${activeRow.flagshipRank + 1}위` : "불일치"}</span>
             </div>}
           </div>}
+          {/* 이슈 #119(협업자 2026-09-02): "지역이 육성하는 특산물과 상표 출원이 활발한
+              특산물을 비교할 필요는 있을 것 같아." 대표작목 1개 대조만으로는 부족해,
+              육성 작목 전체와 실제 출원 활발 품목을 세 갈래로 놓고 본다. */}
+          {activeRow && <section className="compare-match-block">
+            <div className="section-heading"><div><h3>육성 작목 vs 상표 출원이 활발한 품목</h3></div><span>{displayRegionName(activeRow.province)} · 지역 주소 일치 출원 기준</span></div>
+            <div className="compare-match-grid">
+              <article className="compare-match-card match">
+                <div className="compare-match-head"><h4>육성 + 출원 활발</h4><span>정책·시장 일치</span></div>
+                {activeRow.policyActive.length === 0 ? <p className="empty">해당 작목이 없습니다.</p> : <ol className="compare-match-list">{activeRow.policyActive.map((crop) => <li key={crop.name}><span>{crop.displayName}<em className={`crop-badge crop-badge-${crop.tier}`}>{crop.tier}</em></span><b>{number(crop.applications)}건</b></li>)}</ol>}
+              </article>
+              <article className="compare-match-card dormant">
+                <div className="compare-match-head"><h4>육성 중, 출원 없음</h4><span>브랜드화 지원 검토</span></div>
+                {activeRow.policyDormant.length === 0 ? <p className="empty">집계 완료 작목은 모두 출원이 확인됐습니다.</p> : <ol className="compare-match-list">{activeRow.policyDormant.map((crop) => <li key={crop.name}><span>{crop.displayName}<em className={`crop-badge crop-badge-${crop.tier}`}>{crop.tier}</em></span><b>0건</b></li>)}</ol>}
+              </article>
+              <article className="compare-match-card unlisted">
+                <div className="compare-match-head"><h4>출원 활발, 육성 대상 아님</h4><span>지정 검토 대상</span></div>
+                {activeRow.unlistedActive.length === 0 ? <p className="empty">육성 작목 밖에서 출원이 확인된 품목이 없습니다.</p> : <ol className="compare-match-list">{activeRow.unlistedActive.map((row) => <li key={row.name}><span>{row.displayName}</span><b>{number(row.count)}건</b></li>)}</ol>}
+              </article>
+            </div>
+            <p className="compare-match-note">농촌진흥청 특화작목(대표·집중육성·자체육성) 지정 여부와 실제 상표 출원을 대조합니다. 세 번째 칸은 이 도에서 상표 출원은 활발한데 특화작목으로 지정되지 않은 품목으로, 지정 범위 재검토 신호로 볼 수 있습니다.</p>
+          </section>}
         </section>;
       })()}
       {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}

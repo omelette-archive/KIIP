@@ -733,6 +733,25 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .compare-province-stats span small { display: block; color: var(--faint); font-weight: 400; }
 .compare-province-stats b { display: block; margin-top: 6px; font-size: 19px; font-weight: 800; color: var(--green-dark); }
 .compare-province-stats small { color: var(--faint); font-size: 11px; }
+/* 이슈 #119(협업자 2026-09-02): 육성 작목 vs 출원 활발 품목 3갈래 대조. */
+.compare-match-block { margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
+.compare-match-block .section-heading h3 { margin: 0; font-size: 15px; letter-spacing: -0.02em; }
+.compare-match-block .section-heading > span { color: var(--faint); font-size: 11px; }
+.compare-match-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 12px; }
+.compare-match-card { display: flex; flex-direction: column; padding: 13px 14px 10px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 12px; background: var(--surface); }
+.compare-match-card.match { border-left-color: var(--green); }
+.compare-match-card.dormant { border-left-color: var(--amber); }
+.compare-match-card.unlisted { border-left-color: var(--violet); }
+.compare-match-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 8px; }
+.compare-match-head h4 { margin: 0; font-size: 12.5px; font-weight: 800; letter-spacing: -0.02em; }
+.compare-match-head span { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
+.compare-match-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.compare-match-list li { display: flex; align-items: baseline; gap: 8px; padding: 5px 0; font-size: 12px; }
+.compare-match-list li + li { border-top: 1px solid var(--line); }
+.compare-match-list li > span { min-width: 0; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.compare-match-list li > b { margin-left: auto; font-size: 12px; font-weight: 800; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.compare-match-note { margin: 12px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
+@media (max-width: 900px) { .compare-match-grid { grid-template-columns: 1fr; } }
 .compare-province-flagship { margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .compare-province-flagship h3 { margin: 0 0 6px; font-size: 14px; }
 .compare-province-flagship p { margin: 0 0 12px; color: var(--muted); font-size: 12.5px; line-height: 1.6; }

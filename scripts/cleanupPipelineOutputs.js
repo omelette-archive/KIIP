@@ -34,6 +34,12 @@ const NEVER_DELETE_PATTERNS = [
   // 07c_nationwide_flow가 파일 없으면 조용히 스킵한다. 3일 룰로 지워지자 businessFlow가
   // 재실행마다 스냅샷에서 소리 없이 빠졌다(2026-09-07, f90fca1 이후). 나이와 무관하게 보존.
   /^nationwide-flow(-[a-z-]+)?\.json$/,
+  // #12(경로 C, 2026-09-08): enrichBibliographyGoods.js를 --cache/--budget-state 없이
+  // 단독 실행하면 기본 경로가 03-match-trademarks/output/ 아래라 3일 룰 대상이 된다 —
+  // ip-registry-cache와 같은 성격이라 보존한다(파이프라인은 stateDir을 명시로 넘겨서 무관하지만
+  // 단독 실행 방어).
+  /^bibliography-goods-cache\.json$/,
+  /^bibliography-goods-daily-budget\.json$/,
   /^\.gitkeep$/,
 ];
 

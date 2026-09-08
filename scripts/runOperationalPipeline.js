@@ -41,6 +41,10 @@ function parseArgs(argv) {
     // 이슈 #137 코멘트(2026-09-04) "근본 누적 구조": ③ 완료 쿼리를 이 일수마다 처음부터
     // 다시 수집해 신규 출원을 반영한다(0=끔, matchTrademarks.js와 기본값을 맞춤).
     refreshCompleteAfterDays: 14,
+    // #12(경로 C, 2026-09-08): KIPRIS Plus 일일 한도가 아직 미확인(SERVICE_ACCESS_DENIED
+    // 실측만 있음)이라 등록원부(6000)보다 훨씬 보수적으로 시작한다 — probe 성격.
+    bibliographyGoodsDailyBudget: 1000,
+    bibliographyGoodsLimit: 300,
   };
   const valueFlags = new Map([
     ["--run-id", "runId"],
@@ -56,6 +60,8 @@ function parseArgs(argv) {
     ["--applicant-limit", "applicantLimit"],
     ["--ip-registry-daily-budget", "ipRegistryDailyBudget"],
     ["--ip-registry-limit", "ipRegistryLimit"],
+    ["--bibliography-goods-daily-budget", "bibliographyGoodsDailyBudget"],
+    ["--bibliography-goods-limit", "bibliographyGoodsLimit"],
     ["--regional-coverage-threshold", "regionalCoverageThreshold"],
     ["--refresh-complete-after-days", "refreshCompleteAfterDays"],
   ]);
@@ -83,6 +89,8 @@ function parseArgs(argv) {
     "applicantLimit",
     "ipRegistryDailyBudget",
     "ipRegistryLimit",
+    "bibliographyGoodsDailyBudget",
+    "bibliographyGoodsLimit",
   ]) {
     options[key] = Number(options[key]);
     if (!Number.isInteger(options[key]) || options[key] < 1) {
@@ -127,6 +135,8 @@ function printUsage() {
       "  --applicant-limit <n>        03b 출원인 주소 보강의 이번 실행 신규 호출 상한(기본 5000)",
       "  --ip-registry-daily-budget <n>  03c 등록원부 하루(KST) 누적 호출 상한(기본 6000)",
       "  --ip-registry-limit <n>      03c 이번 실행 등록번호 호출 상한(기본 3000)",
+      "  --bibliography-goods-daily-budget <n>  03e 서지상세 하루(KST) 누적 호출 상한(기본 1000, 한도 미확인이라 보수적)",
+      "  --bibliography-goods-limit <n>  03e 이번 실행 출원번호 호출 상한(기본 300)",
       "  --refresh-complete-after-days <n>  ③ 완료 쿼리를 이 일수 뒤 처음부터 다시 수집해",
       "                               신규 출원 반영(기본 14, 0=끔)",
       "",
@@ -175,6 +185,7 @@ function buildPlan(options = {}) {
     applicantEnriched: path.join(runDir, "03b-applicant-enriched.json"),
     registryEnriched: path.join(runDir, "03c-registry-enriched.json"),
     scopedSearch: path.join(runDir, "03d-supplemental-scoped.json"),
+    bibliographyGoodsEnriched: path.join(runDir, "03e-bibliography-goods-enriched.json"),
     analysis: path.join(runDir, "04-analysis.json"),
     gap: path.join(runDir, "05-gap.json"),
     strategy: path.join(runDir, "06-strategy.json"),
@@ -204,6 +215,10 @@ function buildPlan(options = {}) {
     ipRegistryCache: path.join(stateDir, "ip-registry-cache.json"),
     ipRegistryBudget: path.join(stateDir, "ip-registry-daily-budget.json"),
     areaBrands: path.join(stateDir, "nongsaro-area-brands.json"),
+    // #12(경로 C): 서지상세 지정상품 조회 영속 캐시·일일 호출량. KIPRIS Plus 일일 한도가
+    // 아직 미확인이라(2026-09-08 SERVICE_ACCESS_DENIED) 기본 --daily-budget은 보수적으로 둔다.
+    bibliographyGoodsCache: path.join(stateDir, "bibliography-goods-cache.json"),
+    bibliographyGoodsBudget: path.join(stateDir, "bibliography-goods-daily-budget.json"),
   };
   const webPublicDir = path.join(ROOT, "07-dashboard", "web", "public", "data");
   const promotion = {
@@ -363,12 +378,36 @@ function buildPlan(options = {}) {
       [files.scopedSearch]
     ),
     nodeStage(
+      "03e_bibliography_goods",
+      "서지상세(경로 C) 지정상품 대조 — 등록원부가 도달 못 하는 미등록 출원 우선(#12)",
+      "03-match-trademarks/enrichBibliographyGoods.js",
+      [
+        "--input",
+        files.scopedSearch,
+        "--out",
+        files.bibliographyGoodsEnriched,
+        "--cache",
+        state.bibliographyGoodsCache,
+        "--budget-state",
+        state.bibliographyGoodsBudget,
+        "--daily-budget",
+        String(options.bibliographyGoodsDailyBudget ?? 1000),
+        "--limit",
+        String(options.bibliographyGoodsLimit ?? 300),
+        "--concurrency",
+        "2",
+        "--checkpoint-every",
+        "25",
+      ],
+      [files.bibliographyGoodsEnriched, state.bibliographyGoodsCache, state.bibliographyGoodsBudget]
+    ),
+    nodeStage(
       "04_analyze",
       "지역×품목 상표 분석",
       "04-analyze-brand/analyzeBrands.js",
       [
         "--input",
-        files.scopedSearch,
+        files.bibliographyGoodsEnriched,
         "--out",
         files.analysis,
         "--raw-goods-review",
@@ -429,8 +468,10 @@ function buildPlan(options = {}) {
         forestRegions,
         "--rda-crops",
         rdaCrops,
+        // #12(경로 C): 03e까지 거친 최종 문서를 참조 — registryCompleteCount 등 등록원부
+        // 필드는 03e가 안 건드려 값이 같고, 향후 지정상품 경로 C 통계를 추가하기도 쉽다.
         "--match-doc",
-        files.scopedSearch,
+        files.bibliographyGoodsEnriched,
       ],
       [files.snapshotAttached]
     ),
@@ -534,6 +575,8 @@ function buildPlan(options = {}) {
       applicantLimit: options.applicantLimit ?? 5000,
       ipRegistryDailyBudget: options.ipRegistryDailyBudget ?? 6000,
       ipRegistryLimit: options.ipRegistryLimit ?? 3000,
+      bibliographyGoodsDailyBudget: options.bibliographyGoodsDailyBudget ?? 1000,
+      bibliographyGoodsLimit: options.bibliographyGoodsLimit ?? 300,
     },
     stages,
     publication: {
