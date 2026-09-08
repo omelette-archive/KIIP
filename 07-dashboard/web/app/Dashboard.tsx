@@ -1607,6 +1607,25 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .sort((a, b) => b.total - a.total);
     return { columns, rows };
   }, [regionalRegions]);
+  // 2026-09-08: 컨셉 4판의 대표 지표를 첫 화면으로 올린다. 그동안 권리 상태 네 칸은
+  // 지역 → 시도 → 시군구 → 품목까지 네 번 들어가야 보였고, 요약의 첫 지표는 여전히
+  // "공백(출원 0건)" 하나였다. 공백은 네 칸 중 첫 칸일 뿐이고, 보고서가 지목한 위험
+  // (행위만 보호)은 그 지표로는 영영 안 보인다.
+  const rightsBoard = useMemo(() => {
+    const tally = { none: 0, serviceOnly: 0, goods: 0, unknown: 0, pending: 0, total: 0 };
+    for (const region of visibleRegions) {
+      for (const item of region.items) {
+        tally.total += 1;
+        const status = rightsStatusOf(item);
+        if (status.key === "none") tally.none += 1;
+        else if (status.key === "service-only") tally.serviceOnly += 1;
+        else if (status.key === "goods") tally.goods += 1;
+        else if (status.key === "unknown") tally.unknown += 1;
+        else tally.pending += 1;
+      }
+    }
+    return tally;
+  }, [visibleRegions]);
   const coverageListedItemCount = coverageBreakdown.reduce((sum, row) => sum + row.items.length, 0);
   // 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 행("경기도" 자체)과 실제 시군구
   // 카드(가평군 등)를 나란한 카드로 보여주면 헷갈린다는 지적 — 도 단위 항목은 "도 전체"
@@ -1799,7 +1818,19 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
               표시 가능"(항상 100%에 가까워 정보량이 적음)은 빼고, 나머지 둘은 완료율이
               아니라 공백(해야 할 일) 중심으로 다시 쓴다 — B1 "출원율 63%" 대신 "공백
               품목 N개"를 주어로. */}
-          <section className="metrics metrics-inset" aria-label="핵심 지표"><article><span>출원 확인 안 된 특산품(공백)</span><strong>{number(Math.max(0, nationalSpecialtyCoverage.total - nationalSpecialtyCoverage.applied))}개</strong><small>전체 수집 {number(nationalSpecialtyCoverage.total)}개 중 미출원</small></article><article><span>출원인 주소 미확보</span><strong>{pipeline ? `${number(pipeline.applicantRegionVerification.unverified)}건` : "—"}</strong><small>{pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)}건` : "주소 수집 전"}</small></article></section>
+          <section className="rights-board" aria-label="권리 상태">
+            <div className="rights-board-head"><strong>{coverageAreaDisplayName} 권리 상태</strong><span>지역 × 특산품 {number(rightsBoard.total)}개</span></div>
+            <div className="rights-board-bar" role="img" aria-label={`무권리 ${rightsBoard.none}개, 행위만 보호 ${rightsBoard.serviceOnly}개, 상품류 보유 ${rightsBoard.goods}개, 권리 내용 미확인 ${rightsBoard.unknown}개`}>
+              {([["none", rightsBoard.none], ["service-only", rightsBoard.serviceOnly], ["goods", rightsBoard.goods], ["unknown", rightsBoard.unknown + rightsBoard.pending]] as const).map(([key, value]) => value > 0 ? <i key={key} className={`seg seg-${key}`} style={{ flex: value }} /> : null)}
+            </div>
+            <ul className="rights-board-legend">
+              <li className="seg-none"><b>{number(rightsBoard.none)}</b><span>무권리</span><small>출원 0건 · 권리화 1순위</small></li>
+              <li className="seg-service-only"><b>{number(rightsBoard.serviceOnly)}</b><span>행위만 보호</span><small>서비스류만 · 제품 권리 없음</small></li>
+              <li className="seg-goods"><b>{number(rightsBoard.goods)}</b><span>상품류 보유</span><small>파는 물건에 권리 있음</small></li>
+              <li className="seg-unknown"><b>{number(rightsBoard.unknown + rightsBoard.pending)}</b><span>권리 내용 미확인</span><small>지정상품 미확인 · 실사 필요</small></li>
+            </ul>
+            <p className="rights-board-note">출원 건수만으로는 &ldquo;상표는 있는데 정작 파는 물건에 권리가 없는&rdquo; 상태가 드러나지 않습니다. 지정상품의 상품류(1~34류)와 서비스류(35류 이상)로 갈라 네 칸으로 봅니다.</p>
+          </section>
           <h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")} · {MAP_LABELS[mapMetric]}</h2>
           {mapMetric === "applicationCoverage" && <div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} label="출원율" /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>}
           {mapMetric === "registration" && <div className="rate-hero"><RateRing value={visibleRegistrationRate} label="등록률" /><div className="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 {number(visibleTrademarkCount)}건 중 등록 {number(visibleRegisteredCount)}건</small></div></div>}

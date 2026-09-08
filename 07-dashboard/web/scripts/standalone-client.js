@@ -804,7 +804,33 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const insightList = visibleInsightItems.slice(0, 5).map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span><strong>${esc(region.sigungu || displayRegionName(region.region))} / ${esc(label)}</strong><small>${esc(noticeBasis(item))}${item.niceClass ? ` · NICE ${esc(item.niceClass)}류` : ""}</small></span><b>${esc(insightItemValue(item))}</b></button>`).join("") || '<p class="empty">이 지역에는 수집된 특산품이 없습니다.</p>';
     // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장. "전국 특산품 수"·"지역별 출원 수 표시
     // 가능"(항상 100%에 가까움)은 빼고, 나머지 둘은 완료율이 아니라 공백 중심으로.
-    const metricsHtml = `<section class="metrics metrics-inset"><article><span>출원 확인 안 된 특산품(공백)</span><strong>${number(Math.max(0, nationalSpecialtyCoverage.total - nationalSpecialtyCoverage.applied))}개</strong><small>전체 수집 ${number(nationalSpecialtyCoverage.total)}개 중 미출원</small></article><article><span>출원인 주소 미확보</span><strong>${pipeline ? `${number(pipeline.applicantRegionVerification.unverified)}건` : "—"}</strong><small>${pipeline ? `확보 ${number(pipeline.applicantRegionVerification.verifiedCount)}건` : "주소 수집 전"}</small></article></section>`;
+    const metricsHtml = (() => {
+        // 2026-09-08: 컨셉 4판의 대표 지표를 첫 화면으로. 공백(출원 0건)은 네 칸 중 첫 칸일
+        // 뿐이고, 보고서가 지목한 "행위만 보호"는 그 지표로는 안 보인다.
+        const tally = { none: 0, serviceOnly: 0, goods: 0, unknown: 0, total: 0 };
+        for (const region of visibleRegions) {
+          for (const item of region.items) {
+            tally.total += 1;
+            const key = rightsStatusOf(item).key;
+            if (key === "none") tally.none += 1;
+            else if (key === "service-only") tally.serviceOnly += 1;
+            else if (key === "goods") tally.goods += 1;
+            else tally.unknown += 1;
+          }
+        }
+        const seg = (key, value) => value > 0 ? `<i class="seg seg-${key}" style="flex:${value}"></i>` : "";
+        return `<section class="rights-board" aria-label="권리 상태">
+          <div class="rights-board-head"><strong>${esc(displayRegionName(state.municipality || state.province || "전국"))} 권리 상태</strong><span>지역 × 특산품 ${number(tally.total)}개</span></div>
+          <div class="rights-board-bar" role="img" aria-label="무권리 ${tally.none}개, 행위만 보호 ${tally.serviceOnly}개, 상품류 보유 ${tally.goods}개, 권리 내용 미확인 ${tally.unknown}개">${seg("none", tally.none)}${seg("service-only", tally.serviceOnly)}${seg("goods", tally.goods)}${seg("unknown", tally.unknown)}</div>
+          <ul class="rights-board-legend">
+            <li class="seg-none"><b>${number(tally.none)}</b><span>무권리</span><small>출원 0건 · 권리화 1순위</small></li>
+            <li class="seg-service-only"><b>${number(tally.serviceOnly)}</b><span>행위만 보호</span><small>서비스류만 · 제품 권리 없음</small></li>
+            <li class="seg-goods"><b>${number(tally.goods)}</b><span>상품류 보유</span><small>파는 물건에 권리 있음</small></li>
+            <li class="seg-unknown"><b>${number(tally.unknown)}</b><span>권리 내용 미확인</span><small>지정상품 미확인 · 실사 필요</small></li>
+          </ul>
+          <p class="rights-board-note">출원 건수만으로는 &ldquo;상표는 있는데 정작 파는 물건에 권리가 없는&rdquo; 상태가 드러나지 않습니다. 지정상품의 상품류(1~34류)와 서비스류(35류 이상)로 갈라 네 칸으로 봅니다.</p>
+        </section>`;
+    })();
     return `<section class="summary-row" aria-label="핵심 지표·지도·출원 랭킹">
     <aside class="map-insight">${metricsHtml}<h2>${esc(displayRegionName(state.municipality || state.province || "전국"))} · ${esc(mapLabels[state.mapMetric])}</h2>${insightHero}${state.province && !provinceHasRealMunicipalities(state.province) && visibleRegions.some(isUnclassifiedRegion) ? `<p class="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 ${esc(displayRegionName(state.province))} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>` : ""}<div class="mini-list-heading"><strong>${esc(insightListLabel)}</strong><span>최대 5개</span></div><div class="mini-list">${insightList}</div></aside>
     <div class="map-card"><div class="map-heading"><div><h2>${state.province ? `${esc(displayRegionName(state.province))} 시군구` : "전국 지역 브랜드 지도"}</h2></div><span class="reference-chip" title="${esc(`지도 도형은 ${geometry.boundaryReference.sourceName} 제공 경계(${geometry.boundaryReference.sourceBasis})를 참고용으로 씁니다 — 제3자가 재배포하는 데이터라 향후 행정구역 개편이 지도 도형에 늦게 반영될 수 있으며, 클릭하면 항상 실제(현재) 행정구역 데이터로 연결됩니다.`)}">참고 경계 · ${esc(geometry.boundaryReference.sourceBasis.match(/\d{4}-\d{2}-\d{2}/)?.[0] || geometry.boundaryReference.sourceName)}</span></div><div class="map-toolbar"><div class="map-metrics">${Object.entries(mapLabels).map(([key, label]) => `<button type="button" data-map-metric="${key}" class="${state.mapMetric === key ? "active" : ""}" title="${esc(mapDescriptions[key])}" aria-label="${esc(`${label}: ${mapDescriptions[key]}`)}">${label}</button>`).join("")}</div>${state.province ? '<button class="map-back" id="map-back" type="button">← 전국</button>' : ""}</div><p class="map-metric-description"><strong>${mapLabels[state.mapMetric]}</strong><span>${mapDescriptions[state.mapMetric]}</span></p><div class="map-stage"><svg class="korea-map" viewBox="${activeViewBox}" role="img" aria-label="${state.province ? `${esc(displayRegionName(state.province))} 시군구 지도` : "대한민국 시도 지도"}">${shapePaths}${shapeLabels}</svg></div><div class="map-legend quantile-legend"><span><i class="legend-swatch no-data"></i>데이터 없음</span>${quantileLegendHtml(municipal ? municipalBreaks : nationalBreaks, mapValueLabel)}<strong>${mapLabels[state.mapMetric]} 5분위</strong></div></div>

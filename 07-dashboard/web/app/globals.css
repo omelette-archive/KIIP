@@ -649,6 +649,28 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .category-stats-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .category-stats-donuts h3 { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
 @media (max-width: 760px) { .coverage-insight-strip .coverage-insight-stats { margin-left: 0; } }
+/* 2026-09-08: 권리 상태 네 칸을 요약 첫 지표로. 네 칸은 순서가 있는 진단 단계라
+   순차가 아니라 상태 색(위험→양호)을 쓰고, 값은 숫자로 함께 적는다. */
+.rights-board { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.rights-board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.rights-board-head strong { font-size: 14px; }
+.rights-board-head span { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.rights-board-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #eef2f7; }
+.rights-board-bar .seg { display: block; }
+.seg-none { background: var(--red); }
+.seg-service-only { background: var(--amber); }
+.seg-goods { background: var(--green); }
+.seg-unknown { background: repeating-linear-gradient(135deg, #dfe5ee, #dfe5ee 5px, #eef2f7 5px, #eef2f7 6px); }
+.rights-board-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.rights-board-legend li { padding-left: 10px; border-left: 3px solid var(--line); }
+.rights-board-legend li.seg-none { border-left-color: var(--red); background: none; }
+.rights-board-legend li.seg-service-only { border-left-color: var(--amber); background: none; }
+.rights-board-legend li.seg-goods { border-left-color: var(--green); background: none; }
+.rights-board-legend li.seg-unknown { border-left-color: #c7cfdb; background: none; }
+.rights-board-legend b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rights-board-legend span { display: block; margin-top: 1px; font-size: 12px; font-weight: 700; }
+.rights-board-legend small { display: block; margin-top: 2px; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
+.rights-board-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
 /* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
    진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
 .matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }

@@ -90,9 +90,11 @@ test("renders the data-connected Korean dashboard", async () => {
   );
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장, 완료율이 아니라 공백(해야 할 일) 중심
   // 서술로("전국 특산품 수"·"지역별 출원 수 표시 가능"은 제거, 그 값은 데이터 개요 탭에만).
-  assert.match(html, /출원 확인 안 된 특산품\(공백\)/);
+  assert.match(html, /class="rights-board"/);
   assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
-  assert.match(html, /출원인 주소 미확보/);
+  // 2026-09-08: 출원인 주소 확보 현황은 운영 지표라 요약에서 빼고 데이터 개요 탭에만 둔다
+  // (컨셉 4판 "운영 지표는 분리"). 요약 첫 칸은 권리 상태 네 칸이 대신한다.
+  assert.doesNotMatch(html, /출원인 주소 미확보/, "운영 지표는 요약이 아니라 데이터 개요 몫");
   assert.match(html, /전국 지역 브랜드 지도/);
   // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
   // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
@@ -112,18 +114,23 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
   // 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮겼다. 특산품 수·
   // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
-  assert.match(mapInsight, /class="metrics metrics-inset"/, "요약 핵심 지표 바는 지도 옆 왼쪽 열로 이동해야 함");
+  // 2026-09-08: 그 자리를 권리 상태 네 칸이 대신한다(컨셉 4판의 대표 지표).
+  assert.match(mapInsight, /class="rights-board"/, "요약 핵심 지표는 지도 옆 왼쪽 열에 권리 상태 네 칸으로 있어야 함");
   assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장(항상 100%에 가까운 "전국 특산품 수"·
   // "지역별 출원 수 표시 가능"은 정보량이 적어 제거).
   assert.doesNotMatch(mapInsight, /전국 특산품 수|지역별 출원 수 표시 가능/, "정보량이 적은 KPI 2장은 요약에서 빠져야 함");
-  const metricsInsetArticleCount = (mapInsight.match(/<article>/g) || []).length;
-  assert.equal(metricsInsetArticleCount, 2, "요약 핵심 지표는 2장이어야 함(4장→2장)");
+  // 2026-09-08: KPI 카드 2장을 권리 상태 네 칸 하나로 바꿨다. 네 칸은 각각 다른 지표가
+  // 아니라 한 모집단(지역×특산품)을 네 상태로 가른 것이라 카드가 아니라 한 덩어리다.
+  const rightsSegmentCount = (mapInsight.match(/class="seg seg-/g) || []).length;
+  assert.ok(rightsSegmentCount >= 2 && rightsSegmentCount <= 4, `권리 상태 막대는 값이 있는 칸만 그린다(현재 ${rightsSegmentCount}칸)`);
+  const rightsLegendCount = (mapInsight.match(/<li class="seg-/g) || []).length;
+  assert.equal(rightsLegendCount, 4, "권리 상태 범례는 네 칸 모두 표시해야 함(0건이어도)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
-  assert.match(standaloneHtml, /class="metrics metrics-inset"><article><span>출원 확인 안 된 특산품\(공백\)/);
+  assert.match(standaloneHtml, /class="rights-board" aria-label="권리 상태"/);
   assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
   assert.match(standaloneHtml, /dashboardUpdatedAt = latestDate\([\s\S]*metric\.calculatedAt/);
   assert.match(standaloneHtml, /dateOnly\(latestDate\(source\.sourceFetchedAt, source\.sourceLastVerifiedAt\)\)/);
@@ -213,10 +220,15 @@ test("uses every collected region-item specialty as the application-rate denomin
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   // 2026-09-01(#116): 요약 첫 칸에 분모(전체 수집 수)와 출원 확인 수가 모두 노출돼야
   // 한다는 요구사항. 2026-09-06 S2 재설계로 문구는 완료율("전국 특산품 수")에서
-  // 공백 중심("출원 확인 안 된 특산품(공백)")으로 바뀌었지만, 분모(total)와 그로부터
+  // 공백 중심으로, 2026-09-08에는 권리 상태 네 칸으로 다시 바뀌었다. 공백은 그중
+  // "무권리"이고 분모(total)는 지역×특산품 총수로 함께 노출된다.
   // 유도되는 미출원 수(gap = total - applied)는 여전히 함께 노출된다.
-  assert.match(visibleTextHtml, new RegExp(`전체 수집 ${localeNumber(coverage.total)}개 중 미출원`));
-  assert.match(visibleTextHtml, new RegExp(`출원 확인 안 된 특산품\\(공백\\)[\\s\\S]{0,40}${localeNumber(coverage.total - coverage.applied)}개`));
+  assert.match(visibleTextHtml, new RegExp(`지역 × 특산품 ${localeNumber(coverage.total)}개`));
+  for (const label of ["무권리", "행위만 보호", "상품류 보유", "권리 내용 미확인"]) {
+    assert.match(visibleTextHtml, new RegExp(label), `권리 상태 네 칸에 "${label}"이 있어야 함`);
+  }
+  // 무권리 수(= total - applied)가 네 칸 중 첫 칸에 숫자로 노출돼야 한다.
+  assert.match(visibleTextHtml, new RegExp(`${localeNumber(coverage.total - coverage.applied)}[\\s\\S]{0,30}무권리`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
   // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
   assert.doesNotMatch(html, /출원율 계산/);
