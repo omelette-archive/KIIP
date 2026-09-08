@@ -5,6 +5,10 @@ const { loadAdminRegionCodes } = require("../../01-collect-specialties/lib/admin
 const { loadSourceCoverageGaps } = require("../../01-collect-specialties/lib/sourceCoverageGaps");
 const { getSourceDefinition, loadSourceRegistry } = require("../../01-collect-specialties/lib/sourceRegistry");
 const ITEM_CATEGORIES = require("../../02-normalize-items/data/item-categories-v1.json");
+// 2026-09-09(사용자 A안): 확정 표에 없는 696개 이름의 유형 제안. 확정이 아니므로 파일을
+// 나누고, 여기서 온 유형은 provisional: true로 표시해 화면에서 「검토 전」으로 구분한다
+// (#16 — 생성형 AI가 특산품 데이터를 직접 판정하지 않는다). 검토를 마치면 확정 표로 옮긴다.
+const ITEM_CATEGORY_PROPOSALS = require("../../02-normalize-items/data/item-categories-proposed-v1.json");
 const { checkMapGeographyCoverage } = require("./mapGeographyCoverage");
 
 const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
@@ -33,17 +37,24 @@ function hash(value, length = 16) {
 // 남았고, 같은 이름이 나주시에서는 과일, 제주도에서는 미분류로 갈렸다. 표 조회는 이름
 // 정확 일치라 경로와 무관하게 안전하다 — 게이트를 없애고 이름으로만 본다(114개 행 회복).
 const CATEGORY_DISPLAY_PREFIXES = ["신선한 ", "미가공 ", "보존처리한 ", "건조한 ", "말린 "];
-function categoryByName(rawName) {
+function lookupCategory(table, rawName) {
   const name = clean(rawName);
   if (!name) return null;
   const prefix = CATEGORY_DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
   const stripped = prefix ? name.slice(prefix.length) : name;
-  return ITEM_CATEGORIES.items[name] || ITEM_CATEGORIES.items[stripped] || null;
+  return table[name] || table[stripped] || null;
 }
 function itemCategory(row) {
   // 고시명칭을 먼저 보고, 없거나 표에 없으면 수집 원본명으로도 한 번 본다.
-  const code = categoryByName(row.noticeName) || categoryByName(row.itemName);
-  return code ? { code, label: ITEM_CATEGORIES.categories[code] || code } : null;
+  const confirmed =
+    lookupCategory(ITEM_CATEGORIES.items, row.noticeName) ||
+    lookupCategory(ITEM_CATEGORIES.items, row.itemName);
+  if (confirmed) return { code: confirmed, label: ITEM_CATEGORIES.categories[confirmed] || confirmed };
+  const proposed =
+    lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.noticeName) ||
+    lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.itemName);
+  if (!proposed) return null;
+  return { code: proposed, label: ITEM_CATEGORIES.categories[proposed] || proposed, provisional: true };
 }
 
 function canonicalItem(row) {
@@ -891,6 +902,7 @@ module.exports = {
   buildDashboardSnapshot,
   canonicalItem,
   createRegionIndex,
+  itemCategory,
   dataState,
   resolveRegion,
   rowKey,

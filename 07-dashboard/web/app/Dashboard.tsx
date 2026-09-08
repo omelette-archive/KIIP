@@ -7,7 +7,8 @@ type Metric = { value: number | null; availability: "available" | "preview" | "b
 type TrademarkExample = { title: string | null; applicationNumber: string | null; applicationDate: string | null; applicant?: string | null; applicationStatus: string | null; statusCategory?: string | null; applicantRegionMatch?: string | null; niceClass?: string | null; goodsMatchMethod: string; goodsReviewRequired: boolean; goodsEvidence: { classCode?: string | null; designatedProductName?: string | null }[] };
 type VerifiedRegistrationExamples = { schemaVersion: string; verifiedAt: string; sourceUrl: string; entries: { region: string; specialtyId: string | null; itemName: string; query: string; examples: TrademarkExample[] }[] };
 type ItemVerdict = { source: string; method: string | null; confidence: number | null };
-type ItemCategory = { code: string; label: string };
+// provisional은 확정 표가 아니라 제안 파일(item-categories-proposed-v1.json)에서 온 유형이다.
+type ItemCategory = { code: string; label: string; provisional?: boolean };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
@@ -2512,6 +2513,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .sort((a, b) => b.total - a.total);
   }, [coverageAreaRegions]);
   const categoryStatsMaxRate = Math.max(0.01, ...categoryStats.map((row) => row.coverageRate || 0));
+  // 2026-09-09(사용자 A안): 확정 표에 없는 이름은 별도 제안 파일에서 유형을 가져오되
+  // provisional로 표시된다. 검토 전 제안이 섞여 있다는 사실을 표 아래에 밝힌다.
+  const provisionalCount = useMemo(() => coverageAreaRegions.reduce((sum, region) =>
+    sum + region.items.filter((item) => item.category && item.category.provisional).length, 0), [coverageAreaRegions]);
   const [categoryStatsPick, setCategoryStatsPick] = useState("");
   // 2026-09-08: 광역 × 품목 유형 교차표. "어느 지역이 어느 유형에 강한가/약한가"는
   // 목록을 아무리 봐도 안 보이는데 K-브랜드 후보를 고를 때 가장 먼저 필요한 그림이다.
@@ -3024,7 +3029,7 @@ const STRATEGY_CHIP_LIMIT = 12;
         </div>
         {selectedProvince && !selectedMunicipality && <div className="category-stats-donuts"><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="registeredTrademarkCount" label="등록" /></article></div></div>}
         </div>
-        <p className="screen-note">출원율은 수집된 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 비율(분모에 명칭 확인·집계 대기 포함), 등록률은 지역 확인 출원 중 등록 완료 비율입니다 — 분모가 다르므로 두 비율을 직접 비교하지 마십시오.</p>
+        <p className="screen-note">출원율은 수집된 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 비율(분모에 명칭 확인·집계 대기 포함), 등록률은 지역 확인 출원 중 등록 완료 비율입니다 — 분모가 다르므로 두 비율을 직접 비교하지 마십시오.{provisionalCount > 0 && <> 유형 중 <b>{number(provisionalCount)}개 행은 검토 전 제안 분류</b>입니다 — 확정 표에 없는 이름이라 사람 검토 전입니다.</>}</p>
       </section>}
       {comparisonRows.length > 0 && (!selectedProvince || comparisonRows.some((row) => row.province === selectedProvince)) && <section className="compare-embed">
         <div className="section-heading"><div><h2>특화작목 대조</h2></div><span>농촌진흥청 2025년 지정 9개 도·69개 작목 vs 지역 주소 일치 상표</span></div>
