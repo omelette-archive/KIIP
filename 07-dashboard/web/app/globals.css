@@ -1022,9 +1022,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
 .leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
 .leader-bar-low i { background: var(--amber); }
-.leader-bar-empty { border: 0; }
-.leader-fresh { padding: 1px 5px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-size: 10px; font-style: normal; font-weight: 800; }
-.leader-growth { color: var(--green-dark); font-size: 12px; font-style: normal; font-weight: 800; }
+/* #175: 급증 카드 안의 "신규 진입" 소구분 — 가속 목록과 정렬 축이 달라 시각적으로 나눈다. */
+.leader-inline-head { display: flex; align-items: baseline; gap: 7px; margin-top: 9px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.leader-inline-head span { color: var(--muted); font-size: 11px; font-weight: 800; }
+.leader-inline-head small { color: var(--faint); font-size: 9.5px; }
 .summary-leaderboard .method-note { margin-top: 16px; padding: 12px 14px; }
 .leader-csv-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .leader-csv-row .csv-download-button { margin-left: 0; }

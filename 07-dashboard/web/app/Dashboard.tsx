@@ -186,6 +186,10 @@ const LEADER_WINDOWS: { months: number; label: string }[] = [
   { months: 12, label: "최근 1년" },
 ];
 const LEADER_LIMIT = 5;
+// #175: 급증 카드를 "가속"(배수순)과 "신규 진입"(건수순)으로 분리할 때 쓰는 임계값.
+// 1.3배는 4개 창(1·3·6·12개월) 전부에서 TOP5가 안 바뀌는 견고한 값으로 확인됨(교차검증).
+const LEADER_ACCEL_MIN_GROWTH = 1.3;
+const LEADER_FRESH_LIMIT = 3;
 // 급증·등록전환 순위가 표본이 작은 품목(창 기간 출원 1~2건)으로 왜곡되지 않도록
 // 창 길이에 비례한 최소 출원 건수 컷오프를 둔다(#118 열린 질문).
 function leaderMinBase(months: number) { return Math.max(6, months * 2); }
@@ -1287,17 +1291,23 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     const topItems = [...itemList].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.name.localeCompare(b.name, "ko-KR")).slice(0, LEADER_LIMIT);
     const topCategories = [...cats.values()].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.label.localeCompare(b.label, "ko-KR"));
     const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
-    // 급증: 창 기간 출원이 컷오프 이상이고 직전 동일 기간보다 늘어난 품목. 직전 0건이면
-    // "신규", 아니면 증가율. 증가율 왜곡을 막으려 직전이 컷오프의 1/3 미만이면 신규로 본다.
-    const surging = itemList
-      .filter((row) => row.app >= minBase && row.app > row.priorApp)
-      .map((row) => {
-        const fresh = row.priorApp < Math.max(1, minBase / 3);
-        const growth = fresh ? Infinity : row.app / row.priorApp;
-        return { ...row, fresh, growth, delta: row.app - row.priorApp };
-      })
+    // 급증(#175, 2026-09-08): 예전에는 "직전 대비 배수" 하나로 정렬해서, 직전이 0~1건인
+    // 품목이 배수 무한대로 최상단을 독점했다(기본 3개월 창 TOP5가 전부 0→6~14건). 컷오프가
+    // 현재 건수(app)에만 걸려 있어 직전 기간의 표본 부족을 못 걸렀던 것.
+    // → 두 갈래로 분리한다. 섹션 안에서는 정렬·표기 축이 하나뿐이라 일관성도 해결.
+    //   · 가속: 직전에도 최소 기준(minBase/2)이 있으면서 1.3배 이상 성장 → 배수순
+    //   · 신규 진입: 직전이 사실상 0인데 현재 최소 기준의 2배 이상 → 건수순
+    const accelBase = Math.max(2, minBase / 2);
+    const accelerating = itemList
+      .filter((row) => row.app >= minBase && row.priorApp >= accelBase && row.app / row.priorApp >= LEADER_ACCEL_MIN_GROWTH)
+      .map((row) => ({ ...row, growth: row.app / row.priorApp, delta: row.app - row.priorApp }))
       .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
       .slice(0, LEADER_LIMIT);
+    const freshEntries = itemList
+      .filter((row) => row.priorApp < accelBase && row.app >= minBase * 2)
+      .map((row) => ({ ...row, delta: row.app - row.priorApp }))
+      .sort((a, b) => (b.app - a.app) || a.name.localeCompare(b.name, "ko-KR"))
+      .slice(0, LEADER_FRESH_LIMIT);
     // 등록 전환: 누적(연 단위) 출원·등록 기준. 창 안의 등록/출원은 서로 다른 시점 코호트라
     // 비율로 쓰기 어렵다 — 리더보드에서 "정착이 잘/안 되는 품목"은 전체 이력으로 본다.
     const lifetime = new Map<string, { name: string; category: ItemCategory | null; lifeApp: number; lifeReg: number }>();
@@ -1318,7 +1328,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
     const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
     const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
+    return { windowKeys, priorKeys, minBase, accelBase, topItems, topCategories, categoryTotal, accelerating, freshEntries, conversionHigh, conversionLow, itemCount: itemList.length };
   }, [snapshot.generatedAt, regionalRegions, leaderMonths, leaderMetric]);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
@@ -1602,7 +1612,16 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           <div className="leader-grid leader-grid-primary">
             <article className="leader-card">
               <div className="leader-card-head"><h4>출원 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
-              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건).</p> : <ol className="leader-list">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" title={`직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건`} onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val leader-val-wide">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</b></button></li>)}</ol>}
+              {leaderboard.accelerating.length === 0 && leaderboard.freshEntries.length === 0
+                ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건).</p>
+                : <>
+                  {leaderboard.accelerating.length > 0 && <ol className="leader-list">{leaderboard.accelerating.map((row, index) => { const top = leaderboard.accelerating[0].growth; return <li key={row.name}><button type="button" title={`직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건 (+${number(row.delta)})`} onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</b><span className="leader-bar"><i style={{ width: `${top ? Math.max(3, row.growth / top * 100) : 0}%` }} /></span></button></li>; })}</ol>}
+                  {leaderboard.accelerating.length === 0 && <p className="empty">직전 기간 대비 {LEADER_ACCEL_MIN_GROWTH}배 이상 성장한 품목이 없습니다.</p>}
+                  {leaderboard.freshEntries.length > 0 && <>
+                    <div className="leader-inline-head"><span>신규 진입</span><small>직전 기간 거의 없던 품목</small></div>
+                    <ol className="leader-list">{leaderboard.freshEntries.map((row, index) => <li key={row.name}><button type="button" title={`직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건`} onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val leader-val-wide">{number(row.priorApp)}→{number(row.app)}</b></button></li>)}</ol>
+                  </>}
+                </>}
             </article>
 
             <article className="leader-card">
@@ -1629,7 +1648,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             </article>
           </div>
         <details className="method-note"><summary>집계 기준 · CSV</summary>
-          <p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 {leaderboard.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p>
+          <p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 두 갈래로 나눠 봅니다 — <b>가속</b>은 직전 기간에도 {number(leaderboard.accelBase)}건 이상 있으면서 {LEADER_ACCEL_MIN_GROWTH}배 이상 늘어난 품목(배수순), <b>신규 진입</b>은 직전 기간이 거의 없는데 최근 {number(leaderboard.minBase * 2)}건 이상인 품목(건수순)입니다. 직전 기간 표본이 너무 적은 품목은 배수가 과장되므로 가속에서 제외합니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p>
           <div className="leader-csv-row">
             <CsvDownloadButton label="품목 순위 CSV" onClick={() => downloadCsv(`동향_품목${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "품목", "유형", leaderMetric === "application" ? "출원" : "등록"], leaderboard.topItems.map((row, index) => [index + 1, row.name, row.category?.label ?? "", leaderMetric === "application" ? row.app : row.reg]))} />
             <CsvDownloadButton label="유형 순위 CSV" onClick={() => downloadCsv(`동향_유형${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "유형", leaderMetric === "application" ? "출원" : "등록", "비중"], leaderboard.topCategories.map((row, index) => [index + 1, row.label, leaderMetric === "application" ? row.app : row.reg, leaderboard.categoryTotal ? `${Math.round((leaderMetric === "application" ? row.app : row.reg) / leaderboard.categoryTotal * 100)}%` : ""]))} />
@@ -1798,7 +1817,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
             {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} origins={[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)} />}
-            {flowItem?.businessFlow && <ExpansionSuggestionsCard flow={flowItem.businessFlow} itemLabel={row.name} surging={leaderboard.surging.some((s) => s.name === row.name)} />}
+            {flowItem?.businessFlow && <ExpansionSuggestionsCard flow={flowItem.businessFlow} itemLabel={row.name} surging={leaderboard.accelerating.some((s) => s.name === row.name) || leaderboard.freshEntries.some((s) => s.name === row.name)} />}
             {briefingItem?.briefing && <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></>}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
         </div>

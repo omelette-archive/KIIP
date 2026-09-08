@@ -1022,9 +1022,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
 .leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
 .leader-bar-low i { background: var(--amber); }
-.leader-bar-empty { border: 0; }
-.leader-fresh { padding: 1px 5px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-size: 10px; font-style: normal; font-weight: 800; }
-.leader-growth { color: var(--green-dark); font-size: 12px; font-style: normal; font-weight: 800; }
+/* #175: 급증 카드 안의 "신규 진입" 소구분 — 가속 목록과 정렬 축이 달라 시각적으로 나눈다. */
+.leader-inline-head { display: flex; align-items: baseline; gap: 7px; margin-top: 9px; padding-top: 7px; border-top: 1px dashed var(--line); }
+.leader-inline-head span { color: var(--muted); font-size: 11px; font-weight: 800; }
+.leader-inline-head small { color: var(--faint); font-size: 9.5px; }
 .summary-leaderboard .method-note { margin-top: 16px; padding: 12px 14px; }
 .leader-csv-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .leader-csv-row .csv-download-button { margin-left: 0; }
@@ -1167,6 +1168,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 전체 대상이라 지역 귀속 확인 건수와 다른 모집단이다(#50).
   const LEADER_WINDOWS = [[1, "최근 1개월"], [3, "최근 3개월"], [6, "최근 6개월"], [12, "최근 1년"]];
   const LEADER_LIMIT = 5;
+  // #175: 급증 카드 가속/신규진입 분리 임계값(1.3배는 4개 창 전부 견고, 교차검증).
+  const LEADER_ACCEL_MIN_GROWTH = 1.3;
+  const LEADER_FRESH_LIMIT = 3;
   const leaderMinBase = (months) => Math.max(6, months * 2);
   const ymKey = (year, monthIndex0) => `${year}-${String(monthIndex0 + 1).padStart(2, "0")}`;
   const leaderEndMonth = (generatedAt) => { const d = new Date(generatedAt); const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1); return { year: prev.getFullYear(), monthIndex0: prev.getMonth() }; };
@@ -1817,11 +1821,18 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const topItems = itemList.filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.name.localeCompare(b.name, "ko-KR")).slice(0, LEADER_LIMIT);
     const topCategories = [...cats.values()].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.label.localeCompare(b.label, "ko-KR"));
     const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
-    const surging = itemList
-      .filter((row) => row.app >= minBase && row.app > row.priorApp)
-      .map((row) => { const fresh = row.priorApp < Math.max(1, minBase / 3); return { ...row, fresh, growth: fresh ? Infinity : row.app / row.priorApp, delta: row.app - row.priorApp }; })
+    // #175: 배수 하나로 정렬하면 직전 0~1건 품목이 무한 배수로 독점 → 가속/신규 진입 분리.
+    const accelBase = Math.max(2, minBase / 2);
+    const accelerating = itemList
+      .filter((row) => row.app >= minBase && row.priorApp >= accelBase && row.app / row.priorApp >= LEADER_ACCEL_MIN_GROWTH)
+      .map((row) => ({ ...row, growth: row.app / row.priorApp, delta: row.app - row.priorApp }))
       .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
       .slice(0, LEADER_LIMIT);
+    const freshEntries = itemList
+      .filter((row) => row.priorApp < accelBase && row.app >= minBase * 2)
+      .map((row) => ({ ...row, delta: row.app - row.priorApp }))
+      .sort((a, b) => (b.app - a.app) || a.name.localeCompare(b.name, "ko-KR"))
+      .slice(0, LEADER_FRESH_LIMIT);
     const lifetime = new Map();
     for (const region of regionalRegions) {
       for (const item of region.items) {
@@ -1837,7 +1848,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const lifetimeRows = [...lifetime.values()].filter((row) => row.lifeApp >= 20 && row.lifeReg <= row.lifeApp).map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
     const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
     const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
+    return { windowKeys, priorKeys, minBase, accelBase, topItems, topCategories, categoryTotal, accelerating, freshEntries, conversionHigh, conversionLow, itemCount: itemList.length };
   }
   // 이슈 #118: 별도 탭 대신 요약 "최근 동향" 묶음 안에 compact로.
   function leaderboardHtml() {
@@ -1857,7 +1868,12 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const topMax = lb.topItems.length ? topValue(lb.topItems[0]) : 0;
     const itemsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 품목</h4><span class="leader-card-note">TOP ${LEADER_LIMIT}</span></div>${lb.topItems.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topItems.map((row, index) => { const value = topValue(row); return `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val">${number(value)}</b><span class="leader-bar"><i style="width:${topMax ? Math.max(3, value / topMax * 100) : 0}%"></i></span></button></li>`; }).join("")}</ol>`}</article>`;
     const catsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 유형</h4><span class="leader-card-note">비중</span></div>${lb.topCategories.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; const share = lb.categoryTotal ? value / lb.categoryTotal : 0; return `<li><button type="button" title="비중 ${percent(share)}" data-goto-category="${esc(row.code || "")}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.label)}</span><b class="leader-val">${number(value)}</b><span class="leader-bar"><i style="width:${Math.max(3, share * 100)}%;background:${categoryShareColor(row.label)}"></i></span></button></li>`; }).join("")}</ol>`}</article>`;
-    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h4>출원 급증 품목</h4><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `<ol class="leader-list">${lb.surging.map((row, index) => `<li><button type="button" title="직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val leader-val-wide">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</b></button></li>`).join("")}</ol>`}</article>`;
+    const accelMax = lb.accelerating.length ? lb.accelerating[0].growth : 0;
+    const accelHtml = lb.accelerating.length === 0
+      ? `<p class="empty">직전 기간 대비 ${LEADER_ACCEL_MIN_GROWTH}배 이상 성장한 품목이 없습니다.</p>`
+      : `<ol class="leader-list">${lb.accelerating.map((row, index) => `<li><button type="button" title="직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건 (+${number(row.delta)})" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</b><span class="leader-bar"><i style="width:${accelMax ? Math.max(3, row.growth / accelMax * 100) : 0}%"></i></span></button></li>`).join("")}</ol>`;
+    const freshHtml = lb.freshEntries.length === 0 ? "" : `<div class="leader-inline-head"><span>신규 진입</span><small>직전 기간 거의 없던 품목</small></div><ol class="leader-list">${lb.freshEntries.map((row, index) => `<li><button type="button" title="직전 ${number(row.priorApp)}건 → 최근 ${number(row.app)}건" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val leader-val-wide">${number(row.priorApp)}→${number(row.app)}</b></button></li>`).join("")}</ol>`;
+    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h4>출원 급증 품목</h4><span class="leader-card-note">직전 기간 대비</span></div>${lb.accelerating.length === 0 && lb.freshEntries.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `${accelHtml}${freshHtml}`}</article>`;
     const convRow = (row, index, low) => `<li><button type="button" title="등록 ${number(row.lifeReg)}건 / 출원 ${number(row.lifeApp)}건" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val">${percent(row.rate)}</b><span class="leader-bar${low ? " leader-bar-low" : ""}"><i style="width:${Math.max(3, row.rate * 100)}%"></i></span></button></li>`;
     const highCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 상위</h4><span class="leader-card-note">정착이 잘 되는 품목</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
     const lowCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 하위</h4><span class="leader-card-note">전환이 안 되는 품목</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
@@ -2104,7 +2120,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const flowItem = row.matchedItems.find((entry) => entry.businessFlow);
     const briefingItem = row.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences?.length)
       || row.matchedItems.find((entry) => entry.briefing?.sentences?.length);
-    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) + expansionSuggestionsHtml(flowItem.businessFlow, row.name, computeLeaderboard().surging.some((s) => s.name === row.name)) : "";
+    const flowLb = flowItem ? computeLeaderboard() : null;
+    const flowSurging = flowLb ? flowLb.accelerating.some((s) => s.name === row.name) || flowLb.freshEntries.some((s) => s.name === row.name) : false;
+    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) + expansionSuggestionsHtml(flowItem.businessFlow, row.name, flowSurging) : "";
     const briefingHtml = briefingItem ? `${businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`)}${businessStrategyDisclaimerHtml(briefingItem.briefing.templateVersion)}` : "";
     return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail"><summary>전체 ${row.regions.length}개 지역 보기</summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details><div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${flowHtml}${briefingHtml}`;
   }
