@@ -575,6 +575,22 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* UI 검토(3차, 2026-09-06) S3: 비즈니스 전략 — 카드 나열 대신 한 줄 = 한 지역×품목인
    표 + 오른쪽 상세 패널. 표는 province-detail-cols 그리드(지역별 조회의 추이·요약
    2단 레이아웃)를 재사용한다. */
+/* 이슈 #119(협업자 2026-09-02): 비즈니스 전략 탭을 품목 중심으로 — 주요 품목은 칩으로
+   고르고 나머지는 수기 검색. 지역×품목 표는 접힘 뒤로 남긴다. */
+.strategy-item-picker { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 14px 0 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.strategy-item-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.strategy-item-chips button { display: inline-flex; align-items: baseline; gap: 5px; padding: 6px 12px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
+.strategy-item-chips button:hover { color: var(--ink); }
+.strategy-item-chips button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+.strategy-item-chips button small { color: var(--faint); font-size: 10px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.strategy-item-chips button.active small { color: var(--green); }
+.strategy-item-search { flex: 1 1 220px; min-width: 200px; margin-left: auto; }
+.strategy-flow-detail { display: flex; flex-direction: column; gap: 14px; margin-top: 16px; }
+.strategy-flow-detail .nationwide-flow-card, .strategy-flow-detail .expansion-card, .strategy-flow-detail .business-strategy { margin-top: 0; }
+.strategy-table-toggle { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.strategy-table-toggle > summary { display: flex; align-items: baseline; gap: 8px; }
+.strategy-table-toggle > summary span { color: var(--ink); font-size: 13px; font-weight: 800; }
+.strategy-table-toggle > summary small { color: var(--faint); font-size: 11px; }
 .strategy-table-toolbar { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px; margin: 4px 0 14px; }
 .strategy-filter-field { display: inline-flex; flex-direction: column; gap: 4px; }
 .strategy-filter-field span { color: var(--muted); font-size: 12px; font-weight: 700; }
