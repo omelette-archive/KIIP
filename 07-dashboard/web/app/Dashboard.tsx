@@ -1136,12 +1136,17 @@ function ExpansionReportCard({ index, name, category, province, regions }: { ind
 
   return <section className="expansion-report">
     <div className="section-heading"><div><h2>{province ? `${displayRegionName(province)} · ` : ""}{name} 확장 경로 진단</h2></div><span>지정상품 {number(evidenceCount)}건 근거{province ? " · 지역 관점 포함" : ""}</span></div>
+    {/* 2026-09-08(사용자 "인삼소매업이 진짜 한 건도 출원이 없나?"): 없다고 단정할 근거가
+        없다. 지정상품 근거는 고시명칭과 문자열이 겹치는 출원에만 붙어서(normalized_exact /
+        normalized_contains), 「신선한 인삼」은 「인삼소매업」을 구조적으로 못 잡는다. 확인된
+        범위와 실제 보유 범위를 말로 구분한다. */}
     <p className="expansion-lede"><b>{name}</b>{withTopicJosa(name).slice(name.length)} {serviceCodes.length
-      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에 도달했습니다.`
-      : <>제품 {productCodes.length}개 류에 머물러 있고, <b>서비스·확산(35류 이상)은 아직 0건</b>입니다.</>}</p>
+      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에서 지정상품이 확인됐습니다.`
+      : <>제품 {productCodes.length}개 류에서만 지정상품이 확인됐고, <b>서비스·확산(35류 이상)은 확인된 것이 없습니다</b>.</>}</p>
+    <p className="expansion-limit"><b>이 진단이 보는 범위</b> 지정상품 근거는 <b>고시명칭과 문자열이 맞물리는 출원</b>에만 붙습니다(정확 일치·부분 포함). 그래서 「신선한 인삼」은 「인삼소매업」(35류)을 잡아내지 못하고, 「신선한 곰취」는 「신선한곰취소매업」을 잡아냅니다 — 보이는 범위가 <b>이름 형태에 따라</b> 달라집니다. 아래에서 비어 있는 칸은 “권리가 없다”가 아니라 <b>“이 방법으로는 확인되지 않았다”</b>로 읽으십시오.</p>
     <div className="expansion-grid">
       <article>
-        <h3>① 지금 어디까지 갔나</h3>
+        <h3>① 지정상품이 확인된 범위</h3>
         <ul className="expansion-held">{ownCodes.map((code) => {
           const cell = own.get(code)!;
           const eg = goodsSample(cell.goods, 3, name);
@@ -1178,8 +1183,8 @@ function ExpansionReportCard({ index, name, category, province, regions }: { ind
       <article>
         <h3>④ 서비스 · 지역 창업</h3>
         <p className="expansion-hint">{serviceCodes.length
-          ? `이 품목은 ${serviceCodes.map(niceClassLabel).join(" · ")}를 이미 확보했습니다. 남은 서비스 구간은 아래와 같습니다.`
-          : <>이 품목은 <b>서비스류 출원이 한 건도 없습니다</b> — 직판·체험·관광·가공 위탁 같은 지역 창업 영역을 아직 아무도 권리화하지 않았다는 뜻입니다.</>}</p>
+          ? `이 품목은 ${serviceCodes.map(niceClassLabel).join(" · ")}가 확인됐습니다. 남은 서비스 구간은 아래와 같습니다.`
+          : <>이 품목은 <b>서비스류 지정상품이 확인되지 않았습니다</b> — 없다는 증거가 아니라 위 단서대로 확인되지 않았다는 뜻입니다. 직판·체험·관광·가공 위탁 방향을 검토할 때 <b>선등록 여부를 먼저 조사</b>하십시오.</>}</p>
         {svcRows.length > 0
           ? <ol className="expansion-list svc">{svcRows.map((row) => <li key={row.code}>
             <span className="expansion-class">{niceClassLabel(row.code)}</span>
@@ -1191,7 +1196,7 @@ function ExpansionReportCard({ index, name, category, province, regions }: { ind
       </article>
       {province && <ExpansionRegionSection regions={regions} name={name} province={province} index={index} />}
     </div>
-    <p className="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
+    <p className="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이고 그 일부도 고시명칭과 맞물린 것만이라, <b>실제 보유 범위는 여기 보이는 것보다 넓습니다</b>. 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
   </section>;
 }
 function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow; itemLabel: string; origins?: string[] }) {
@@ -2238,6 +2243,11 @@ const STRATEGY_CHIP_LIMIT = 12;
           <h2>{displayRegionName(selectedMunicipality || selectedProvince || "전국")} · {MAP_LABELS[mapMetric]}</h2>
           {mapMetric === "applicationCoverage" && <div className="rate-hero"><RateRing value={visibleSpecialtyCoverage.rate} label="출원율" /><div className="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 {number(visibleSpecialtyCoverage.total)}개 중 출원 확인 {number(visibleSpecialtyCoverage.applied)}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>}
           {mapMetric === "registration" && <div className="rate-hero"><RateRing value={visibleRegistrationRate} label="등록률" /><div className="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 {number(visibleTrademarkCount)}건 중 등록 {number(visibleRegisteredCount)}건</small></div></div>}
+          {/* 2026-09-08(사용자): "전국 특산품수에서 수집한 지역+품목 수를 top5 위에 적어줘 /
+              전국 상표건수 Top5 위에 상표 수집건수 적어줘." 출원율·등록률에는 비율 고리가 있어
+              모집단이 보이는데, 특산품 수·상표 건수는 상위 5개만 나열돼 전체가 얼마인지 없었다. */}
+          {mapMetric === "coverage" && <div className="insight-total"><strong>{number(visibleSpecialtyCoverage.total)}</strong><span>지역 × 특산품</span><small>출원 확인 {number(visibleSpecialtyCoverage.applied)}개 · 공백 {number(Math.max(0, visibleSpecialtyCoverage.total - visibleSpecialtyCoverage.applied))}개{visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div>}
+          {mapMetric === "trademarks" && <div className="insight-total"><strong>{number(visibleTrademarkCount)}</strong><span>지역 확인 출원</span><small>등록 {number(visibleRegisteredCount)}건 · 출원인 주소가 이 지역으로 확인된 고유 출원만 셉니다</small></div>}
           {selectedProvince && !provinceHasRealMunicipalities && visibleRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다. 지도에서 특정 구·군을 눌러도 같은 목록이 표시됩니다.</p>}
           <div className="mini-list-heading"><strong>{insightListLabel}</strong><span>최대 5개</span></div>
           <div className="mini-list">{visibleInsightItems.slice(0, 5).map(({ region, item, label }) => <button type="button" key={`${regionKey(region)}-${item.specialtyId}`} onClick={() => { chooseRegion(region); setSelectedItemId(item.specialtyId || ""); setTab("regions"); }}><span><strong>{region.sigungu || displayRegionName(region.region)} / {label}</strong><small>{noticeBasis(item)}{item.niceClass ? ` · NICE ${item.niceClass}류` : ""}</small></span><b>{insightItemValue(item)}</b></button>)}{visibleInsightItems.length === 0 && <p className="empty">이 지역에는 수집된 특산품이 없습니다.</p>}</div>
@@ -2680,7 +2690,36 @@ const STRATEGY_CHIP_LIMIT = 12;
             const briefingItem = row.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences.length) || row.matchedItems.find((entry) => entry.briefing?.sentences.length);
             return <>
             <div className="item-card-head"><div><h2>{row.name}</h2><small>{row.category ? `${row.category.label} · ` : ""}{row.regions.length}개 지역에서 확인</small></div><span className={pendingRegions === 0 ? "item-status complete" : decidedRegions ? "item-status partial" : "item-status pending"}>{pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기"}</span></div>
-            <details className="item-regions-detail" open><summary>전체 {row.regions.length}개 지역 보기<small>지역을 누르면 그 지역 출원 상표가 아래에 열립니다</small></summary><div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return <button type="button" key={region} className={itemRegionPick === region ? "region-chip-button active" : "region-chip-button"} style={{ fontSize: `${wordCloudFontSize(value, max)}px`, color: wordCloudColor(region) }} title={`${displayRegionName(region)} · 출원 ${number(value)}건`} onClick={() => setItemRegionPick(itemRegionPick === region ? "" : region)}>{displayRegionName(region)}</button>; })}</div></details>
+            {(() => {
+              // 2026-09-08(사용자 "이 중에 공백지역은 안 보이는 건가?"): 칩은 출원 건수로 크기만
+              // 달랐고 0건 지역은 그냥 작은 칩이라, 진단의 핵심인 공백이 눈에 띄지 않았다. 집계가
+              // 끝났는데 0건인 곳(공백)과 아직 집계 중인 곳(공백인지 알 수 없음)을 갈라 표시한다.
+              const decidedSet = new Set(row.availableRegions);
+              const chipRegions = [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0));
+              const gapCount = chipRegions.filter((region) => decidedSet.has(region) && !(row.regionCounts[region] > 0)).length;
+              const pendingCount = chipRegions.filter((region) => !decidedSet.has(region)).length;
+              const max = Math.max(1, ...Object.values(row.regionCounts));
+              return <details className="item-regions-detail" open>
+                <summary>전체 {row.regions.length}개 지역 보기
+                  {gapCount > 0 && <em className="region-chip-tally gap">공백 {number(gapCount)}곳</em>}
+                  {pendingCount > 0 && <em className="region-chip-tally pending">집계 대기 {number(pendingCount)}곳</em>}
+                  <small>지역을 누르면 그 지역 출원 상표가 아래에 열립니다</small>
+                </summary>
+                <div className="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">{chipRegions.map((region) => {
+                  const value = row.regionCounts[region] || 0;
+                  const pending = !decidedSet.has(region);
+                  const gap = !pending && value === 0;
+                  const note = pending ? "집계 대기 — 공백인지 아직 알 수 없습니다" : gap ? "공백 — 확인된 출원이 없습니다" : `출원 ${number(value)}건`;
+                  // 공백·대기 칩은 건수로 크기를 줄이지 않는다 — 찾아야 할 대상이 가장 작게 보이면 안 된다.
+                  const size = gap || pending ? 15 : wordCloudFontSize(value, max);
+                  const cls = ["region-chip-button", itemRegionPick === region ? "active" : "", pending ? "pending" : gap ? "gap" : ""].filter(Boolean).join(" ");
+                  return <button type="button" key={region} className={cls}
+                    style={gap || pending ? { fontSize: `${size}px` } : { fontSize: `${size}px`, color: wordCloudColor(region) }}
+                    title={`${displayRegionName(region)} · ${note}`}
+                    onClick={() => setItemRegionPick(itemRegionPick === region ? "" : region)}>{displayRegionName(region)}{gap && <i aria-hidden="true">공백</i>}</button>;
+                })}</div>
+              </details>;
+            })()}
             {(() => {
               const picked = row.regionItems.filter((entry) => entry.region.region === itemRegionPick);
               if (!picked.length) return null;

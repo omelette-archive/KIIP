@@ -725,11 +725,13 @@ test("sizes region/item tag clouds by application count instead of listing them 
   );
   assert.match(standaloneHtml, /class="item-tabs word-cloud"/, "지자체별 조회의 품목 탭이 태그 클라우드여야 함");
   assert.match(standaloneHtml, /class="region-chips word-cloud"/, "품목별 조회의 지역 목록이 태그 클라우드여야 함");
-  assert.match(
-    standaloneHtml,
-    /style="font-size:\$\{wordCloudFontSize\(value, max\)\}px;color:\$\{wordCloudColor\(region\)\}"/,
-    "각 태그의 font-size는 인라인 style로 출원건수에 비례해 지정해야 함",
-  );
+  // 2026-09-08(사용자 "이 중에 공백지역은 안 보이는 건가?"): 출원이 있는 지역은 건수에
+  // 비례한 크기 그대로 두되, 공백·집계대기 지역은 고정 크기로 키우고 표시를 붙인다 —
+  // 찾아야 할 대상이 가장 작게 보이면 안 된다.
+  assert.match(standaloneHtml, /wordCloudFontSize\(value, max\)/, "출원이 있는 지역 태그는 건수에 비례한 크기를 유지해야 함");
+  assert.match(standaloneHtml, /region-chip-button\$\{state\.itemRegionPick === region \? " active" : ""\}\$\{state2\}/, "공백·집계대기 상태가 칩 class로 구분돼야 함");
+  assert.match(standaloneHtml, /공백 — 확인된 출원이 없습니다/, "공백 지역은 title로 이유를 밝혀야 함");
+  assert.match(standaloneHtml, /region-chip-tally gap/, "공백 지역 수가 목록 머리에 집계돼야 함");
   // 2026-08-24(이슈 #112 후속): 태그 클라우드를 더 컬러풀하게 해달라는 요청 —
   // dataviz 스킬로 검증한(all-pairs CVD·정상시각 하한 통과) 4색 텍스트 팔레트를
   // 이름 해시로 고정 배정한다. 선택된 특산품 탭은 초록 배경에 흰 글자를 유지해야

@@ -143,6 +143,24 @@ a { color: inherit; text-decoration: none; }
 
 .expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
 .expansion-caveat b { color: var(--ink); }
+/* 상위 5개 목록 위에 모집단을 적는다 — 순위만 보면 "전체가 얼마인지"를 모른다. */
+.insight-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.insight-total strong { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--green-dark); font-variant-numeric: tabular-nums; }
+.insight-total span { font-size: 12px; font-weight: 700; color: var(--ink); }
+.insight-total small { flex-basis: 100%; color: var(--muted); font-size: 11px; line-height: 1.55; }
+/* 확인 범위의 한계를 첫 문장 바로 아래에 둔다 — 아래 빈 칸을 "권리 없음"으로 읽으면
+   틀린 결론이 나오므로 눈에 걸려야 한다. */
+.expansion-limit { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--amber); border-radius: 0 6px 6px 0; background: var(--amber-soft); color: #6d4310; font-size: 11px; line-height: 1.6; }
+.expansion-limit b { color: #4a2c07; }
+/* 2026-09-08(사용자 "이 중에 공백지역은 안 보이는 건가?"): 칩이 출원 건수로 크기만 달라
+   0건 지역이 그냥 작은 칩으로 묻혔다. 진단의 대상인 공백을 가장 눈에 띄게 두고, 아직
+   집계 중이라 공백인지 알 수 없는 곳은 따로 흐리게 구분한다. */
+.region-chip-button.gap { color: var(--amber); font-weight: 800; border-bottom: 2px solid var(--amber); }
+.region-chip-button.gap i { margin-left: 3px; padding: 0 4px; border-radius: 3px; background: var(--amber-soft); color: var(--amber); font-size: 9.5px; font-style: normal; font-weight: 800; vertical-align: 1px; }
+.region-chip-button.pending { color: var(--faint); border-bottom: 1px dashed var(--line); }
+.region-chip-tally { margin-left: 8px; padding: 1px 7px; border-radius: 4px; font-size: 10.5px; font-style: normal; font-weight: 800; }
+.region-chip-tally.gap { background: var(--amber-soft); color: var(--amber); }
+.region-chip-tally.pending { margin-left: 5px; background: var(--paper); color: var(--faint); border: 1px solid var(--line); }
 /* 2026-09-08(사용자): "맞춤형 추천을 해줘야지.. 류에 해당하는 적절한 지정상품으로."
    제안 문안이 주인공이고 남의 등록례는 그 근거이므로, 제안을 진하게 앞세우고 근거는 흐리게. */
 .expansion-suggest { grid-column: 1 / -1; margin-top: 3px; color: var(--ink); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
@@ -2209,11 +2227,18 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 옮긴다 — "전국 특산품 수" 카드가 그 지표 바와 겹쳐 보인다는 지적. 지도 지표 토글에
     // 연동되는 출원율·등록률 링만 왼쪽 열에 남기고, 특산품 수·상표 건수 단독 카드는
     // 지표 바가 이미 보여주므로 뺀다.
+    // 2026-09-08(사용자): "전국 특산품수에서 수집한 지역+품목 수를 top5 위에 적어줘 / 전국
+    // 상표건수 Top5 위에 상표 수집건수 적어줘." 출원율·등록률에는 비율 고리가 있어 모집단이
+    // 보이는데, 특산품 수·상표 건수는 상위 5개만 나열돼 "전체가 얼마인지"가 없었다.
     const insightHero = state.mapMetric === "applicationCoverage"
       ? `<div class="rate-hero">${rateRing(visibleSpecialtyCoverage.rate, "출원율")}<div class="rate-hero-detail"><span>특산품 출원율</span><small>수집 특산품 ${number(visibleSpecialtyCoverage.total)}개 중 출원 확인 ${number(visibleSpecialtyCoverage.applied)}개${visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div></div>`
       : state.mapMetric === "registration"
         ? `<div class="rate-hero">${rateRing(visibleRegistrationRate, "등록률")}<div class="rate-hero-detail"><span>상표 등록률</span><small>지역 주소 일치 출원 ${number(visibleTrademarkCount)}건 중 등록 ${number(visibleRegisteredCount)}건</small></div></div>`
-        : "";
+        : state.mapMetric === "coverage"
+          ? `<div class="insight-total"><strong>${number(visibleSpecialtyCoverage.total)}</strong><span>지역 × 특산품</span><small>출원 확인 ${number(visibleSpecialtyCoverage.applied)}개 · 공백 ${number(Math.max(0, visibleSpecialtyCoverage.total - visibleSpecialtyCoverage.applied))}개${visibleSpecialtyCoverage.pending ? ` · 집계 대기 ${number(visibleSpecialtyCoverage.pending)}개` : ""}</small></div>`
+          : state.mapMetric === "trademarks"
+            ? `<div class="insight-total"><strong>${number(visibleTrademarkCount)}</strong><span>지역 확인 출원</span><small>등록 ${number(visibleRegisteredCount)}건 · 출원인 주소가 이 지역으로 확인된 고유 출원만 셉니다</small></div>`
+            : "";
     const insightList = visibleInsightItems.slice(0, 5).map(({ region, item, label }) => `<button type="button" data-open-region="${esc(regionKey(region))}" data-open-item="${esc(item.specialtyId || "")}"><span><strong>${esc(region.sigungu || displayRegionName(region.region))} / ${esc(label)}</strong><small>${esc(noticeBasis(item))}${item.niceClass ? ` · NICE ${esc(item.niceClass)}류` : ""}</small></span><b>${esc(insightItemValue(item))}</b></button>`).join("") || '<p class="empty">이 지역에는 수집된 특산품이 없습니다.</p>';
     // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장. "전국 특산품 수"·"지역별 출원 수 표시
     // 가능"(항상 100%에 가까움)은 빼고, 나머지 둘은 완료율이 아니라 공백 중심으로.
@@ -2726,7 +2751,25 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const statusClass = pendingRegions === 0 ? "complete" : decidedRegions ? "partial" : "pending";
     const statusLabel = pendingRegions === 0 ? "전체 지역 판정 완료" : decidedRegions ? "일부 지역 판정" : "지역 집계 대기";
     const registrationRate = decidedRegions && row.trademarks ? row.registered / row.trademarks : null;
-    const chips = [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).map((region) => { const value = row.regionCounts[region] || 0; const max = Math.max(1, ...Object.values(row.regionCounts)); return `<button type="button" data-item-region="${esc(region)}" class="region-chip-button${state.itemRegionPick === region ? " active" : ""}" style="font-size:${wordCloudFontSize(value, max)}px;color:${wordCloudColor(region)}" title="${esc(displayRegionName(region))} · 출원 ${number(value)}건">${esc(displayRegionName(region))}</button>`; }).join("");
+    // 2026-09-08(사용자 "이 중에 공백지역은 안 보이는 건가?"): 칩은 출원 건수로 크기만
+    // 달랐고 0건 지역은 그냥 작은 칩이라, 진단의 핵심인 공백이 눈에 띄지 않았다. 집계가
+    // 끝났는데 0건인 곳(공백)과 아직 집계 중인 곳(공백인지 알 수 없음)을 갈라 표시한다.
+    const decidedSet = new Set(row.availableRegions);
+    const chipRegions = [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0));
+    const gapRegionCount = chipRegions.filter((region) => decidedSet.has(region) && !(row.regionCounts[region] > 0)).length;
+    const pendingRegionCount = chipRegions.filter((region) => !decidedSet.has(region)).length;
+    const chips = chipRegions.map((region) => {
+      const value = row.regionCounts[region] || 0;
+      const max = Math.max(1, ...Object.values(row.regionCounts));
+      const pending = !decidedSet.has(region);
+      const gap = !pending && value === 0;
+      const state2 = pending ? " pending" : gap ? " gap" : "";
+      const note = pending ? "집계 대기 — 공백인지 아직 알 수 없습니다" : gap ? "공백 — 확인된 출원이 없습니다" : `출원 ${number(value)}건`;
+      // 공백·대기 칩은 건수로 크기를 줄이지 않는다 — 찾아야 할 대상이 가장 작게 보이면 안 된다.
+      const size = gap || pending ? 15 : wordCloudFontSize(value, max);
+      return `<button type="button" data-item-region="${esc(region)}" class="region-chip-button${state.itemRegionPick === region ? " active" : ""}${state2}" style="font-size:${size}px${gap || pending ? "" : `;color:${wordCloudColor(region)}`}" title="${esc(displayRegionName(region))} · ${esc(note)}">${esc(displayRegionName(region))}${gap ? '<i aria-hidden="true">공백</i>' : ""}</button>`;
+    }).join("");
+    const chipLegend = `${gapRegionCount ? `<em class="region-chip-tally gap">공백 ${number(gapRegionCount)}곳</em>` : ""}${pendingRegionCount ? `<em class="region-chip-tally pending">집계 대기 ${number(pendingRegionCount)}곳</em>` : ""}`;
     // 이슈 #116(2026-09-01): 마스터-디테일 개편(29fb843) 때 품목별 조회에서 빠진 비즈니스
     // 확장 흐름·전략 카드를 되살린다. 흐름은 품목 단위 전국 지표라 대표 항목 하나에서,
     // 브리핑은 공백 알림을 우선해 뽑는다.
@@ -2735,7 +2778,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       || row.matchedItems.find((entry) => entry.briefing?.sentences?.length);
     const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) + expansionSuggestionsHtml(flowItem.businessFlow, row.name, computeLeaderboard().surging.some((s) => s.name === row.name)) : "";
     const briefingHtml = briefingItem ? `${businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`, "", nationwideReach(briefingItem))}${businessStrategyDisclaimerHtml(briefingItem.briefing.templateVersion)}` : "";
-    return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail" open><summary>전체 ${row.regions.length}개 지역 보기<small>지역을 누르면 그 지역 출원 상표가 아래에 열립니다</small></summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details>${regionTrademarkPanelHtml(row)}<div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${flowHtml}${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, adjustable: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${briefingHtml}`;
+    return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail" open><summary>전체 ${row.regions.length}개 지역 보기${chipLegend}<small>지역을 누르면 그 지역 출원 상표가 아래에 열립니다</small></summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details>${regionTrademarkPanelHtml(row)}<div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${flowHtml}${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, adjustable: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${briefingHtml}`;
   }
   function itemsScreen() {
     const rows = itemRows(); const ITEM_ROW_LIMIT = 100;
@@ -3098,9 +3141,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       const eg = goodsSample(cell.goods, 3, row.name);
       return `<li class="${Number(code) >= REPORT_SERVICE_FLOOR ? "svc" : "goods"}"><b>${esc(niceClassLabel(code))}</b><span>${number(cell.count)}건</span>${eg.length ? `<small>${eg.map(esc).join(" · ")}</small>` : ""}</li>`;
     }).join("");
+    // 2026-09-08(사용자 "인삼소매업이 진짜 한 건도 출원이 없나?"): 없다고 단정할 근거가
+    // 없다. 지정상품 근거는 고시명칭과 문자열이 겹치는 출원에만 붙어서(normalized_exact /
+    // normalized_contains), 「신선한 인삼」은 「인삼소매업」을 구조적으로 못 잡는다. 확인된
+    // 범위와 실제 보유 범위를 말로 구분한다.
     const reachLine = serviceCodes.length
-      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에 도달했습니다.`
-      : `제품 ${productCodes.length}개 류에 머물러 있고, <b>서비스·확산(35류 이상)은 아직 0건</b>입니다.`;
+      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에서 지정상품이 확인됐습니다.`
+      : `제품 ${productCodes.length}개 류에서만 지정상품이 확인됐고, <b>서비스·확산(35류 이상)은 확인된 것이 없습니다</b>.`;
 
     // ② 같은 유형이 먼저 간 곳
     const catCode = entry.category ? entry.category.code : "";
@@ -3157,8 +3204,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         return { code, count: cell.count, lead: show.lead, goods: show.goods };
       });
     const svcHead = serviceCodes.length
-      ? `이 품목은 ${serviceCodes.map((c) => esc(niceClassLabel(c))).join(" · ")}를 이미 확보했습니다. 남은 서비스 구간은 아래와 같습니다.`
-      : `이 품목은 <b>서비스류 출원이 한 건도 없습니다</b> — 직판·체험·관광·가공 위탁 같은 지역 창업 영역을 아직 아무도 권리화하지 않았다는 뜻입니다.`;
+      ? `이 품목은 ${serviceCodes.map((c) => esc(niceClassLabel(c))).join(" · ")}가 확인됐습니다. 남은 서비스 구간은 아래와 같습니다.`
+      : `이 품목은 <b>서비스류 지정상품이 확인되지 않았습니다</b> — 없다는 증거가 아니라 위 단서대로 확인되지 않았다는 뜻입니다. 직판·체험·관광·가공 위탁 방향을 검토할 때 <b>선등록 여부를 먼저 조사</b>하십시오.`;
     const svcHtml = svcRows.length
       ? `<ol class="expansion-list svc">${svcRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 상표 ${number(r.count)}건이 이 구간에</span>${suggestionHtml(suggestGoods(index, r.code, row.name, 3))}${r.goods ? `<small class="expansion-basis">근거 ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
       : `<p class="empty">전국 특산품 상표에서도 아직 서비스류 사례가 확인되지 않았습니다.</p>`;
@@ -3166,14 +3213,15 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     return `<section class="expansion-report">
       <div class="section-heading"><div><h2>${province ? `${esc(displayRegionName(province))} · ` : ""}${esc(row.name)} 확장 경로 진단</h2></div><span>지정상품 ${number(evidenceCount)}건 근거${province ? " · 지역 관점 포함" : ""}</span></div>
       <p class="expansion-lede"><b>${esc(row.name)}</b>${esc(withTopicJosa(row.name).slice(row.name.length))} ${reachLine}</p>
+      <p class="expansion-limit"><b>이 진단이 보는 범위</b> 지정상품 근거는 <b>고시명칭과 문자열이 맞물리는 출원</b>에만 붙습니다(정확 일치·부분 포함). 그래서 「신선한 인삼」은 「인삼소매업」(35류)을 잡아내지 못하고, 「신선한 곰취」는 「신선한곰취소매업」을 잡아냅니다 — 보이는 범위가 <b>이름 형태에 따라</b> 달라집니다. 아래에서 비어 있는 칸은 “권리가 없다”가 아니라 <b>“이 방법으로는 확인되지 않았다”</b>로 읽으십시오.</p>
       <div class="expansion-grid">
-        <article><h3>① 지금 어디까지 갔나</h3><ul class="expansion-held">${heldHtml}</ul></article>
+        <article><h3>① 지정상품이 확인된 범위</h3><ul class="expansion-held">${heldHtml}</ul></article>
         <article><h3>② 다음 확장 후보</h3><p class="expansion-hint">같은 유형의 다른 특산품이 이미 확보했는데 이 품목만 비어 있는 상품류입니다. 세 줄이 안 되면 전국 특산품 기준으로 채웁니다.</p>${peerHtml}</article>
         <article><h3>③ 이색 확장 사례</h3><p class="expansion-hint">전국 특산품 상표에서 도달한 품목이 가장 적은 상품류입니다 — 선례가 드문 만큼 차별화 여지도 큽니다.</p>${rareHtml}</article>
         <article><h3>④ 서비스 · 지역 창업</h3><p class="expansion-hint">${svcHead}</p>${svcHtml}</article>
         ${province ? regionSectionHtml(row, province, index) : ""}
       </div>
-      <p class="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
+      <p class="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이고 그 일부도 고시명칭과 맞물린 것만이라, <b>실제 보유 범위는 여기 보이는 것보다 넓습니다</b>. 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
     </section>`;
   }
   function strategyFlowHtml() {
