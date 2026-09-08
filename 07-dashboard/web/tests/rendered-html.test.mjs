@@ -100,7 +100,9 @@ test("renders the data-connected Korean dashboard", async () => {
   // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
   assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
   assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
-  assert.match(html, /특화작목 비교/);
+  // 2026-09-08: 특화작목 비교는 단위가 "도"라 지역별 화면(시도 선택)으로 내렸다.
+  // 최상위 탭은 요약 / 지역·품목별 조회 / 데이터 개요 셋이다.
+  assert.doesNotMatch(html.split("</nav>")[0], /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
   assert.match(html, /데이터 개요/);
   assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
   assert.match(html, />특산품 수<\/button>/);
@@ -1017,7 +1019,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /data-strategy-row=/);
   assert.match(html, /data-strategy-sort=/);
   assert.doesNotMatch(html, /class="strategy-featured-options"|data-strategy-sample=/, "카드 나열용 주요 특산품 토글은 표로 교체돼야 함");
-  assert.match(html, /특화작목 비교/);
+  assert.match(html, /class="compare-embed"/, "특화작목 대조는 지역별 화면에 끼워 넣은 섹션으로 있어야 함");
+  assert.match(html, /function compareEmbedHtml\(\)/);
   assert.doesNotMatch(html, /class="compare-readiness"/);
   assert.match(html, /공식 원본 반영 완료/);
   assert.match(html, /등급별 특화작목 출원 현황/);

@@ -678,6 +678,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .rights-board-legend span { display: block; margin-top: 1px; font-size: 12px; font-weight: 700; }
 .rights-board-legend small { display: block; margin-top: 2px; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
 .rights-board-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+/* 2026-09-08: 특화작목 대조를 최상위 탭에서 내려 지역별 화면 안에 끼웠다. 단위가 "도"라
+   시도를 고른 것과 같은 단위이고, 그때는 도 스트립을 숨긴다. */
+.compare-embed { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.compare-embed > .compare-banner { margin-top: 12px; }
 /* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
    진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
 .matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }

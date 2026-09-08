@@ -33,7 +33,6 @@ const EXPLORE_TABS: Tab[] = ["applications", "regions", "items", "strategy"];
 const PRIMARY_NAV: { key: Tab; label: string }[] = [
   { key: "summary", label: "요약" },
   { key: "applications", label: "지역·품목별 조회" },
-  { key: "compare", label: "특화작목 비교" },
   { key: "data", label: "데이터 개요" },
 ];
 const MAP_LABELS: Record<MapMetric, string> = { coverage: "특산품 수", trademarks: "상표 건수", applicationCoverage: "출원율", registration: "등록률" };
@@ -2048,6 +2047,95 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
         <p className="screen-note">출원율은 수집된 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 비율(분모에 명칭 확인·집계 대기 포함), 등록률은 지역 확인 출원 중 등록 완료 비율입니다 — 분모가 다르므로 두 비율을 직접 비교하지 마십시오.</p>
       </section>}
+      {comparisonRows.length > 0 && (!selectedProvince || comparisonRows.some((row) => row.province === selectedProvince)) && <section className="compare-embed">
+        <div className="section-heading"><div><h2>특화작목 대조</h2></div><span>농촌진흥청 2025년 지정 9개 도·69개 작목 vs 지역 주소 일치 상표</span></div>
+      <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
+      {/* UI 검토(3차, 2026-09-06) S4: 9개 도 × 8개 열 넓은 표 대신, 도 스트립에서 하나를
+          고르면 그 도만 상세로 보여준다 — 일치/불일치 표식은 이미 있던 "대표작목 vs
+          실제 등록 상표 TOP5" 대조 결과를 재사용한다. */}
+      {(() => {
+        // 지역별 화면에서 시도를 이미 골랐으면 그 도로 고정한다(도 스트립은 그때 숨긴다).
+        const pinned = selectedProvince && comparisonRows.some((row) => row.province === selectedProvince) ? selectedProvince : null;
+        const activeProvince = pinned || (selectedCompareProvince && comparisonRows.some((row) => row.province === selectedCompareProvince) ? selectedCompareProvince : comparisonRows[0]?.province || null);
+        const activeRow = comparisonRows.find((row) => row.province === activeProvince) || null;
+        const tierCell = (policyCrops: typeof comparisonRows[number]["policyCrops"], tier: string) => {
+          const crops = policyCrops.filter((crop) => crop.tier === tier);
+          return crops.length === 0 ? <span className="compare-tier-empty">—</span> : <span className="compare-tier-crops">{crops.map((crop) => <em key={crop.name} className={crop.applied ? "filed" : crop.decided ? "unfiled" : "pending"}>{crop.displayName}</em>)}</span>;
+        };
+        return <section className="compare-province-detail-section">
+          <div className="compare-province-strip" role="group" aria-label="도 선택" hidden={Boolean(pinned)}>
+            {comparisonRows.map((row) => <button type="button" key={row.province} className={activeProvince === row.province ? "active" : ""} onClick={() => setSelectedCompareProvince(row.province)}>
+              <strong>{displayRegionName(row.province)}</strong>
+              <span className={row.flagshipCrop ? (row.flagshipMatch ? "compare-strip-match" : "compare-strip-mismatch") : "compare-strip-none"}>{row.flagshipCrop ? (row.flagshipMatch ? "일치" : "불일치") : "대표작목 없음"}</span>
+            </button>)}
+          </div>
+          {activeRow && <div className="compare-province-detail">
+            <div className="compare-section-head"><div><span>{activeRow.policyDecided}/{activeRow.policyCrops.length} 집계 완료</span><h2>{displayRegionName(activeRow.province)} 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div>
+            <div className="compare-province-tiers">
+              <div><span>특화작목<small>대표</small></span>{tierCell(activeRow.policyCrops, "대표작목")}</div>
+              <div><span>특화작목<small>자체육성</small></span>{tierCell(activeRow.policyCrops, "자체육성작목")}</div>
+              <div><span>특화작목<small>집중육성</small></span>{tierCell(activeRow.policyCrops, "집중육성작목")}</div>
+            </div>
+            <div className="compare-province-stats">
+              <div><span>상표 출원건수<small>원물 기준</small></span><b>{number(activeRow.policyApplicationsTotal)}건</b></div>
+              <div><span>특화작물의 상표 출원 비율</span><b>{percent(activeRow.policyRate)}</b><small>{activeRow.policyApplied}/{activeRow.policyCrops.length}작목</small></div>
+            </div>
+            {activeRow.flagshipCrop && <div className="compare-province-flagship">
+              <h3>대표작목 vs 실제 등록 상표 TOP5</h3>
+              <p><b>{stripParens(activeRow.flagshipCrop.name)}</b>(대표작목)이 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p>
+              <ol className="compare-top5-list">
+                {activeRow.topRegisteredItems.length === 0 && <li className="empty">등록 상표 없음</li>}
+                {activeRow.topRegisteredItems.map((row, index) => <li key={row.name} className={row.name === activeRow.flagshipCrop!.name ? "match" : undefined}>{index + 1}. {stripParens(row.name)} <b>{number(row.count)}건</b></li>)}
+              </ol>
+              <span className={activeRow.flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}>{activeRow.flagshipMatch ? `일치 · ${activeRow.flagshipRank + 1}위` : "불일치"}</span>
+            </div>}
+          </div>}
+        </section>;
+      })()}
+      {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}
+      {/* 이슈 #117 코멘트(2026-08-31, 2026-09-02 재요청): 컬럼을 "지역 / 특화작목(대표) /
+          특화작목(자체육성) / 특화작목(집중육성) / 상표 출원건수(원물 기준) / 특화작물의 상표
+          출원 비율 / 집계상태(칸 좁게)"로 — 컬럼 순서·의미는 이미 같았고 라벨만 요청과
+          다르게 남아 있었다. */}
+      {/* UI 검토(3차, 2026-09-06) S4: 도 상세를 기본 화면으로 삼고, 9개 도 전체를 한 번에
+          보는 원래 표는 토글 뒤로 옮긴다. */}
+      <details className="compare-full-tables-toggle">
+        <summary><span>9개 도 전체 표로 보기</span><small>클릭하면 펼쳐집니다</small></summary>
+      <section className="compare-region-section"><div className="compare-section-head"><div><span>69개 전체 상세</span><h2>등급별 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p><CsvDownloadButton onClick={() => downloadCsv(`특화작목비교_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특화작목(대표)", "특화작목(자체육성)", "특화작목(집중육성)", "상표 출원건수(원물 기준)", "특화작물의 상표 출원 비율", "출원 확인 작목 수", "전체 작목 수", "집계상태"], comparisonRows.map((row) => { const byTier = (tier: string) => row.policyCrops.filter((crop) => crop.tier === tier).map((crop) => crop.displayName).join("·"); return [displayRegionName(row.province), byTier("대표작목"), byTier("자체육성작목"), byTier("집중육성작목"), row.policyApplicationsTotal, percent(row.policyRate), row.policyApplied, row.policyCrops.length, `${row.policyDecided}/${row.policyCrops.length}`]; }))} /></div>
+        <div className="compare-region-table"><div className="compare-region-head"><span>지역</span><span>특화작목<small>대표</small></span><span>특화작목<small>자체육성</small></span><span>특화작목<small>집중육성</small></span><span>상표 출원건수<small>원물 기준</small></span><span>특화작물의<small>상표 출원 비율</small></span><span title="지역 특화작목 중 지역별 상표 집계를 완료한 작목 수">집계상태</span></div>
+          {comparisonRows.map(({ province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate }) => {
+            const byTier = (tier: string) => policyCrops.filter((crop) => crop.tier === tier);
+            const tierCell = (tier: string) => { const crops = byTier(tier); return crops.length === 0 ? <span className="compare-tier-empty">—</span> : <span className="compare-tier-crops">{crops.map((crop) => <em key={crop.name} className={crop.applied ? "filed" : crop.decided ? "unfiled" : "pending"}>{crop.displayName}</em>)}</span>; };
+            return <div className="compare-region-row" key={province}>
+              <strong>{displayRegionName(province)}</strong>
+              {tierCell("대표작목")}
+              {tierCell("자체육성작목")}
+              {tierCell("집중육성작목")}
+              <b>{number(policyApplicationsTotal)}건</b>
+              <div className="compare-region-rate"><b>{percent(policyRate)}</b><small>{policyApplied}/{policyCrops.length}작목</small></div>
+              <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided}/{policyCrops.length}{policyDecided === policyCrops.length ? " 완료" : ""}</span>
+            </div>;
+          })}</div>
+        <p className="compare-region-scroll-hint">← 표가 화면보다 넓습니다. 좌우로 스크롤하면 전체 열을 볼 수 있습니다(지역명 열은 고정).</p>
+      </section>
+      <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><CsvDownloadButton onClick={() => downloadCsv(`대표작목TOP5대조_${csvDateStamp(dashboardUpdatedAt)}`, ["도", "대표작목(정책 지정)", "실제 등록 상표 TOP5", "일치 여부"], comparisonRows.filter((row) => row.flagshipCrop).map((row) => [displayRegionName(row.province), stripParens(row.flagshipCrop!.name), row.topRegisteredItems.map((item, index) => `${index + 1}. ${stripParens(item.name)}(${item.count}건)`).join(" / ") || "등록 상표 없음", row.flagshipMatch ? `일치 · ${row.flagshipRank + 1}위` : "불일치"]))} /></div>
+        <div className="compare-flagship-table">
+          <div className="compare-flagship-head"><span>도</span><span>대표작목(정책 지정)</span><span>실제 등록 상표 TOP5</span><span>일치</span></div>
+          {comparisonRows.filter((row) => row.flagshipCrop).map(({ province, flagshipCrop, topRegisteredItems, flagshipMatch, flagshipRank }) => <div className="compare-flagship-row" key={province}>
+            <strong>{displayRegionName(province)}</strong>
+            <div className="compare-flagship-name">{stripParens(flagshipCrop!.name)}</div>
+            <ol className="compare-top5-list">
+              {topRegisteredItems.length === 0 && <li className="empty">등록 상표 없음</li>}
+              {topRegisteredItems.map((row, index) => <li key={row.name} className={row.name === flagshipCrop!.name ? "match" : undefined}>{index + 1}. {stripParens(row.name)} <b>{number(row.count)}건</b></li>)}
+            </ol>
+            <span className={flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}>{flagshipMatch ? `일치 · ${flagshipRank + 1}위` : "불일치"}</span>
+          </div>)}
+        </div>
+        <p className="compare-flagship-note">9개 도 중 {comparisonRows.filter((row) => row.flagshipMatch).length}개 도에서 대표작목과 실제 등록 상표를 주도하는 품목이 일치합니다. 나머지 도는 정책상 육성 중인 작목과 실제 브랜드 출원을 주도하는 품목이 다르다는 뜻입니다 — 특화작목이 아직 상표 등록으로 이어지지 않았거나, 쌀·소고기 같은 범용 품목이 여전히 지역 브랜드 활동을 주도하고 있을 수 있습니다.</p>
+      </section>
+      </details>
+      <div className="compare-sources"><article><span>공식 근거</span><strong>농촌진흥청 2025년도 지역특화작목 현황</strong><p>제1차 종합계획(2021~2025) 종료 시점의 69개 배정을 사용합니다.</p></article><article><span>지역 판정</span><strong>출원인 주소를 도 단위로 대조</strong><p>검색 상한에 도달한 품목은 0건으로 확정하지 않고 집계 대기로 표시합니다.</p></article></div>
+    </section>}
       <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>지자체별 특산품 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span><CsvDownloadButton onClick={() => downloadCsv(`지역별집계_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특산품 수", "출원 확인", "출원율"], coverageBreakdown.map((row) => [displayRegionName(row.label), row.coverage.total, row.coverage.applied, percent(row.coverage.rate)]))} /></div>
         {/* 이슈 #117 코멘트(2026-09-03): 도를 클릭하면 시군구 목록이 나오기 전에 그 도 전체의
             특산품 유형별 출원·등록 비중을 원그래프로 먼저 보여준다. 시군구 상세로 이미 들어간
@@ -2273,94 +2361,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           </aside>
         </div>
       </>}
-    </section>}
-
-    {tab === "compare" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-compare" aria-labelledby="primary-tab-compare">
-      <p className="screen-note">농촌진흥청이 2025년에 지정한 9개 도·69개 특화작목과 지역 주소 일치 상표 현황을 비교합니다.</p>
-      <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
-      {/* UI 검토(3차, 2026-09-06) S4: 9개 도 × 8개 열 넓은 표 대신, 도 스트립에서 하나를
-          고르면 그 도만 상세로 보여준다 — 일치/불일치 표식은 이미 있던 "대표작목 vs
-          실제 등록 상표 TOP5" 대조 결과를 재사용한다. */}
-      {(() => {
-        const activeProvince = selectedCompareProvince && comparisonRows.some((row) => row.province === selectedCompareProvince) ? selectedCompareProvince : comparisonRows[0]?.province || null;
-        const activeRow = comparisonRows.find((row) => row.province === activeProvince) || null;
-        const tierCell = (policyCrops: typeof comparisonRows[number]["policyCrops"], tier: string) => {
-          const crops = policyCrops.filter((crop) => crop.tier === tier);
-          return crops.length === 0 ? <span className="compare-tier-empty">—</span> : <span className="compare-tier-crops">{crops.map((crop) => <em key={crop.name} className={crop.applied ? "filed" : crop.decided ? "unfiled" : "pending"}>{crop.displayName}</em>)}</span>;
-        };
-        return <section className="compare-province-detail-section">
-          <div className="compare-province-strip" role="group" aria-label="도 선택">
-            {comparisonRows.map((row) => <button type="button" key={row.province} className={activeProvince === row.province ? "active" : ""} onClick={() => setSelectedCompareProvince(row.province)}>
-              <strong>{displayRegionName(row.province)}</strong>
-              <span className={row.flagshipCrop ? (row.flagshipMatch ? "compare-strip-match" : "compare-strip-mismatch") : "compare-strip-none"}>{row.flagshipCrop ? (row.flagshipMatch ? "일치" : "불일치") : "대표작목 없음"}</span>
-            </button>)}
-          </div>
-          {activeRow && <div className="compare-province-detail">
-            <div className="compare-section-head"><div><span>{activeRow.policyDecided}/{activeRow.policyCrops.length} 집계 완료</span><h2>{displayRegionName(activeRow.province)} 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p></div>
-            <div className="compare-province-tiers">
-              <div><span>특화작목<small>대표</small></span>{tierCell(activeRow.policyCrops, "대표작목")}</div>
-              <div><span>특화작목<small>자체육성</small></span>{tierCell(activeRow.policyCrops, "자체육성작목")}</div>
-              <div><span>특화작목<small>집중육성</small></span>{tierCell(activeRow.policyCrops, "집중육성작목")}</div>
-            </div>
-            <div className="compare-province-stats">
-              <div><span>상표 출원건수<small>원물 기준</small></span><b>{number(activeRow.policyApplicationsTotal)}건</b></div>
-              <div><span>특화작물의 상표 출원 비율</span><b>{percent(activeRow.policyRate)}</b><small>{activeRow.policyApplied}/{activeRow.policyCrops.length}작목</small></div>
-            </div>
-            {activeRow.flagshipCrop && <div className="compare-province-flagship">
-              <h3>대표작목 vs 실제 등록 상표 TOP5</h3>
-              <p><b>{stripParens(activeRow.flagshipCrop.name)}</b>(대표작목)이 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p>
-              <ol className="compare-top5-list">
-                {activeRow.topRegisteredItems.length === 0 && <li className="empty">등록 상표 없음</li>}
-                {activeRow.topRegisteredItems.map((row, index) => <li key={row.name} className={row.name === activeRow.flagshipCrop!.name ? "match" : undefined}>{index + 1}. {stripParens(row.name)} <b>{number(row.count)}건</b></li>)}
-              </ol>
-              <span className={activeRow.flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}>{activeRow.flagshipMatch ? `일치 · ${activeRow.flagshipRank + 1}위` : "불일치"}</span>
-            </div>}
-          </div>}
-        </section>;
-      })()}
-      {/* 이슈 #117: "등급별 특화작목 출원 현황"을 먼저, 대표작목 대조를 뒤로. */}
-      {/* 이슈 #117 코멘트(2026-08-31, 2026-09-02 재요청): 컬럼을 "지역 / 특화작목(대표) /
-          특화작목(자체육성) / 특화작목(집중육성) / 상표 출원건수(원물 기준) / 특화작물의 상표
-          출원 비율 / 집계상태(칸 좁게)"로 — 컬럼 순서·의미는 이미 같았고 라벨만 요청과
-          다르게 남아 있었다. */}
-      {/* UI 검토(3차, 2026-09-06) S4: 도 상세를 기본 화면으로 삼고, 9개 도 전체를 한 번에
-          보는 원래 표는 토글 뒤로 옮긴다. */}
-      <details className="compare-full-tables-toggle">
-        <summary><span>9개 도 전체 표로 보기</span><small>클릭하면 펼쳐집니다</small></summary>
-      <section className="compare-region-section"><div className="compare-section-head"><div><span>69개 전체 상세</span><h2>등급별 특화작목 출원 현황</h2></div><p>상표 출원건수는 각 특화작목의 원물명 검색 기준 지역 주소 일치 출원 합계, 특화작물의 상표 출원 비율은 출원이 1건 이상 확인된 작목 비율입니다.</p><CsvDownloadButton onClick={() => downloadCsv(`특화작목비교_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특화작목(대표)", "특화작목(자체육성)", "특화작목(집중육성)", "상표 출원건수(원물 기준)", "특화작물의 상표 출원 비율", "출원 확인 작목 수", "전체 작목 수", "집계상태"], comparisonRows.map((row) => { const byTier = (tier: string) => row.policyCrops.filter((crop) => crop.tier === tier).map((crop) => crop.displayName).join("·"); return [displayRegionName(row.province), byTier("대표작목"), byTier("자체육성작목"), byTier("집중육성작목"), row.policyApplicationsTotal, percent(row.policyRate), row.policyApplied, row.policyCrops.length, `${row.policyDecided}/${row.policyCrops.length}`]; }))} /></div>
-        <div className="compare-region-table"><div className="compare-region-head"><span>지역</span><span>특화작목<small>대표</small></span><span>특화작목<small>자체육성</small></span><span>특화작목<small>집중육성</small></span><span>상표 출원건수<small>원물 기준</small></span><span>특화작물의<small>상표 출원 비율</small></span><span title="지역 특화작목 중 지역별 상표 집계를 완료한 작목 수">집계상태</span></div>
-          {comparisonRows.map(({ province, policyCrops, policyApplicationsTotal, policyDecided, policyApplied, policyRate }) => {
-            const byTier = (tier: string) => policyCrops.filter((crop) => crop.tier === tier);
-            const tierCell = (tier: string) => { const crops = byTier(tier); return crops.length === 0 ? <span className="compare-tier-empty">—</span> : <span className="compare-tier-crops">{crops.map((crop) => <em key={crop.name} className={crop.applied ? "filed" : crop.decided ? "unfiled" : "pending"}>{crop.displayName}</em>)}</span>; };
-            return <div className="compare-region-row" key={province}>
-              <strong>{displayRegionName(province)}</strong>
-              {tierCell("대표작목")}
-              {tierCell("자체육성작목")}
-              {tierCell("집중육성작목")}
-              <b>{number(policyApplicationsTotal)}건</b>
-              <div className="compare-region-rate"><b>{percent(policyRate)}</b><small>{policyApplied}/{policyCrops.length}작목</small></div>
-              <span className={policyDecided === policyCrops.length ? "compare-complete" : "compare-waiting"}>{policyDecided}/{policyCrops.length}{policyDecided === policyCrops.length ? " 완료" : ""}</span>
-            </div>;
-          })}</div>
-        <p className="compare-region-scroll-hint">← 표가 화면보다 넓습니다. 좌우로 스크롤하면 전체 열을 볼 수 있습니다(지역명 열은 고정).</p>
-      </section>
-      <section className="compare-flagship-section"><div className="compare-section-head"><div><span>대표작목 우선순위 대조</span><h2>도별 대표작목 vs 실제 등록 상표 TOP5</h2></div><p>도 대표작목(농촌진흥청 지정 1개)이 그 도의 <b>등록 완료</b> 상표 상위 5개 품목 안에 실제로 있는지 대조합니다. 출원 중인 건은 포함하지 않습니다.</p><CsvDownloadButton onClick={() => downloadCsv(`대표작목TOP5대조_${csvDateStamp(dashboardUpdatedAt)}`, ["도", "대표작목(정책 지정)", "실제 등록 상표 TOP5", "일치 여부"], comparisonRows.filter((row) => row.flagshipCrop).map((row) => [displayRegionName(row.province), stripParens(row.flagshipCrop!.name), row.topRegisteredItems.map((item, index) => `${index + 1}. ${stripParens(item.name)}(${item.count}건)`).join(" / ") || "등록 상표 없음", row.flagshipMatch ? `일치 · ${row.flagshipRank + 1}위` : "불일치"]))} /></div>
-        <div className="compare-flagship-table">
-          <div className="compare-flagship-head"><span>도</span><span>대표작목(정책 지정)</span><span>실제 등록 상표 TOP5</span><span>일치</span></div>
-          {comparisonRows.filter((row) => row.flagshipCrop).map(({ province, flagshipCrop, topRegisteredItems, flagshipMatch, flagshipRank }) => <div className="compare-flagship-row" key={province}>
-            <strong>{displayRegionName(province)}</strong>
-            <div className="compare-flagship-name">{stripParens(flagshipCrop!.name)}</div>
-            <ol className="compare-top5-list">
-              {topRegisteredItems.length === 0 && <li className="empty">등록 상표 없음</li>}
-              {topRegisteredItems.map((row, index) => <li key={row.name} className={row.name === flagshipCrop!.name ? "match" : undefined}>{index + 1}. {stripParens(row.name)} <b>{number(row.count)}건</b></li>)}
-            </ol>
-            <span className={flagshipMatch ? "compare-flagship-match" : "compare-flagship-mismatch"}>{flagshipMatch ? `일치 · ${flagshipRank + 1}위` : "불일치"}</span>
-          </div>)}
-        </div>
-        <p className="compare-flagship-note">9개 도 중 {comparisonRows.filter((row) => row.flagshipMatch).length}개 도에서 대표작목과 실제 등록 상표를 주도하는 품목이 일치합니다. 나머지 도는 정책상 육성 중인 작목과 실제 브랜드 출원을 주도하는 품목이 다르다는 뜻입니다 — 특화작목이 아직 상표 등록으로 이어지지 않았거나, 쌀·소고기 같은 범용 품목이 여전히 지역 브랜드 활동을 주도하고 있을 수 있습니다.</p>
-      </section>
-      </details>
-      <div className="compare-sources"><article><span>공식 근거</span><strong>농촌진흥청 2025년도 지역특화작목 현황</strong><p>제1차 종합계획(2021~2025) 종료 시점의 69개 배정을 사용합니다.</p></article><article><span>지역 판정</span><strong>출원인 주소를 도 단위로 대조</strong><p>검색 상한에 도달한 품목은 0건으로 확정하지 않고 집계 대기로 표시합니다.</p></article></div>
     </section>}
 
     {tab === "data" && pipeline && <section className="screen-section data-overview" role="tabpanel" id="primary-tabpanel-data" aria-labelledby="primary-tab-data">
