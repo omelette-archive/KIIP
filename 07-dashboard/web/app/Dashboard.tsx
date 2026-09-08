@@ -2369,15 +2369,31 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
     // 급증: 창 기간 출원이 컷오프 이상이고 직전 동일 기간보다 늘어난 품목. 직전 0건이면
     // "신규", 아니면 증가율. 증가율 왜곡을 막으려 직전이 컷오프의 1/3 미만이면 신규로 본다.
-    const surging = itemList
-      .filter((row) => row.app >= minBase && row.app > row.priorApp)
+    // 2026-09-09(사용자): "출원/등록 토글 누를 때 맨 처음 표는 출원 급증 품목 → 등록 급증
+    // 품목으로 바뀌지 않네." 옆의 두 카드는 metricValue로 토글을 따랐는데 급증만 row.app에
+    // 박혀 있어 세 카드가 서로 다른 기준을 말하고 있었다. priorReg는 이미 집계 중이다.
+    type SurgeRow = { app: number; reg: number; priorApp: number; priorReg: number; name: string };
+    const surgingBy = (current: (row: SurgeRow) => number, prior: (row: SurgeRow) => number) => itemList
+      .filter((row) => current(row) >= minBase && current(row) > prior(row))
       .map((row) => {
-        const fresh = row.priorApp < Math.max(1, minBase / 3);
-        const growth = fresh ? Infinity : row.app / row.priorApp;
-        return { ...row, fresh, growth, delta: row.app - row.priorApp };
+        const fresh = prior(row) < Math.max(1, minBase / 3);
+        const growth = fresh ? Infinity : current(row) / prior(row);
+        return {
+          ...row,
+          fresh,
+          growth,
+          delta: current(row) - prior(row),
+          currentValue: current(row),
+          priorValue: prior(row),
+        };
       })
       .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
       .slice(0, LEADER_LIMIT);
+    const surging = leaderMetric === "application"
+      ? surgingBy((row) => row.app, (row) => row.priorApp)
+      : surgingBy((row) => row.reg, (row) => row.priorReg);
+    // 확장 방향 제안의 "출원이 급증한다" 문구는 토글과 무관하게 출원 기준이어야 한다.
+    const surgingApplications = surgingBy((row) => row.app, (row) => row.priorApp);
     // 등록 전환: 누적(연 단위) 출원·등록 기준. 창 안의 등록/출원은 서로 다른 시점 코호트라
     // 비율로 쓰기 어렵다 — 리더보드에서 "정착이 잘/안 되는 품목"은 전체 이력으로 본다.
     const lifetime = new Map<string, { name: string; category: ItemCategory | null; lifeApp: number; lifeReg: number }>();
@@ -2398,7 +2414,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
     const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
     const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
+    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, surgingApplications, conversionHigh, conversionLow, itemCount: itemList.length };
   }, [snapshot.generatedAt, regionalRegions, leaderMonths, leaderMetric]);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
@@ -2864,8 +2880,8 @@ const STRATEGY_CHIP_LIMIT = 12;
           </div>
           <div className="leader-grid leader-grid-primary">
             <article className="leader-card">
-              <div className="leader-card-head"><h4>출원 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
-              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건).</p> : <ol className="leader-list leader-list-surge">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val">{number(row.priorApp)}→{number(row.app)}</b><small className="leader-sub">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</small></button></li>)}</ol>}
+              <div className="leader-card-head"><h4>{leaderMetric === "application" ? "출원" : "등록"} 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
+              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 {leaderMetric === "application" ? "출원" : "등록"} {leaderboard.minBase}건).</p> : <ol className="leader-list leader-list-surge">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val">{number(row.priorValue)}→{number(row.currentValue)}</b><small className="leader-sub">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</small></button></li>)}</ol>}
             </article>
 
             <article className="leader-card">
@@ -3321,7 +3337,7 @@ const STRATEGY_CHIP_LIMIT = 12;
               <div className="item-share-block"><div className="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div><ProvinceShareDonut counts={row.provinceCounts} label={row.name} /></div>
             </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
-            {flowItem?.businessFlow && <ExpansionSuggestionsCard flow={flowItem.businessFlow} itemLabel={row.name} surging={leaderboard.surging.some((s) => s.name === row.name)} />}
+            {flowItem?.businessFlow && <ExpansionSuggestionsCard flow={flowItem.businessFlow} itemLabel={row.name} surging={leaderboard.surgingApplications.some((entry) => entry.name === row.name)} />}
             {briefingItem?.briefing && <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} nationwideCount={nationwideReach(briefingItem).count} nationwideShare={nationwideReach(briefingItem).share} nationwideCapped={nationwideReach(briefingItem).capped} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></>}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
         </div>
@@ -3356,7 +3372,7 @@ const STRATEGY_CHIP_LIMIT = 12;
             <ExpansionReportCard index={expansionIndex} name={strategySelectedFlow.name} category={strategySelectedFlow.category} province={strategyRegion} regions={regionalRegions} />
             {strategySelectedFlow.flow ? <>
               <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
-              <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.surging.some((entry) => entry.name === strategySelectedFlow.name)} />
+              <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.surgingApplications.some((entry) => entry.name === strategySelectedFlow.name)} />
             </> : <p className="strategy-flow-pending">이 품목은 전국 흐름(원물 → 가공품 → 서비스) 배치가 아직 반영되지 않아 단계별 지정상품·확장 방향 제안이 비어 있습니다. 아래 지역 확인 출원 현황은 지금 데이터입니다.</p>}
             {/* 협업자 요청(#116 2026-08-26): "전체 쌀 상표 출원 중에 지역별 출원 비중도 분석결과에 포함". */}
             <section className="item-share-block"><div className="section-heading"><div><h2>{strategySelectedFlow.name} 광역 단위 출원 비중</h2></div><span>지역 주소 일치 출원 {number(strategySelectedFlow.trademarks)}건 기준</span></div><ProvinceShareDonut counts={strategySelectedFlow.provinceCounts} label={strategySelectedFlow.name} /></section>

@@ -963,11 +963,23 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const topItems = itemList.filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.name.localeCompare(b.name, "ko-KR")).slice(0, LEADER_LIMIT);
     const topCategories = [...cats.values()].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.label.localeCompare(b.label, "ko-KR"));
     const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
-    const surging = itemList
-      .filter((row) => row.app >= minBase && row.app > row.priorApp)
-      .map((row) => { const fresh = row.priorApp < Math.max(1, minBase / 3); return { ...row, fresh, growth: fresh ? Infinity : row.app / row.priorApp, delta: row.app - row.priorApp }; })
+    // 2026-09-09(사용자): "우측에 출원/등록 토글 누를 때 맨 처음 표는 출원 급증 품목 →
+    // 등록 급증 품목으로 바뀌지 않네." 옆의 두 카드는 metricValue로 토글을 따랐는데 급증만
+    // row.app에 박혀 있었다 — 등록으로 바꿔도 출원 급증이 그대로 떠 세 카드가 서로 다른
+    // 기준을 말하고 있었다. priorReg는 이미 집계하고 있으므로 같은 방식으로 고른다.
+    const surgingBy = (current, prior) => itemList
+      .filter((row) => current(row) >= minBase && current(row) > prior(row))
+      .map((row) => {
+        const fresh = prior(row) < Math.max(1, minBase / 3);
+        return { ...row, fresh, growth: fresh ? Infinity : current(row) / prior(row), delta: current(row) - prior(row), currentValue: current(row), priorValue: prior(row) };
+      })
       .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
       .slice(0, LEADER_LIMIT);
+    const surging = state.leaderMetric === "application"
+      ? surgingBy((row) => row.app, (row) => row.priorApp)
+      : surgingBy((row) => row.reg, (row) => row.priorReg);
+    // 확장 방향 제안의 "출원이 급증한다" 문구는 토글과 무관하게 출원 기준이어야 한다.
+    const surgingApplications = surgingBy((row) => row.app, (row) => row.priorApp);
     const lifetime = new Map();
     for (const region of regionalRegions) {
       for (const item of region.items) {
@@ -983,7 +995,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const lifetimeRows = [...lifetime.values()].filter((row) => row.lifeApp >= 20 && row.lifeReg <= row.lifeApp).map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
     const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
     const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
+    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, surgingApplications, conversionHigh, conversionLow, itemCount: itemList.length };
   }
   // 이슈 #118: 별도 탭 대신 요약 "최근 동향" 묶음 안에 compact로.
   function leaderboardHtml() {
@@ -1002,7 +1014,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const topMax = lb.topItems.length ? topValue(lb.topItems[0]) : 0;
     const itemsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 품목</h4><span class="leader-card-note">TOP ${LEADER_LIMIT}</span></div>${lb.topItems.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topItems.map((row, index) => { const value = topValue(row); return `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar"><i style="width:${topMax ? Math.max(4, value / topMax * 100) : 0}%"></i></span><b class="leader-val">${number(value)}</b><small class="leader-sub"></small></button></li>`; }).join("")}</ol>`}</article>`;
     const catsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 유형</h4><span class="leader-card-note">비중</span></div>${lb.topCategories.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; const share = lb.categoryTotal ? value / lb.categoryTotal : 0; return `<li><button type="button" data-goto-category="${esc(row.code || "")}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.label)}</span><span class="leader-bar"><i style="width:${Math.max(4, share * 100)}%;background:${categoryShareColor(row.label)}"></i></span><b class="leader-val">${number(value)}</b><small class="leader-sub">${percent(share)}</small></button></li>`; }).join("")}</ol>`}</article>`;
-    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h4>출원 급증 품목</h4><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `<ol class="leader-list leader-list-surge">${lb.surging.map((row, index) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val">${number(row.priorApp)}→${number(row.app)}</b><small class="leader-sub">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</small></button></li>`).join("")}</ol>`}</article>`;
+    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 급증 품목</h4><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 ${metricWord} ${lb.minBase}건).</p>` : `<ol class="leader-list leader-list-surge">${lb.surging.map((row, index) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><b class="leader-val">${number(row.priorValue)}→${number(row.currentValue)}</b><small class="leader-sub">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</small></button></li>`).join("")}</ol>`}</article>`;
     const convRow = (row, index, low) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar${low ? " leader-bar-low" : ""}"><i style="width:${Math.max(4, row.rate * 100)}%"></i></span><b class="leader-val">${percent(row.rate)}</b><small class="leader-sub">${number(row.lifeReg)}/${number(row.lifeApp)}</small></button></li>`;
     const highCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 상위</h4><span class="leader-card-note">정착이 잘 되는 품목</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
     const lowCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 하위</h4><span class="leader-card-note">전환이 안 되는 품목</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
@@ -1457,7 +1469,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const flowItem = row.matchedItems.find((entry) => entry.businessFlow);
     const briefingItem = row.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences?.length)
       || row.matchedItems.find((entry) => entry.briefing?.sentences?.length);
-    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) + expansionSuggestionsHtml(flowItem.businessFlow, row.name, computeLeaderboard().surging.some((s) => s.name === row.name)) : "";
+    const flowHtml = flowItem ? nationwideFlowCardHtml(flowItem.businessFlow, row.name, [...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)) + expansionSuggestionsHtml(flowItem.businessFlow, row.name, computeLeaderboard().surgingApplications.some((s) => s.name === row.name)) : "";
     const briefingHtml = briefingItem ? `${businessStrategyCardHtml(briefingItem.briefing, `${row.name} 비즈니스 확장 전략`, "", nationwideReach(briefingItem))}${businessStrategyDisclaimerHtml(briefingItem.briefing.templateVersion)}` : "";
     return `<div class="item-card-head"><div><h2>${esc(row.name)}</h2><small>${row.category ? `${esc(row.category.label)} · ` : ""}${row.regions.length}개 지역에서 확인</small></div><span class="item-status ${statusClass}">${statusLabel}</span></div><details class="item-regions-detail" open><summary>전체 ${row.regions.length}개 지역 보기${chipLegend}<small>지역을 누르면 그 지역 출원 상표가 아래에 열립니다</small></summary><div class="region-chips word-cloud" aria-label="지역 · 출원건수 기준 글자 크기">${chips}</div></details>${regionTrademarkPanelHtml(row)}<div class="item-card-metrics"><div><span>지역 확인 출원</span><strong>${decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 ${decidedRegions}/${row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>${decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong class="${registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : ""}">${registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>${registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>${flowHtml}${decidedRegions > 0 ? `${regionTrendHtml({ region: row.name, items: row.matchedItems }, "연도별 출원·등록 추이", `${row.name} · 전체 지역 합계`, { prominent: true, adjustable: true, emptyLabel: "이 품목은 아직 연도별 데이터가 없습니다." })}<div class="item-share-block"><div class="section-heading"><div><h2>광역 단위 출원 비중</h2></div></div>${shareDonutHtml(row.provinceCounts, row.name)}</div>` : ""}${nationwideOnly > 0 ? `<p class="provisional-note">지역 확인 전 전국 검색 후보 ${number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>` : ""}${briefingHtml}`;
   }
@@ -2378,7 +2390,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const lb = computeLeaderboard();
     // 현재 main의 computeLeaderboard는 급증을 surging 하나로 돌려준다(가속/신규진입 분리는
     // #181 머지에서 되돌아갔다) — 그 API에 맞춘다.
-    const surging = lb.surging.some((s) => s.name === selected.name);
+    const surging = lb.surgingApplications.some((s) => s.name === selected.name);
     const briefingItem = selected.matchedItems.find((e) => e.briefing && e.briefing.isGapAlert && e.briefing.sentences.length) || selected.matchedItems.find((e) => e.briefing && e.briefing.sentences.length);
     const briefingHtml = briefingItem ? `${businessStrategyCardHtml(briefingItem.briefing, `${selected.name} 지역 브랜드 진단`)}${businessStrategyDisclaimerHtml(briefingItem.briefing.templateVersion)}` : "";
     // 협업자 요청(#116 2026-08-26): 전국 상표 중 지역별 출원 비중도 함께.
