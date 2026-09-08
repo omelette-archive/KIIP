@@ -765,8 +765,12 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   assert.match(standaloneHtml, /id="summary-trend-range-handle-start"/);
   assert.match(standaloneHtml, /adjustable: true/);
   assert.match(standaloneHtml, /const clampTrendRange = \(startYear, endYear, fullStart, fullEnd, \{ recentDefault = false \} = \{\}\) => \{/);
-  // #136(2026-09-07): 슬라이더 있는 추이 그래프는 기본 구간을 최근 20년으로 연다(전체는 슬라이더로 확장).
-  assert.match(standaloneHtml, /const fallbackStart = recentDefault \? defaultTrendStart\(fullStart, fullEnd\) : fullStart;/);
+  // #136(2026-09-07): 추이 그래프 표시 범위(슬라이더 하한 포함)를 2000년으로 고정하고
+  // 기본 구간도 2000년~최근 전체를 연다("그냥 2000년 이후만", 협업자 2026-09-07).
+  assert.match(standaloneHtml, /const TREND_FLOOR_YEAR = 2000;/);
+  assert.match(standaloneHtml, /const flooredTrendStart = \(sortedYears\) => \{/);
+  assert.match(standaloneHtml, /const fullStart = flooredTrendStart\(allYears\), fullEnd = allYears\[allYears\.length - 1\];/);
+  assert.match(standaloneHtml, /const fallbackStart = recentDefault \? defaultTrendStart\(fullStart\) : fullStart;/);
   assert.match(standaloneHtml, /Math\.max\(fullStart, Math\.min\(startYear \?\? fallbackStart, fullEnd\)\)/);
   assert.match(standaloneHtml, /recentDefault: options\.adjustable/);
   // 2026-09-02(#116): 지도를 맨 위 전체 폭으로 크게 두고, 그 아래에 광역 구성·추이·요약을
