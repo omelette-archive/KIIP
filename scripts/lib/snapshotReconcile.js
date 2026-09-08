@@ -105,6 +105,15 @@ function num(value) {
   return typeof value === "number" && Number.isFinite(value) ? value : 0;
 }
 
+// #137 후속 — floor 보호 밖에 있던 품목 부가 필드(참고용, 지역 통계 분모/분자에는 안 섞임).
+const SUPPLEMENTARY_ITEM_FIELDS = ["businessFlow", "trademarkExamples", "regionalEvidence", "briefing"];
+function isNonEmptyValue(value) {
+  if (value === null || value === undefined) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  if (typeof value === "object") return Object.keys(value).length > 0;
+  return Boolean(value);
+}
+
 /** 연도별 집계를 연도별 max로 합친다(둘 다 같은 모집단 기준이라 max가 안전). */
 function unionYearCounts(previous, next) {
   if (!previous && !next) return next ?? previous ?? null;
@@ -160,6 +169,22 @@ function retainMetricFloor(previousItem, nextItem, context) {
         },
       };
       retainedFields.push(name);
+    }
+  }
+
+  // #137 후속: 07d_reconcile의 floor는 그동안 숫자 지표만 지켰다. businessFlow(전국
+  // 원물→가공→서비스 흐름, #116/#74/#110)·trademarkExamples·regionalEvidence·briefing
+  // 같은 참고용 부가 필드는 보호 대상이 아니어서, 상류 첨부 단계(07b/07c 등)가 근거 파일
+  // 없이 조용히 스킵해도(예: nationwide-flow.json이 cleanup에 지워진 사례, fe88ede) 그대로
+  // 통과됐다 — businessFlow가 재실행마다 882개 품목 → 0개로 사라진 게 이 방식으로 감지됐다.
+  // 이전 스냅샷엔 값이 있었는데 이번엔 비어 있으면(신규 값이 있으면 그걸 우선) 이전 값을
+  // 그대로 이어 붙인다 — 숫자 지표 floor·연도 union과 같은 "last-known-good 유지" 철학.
+  for (const field of SUPPLEMENTARY_ITEM_FIELDS) {
+    const prevValue = previousItem[field];
+    const nextValue = item[field];
+    if (isNonEmptyValue(prevValue) && !isNonEmptyValue(nextValue)) {
+      item[field] = prevValue;
+      retainedFields.push(field);
     }
   }
 

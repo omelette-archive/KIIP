@@ -199,6 +199,39 @@ console.log("snapshotReconcile 자체 테스트");
   ok("같은 지역·같은 고시명칭의 원물명 변경은 실종이 아님");
 }
 
+// 8) 부가 필드(businessFlow/trademarkExamples/regionalEvidence/briefing)가 사유 없이
+//    비어버리면 이전 값을 이어 붙인다(#137 후속 — cleanup 버그로 businessFlow가 882→0으로
+//    조용히 사라진 회귀). 새 값이 있으면 그대로 쓰고(신선 데이터 우선), 옛 값을 덮지 않는다.
+{
+  const flow = { totalCount: 5038, stages: { raw: { count: 634 } } };
+  const examples = [{ title: "블루베리팜", applicationNumber: "1" }];
+  const evidence = [{ sourceId: "forest_product_production_survey" }];
+  const briefing = { headline: "블루베리 확장 여지" };
+  const prevItem = { ...item("블루베리", { niceClass: "31", unique: 10 }), businessFlow: flow, trademarkExamples: examples, regionalEvidence: evidence, briefing };
+  const previous = snapshot("prev", [{ region: "전라남도 담양군", sido: "전라남도", sigungu: "담양군", items: [prevItem] }]);
+
+  // 8a) 이번 실행에서 부가 필드가 전부 비었으면(첨부 단계 스킵 등) 이전 값을 이어 붙임
+  const droppedNext = snapshot("next", [
+    { region: "전라남도 담양군", sido: "전라남도", sigungu: "담양군", items: [item("블루베리", { niceClass: "31", unique: 12 })] },
+  ]);
+  const { report: r8a } = reconcilePublicSnapshot(droppedNext, previous, [], { massRevivalLimit: 50 });
+  const carried = droppedNext.regions[0].items[0];
+  assert.deepStrictEqual(carried.businessFlow, flow, "businessFlow가 비면 이전 값을 이어 붙임");
+  assert.deepStrictEqual(carried.trademarkExamples, examples, "trademarkExamples가 비면 이전 값을 이어 붙임");
+  assert.deepStrictEqual(carried.regionalEvidence, evidence, "regionalEvidence가 비면 이전 값을 이어 붙임");
+  assert.deepStrictEqual(carried.briefing, briefing, "briefing이 비면 이전 값을 이어 붙임");
+  assert.ok(r8a.counts.metricFloorRetained >= 1, "부가 필드 이어붙임도 metricFloorRetained에 집계됨");
+
+  // 8b) 이번 실행에 새 값이 있으면 그걸 쓰고 옛 값을 덮지 않음
+  const freshFlow = { totalCount: 9000, stages: { raw: { count: 700 } } };
+  const freshNext = snapshot("next2", [
+    { region: "전라남도 담양군", sido: "전라남도", sigungu: "담양군", items: [{ ...item("블루베리", { niceClass: "31", unique: 12 }), businessFlow: freshFlow }] },
+  ]);
+  reconcilePublicSnapshot(freshNext, previous, [], { massRevivalLimit: 50 });
+  assert.deepStrictEqual(freshNext.regions[0].items[0].businessFlow, freshFlow, "새 값이 있으면 옛 값으로 덮지 않음");
+  ok("부가 필드가 사유 없이 비면 last-known-good을 이어 붙이고, 새 값이 있으면 그대로 씀");
+}
+
 // unionYearCounts 단위
 assert.deepStrictEqual(unionYearCounts({ "2020": 5, "2021": 3 }, { "2021": 7, "2022": 1 }), { "2020": 5, "2021": 7, "2022": 1 });
 assert.strictEqual(regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣(청정)" }), regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣" }));
