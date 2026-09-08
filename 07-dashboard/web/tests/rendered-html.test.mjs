@@ -287,9 +287,20 @@ test("tags official items with a category and lets the items tab filter by it", 
   const apple = snapshot.regions.flatMap((region) => region.items).find((item) => item.itemName === "사과" && item.matchingBasis === "notice_name_and_nice_class");
   assert.ok(apple, "사과 스냅샷 데이터가 있어야 함");
   assert.deepEqual(apple.category, { code: "fruit", label: "과일" });
-  const unclassified = snapshot.regions.flatMap((region) => region.items).find((item) => item.matchingBasis === "raw_item_name_unclassified");
-  assert.ok(unclassified, "미분류 원물명 항목이 있어야 함");
-  assert.equal(unclassified.category, null, "미분류 원물명에는 카테고리를 붙이면 안 됨");
+  // 2026-09-09(사용자 A안): 유형 조회를 수집 경로로 막지 않는다 — 「한라봉」은 확정 표에
+  // 있으므로 제주 GI 목록으로 들어온 행도 과일이어야 한다. 확정 표에 없는 이름은 제안
+  // 파일에서 가져오되 provisional로 표시해 확정과 구분한다.
+  const unclassified = snapshot.regions.flatMap((region) => region.items).filter((item) => item.matchingBasis === "raw_item_name_unclassified");
+  assert.ok(unclassified.length > 0, "미분류 원물명 항목이 있어야 함");
+  const hallabong = unclassified.find((item) => (item.noticeName || item.itemName) === "한라봉");
+  if (hallabong) {
+    assert.deepEqual(hallabong.category, { code: "fruit", label: "과일" }, "확정 표에 있는 이름은 수집 경로와 무관하게 확정 유형이어야 함");
+  }
+  const provisional = snapshot.regions.flatMap((region) => region.items).filter((item) => item.category?.provisional);
+  assert.ok(provisional.length > 0, "확정 표에 없는 이름은 제안 유형이 붙어야 함");
+  for (const item of provisional.slice(0, 20)) {
+    assert.ok(item.category.code && item.category.label, "제안 유형도 코드·라벨을 갖춰야 함");
+  }
 
   // "items" 탭은 기본 탭(summary)이 아니라 클라이언트 상태 전환 후에만 렌더링되므로,
   // 정적 HTML에는 필터 버튼의 실제 값이 아니라 이를 만드는 JS 소스만 들어있다.
@@ -944,7 +955,13 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /region\.sigungu \|\| displayRegionName\(region\.region\)} \/ \$\{label}/, "전국 목록은 시군구와 특산품을 함께 나열해야 함");
   assert.doesNotMatch(html, /const uniqueItems/, "도 단위 목록에서 중복 품목을 숨겨 총 특산품 수와 목록 수가 달라지면 안 됨");
   assert.match(html, /bindSearchInput\("#item-search", "itemQuery"\)/, "standalone item search should use the IME-safe input binding");
-  assert.match(html, /if \(composing \|\| event\.isComposing\) return;/, "standalone search should not rerender during Korean IME composition");
+  // 2026-09-08(사용자 "단어 넣고 엔터치면 검색이 되었으면"): 한 글자마다 검색하던 걸
+  // 엔터에서만 검색하도록 바꿨다. 타이핑 중에는 아예 다시 그리지 않으므로 조합이 끊길
+  // 일이 없다 — 대신 엔터가 조합 확정용일 때는 검색으로 치지 않아야 한다.
+  assert.match(html, /input\.oninput = \(event\) => \{\s*pending = event\.currentTarget\.value;/, "타이핑 중에는 state를 건드리지 않고 입력값만 담아 둬야 함");
+  assert.match(html, /if \(event\.key !== "Enter" \|\| event\.isComposing\) return;/, "엔터에서만 검색하고, 한글 조합 확정 엔터는 무시해야 함");
+  assert.match(html, /input\.onblur = commit;/, "엔터 없이 칸을 벗어나도 입력한 내용이 반영돼야 함");
+  assert.doesNotMatch(html, /input\.oncompositionend/, "조합 완료마다 검색하던 경로는 없어야 함");
   assert.match(html, /row\.searchTerms\.some\(\(term\) => term && term\.toLocaleLowerCase\("ko-KR"\)\.includes\(keyword\)\)/, "품목 검색은 공식 표시명 외 원물명·고시명칭도 검색해야 함");
   assert.match(html, /<title>지역 특산품-상표 분석·정책지원 플랫폼<\/title>/);
   assert.match(html, /dashboard-snapshot-v1/);
