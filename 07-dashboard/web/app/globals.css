@@ -143,6 +143,14 @@ a { color: inherit; text-decoration: none; }
 
 .expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
 .expansion-caveat b { color: var(--ink); }
+/* 다출원 특산품 토글 + 품목·지역 직접 입력. 지역을 고르면 보고서에 ⑤ 지역 관점 절이 붙는다. */
+.strategy-picker-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.strategy-picker-label { font-size: 11px; font-weight: 800; letter-spacing: .02em; color: var(--muted); }
+.strategy-picker-inputs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.strategy-region-select select { min-width: 190px; border: 0; background: transparent; color: var(--ink); font-size: 13px; font-family: inherit; }
+.expansion-region { grid-column: 1 / -1; border-color: var(--green) !important; }
+.expansion-region h4 { margin: 12px 0 6px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.expansion-region h4:first-of-type { margin-top: 8px; }
 
 @media (min-width: 1281px) {
   .ranking-stack { position: absolute; inset: 0; }

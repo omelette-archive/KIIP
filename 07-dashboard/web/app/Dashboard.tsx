@@ -969,7 +969,63 @@ function buildExpansionIndex(regions: Region[]): ExpansionIndex {
   }
   return { byItem, byClass, byCategory };
 }
-function ExpansionReportCard({ index, name, category }: { index: ExpansionIndex; name: string; category: ItemCategory | null }) {
+const withSubjectJosa = (word: string) => `${word}${hasFinalConsonant(word) === false ? "가" : "이"}`;
+const provinceOf = (region: Region) => region.sido || region.region;
+// 지역을 고르면 ⑤절이 붙는다. 그 지역 행만으로 만든 색인과 전국 색인을 견주어 "전국
+// 특산품은 도달했는데 이 지역은 아직 비어 있는 상품류"를 지역 공백으로 보여 주고, 그
+// 지역 다른 특산품의 서비스류 등록례를 지역 창업 선례로 붙인다.
+function ExpansionRegionSection({ regions, name, province, index }: { regions: Region[]; name: string; province: string; index: ExpansionIndex }) {
+  const rows = regions.filter((region) => provinceOf(region) === province);
+  if (!rows.length) return null;
+  const local = buildExpansionIndex(rows);
+  const localClasses = local.byItem.get(name)?.classes || new Map<string, ClassCell>();
+  let filed = 0;
+  let registered = 0;
+  let pending = 0;
+  for (const region of rows) {
+    for (const item of region.items) {
+      if (officialItemLabel(item) !== name) continue;
+      const metric = item.metrics.uniqueTrademarkCount;
+      if (metric.availability === "available") {
+        filed += metric.value || 0;
+        registered += item.metrics.registeredTrademarkCount.value || 0;
+      } else pending += 1;
+    }
+  }
+  const crop = rows.flatMap((region) => region.items).find((item) => officialItemLabel(item) === name && item.regionalSpecialtyCropBadge)?.regionalSpecialtyCropBadge;
+  const missing = [...(index.byItem.get(name)?.classes.keys() || [])].filter((code) => !localClasses.has(code)).sort((a, b) => Number(a) - Number(b));
+  const localSvc = [...local.byClass.entries()]
+    .filter(([code]) => Number(code) >= REPORT_SERVICE_FLOOR)
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 3)
+    .map(([code, cell]) => ({ code, show: classShowcase(cell) }))
+    .filter((row) => row.show);
+  return <article className="expansion-region">
+    <h3>⑤ {displayRegionName(province)} 관점</h3>
+    <p className="expansion-hint">{filed
+      ? <>이 지역에서 <b>{displayRegionName(province)} 주소로 확인된 {name} 출원은 {number(filed)}건</b>(등록 {number(registered)}건)입니다.</>
+      : pending
+        ? `이 지역의 ${name} 출원은 아직 집계 중입니다(대기 ${number(pending)}건).`
+        : <>이 지역에는 <b>주소가 확인된 {name} 출원이 한 건도 없습니다</b> — 권리화 1순위입니다.</>}</p>
+    {crop && <p className="expansion-hint">농촌진흥청 <b>{crop.tier}</b> 지역특화작목({crop.officialItemName} · {number(crop.referenceYear)}년)이라 정책 연계 근거가 이미 있습니다.</p>}
+    <h4>전국은 갔는데 이 지역은 아직</h4>
+    {missing.length > 0
+      ? <ol className="expansion-list">{missing.slice(0, 6).map((code) => <li key={code}>
+        <span className="expansion-class">{niceClassLabel(code)}</span>
+        <span className="expansion-why">전국에는 있고 이 지역엔 없음</span>
+      </li>)}</ol>
+      : <p className="empty">{withSubjectJosa(name)} 전국에서 도달한 상품류를 이 지역도 모두 갖고 있습니다.</p>}
+    <h4>이 지역의 서비스 · 창업 선례</h4>
+    {localSvc.length > 0
+      ? <ol className="expansion-list svc">{localSvc.map((row) => <li key={row.code}>
+        <span className="expansion-class">{niceClassLabel(row.code)}</span>
+        <span className="expansion-why">이 지역 선례</span>
+        <small>예: {row.show!.lead} 「{row.show!.goods}」</small>
+      </li>)}</ol>
+      : <p className="empty">이 지역 특산품 중 서비스류(35류 이상)를 확보한 사례가 아직 없습니다 — 지역 창업 영역이 통째로 비어 있습니다.</p>}
+  </article>;
+}
+function ExpansionReportCard({ index, name, category, province, regions }: { index: ExpansionIndex; name: string; category: ItemCategory | null; province: string; regions: Region[] }) {
   const entry = index.byItem.get(name);
   const own = entry ? entry.classes : new Map<string, ClassCell>();
   const evidenceCount = [...own.values()].reduce((sum, cell) => sum + cell.count, 0);
@@ -1023,7 +1079,7 @@ function ExpansionReportCard({ index, name, category }: { index: ExpansionIndex;
     .map(([code, cell]) => ({ code, count: cell.count, show: classShowcase(cell) }));
 
   return <section className="expansion-report">
-    <div className="section-heading"><div><h2>{name} 확장 경로 진단</h2></div><span>지정상품 {number(evidenceCount)}건 근거</span></div>
+    <div className="section-heading"><div><h2>{province ? `${displayRegionName(province)} · ` : ""}{name} 확장 경로 진단</h2></div><span>지정상품 {number(evidenceCount)}건 근거{province ? " · 지역 관점 포함" : ""}</span></div>
     <p className="expansion-lede"><b>{name}</b>{withTopicJosa(name).slice(name.length)} {serviceCodes.length
       ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에 도달했습니다.`
       : <>제품 {productCodes.length}개 류에 머물러 있고, <b>서비스·확산(35류 이상)은 아직 0건</b>입니다.</>}</p>
@@ -1074,6 +1130,7 @@ function ExpansionReportCard({ index, name, category }: { index: ExpansionIndex;
           </li>)}</ol>
           : <p className="empty">전국 특산품 상표에서도 아직 서비스류 사례가 확인되지 않았습니다.</p>}
       </article>
+      {province && <ExpansionRegionSection regions={regions} name={name} province={province} index={index} />}
     </div>
     <p className="expansion-caveat">이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
   </section>;
@@ -1299,6 +1356,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 품목별로 조회", #74 "해당 지역이 아니라 전체 상표DB로부터 탐색").
   const [strategyItem, setStrategyItem] = useState("");
   const [strategyItemQuery, setStrategyItemQuery] = useState("");
+  // 지역을 함께 고르면 보고서에 ⑤ 지역 관점 절이 붙는다(선택 안 하면 전국 기준).
+  const [strategyRegion, setStrategyRegion] = useState("");
   const [strategyShowAll, setStrategyShowAll] = useState(false);
   useEffect(() => { setStrategyShowAll(false); }, [strategyFilter]);
   // UI 검토(3차, 2026-09-06) S4: 특화작목 비교 — 9개 도 × 8개 열 넓은 표 대신, 도 9칸
@@ -2020,6 +2079,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }, [strategyFlowRows, strategyItemQuery]);
   const strategySelectedFlow = strategyFlowFiltered.find((row) => row.name === strategyItem) || strategyFlowFiltered[0] || null;
   const expansionIndex = useMemo(() => buildExpansionIndex(regionalRegions), [regionalRegions]);
+  const strategyProvinces = useMemo(() => [...new Set(regionalRegions.map(provinceOf))].sort((a, b) => a.localeCompare(b, "ko-KR")), [regionalRegions]);
   const strategyRows = useMemo(() => {
     const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; isGapAlert: boolean }[] = [];
     for (const region of regionalRegions) {
@@ -2528,15 +2588,22 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         ? <p className="empty">표시할 품목이 없습니다.</p>
         : <>
           <div className="strategy-item-picker">
-            <div className="strategy-item-chips" role="group" aria-label="주요 품목 선택">
+            {/* 목록은 출원이 많은 순이다(strategyFlowRows). 무슨 기준의 토글인지 이름으로 밝힌다. */}
+            <div className="strategy-picker-group">
+            <span className="strategy-picker-label">다출원 특산품 {number(STRATEGY_CHIP_LIMIT)}선</span>
+            <div className="strategy-item-chips" role="group" aria-label="다출원 특산품 선택">
               {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.flow ? row.flow.totalCount : row.trademarks)}</small></button>)}
             </div>
+            </div>
+            <div className="strategy-picker-inputs">
             <label className="search-field strategy-item-search"><span className="sr-only">품목 직접 검색</span><input type="search" value={strategyItemQuery} placeholder={`품목명 직접 입력 · 전체 ${strategyFlowRows.length}개`} onChange={(event) => { setStrategyItemQuery(event.target.value); setStrategyItem(""); }} /></label>
+            <label className="search-field strategy-region-select"><span className="sr-only">지역 선택</span><select value={strategyRegion} onChange={(event) => setStrategyRegion(event.target.value)}><option value="">지역 선택 안 함 (전국 기준)</option>{strategyProvinces.map((province) => <option key={province} value={province}>{displayRegionName(province)}</option>)}</select></label>
+            </div>
           </div>
           {strategyItemQuery.trim() && <p className="screen-note">검색 결과 {strategyFlowFiltered.length}개{strategyFlowFiltered.length > 0 ? ` · ${strategySelectedFlow?.name} 표시 중` : ""}</p>}
 
           {strategySelectedFlow ? <div className="strategy-flow-detail">
-            <ExpansionReportCard index={expansionIndex} name={strategySelectedFlow.name} category={strategySelectedFlow.category} />
+            <ExpansionReportCard index={expansionIndex} name={strategySelectedFlow.name} category={strategySelectedFlow.category} province={strategyRegion} regions={regionalRegions} />
             {strategySelectedFlow.flow ? <>
               <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
               <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.accelerating.some((s) => s.name === strategySelectedFlow.name) || leaderboard.freshEntries.some((s) => s.name === strategySelectedFlow.name)} />
