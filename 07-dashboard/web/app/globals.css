@@ -111,6 +111,47 @@ a { color: inherit; text-decoration: none; }
    세로 스크롤(.ranking-table-wrap). 축소 화면(≤1280px 1단 적층)에서는 static 흐름 배치. */
 .ranking-columns { position: relative; min-height: 0; }
 .ranking-stack { display: flex; flex-direction: column; gap: 16px; }
+/* 2026-09-08(사용자): 비즈니스 확장 경로 분석 — "쌀로 어디까지? 토마토는? 이색적인 건?
+   서비스·창업은?" 네 질문에 답하는 진단 보고서. 근거(실제 지정상품)를 항상 곁들이므로
+   본문보다 예시 줄이 길어지기 쉽다 — 예시는 한 단계 작고 흐리게 두고 줄바꿈을 허용한다. */
+.expansion-report { margin-top: 18px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.expansion-report.empty { background: var(--paper); }
+.expansion-lede { margin: 12px 0 0; color: var(--ink); font-size: 14px; line-height: 1.7; }
+.expansion-lede b { color: var(--green-dark); }
+.expansion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.expansion-grid article { min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.expansion-grid h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--green-dark); }
+.expansion-hint { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+.expansion-hint b { color: var(--ink); }
+
+.expansion-held { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.expansion-held li { flex: 1 1 190px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px; background: #fff; }
+.expansion-held li.goods { border-left-color: var(--green); }
+.expansion-held li.svc { border-left-color: #b26a00; }
+.expansion-held b { display: block; font-size: 12.5px; color: var(--ink); }
+.expansion-held span { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.expansion-held small { display: block; margin-top: 4px; color: var(--muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.expansion-list { margin: 0; padding: 0 0 0 0; list-style: none; counter-reset: exp; }
+.expansion-list li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.expansion-list li:first-child { border-top: 0; }
+.expansion-class { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.expansion-why { font-size: 11.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.expansion-list small { grid-column: 1 / -1; color: var(--muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.expansion-list.rare .expansion-class { color: #7a3ea8; }
+.expansion-list.svc .expansion-class { color: #b26a00; }
+
+.expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
+.expansion-caveat b { color: var(--ink); }
+/* 다출원 특산품 토글 + 품목·지역 직접 입력. 지역을 고르면 보고서에 ⑤ 지역 관점 절이 붙는다. */
+.strategy-picker-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.strategy-picker-label { font-size: 11px; font-weight: 800; letter-spacing: .02em; color: var(--muted); }
+.strategy-picker-inputs { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.strategy-region-select select { min-width: 190px; border: 0; background: transparent; color: var(--ink); font-size: 13px; font-family: inherit; }
+.expansion-region { grid-column: 1 / -1; border-color: var(--green) !important; }
+.expansion-region h4 { margin: 12px 0 6px; font-size: 12px; font-weight: 700; color: var(--ink); }
+.expansion-region h4:first-of-type { margin-top: 8px; }
+
 @media (min-width: 1281px) {
   .ranking-stack { position: absolute; inset: 0; }
 }
@@ -246,25 +287,19 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-flow: row;
+  position: sticky; top: 0; z-index: 20; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
-/* 이슈 #116(2026-09-01): "지역·품목별 조회" 탭 안에서 지역별/품목별을 고르는 토글 */
-.explore-subnav { display: inline-flex; gap: 4px; margin-bottom: 14px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: #eef2f7; }
 /* 이슈 #136(2026-09-07): 지역별/품목별 토글·검색·정렬이 각각 한 줄씩 차지하던 것을
    한 줄로 합친다(지자체별 상세에서는 토글 + "전국 시도 비교로" 버튼). */
 .explore-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.explore-toolbar > .explore-subnav { flex: none; margin-bottom: 0; }
 .explore-toolbar > .drill-back { margin: 0; }
 .explore-toolbar > .item-search-row { flex: 1; min-width: 0; }
 @media (max-width: 760px) {
   .explore-toolbar { flex-wrap: wrap; }
   .explore-toolbar > .item-search-row { flex-basis: 100%; }
 }
-.explore-subnav button { min-width: 88px; padding: 7px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
-.explore-subnav button:hover { color: var(--ink); }
-.explore-subnav button.active { background: #fff; color: var(--green-dark); box-shadow: var(--shadow); }
 .primary-tabs button { min-height: 38px; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
@@ -286,7 +321,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-metrics button.active { border-color: var(--green); background: var(--green); color: white; }
 .map-metrics button:disabled { opacity: .42; cursor: not-allowed; text-decoration: line-through; }
 .map-back { color: var(--green); font-weight: 800; }
-.map-metric-description { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+/* 2026-09-08(사용자): 지표를 바꾸면 설명이 1~3줄로 오락가락해 아래 지도가 위아래로
+   움직였다. 설명 칸을 세 줄 높이로 고정해 지도 위치를 붙박이로 만든다. 더 좁은 화면에서
+   설명이 세 줄을 넘으면 칸 안에서만 스크롤하고 지도는 그대로 둔다. */
+.map-metric-description { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; height: calc(3 * 1.55em); overflow-y: auto; overscroll-behavior: contain; }
 .map-metric-description strong { flex: none; color: var(--green-dark); }
 .map-metric-description span { min-width: 0; }
 .map-stage { display: grid; place-items: center; min-height: clamp(560px, 44vw, 860px); margin-top: 10px; overflow: hidden; }
@@ -1097,6 +1135,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking .section-heading h2 { font-size: 16px; }
   .map-heading { align-items: flex-start; flex-direction: column; }
   .map-stage { min-height: 390px; }
+  .map-metric-description { height: calc(5 * 1.55em); }
+  .expansion-grid { grid-template-columns: 1fr; }
   .map-label { font-size: 11px; }
   .map-label-province { font-size: 11px; }
   .coverage-kpis { grid-template-columns: 1fr; }
@@ -1268,7 +1308,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    표가 인쇄 페이지 폭에 맞게 늘어나도록 하는 정도로 충분하다(과한 인쇄 전용 레이아웃은
    두지 않는다). */
 @media print {
-  .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
+  .primary-tabs, .province-tabbar, .region-quick-filter, .search-field,
   .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
   .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider, .leader-controls,
   .province-municipalities summary,

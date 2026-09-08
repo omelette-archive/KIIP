@@ -96,13 +96,17 @@ test("renders the data-connected Korean dashboard", async () => {
   // (컨셉 4판 "운영 지표는 분리"). 요약 첫 칸은 권리 상태 네 칸이 대신한다.
   assert.doesNotMatch(html, /출원인 주소 미확보/, "운영 지표는 요약이 아니라 데이터 개요 몫");
   assert.match(html, /전국 지역 브랜드 지도/);
-  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
-  // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
-  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
-  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
-  // 2026-09-08: 특화작목 비교는 단위가 "도"라 지역별 화면(시도 선택)으로 내렸다.
-  // 최상위 탭은 요약 / 지역·품목별 조회 / 데이터 개요 셋이다.
-  assert.doesNotMatch(html.split("</nav>")[0], /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  // 2026-09-08(사용자): 한 탭 안의 하위 토글이 불편해 지역별·품목별·비즈니스 확장 경로를
+  // 다시 최상위 탭으로 꺼냈다. 지역 상세만 지역별 탭의 드릴다운, 특화작목은 지역별 화면 안.
+  {
+    const nav = html.split("</nav>")[0];
+    assert.match(nav, /지역별 특산품 상표 현황/);
+    assert.match(nav, /품목별 특산품 상표 현황/);
+    assert.match(nav, /비즈니스 확장 경로 분석/);
+    assert.doesNotMatch(nav, /지역·품목별 조회/, "합쳐 놓은 옛 탭 이름이 남아 있으면 안 됨");
+    assert.doesNotMatch(nav, />지역 상세<|>전국 지역 비교</);
+    assert.doesNotMatch(nav, /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  }
   assert.match(html, /데이터 개요/);
   assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
   assert.match(html, />특산품 수<\/button>/);
@@ -319,10 +323,18 @@ test("renders tab navigation and separate application/registration ranking table
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지역·품목별 조회/비즈니스 전략/특화작목/데이터 개요 5개 탭이 있어야 함");
-  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 "지역·품목별 조회" 하나로 병합.
-  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
-  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
+  assert.match(html, /class="primary-tabs"/, "요약/지역별/품목별/비즈니스 확장 경로/데이터 개요 5개 탭이 있어야 함");
+  // 2026-09-08(사용자): 한 탭 안의 하위 토글이 불편해 지역별·품목별·비즈니스 확장 경로를
+  // 다시 최상위 탭으로 꺼냈다. 지역 상세만 지역별 탭의 드릴다운, 특화작목은 지역별 화면 안.
+  {
+    const nav = html.split("</nav>")[0];
+    assert.match(nav, /지역별 특산품 상표 현황/);
+    assert.match(nav, /품목별 특산품 상표 현황/);
+    assert.match(nav, /비즈니스 확장 경로 분석/);
+    assert.doesNotMatch(nav, /지역·품목별 조회/, "합쳐 놓은 옛 탭 이름이 남아 있으면 안 됨");
+    assert.doesNotMatch(nav, />지역 상세<|>전국 지역 비교</);
+    assert.doesNotMatch(nav, /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  }
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
   // UI 검토(3차, 2026-09-06) S2: 출원 랭킹 표·등록 랭킹 표 2개를 전환 탭 하나로 합쳤다 —
