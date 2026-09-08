@@ -36,11 +36,26 @@ function parseCsvLine(line) {
   return fields;
 }
 
+// 법정동코드 CSV는 커밋된 정적 파일(2만행 이상)이고, 파싱 결과는 프로세스 수명 동안
+// 바뀌지 않는다. 그런데 enrichHit → evaluateApplicantRegions 등이 hit마다 인자 없이
+// 호출하면서 매번 파일을 다시 읽고 문자 단위로 파싱했다 — 등록원부 캐시가 커지자(수천 hit)
+// 03c 후처리가 CPU에 15분 이상 묶였다(2026-09-08). 경로별로 파싱 결과를 캐시한다.
+const regionCodeCache = new Map();
+
 /**
  * @param {string} [csvPath]
  * @returns {{code:string, sido:string, sigungu:string, level:"sido"|"sigungu"}[]}
  */
 function loadAdminRegionCodes(csvPath = DEFAULT_CSV_PATH) {
+  const key = path.resolve(csvPath);
+  const cached = regionCodeCache.get(key);
+  if (cached) return cached;
+  const parsed = parseAdminRegionCodes(csvPath);
+  regionCodeCache.set(key, parsed);
+  return parsed;
+}
+
+function parseAdminRegionCodes(csvPath) {
   const raw = fs.readFileSync(csvPath, "utf8");
   const text = raw.charCodeAt(0) === 0xfeff ? raw.slice(1) : raw;
   const lines = text.split(/\r\n|\n/).filter((line) => line.length > 0);
@@ -79,10 +94,29 @@ function loadAdminRegionCodes(csvPath = DEFAULT_CSV_PATH) {
   return result;
 }
 
+const sigunguCodeCache = new Map();
+
 function loadAdminCodes(csvPath = DEFAULT_CSV_PATH) {
-  return loadAdminRegionCodes(csvPath)
+  const key = path.resolve(csvPath);
+  const cached = sigunguCodeCache.get(key);
+  if (cached) return cached;
+  const list = loadAdminRegionCodes(csvPath)
     .filter((row) => row.level === "sigungu")
     .map(({ code, sido, sigungu }) => ({ code, sido, sigungu }));
+  sigunguCodeCache.set(key, list);
+  return list;
 }
 
-module.exports = { loadAdminCodes, loadAdminRegionCodes, parseCsvLine, DEFAULT_CSV_PATH };
+// 테스트 등에서 같은 경로의 파일 내용을 바꿔 다시 읽어야 할 때 캐시를 비운다.
+function clearAdminCodeCache() {
+  regionCodeCache.clear();
+  sigunguCodeCache.clear();
+}
+
+module.exports = {
+  loadAdminCodes,
+  loadAdminRegionCodes,
+  clearAdminCodeCache,
+  parseCsvLine,
+  DEFAULT_CSV_PATH,
+};
