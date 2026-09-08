@@ -1009,22 +1009,22 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-card-note { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
 .leader-list { list-style: none; margin: 0; padding: 0; }
 .leader-list li + li { border-top: 1px solid var(--line); }
-/* 이슈 #136(2026-09-08): 카드마다 값 폭이 달라 게이지 바·숫자가 좌우로 틀어지던 문제 —
-   5개 카드 전부 동일한 5열 그리드로 고정(순위·이름·게이지·값·부가). */
-.leader-list button { display: grid; grid-template-columns: 16px minmax(0, 1fr) 36px 54px auto; align-items: center; column-gap: 8px; width: 100%; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+/* 이슈 #136(2026-09-08): 게이지 바를 맨 오른쪽 고정 열에 두고, 그 사이에 값을 둔다 —
+   모든 행의 바가 같은 x에서 시작해 길이 비교로 순위가 한눈에 보이게. 회색 채움만으로는
+   얼마나 찼는지 안 보여 트랙에 테두리를 준다(빈 부분이 보이도록). */
+.leader-list button { display: grid; grid-template-columns: 16px minmax(0, 1fr) 52px 76px; align-items: center; column-gap: 10px; width: 100%; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .leader-list button:hover { background: var(--green-soft); }
 .leader-rank { color: var(--faint); font-size: 11px; font-weight: 800; text-align: center; }
 .leader-name { min-width: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .leader-tag { margin-left: 5px; padding: 0 5px; border-radius: 5px; background: #eef2f7; color: var(--muted); font-size: 9px; font-style: normal; font-weight: 700; vertical-align: 1px; }
-.leader-bar { height: 6px; border-radius: 99px; background: #eef2f7; overflow: hidden; align-self: center; }
-.leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
-.leader-bar-low i { background: var(--amber); }
-.leader-bar-empty { background: transparent; }
 .leader-val { font-size: 12px; font-weight: 800; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.leader-sub { justify-self: end; color: var(--faint); font-size: 9.5px; font-weight: 700; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
-.leader-sub:empty { display: none; }
-.leader-fresh { padding: 0 5px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-size: 9px; font-style: normal; font-weight: 800; }
-.leader-growth { color: var(--green-dark); font-size: 11px; font-style: normal; font-weight: 800; }
+.leader-val-wide { grid-column: 3 / 5; }
+.leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
+.leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
+.leader-bar-low i { background: var(--amber); }
+.leader-bar-empty { border: 0; }
+.leader-fresh { padding: 1px 5px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-size: 10px; font-style: normal; font-weight: 800; }
+.leader-growth { color: var(--green-dark); font-size: 12px; font-style: normal; font-weight: 800; }
 .summary-leaderboard .method-note { margin-top: 16px; padding: 12px 14px; }
 .leader-csv-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .leader-csv-row .csv-download-button { margin-left: 0; }
