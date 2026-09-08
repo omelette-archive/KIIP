@@ -24,7 +24,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   const compareProvince = (a, b) => provinceRank(a) - provinceRank(b) || displayRegionName(a).localeCompare(displayRegionName(b), "ko-KR");
   const firstRegionProvince = [...new Set(snapshot.regions.map((region) => region.sido).filter((sido) => sido && sido !== "전국"))].sort(compareProvince)[0] || null;
-  const state = { tab: "summary", query: "", regionQuery: "", itemQuery: "", categoryFilter: "", selectedItemName: "", strategySortKey: "verdict", strategySortDir: "desc", strategySelectedKey: "", strategyFilter: "", strategyShowAll: false, selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null, summaryTrendStartYear: null, summaryTrendEndYear: null, itemSort: "trademarks", itemShowAll: false, compareProvince: null, summaryRankingMetric: "application" };
+  const state = { tab: "summary", query: "", regionQuery: "", itemQuery: "", categoryFilter: "", selectedItemName: "", strategySortKey: "verdict", strategySortDir: "desc", strategySelectedKey: "", strategyFilter: "", strategyShowAll: false, selectedRegionProvince: firstRegionProvince, expandedRegionProvince: null, regionKey: "", itemId: "", mapMetric: "coverage", province: null, municipality: null, trendStartYear: null, trendEndYear: null, summaryTrendStartYear: null, summaryTrendEndYear: null, itemSort: "trademarks", itemShowAll: false, compareProvince: null, summaryRankingMetric: "application", leaderMonths: 3, leaderMetric: "application" };
   const esc = (value) => String(value ?? "").replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]);
   const number = (value) => typeof value === "number" ? value.toLocaleString("ko-KR") : "—";
   const percent = (value) => typeof value === "number" ? `${Math.round(value * 100)}%` : "—";
@@ -105,6 +105,17 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     }
     return totals;
   };
+  // 이슈 #118: 최근 출원·등록 동향 리더보드. Dashboard.tsx와 동일 로직. 월 단위 집계
+  // (applicationMonthCounts/registrationMonthCounts, 키 YYYY-MM)는 전국 키워드 검색 결과
+  // 전체 대상이라 지역 귀속 확인 건수와 다른 모집단이다(#50).
+  const LEADER_WINDOWS = [[1, "최근 1개월"], [3, "최근 3개월"], [6, "최근 6개월"], [12, "최근 1년"]];
+  const LEADER_LIMIT = 5;
+  const leaderMinBase = (months) => Math.max(6, months * 2);
+  const ymKey = (year, monthIndex0) => `${year}-${String(monthIndex0 + 1).padStart(2, "0")}`;
+  const leaderEndMonth = (generatedAt) => { const d = new Date(generatedAt); const prev = new Date(d.getFullYear(), d.getMonth() - 1, 1); return { year: prev.getFullYear(), monthIndex0: prev.getMonth() }; };
+  const monthWindowKeys = (end, months) => { const keys = []; for (let offset = months - 1; offset >= 0; offset--) { const d = new Date(end.year, end.monthIndex0 - offset, 1); keys.push(ymKey(d.getFullYear(), d.getMonth())); } return keys; };
+  const sumMonthCounts = (counts, keys) => { if (!counts) return 0; let total = 0; for (const key of keys) total += counts[key] || 0; return total; };
+  const monthRangeLabel = (keys) => { if (!keys.length) return ""; const fmt = (key) => { const [y, m] = key.split("-"); return `${y}.${m}`; }; return keys.length === 1 ? fmt(keys[0]) : `${fmt(keys[0])}–${fmt(keys[keys.length - 1])}`; };
   // UI 검토(3차, 2026-09-06) 시각화 교체안 "목록 행": 48×14px 스파크라인(축·격자선 없음,
   // 형태만 가볍게). React Dashboard.tsx의 sparklinePoints와 동일 로직.
   const SPARKLINE_WIDTH = 48;
@@ -683,7 +694,93 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     </div>
     </section>
     ${regionTrendHtml({ region: "전국", items: regionalRegions.flatMap((region) => region.items) }, "전국 연도별 출원·등록 추이", "전국 · 실제 출원일자·등록일자 기준", { prominent: true, adjustable: true, emptyLabel: "아직 연도별 출원 데이터가 수집되지 않았습니다." })}
+    ${leaderboardHtml()}
     `;
+  }
+
+  // 이슈 #118: 최근 출원·등록 동향 리더보드. Dashboard.tsx의 leaderboard useMemo와 동일.
+  function computeLeaderboard() {
+    const end = leaderEndMonth(snapshot.generatedAt);
+    const windowKeys = monthWindowKeys(end, state.leaderMonths);
+    const priorEndDate = new Date(end.year, end.monthIndex0 - state.leaderMonths, 1);
+    const priorKeys = monthWindowKeys({ year: priorEndDate.getFullYear(), monthIndex0: priorEndDate.getMonth() }, state.leaderMonths);
+    const minBase = leaderMinBase(state.leaderMonths);
+    const items = new Map();
+    const cats = new Map();
+    for (const region of regionalRegions) {
+      for (const item of region.items) {
+        const app = sumMonthCounts(item.applicationMonthCounts, windowKeys);
+        const reg = sumMonthCounts(item.registrationMonthCounts, windowKeys);
+        const priorApp = sumMonthCounts(item.applicationMonthCounts, priorKeys);
+        const priorReg = sumMonthCounts(item.registrationMonthCounts, priorKeys);
+        if (!app && !reg && !priorApp && !priorReg) continue;
+        const label = officialItemLabel(item);
+        if (label) {
+          const row = items.get(label) || { name: label, category: item.category || null, app: 0, reg: 0, priorApp: 0, priorReg: 0 };
+          row.app += app; row.reg += reg; row.priorApp += priorApp; row.priorReg += priorReg;
+          if (!row.category && item.category) row.category = item.category;
+          items.set(label, row);
+        }
+        if (item.category) {
+          const cat = cats.get(item.category.label) || { label: item.category.label, code: item.category.code, app: 0, reg: 0, priorApp: 0, priorReg: 0 };
+          cat.app += app; cat.reg += reg; cat.priorApp += priorApp; cat.priorReg += priorReg;
+          cats.set(item.category.label, cat);
+        }
+      }
+    }
+    const itemList = [...items.values()];
+    const metricValue = (row) => state.leaderMetric === "application" ? row.app : row.reg;
+    const topItems = itemList.filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.name.localeCompare(b.name, "ko-KR")).slice(0, LEADER_LIMIT);
+    const topCategories = [...cats.values()].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.label.localeCompare(b.label, "ko-KR"));
+    const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
+    const surging = itemList
+      .filter((row) => row.app >= minBase && row.app > row.priorApp)
+      .map((row) => { const fresh = row.priorApp < Math.max(1, minBase / 3); return { ...row, fresh, growth: fresh ? Infinity : row.app / row.priorApp, delta: row.app - row.priorApp }; })
+      .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
+      .slice(0, LEADER_LIMIT);
+    const lifetime = new Map();
+    for (const region of regionalRegions) {
+      for (const item of region.items) {
+        const label = officialItemLabel(item);
+        if (!label) continue;
+        const row = lifetime.get(label) || { name: label, category: item.category || null, lifeApp: 0, lifeReg: 0 };
+        for (const v of Object.values(item.applicationYearCounts || {})) row.lifeApp += v;
+        for (const v of Object.values(item.registrationYearCounts || {})) row.lifeReg += v;
+        lifetime.set(label, row);
+      }
+    }
+    // 등록 수가 출원 수를 넘는 행은 데이터 아티팩트라 등록률 순위에서 제외.
+    const lifetimeRows = [...lifetime.values()].filter((row) => row.lifeApp >= 20 && row.lifeReg <= row.lifeApp).map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
+    const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
+    const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
+    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
+  }
+  // 이슈 #118: 별도 탭 대신 요약 하단에 compact로.
+  function leaderboardHtml() {
+    const lb = computeLeaderboard();
+    if (lb.itemCount === 0) return "";
+    const metricWord = state.leaderMetric === "application" ? "출원" : "등록";
+    const winStamp = `${lb.windowKeys[0]}_${lb.windowKeys[lb.windowKeys.length - 1]}`;
+    currentCsvExporters.leaderItems = () => downloadCsv(`동향_품목${metricWord}_${winStamp}`, ["순위", "품목", "유형", metricWord], lb.topItems.map((row, index) => [index + 1, row.name, row.category?.label ?? "", state.leaderMetric === "application" ? row.app : row.reg]));
+    currentCsvExporters.leaderCategories = () => downloadCsv(`동향_유형${metricWord}_${winStamp}`, ["순위", "유형", metricWord, "비중"], lb.topCategories.map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; return [index + 1, row.label, value, lb.categoryTotal ? `${Math.round(value / lb.categoryTotal * 100)}%` : ""]; }));
+    const heading = `<div class="section-heading"><div><h2>최근 출원·등록 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>`;
+    const note = `<p class="leader-scope-note">전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준 월별로 집계한 순위입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹의 수치)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>`;
+    const controls = `<div class="leader-controls">
+      <div class="leader-window" role="group" aria-label="기간 선택">${LEADER_WINDOWS.map(([months, label]) => `<button type="button" data-leader-window="${months}" class="${state.leaderMonths === months ? "active" : ""}">${label}</button>`).join("")}</div>
+      <div class="leader-metric" role="group" aria-label="출원·등록 기준"><button type="button" data-leader-metric="application" aria-pressed="${state.leaderMetric === "application"}" class="${state.leaderMetric === "application" ? "active" : ""}">출원</button><button type="button" data-leader-metric="registration" aria-pressed="${state.leaderMetric === "registration"}" class="${state.leaderMetric === "registration" ? "active" : ""}">등록</button></div>
+      <span class="leader-window-range">${esc(monthRangeLabel(lb.windowKeys))} · 직전 대비 ${esc(monthRangeLabel(lb.priorKeys))}</span>
+    </div>`;
+    const tag = (cat) => cat ? `<em class="leader-tag">${esc(cat.label)}</em>` : "";
+    const topValue = (row) => state.leaderMetric === "application" ? row.app : row.reg;
+    const topMax = lb.topItems.length ? topValue(lb.topItems[0]) : 0;
+    const itemsCard = `<article class="leader-card"><div class="leader-card-head"><h3>${metricWord} 많은 품목</h3><span class="leader-card-note">TOP ${LEADER_LIMIT}</span></div>${lb.topItems.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topItems.map((row, index) => { const value = topValue(row); return `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar"><i style="width:${topMax ? Math.max(4, value / topMax * 100) : 0}%"></i></span><b>${number(value)}</b></button></li>`; }).join("")}</ol>`}</article>`;
+    const catsCard = `<article class="leader-card"><div class="leader-card-head"><h3>${metricWord} 많은 유형</h3><span class="leader-card-note">비중</span></div>${lb.topCategories.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; const share = lb.categoryTotal ? value / lb.categoryTotal : 0; return `<li><button type="button" data-goto-category="${esc(row.code || "")}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.label)}</span><span class="leader-bar"><i style="width:${Math.max(4, share * 100)}%;background:${categoryShareColor(row.label)}"></i></span><b>${number(value)}<small>${percent(share)}</small></b></button></li>`; }).join("")}</ol>`}</article>`;
+    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h3>출원 급증 품목</h3><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `<ol class="leader-list">${lb.surging.map((row, index) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-delta">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</span><b>${number(row.priorApp)}→${number(row.app)}</b></button></li>`).join("")}</ol>`}</article>`;
+    const convRow = (row, index, low) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar${low ? " leader-bar-low" : ""}"><i style="width:${Math.max(4, row.rate * 100)}%"></i></span><b>${percent(row.rate)}<small>${number(row.lifeReg)}/${number(row.lifeApp)}</small></b></button></li>`;
+    const highCard = `<article class="leader-card"><div class="leader-card-head"><h3>등록률 상위</h3><span class="leader-card-note">누적 · 출원 20건+</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
+    const lowCard = `<article class="leader-card"><div class="leader-card-head"><h3>등록률 하위</h3><span class="leader-card-note">보호 전략 검토</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
+    const methodNote = `<details class="method-note"><summary>집계 기준 · CSV</summary><p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 ${lb.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p><div class="leader-csv-row">${csvDownloadButtonHtml("leaderItems").replace("CSV 다운로드", "품목 순위 CSV")}${csvDownloadButtonHtml("leaderCategories").replace("CSV 다운로드", "유형 순위 CSV")}</div></details>`;
+    return `<section class="summary-leaderboard">${heading}${note}${controls}<div class="leader-grid">${itemsCard}${catsCard}${surgeCard}${highCard}${lowCard}</div>${methodNote}</section>`;
   }
 
   function applicationsScreen() {
@@ -1190,6 +1287,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 그대로 보이게 한다. 좌측 목록에서 직접 아코디언을 펼치는 클릭(data-region-group)은
     // 그대로 유지된다.
     document.querySelectorAll("[data-goto-tab]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.gotoTab; render(); }; });
+    // 이슈 #118: 동향(리더보드) 컨트롤 + 항목 클릭 → 품목별 조회.
+    document.querySelectorAll("[data-leader-window]").forEach((button) => { button.onclick = () => { state.leaderMonths = Number(button.dataset.leaderWindow); render(); }; });
+    document.querySelectorAll("[data-leader-metric]").forEach((button) => { button.onclick = () => { state.leaderMetric = button.dataset.leaderMetric; render(); }; });
+    document.querySelectorAll("[data-goto-item]").forEach((button) => { button.onclick = () => { state.itemQuery = ""; state.categoryFilter = ""; state.itemShowAll = true; state.selectedItemName = button.dataset.gotoItem; state.tab = "items"; render(); scrollTop(); }; });
+    document.querySelectorAll("[data-goto-category]").forEach((button) => { button.onclick = () => { state.itemQuery = ""; state.selectedItemName = ""; state.categoryFilter = button.dataset.gotoCategory; state.tab = "items"; render(); scrollTop(); }; });
     document.querySelectorAll("[data-explore-mode]").forEach((button) => { button.onclick = () => { state.tab = button.dataset.exploreMode === "item" ? "items" : "applications"; state.regionKey = ""; state.itemId = ""; render(); }; });
     // 이슈 #116: 지역·품목을 새로 고르면 상세가 바뀌는데 스크롤이 이전 상세를 읽던 자리에
     // 남는다(특히 데이터 없는 품목은 빈 화면 하단만). 선택 시 화면 최상단으로 올린다.
