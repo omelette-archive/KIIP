@@ -814,7 +814,9 @@ function RateRing({ value, label = "출원율", size = 128, strokeWidth = 12 }: 
 const FLOW_STAGE_LABELS: Record<"raw" | "processed" | "service", string> = { raw: "원물", processed: "가공품", service: "서비스·확장" };
 const FLOW_STAGE_HINTS: Record<"raw" | "processed" | "service", string> = { raw: "산지·1차 생산 단계 상표", processed: "가공식품·음료·화장품 등", service: "유통·체험·관광·식음 서비스류" };
 // 이슈 #119: 단계별 주요 상품류 — NICE 13판 대분류 이름(자주 나오는 것만).
-const NICE_CLASS_LABELS: Record<string, string> = { "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "35": "도소매·광고(35)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
+// 2026-09-08: 확장 경로 보고서가 스냅샷에 실제로 나타나는 류를 모두 이름으로 부른다
+// (관측된 류: 1·2·5·7·9·10·15·16·20·21·29~35·39·40·41·43·44·45).
+const NICE_CLASS_LABELS: Record<string, string> = { "1": "화학·비료(1)", "2": "페인트·염료(2)", "3": "화장품·세제(3)", "5": "건강기능식품·의약(5)", "7": "농기계(7)", "9": "전자·앱(9)", "10": "의료기기(10)", "14": "귀금속(14)", "15": "악기(15)", "16": "인쇄물·문구(16)", "18": "가죽제품(18)", "20": "가구·목재(20)", "21": "주방·생활용품(21)", "24": "직물(24)", "25": "의류(25)", "28": "완구·스포츠(28)", "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "34": "담배(34)", "35": "도소매·광고(35)", "36": "금융(36)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "42": "연구·기술(42)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
 const niceClassLabel = (code: string) => NICE_CLASS_LABELS[code] || `${code}류`;
 // 이슈 #119(협업자 2026-09-02): 단계별 상위 5개 지역 출원 점유율을 원그래프로. topRegions는
 // 상위 출원인 주소 기준 근사치이고(특산품 관리 지역과 무관) 합이 1이 아닐 수 있어, 보이는
@@ -869,6 +871,212 @@ function reportChainBuckets(flow: NationwideFlow) {
   const max = Math.max(1, ...buckets.map((bucket) => bucket.count));
   const leader = [...buckets].sort((a, b) => b.count - a.count)[0];
   return { buckets, max, leader: leader && leader.count > 0 ? leader : null };
+}
+// 2026-09-08(사용자): "쌀로 어디까지 비즈니스를 확장할 수 있을까? 토마토는? 이색적인
+// 비즈니스는? 서비스나 지역 창업은?" — 이 네 질문에 답하는 확장 경로 진단 보고서.
+//
+// 근거는 오직 스냅샷에 실린 지정상품이다. businessFlow(원물→가공품→서비스 배치)는 아직
+// 스냅샷에 0건이라 그 위에 세우면 전 품목이 빈칸이 된다. 대신 출원의 지정상품 상품류를
+// 쓴다 — "이 품목이 실제로 도달한 류"와 "같은 유형의 다른 특산품은 도달했는데 이 품목은
+// 비어 있는 류"의 차이가 곧 확장 여지다. 없는 걸 지어내지 않는다.
+// standalone-client.js의 expansionIndex/expansionReportHtml과 같은 규칙.
+const REPORT_SERVICE_FLOOR = 35;
+type ClassCell = { count: number; goods: Set<string> };
+type ExpansionEntry = { name: string; category: ItemCategory | null; classes: Map<string, ClassCell> };
+type ExpansionIndex = {
+  byItem: Map<string, ExpansionEntry>;
+  byClass: Map<string, { items: Map<string, Set<string>>; count: number }>;
+  byCategory: Map<string, Map<string, Set<string>>>;
+};
+const hasFinalConsonant = (word: string) => {
+  const code = String(word || "").trim().slice(-1).charCodeAt(0);
+  if (!(code >= 0xac00 && code <= 0xd7a3)) return null;
+  return (code - 0xac00) % 28 !== 0;
+};
+const withTopicJosa = (word: string) => `${word}${hasFinalConsonant(word) === false ? "는" : "은"}`;
+const normalizeGoods = (text: string) => String(text || "").replace(/[\s()（）]/g, "");
+const isTautology = (goods: string, itemName: string) => normalizeGoods(goods) === normalizeGoods(itemName);
+// 읽는 사람이 알고 싶은 건 "이 품목이 무엇으로 사업이 됐는가"이므로, 서비스업(…업)과
+// 가공품을 원물 나열보다 먼저 보여 준다. 품목명을 그대로 옮겨 적은 행은 가장 뒤로.
+const BUSINESS_MARKERS = /(업|가공|제조|체험|판매|배달|음료|주스|막걸리|맥주|와인|차|빵|과자|잼|즙|진액|분말|가루|말랭이|절임|김치|장아찌|통조림|엑기스|화장품|비누)/;
+function showcaseScore(goods: string, itemName: string) {
+  if (!goods) return -1;
+  if (isTautology(goods, itemName)) return 0;
+  const normalized = normalizeGoods(goods);
+  const bare = normalizeGoods(itemName);
+  let score = 1;
+  if (BUSINESS_MARKERS.test(goods)) score += 3;
+  if (bare && normalized.startsWith(bare) && normalized.length - bare.length <= 4) score -= 1;
+  if (goods.length > 8) score += 1;
+  return score;
+}
+function classShowcase(cell: { items: Map<string, Set<string>> }) {
+  let best: { lead: string; goods: string; score: number } | null = null;
+  for (const [name, goodsSet] of cell.items) {
+    for (const goods of goodsSet) {
+      const score = showcaseScore(goods, name);
+      if (!best || score > best.score) best = { lead: name, goods, score };
+    }
+  }
+  return best && best.score > 0 ? best : null;
+}
+function goodsSample(set: Set<string>, n: number, itemName?: string) {
+  const all = [...set];
+  const informative = itemName ? all.filter((g) => !isTautology(g, itemName)) : all;
+  const pool = informative.length ? informative : all;
+  return pool.sort((a, b) => a.length - b.length || a.localeCompare(b, "ko-KR")).slice(0, n);
+}
+function buildExpansionIndex(regions: Region[]): ExpansionIndex {
+  const byItem = new Map<string, ExpansionEntry>();
+  const byClass = new Map<string, { items: Map<string, Set<string>>; count: number }>();
+  const byCategory = new Map<string, Map<string, Set<string>>>();
+  for (const region of regions) {
+    for (const item of region.items) {
+      const name = officialItemLabel(item);
+      if (!name) continue;
+      const entry = byItem.get(name) || { name, category: item.category || null, classes: new Map<string, ClassCell>() };
+      if (!entry.category && item.category) entry.category = item.category;
+      for (const example of item.trademarkExamples || []) {
+        for (const evidence of example.goodsEvidence || []) {
+          const code = String(evidence.classCode || "").trim();
+          const goods = String((evidence as { designatedProductName?: string }).designatedProductName || "").trim();
+          if (!code || !Number.isFinite(Number(code))) continue;
+          const own = entry.classes.get(code) || { count: 0, goods: new Set<string>() };
+          own.count += 1;
+          if (goods) own.goods.add(goods);
+          entry.classes.set(code, own);
+          const shared = byClass.get(code) || { items: new Map<string, Set<string>>(), count: 0 };
+          shared.count += 1;
+          const bucket = shared.items.get(name) || new Set<string>();
+          if (goods) bucket.add(goods);
+          shared.items.set(name, bucket);
+          byClass.set(code, shared);
+        }
+      }
+      byItem.set(name, entry);
+    }
+  }
+  for (const entry of byItem.values()) {
+    const code = entry.category?.code || "";
+    if (!code) continue;
+    const map = byCategory.get(code) || new Map<string, Set<string>>();
+    for (const cls of entry.classes.keys()) {
+      const names = map.get(cls) || new Set<string>();
+      names.add(entry.name);
+      map.set(cls, names);
+    }
+    byCategory.set(code, map);
+  }
+  return { byItem, byClass, byCategory };
+}
+function ExpansionReportCard({ index, name, category }: { index: ExpansionIndex; name: string; category: ItemCategory | null }) {
+  const entry = index.byItem.get(name);
+  const own = entry ? entry.classes : new Map<string, ClassCell>();
+  const evidenceCount = [...own.values()].reduce((sum, cell) => sum + cell.count, 0);
+  if (!evidenceCount) {
+    return <section className="expansion-report empty">
+      <div className="section-heading"><div><h2>{name} 확장 경로 진단</h2></div><span>근거 부족</span></div>
+      <p className="empty">이 품목은 출원의 지정상품이 아직 한 건도 확인되지 않아 확장 경로를 진단할 수 없습니다. 지정상품 대조가 끝나면 자동으로 채워집니다.</p>
+    </section>;
+  }
+  const ownCodes = [...own.keys()].sort((a, b) => Number(a) - Number(b));
+  const productCodes = ownCodes.filter((code) => Number(code) < REPORT_SERVICE_FLOOR);
+  const serviceCodes = ownCodes.filter((code) => Number(code) >= REPORT_SERVICE_FLOOR);
+
+  const catCode = (entry?.category || category)?.code || "";
+  const peerMap = index.byCategory.get(catCode) || new Map<string, Set<string>>();
+  // 같은 유형 안에서 단 한 품목만 가진 류는 대개 분류 잡음이다(쌀 상표 한 건이 2류로 잡힌 것
+  // 같은). 두 품목 이상이 확보한 류만 후보로 올리고, 세 줄이 안 되면 전국 기준으로 채운다.
+  const peerRows: { code: string; scope: string; peers: number; lead: string; goods: string }[] = [...peerMap.entries()]
+    .filter(([code, names]) => !own.has(code) && [...names].filter((n) => n !== name).length >= 2)
+    .map(([code, names]) => {
+      const peers = [...names].filter((n) => n !== name);
+      const show = classShowcase(index.byClass.get(code)!) || { lead: peers[0], goods: "" };
+      return { code, scope: (entry?.category || category)?.label || "같은 유형", peers: peers.length, lead: show.lead, goods: show.goods };
+    })
+    .sort((a, b) => b.peers - a.peers || Number(a.code) - Number(b.code));
+  if (peerRows.length < 3) {
+    const seen = new Set(peerRows.map((row) => row.code));
+    peerRows.push(...[...index.byClass.entries()]
+      .filter(([code, cell]) => !own.has(code) && !seen.has(code) && cell.items.size >= 2 && Number(code) < REPORT_SERVICE_FLOOR)
+      .sort((a, b) => b[1].items.size - a[1].items.size)
+      .slice(0, 3 - peerRows.length)
+      .map(([code, cell]) => {
+        const show = classShowcase(cell) || { lead: "", goods: "" };
+        return { code, scope: "전국 특산품", peers: cell.items.size, lead: show.lead, goods: show.goods };
+      }));
+  }
+  peerRows.splice(6);
+
+  // 「담배」가 34류에 「담배」로 등록된 것 같은 동어반복은 이색 사례가 못 된다.
+  const rare = [...index.byClass.entries()]
+    .filter(([code, cell]) => !own.has(code) && cell.items.size > 0)
+    .map(([code, cell]) => ({ code, itemCount: cell.items.size, show: classShowcase(cell) }))
+    .filter((row) => row.show && row.show.goods && !isTautology(row.show.goods, row.show.lead))
+    .sort((a, b) => a.itemCount - b.itemCount || Number(a.code) - Number(b.code))
+    .slice(0, 5);
+
+  const svcRows = [...index.byClass.entries()]
+    .filter(([code]) => Number(code) >= REPORT_SERVICE_FLOOR && !own.has(code))
+    .sort((a, b) => b[1].count - a[1].count)
+    .slice(0, 5)
+    .map(([code, cell]) => ({ code, count: cell.count, show: classShowcase(cell) }));
+
+  return <section className="expansion-report">
+    <div className="section-heading"><div><h2>{name} 확장 경로 진단</h2></div><span>지정상품 {number(evidenceCount)}건 근거</span></div>
+    <p className="expansion-lede"><b>{name}</b>{withTopicJosa(name).slice(name.length)} {serviceCodes.length
+      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에 도달했습니다.`
+      : <>제품 {productCodes.length}개 류에 머물러 있고, <b>서비스·확산(35류 이상)은 아직 0건</b>입니다.</>}</p>
+    <div className="expansion-grid">
+      <article>
+        <h3>① 지금 어디까지 갔나</h3>
+        <ul className="expansion-held">{ownCodes.map((code) => {
+          const cell = own.get(code)!;
+          const eg = goodsSample(cell.goods, 3, name);
+          return <li key={code} className={Number(code) >= REPORT_SERVICE_FLOOR ? "svc" : "goods"}>
+            <b>{niceClassLabel(code)}</b><span>{number(cell.count)}건</span>
+            {eg.length > 0 && <small>{eg.join(" · ")}</small>}
+          </li>;
+        })}</ul>
+      </article>
+      <article>
+        <h3>② 다음 확장 후보</h3>
+        <p className="expansion-hint">같은 유형의 다른 특산품이 이미 확보했는데 이 품목만 비어 있는 상품류입니다. 세 줄이 안 되면 전국 특산품 기준으로 채웁니다.</p>
+        {peerRows.length > 0
+          ? <ol className="expansion-list">{peerRows.map((row) => <li key={row.code}>
+            <span className="expansion-class">{niceClassLabel(row.code)}</span>
+            <span className="expansion-why">{row.scope} {number(row.peers)}개 품목이 이미 확보</span>
+            {row.goods && <small>예: {row.lead} 「{row.goods}」</small>}
+          </li>)}</ol>
+          : <p className="empty">같은 유형 품목들이 확보한 상품류를 이 품목도 모두 갖고 있습니다.</p>}
+      </article>
+      <article>
+        <h3>③ 이색 확장 사례</h3>
+        <p className="expansion-hint">전국 특산품 상표에서 도달한 품목이 가장 적은 상품류입니다 — 선례가 드문 만큼 차별화 여지도 큽니다.</p>
+        {rare.length > 0
+          ? <ol className="expansion-list rare">{rare.map((row) => <li key={row.code}>
+            <span className="expansion-class">{niceClassLabel(row.code)}</span>
+            <span className="expansion-why">전국 특산품 중 {number(row.itemCount)}개 품목만 도달</span>
+            <small>예: {row.show!.lead} 「{row.show!.goods}」</small>
+          </li>)}</ol>
+          : <p className="empty">이 품목이 이미 대부분의 상품류에 도달해 있습니다.</p>}
+      </article>
+      <article>
+        <h3>④ 서비스 · 지역 창업</h3>
+        <p className="expansion-hint">{serviceCodes.length
+          ? `이 품목은 ${serviceCodes.map(niceClassLabel).join(" · ")}를 이미 확보했습니다. 남은 서비스 구간은 아래와 같습니다.`
+          : <>이 품목은 <b>서비스류 출원이 한 건도 없습니다</b> — 직판·체험·관광·가공 위탁 같은 지역 창업 영역을 아직 아무도 권리화하지 않았다는 뜻입니다.</>}</p>
+        {svcRows.length > 0
+          ? <ol className="expansion-list svc">{svcRows.map((row) => <li key={row.code}>
+            <span className="expansion-class">{niceClassLabel(row.code)}</span>
+            <span className="expansion-why">전국 특산품 상표 {number(row.count)}건이 이 구간에</span>
+            {row.show && row.show.goods && <small>예: {row.show.lead} 「{row.show.goods}」</small>}
+          </li>)}</ol>
+          : <p className="empty">전국 특산품 상표에서도 아직 서비스류 사례가 확인되지 않았습니다.</p>}
+      </article>
+    </div>
+    <p className="expansion-caveat">이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
+  </section>;
 }
 function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow; itemLabel: string; origins?: string[] }) {
   const chain = reportChainBuckets(flow);
@@ -1811,6 +2019,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     return strategyFlowRows.filter((row) => row.name.toLocaleLowerCase("ko-KR").includes(keyword) || (row.category?.label || "").toLocaleLowerCase("ko-KR").includes(keyword));
   }, [strategyFlowRows, strategyItemQuery]);
   const strategySelectedFlow = strategyFlowFiltered.find((row) => row.name === strategyItem) || strategyFlowFiltered[0] || null;
+  const expansionIndex = useMemo(() => buildExpansionIndex(regionalRegions), [regionalRegions]);
   const strategyRows = useMemo(() => {
     const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; isGapAlert: boolean }[] = [];
     for (const region of regionalRegions) {
@@ -2327,6 +2536,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           {strategyItemQuery.trim() && <p className="screen-note">검색 결과 {strategyFlowFiltered.length}개{strategyFlowFiltered.length > 0 ? ` · ${strategySelectedFlow?.name} 표시 중` : ""}</p>}
 
           {strategySelectedFlow ? <div className="strategy-flow-detail">
+            <ExpansionReportCard index={expansionIndex} name={strategySelectedFlow.name} category={strategySelectedFlow.category} />
             {strategySelectedFlow.flow ? <>
               <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
               <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.accelerating.some((s) => s.name === strategySelectedFlow.name) || leaderboard.freshEntries.some((s) => s.name === strategySelectedFlow.name)} />

@@ -513,7 +513,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   const FLOW_STAGE_LABELS = { raw: "원물", processed: "가공품", service: "서비스·확장" };
   const FLOW_STAGE_HINTS = { raw: "산지·1차 생산 단계 상표", processed: "가공식품·음료·화장품 등", service: "유통·체험·관광·식음 서비스류" };
   // 이슈 #119: 단계별 주요 상품류 이름(자주 나오는 NICE 13판 대분류만).
-  const NICE_CLASS_LABELS = { "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "35": "도소매·광고(35)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
+  // 2026-09-08: 확장 경로 보고서가 스냅샷에 실제로 나타나는 류를 모두 이름으로 부른다
+  // (관측된 류: 1·2·5·7·9·10·15·16·20·21·29~35·39·40·41·43·44·45).
+  const NICE_CLASS_LABELS = { "1": "화학·비료(1)", "2": "페인트·염료(2)", "3": "화장품·세제(3)", "5": "건강기능식품·의약(5)", "7": "농기계(7)", "9": "전자·앱(9)", "10": "의료기기(10)", "14": "귀금속(14)", "15": "악기(15)", "16": "인쇄물·문구(16)", "18": "가죽제품(18)", "20": "가구·목재(20)", "21": "주방·생활용품(21)", "24": "직물(24)", "25": "의류(25)", "28": "완구·스포츠(28)", "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "34": "담배(34)", "35": "도소매·광고(35)", "36": "금융(36)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "42": "연구·기술(42)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
   const niceClassLabel = (code) => NICE_CLASS_LABELS[code] || `${code}류`;
   // 이슈 #119(협업자 2026-09-02): 단계별 상위 5개 지역 출원 점유율 원그래프.
   // topRegions는 상위 출원인 주소 기준 근사치라 합이 1이 아닐 수 있어, 보이는 항목 안에서
@@ -1484,6 +1486,199 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 데이터로 먼저 보여주고, 배치가 반영되면 단계별 카드가 그 위에 붙는다.
     return [...rows.values()].sort((a, b) => ((b.flow ? b.flow.totalCount : 0) - (a.flow ? a.flow.totalCount : 0)) || b.trademarks - a.trademarks);
   }
+  // 2026-09-08(사용자): "쌀로 어디까지 비즈니스를 확장할 수 있을까? 토마토는? 이색적인
+  // 비즈니스는? 서비스나 지역 창업은?" — 이 네 질문에 답하는 확장 경로 진단 보고서.
+  //
+  // 근거는 오직 스냅샷에 실제로 실린 지정상품이다. businessFlow(원물→가공품→서비스 배치)는
+  // 아직 스냅샷에 0건이라 그 위에 세우면 전 품목이 빈칸이 된다. 대신 상표 출원의 지정상품
+  // 상품류(NICE)를 쓴다 — "이 품목이 실제로 도달한 류"와 "같은 유형의 다른 특산품은
+  // 도달했는데 이 품목은 비어 있는 류"의 차이가 곧 확장 여지다. 없는 걸 지어내지 않는다.
+  const REPORT_SERVICE_FLOOR = 35;
+  let expansionIndexCache = null;
+  function expansionIndex() {
+    if (expansionIndexCache) return expansionIndexCache;
+    const byItem = new Map();     // 품목명 -> { category, classes: Map<류, {count, goods:Set}> }
+    const byClass = new Map();    // 류 -> { items: Map<품목명, Set<지정상품>>, count }
+    const byCategory = new Map(); // 유형코드 -> Map<류, Set<품목명>>
+    for (const region of regionalRegions) {
+      for (const item of region.items) {
+        const name = officialItemLabel(item);
+        if (!name) continue;
+        const entry = byItem.get(name) || { name, category: item.category || null, classes: new Map() };
+        if (!entry.category && item.category) entry.category = item.category;
+        for (const example of item.trademarkExamples || []) {
+          for (const evidence of example.goodsEvidence || []) {
+            const code = String(evidence.classCode || "").trim();
+            const goods = String(evidence.designatedProductName || "").trim();
+            if (!code || !Number.isFinite(Number(code))) continue;
+            const own = entry.classes.get(code) || { count: 0, goods: new Set() };
+            own.count += 1;
+            if (goods) own.goods.add(goods);
+            entry.classes.set(code, own);
+
+            const shared = byClass.get(code) || { items: new Map(), count: 0 };
+            shared.count += 1;
+            const bucket = shared.items.get(name) || new Set();
+            if (goods) bucket.add(goods);
+            shared.items.set(name, bucket);
+            byClass.set(code, shared);
+          }
+        }
+        byItem.set(name, entry);
+      }
+    }
+    for (const entry of byItem.values()) {
+      const code = entry.category ? entry.category.code : "";
+      if (!code) continue;
+      const map = byCategory.get(code) || new Map();
+      for (const cls of entry.classes.keys()) {
+        const names = map.get(cls) || new Set();
+        names.add(entry.name);
+        map.set(cls, names);
+      }
+      byCategory.set(code, map);
+    }
+    expansionIndexCache = { byItem, byClass, byCategory };
+    return expansionIndexCache;
+  }
+  // 받침이 있으면 "은", 없으면 "는". 보고서 첫 문장이 "쌀은(는)"으로 나오던 걸 없앤다.
+  const hasFinalConsonant = (word) => {
+    const code = String(word || "").trim().slice(-1).charCodeAt(0);
+    if (!(code >= 0xac00 && code <= 0xd7a3)) return null;
+    return (code - 0xac00) % 28 !== 0;
+  };
+  const withTopicJosa = (word) => `${word}${hasFinalConsonant(word) === false ? "는" : "은"}`;
+  // 지정상품이 품목명과 똑같은 행("담배" 류34 「담배」)은 확장 사례로서 아무것도 말해 주지
+  // 않는다 — 가공·서비스로 넘어간 걸 보여 주는 행을 먼저 고른다.
+  const normalizeGoods = (text) => String(text || "").replace(/[\s()（）]/g, "");
+  const isTautology = (goods, itemName) => normalizeGoods(goods) === normalizeGoods(itemName);
+  function goodsSample(set, n, itemName) {
+    const all = [...set];
+    const informative = itemName ? all.filter((g) => !isTautology(g, itemName)) : all;
+    const pool = informative.length ? informative : all;
+    return pool.sort((a, b) => a.length - b.length || a.localeCompare(b, "ko-KR")).slice(0, n);
+  }
+  // 한 상품류의 대표 사례를 고른다. 읽는 사람이 알고 싶은 건 "이 품목이 무엇으로 사업이
+  // 됐는가"이므로, 서비스업(…업)과 가공품을 원물 나열보다 먼저 보여 준다. 품목명을 그대로
+  // 옮겨 적은 행(「담배」→「담배및흡연용구」)은 확장 사례가 못 되니 가장 뒤로 민다.
+  const BUSINESS_MARKERS = /(업|가공|제조|체험|판매|배달|음료|주스|막걸리|맥주|와인|차|빵|과자|잼|즙|진액|분말|가루|말랭이|절임|김치|장아찌|통조림|엑기스|화장품|비누)/;
+  function showcaseScore(goods, itemName) {
+    if (!goods) return -1;
+    if (isTautology(goods, itemName)) return 0;
+    const normalized = normalizeGoods(goods);
+    const bare = normalizeGoods(itemName);
+    let score = 1;
+    if (BUSINESS_MARKERS.test(goods)) score += 3;
+    if (bare && normalized.startsWith(bare) && normalized.length - bare.length <= 4) score -= 1;
+    if (goods.length > 8) score += 1;
+    return score;
+  }
+  function classShowcase(cell) {
+    let best = null;
+    for (const [name, goodsSet] of cell.items) {
+      for (const goods of goodsSet) {
+        const score = showcaseScore(goods, name);
+        if (!best || score > best.score) best = { lead: name, goods, score };
+      }
+    }
+    return best && best.score > 0 ? best : null;
+  }
+  function expansionReportHtml(row) {
+    const index = expansionIndex();
+    const entry = index.byItem.get(row.name);
+    const own = entry ? entry.classes : new Map();
+    const evidenceCount = [...own.values()].reduce((sum, c) => sum + c.count, 0);
+    if (!evidenceCount) {
+      return `<section class="expansion-report empty"><div class="section-heading"><div><h2>${esc(row.name)} 확장 경로 진단</h2></div><span>근거 부족</span></div>`
+        + `<p class="empty">이 품목은 출원의 지정상품이 아직 한 건도 확인되지 않아 확장 경로를 진단할 수 없습니다. 지정상품 대조가 끝나면 자동으로 채워집니다.</p></section>`;
+    }
+    const ownCodes = [...own.keys()].sort((a, b) => Number(a) - Number(b));
+    const productCodes = ownCodes.filter((c) => Number(c) < REPORT_SERVICE_FLOOR);
+    const serviceCodes = ownCodes.filter((c) => Number(c) >= REPORT_SERVICE_FLOOR);
+
+    // ① 지금 어디까지 갔나
+    const heldHtml = ownCodes.map((code) => {
+      const cell = own.get(code);
+      const eg = goodsSample(cell.goods, 3, row.name);
+      return `<li class="${Number(code) >= REPORT_SERVICE_FLOOR ? "svc" : "goods"}"><b>${esc(niceClassLabel(code))}</b><span>${number(cell.count)}건</span>${eg.length ? `<small>${eg.map(esc).join(" · ")}</small>` : ""}</li>`;
+    }).join("");
+    const reachLine = serviceCodes.length
+      ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에 도달했습니다.`
+      : `제품 ${productCodes.length}개 류에 머물러 있고, <b>서비스·확산(35류 이상)은 아직 0건</b>입니다.`;
+
+    // ② 같은 유형이 먼저 간 곳
+    const catCode = entry.category ? entry.category.code : "";
+    const catLabel = entry.category ? entry.category.label : "같은 유형";
+    const peerMap = index.byCategory.get(catCode) || new Map();
+    // 같은 유형 안에서 단 한 품목만 가진 류는 대개 분류 잡음이다(예: 쌀 상표 한 건이
+    // 2류로 잡힌 것). 두 품목 이상이 확보한 류만 후보로 올리고, 그래도 세 줄이 안 되면
+    // 전국 특산품 기준으로 채운 뒤 근거를 다르게 적는다.
+    const peerRows = [...peerMap.entries()]
+      .filter(([code, names]) => !own.has(code) && [...names].filter((n) => n !== row.name).length >= 2)
+      .map(([code, names]) => {
+        const peers = [...names].filter((n) => n !== row.name);
+        const show = classShowcase(index.byClass.get(code)) || { lead: peers[0], goods: "" };
+        return { code, scope: catLabel, peers: peers.length, lead: show.lead, goods: show.goods };
+      })
+      .sort((a, b) => b.peers - a.peers || Number(a.code) - Number(b.code));
+    if (peerRows.length < 3) {
+      const seen = new Set(peerRows.map((r) => r.code));
+      const filler = [...index.byClass.entries()]
+        .filter(([code, cell]) => !own.has(code) && !seen.has(code) && cell.items.size >= 2 && Number(code) < REPORT_SERVICE_FLOOR)
+        .sort((a, b) => b[1].items.size - a[1].items.size)
+        .slice(0, 3 - peerRows.length)
+        .map(([code, cell]) => {
+          const show = classShowcase(cell) || { lead: "", goods: "" };
+          return { code, scope: "전국 특산품", peers: cell.items.size, lead: show.lead, goods: show.goods };
+        });
+      peerRows.push(...filler);
+    }
+    peerRows.splice(6);
+    const peerHtml = peerRows.length
+      ? `<ol class="expansion-list">${peerRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">${esc(r.scope)} ${number(r.peers)}개 품목이 이미 확보</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      : `<p class="empty">같은 유형 품목들이 확보한 상품류를 이 품목도 모두 갖고 있습니다.</p>`;
+
+    // ③ 이색 확장 사례 — 전국에서 도달한 품목이 가장 적은 류
+    const rare = [...index.byClass.entries()]
+      .filter(([code, cell]) => !own.has(code) && cell.items.size > 0)
+      .map(([code, cell]) => ({ code, itemCount: cell.items.size, show: classShowcase(cell) }))
+      // 「담배」가 34류에 「담배」로 등록된 것 같은 동어반복은 확장 사례가 못 된다.
+      .filter((r) => r.show && r.show.goods && !isTautology(r.show.goods, r.show.lead))
+      .sort((a, b) => a.itemCount - b.itemCount || Number(a.code) - Number(b.code))
+      .slice(0, 5)
+      .map((r) => ({ code: r.code, itemCount: r.itemCount, lead: r.show.lead, goods: r.show.goods }));
+    const rareHtml = rare.length
+      ? `<ol class="expansion-list rare">${rare.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 중 ${number(r.itemCount)}개 품목만 도달</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      : `<p class="empty">이 품목이 이미 대부분의 상품류에 도달해 있습니다.</p>`;
+
+    // ④ 서비스·지역 창업
+    const svcRows = [...index.byClass.entries()]
+      .filter(([code]) => Number(code) >= REPORT_SERVICE_FLOOR && !own.has(code))
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 5)
+      .map(([code, cell]) => {
+        const show = classShowcase(cell) || { lead: "", goods: "" };
+        return { code, count: cell.count, lead: show.lead, goods: show.goods };
+      });
+    const svcHead = serviceCodes.length
+      ? `이 품목은 ${serviceCodes.map((c) => esc(niceClassLabel(c))).join(" · ")}를 이미 확보했습니다. 남은 서비스 구간은 아래와 같습니다.`
+      : `이 품목은 <b>서비스류 출원이 한 건도 없습니다</b> — 직판·체험·관광·가공 위탁 같은 지역 창업 영역을 아직 아무도 권리화하지 않았다는 뜻입니다.`;
+    const svcHtml = svcRows.length
+      ? `<ol class="expansion-list svc">${svcRows.map((r) => `<li><span class="expansion-class">${esc(niceClassLabel(r.code))}</span><span class="expansion-why">전국 특산품 상표 ${number(r.count)}건이 이 구간에</span>${r.goods ? `<small>예: ${esc(r.lead)} 「${esc(r.goods)}」</small>` : ""}</li>`).join("")}</ol>`
+      : `<p class="empty">전국 특산품 상표에서도 아직 서비스류 사례가 확인되지 않았습니다.</p>`;
+
+    return `<section class="expansion-report">
+      <div class="section-heading"><div><h2>${esc(row.name)} 확장 경로 진단</h2></div><span>지정상품 ${number(evidenceCount)}건 근거</span></div>
+      <p class="expansion-lede"><b>${esc(row.name)}</b>${esc(withTopicJosa(row.name).slice(row.name.length))} ${reachLine}</p>
+      <div class="expansion-grid">
+        <article><h3>① 지금 어디까지 갔나</h3><ul class="expansion-held">${heldHtml}</ul></article>
+        <article><h3>② 다음 확장 후보</h3><p class="expansion-hint">같은 유형의 다른 특산품이 이미 확보했는데 이 품목만 비어 있는 상품류입니다. 세 줄이 안 되면 전국 특산품 기준으로 채웁니다.</p>${peerHtml}</article>
+        <article><h3>③ 이색 확장 사례</h3><p class="expansion-hint">전국 특산품 상표에서 도달한 품목이 가장 적은 상품류입니다 — 선례가 드문 만큼 차별화 여지도 큽니다.</p>${rareHtml}</article>
+        <article><h3>④ 서비스 · 지역 창업</h3><p class="expansion-hint">${svcHead}</p>${svcHtml}</article>
+      </div>
+      <p class="expansion-caveat">이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이므로 실제 도달 범위는 더 넓을 수 있고, 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
+    </section>`;
+  }
   function strategyFlowHtml() {
     const all = strategyFlowRows();
     const heading = `<div class="section-heading"><div><h2>품목별 비즈니스 확장 경로</h2></div><span>전국 상표DB 기준 · 지역 한정 아님</span></div><p class="screen-note">품목을 고르면 그 품목의 전국 상표 활동을 보여줍니다. 특정 지역의 현황이 아니라 전체 상표DB에서 탐색한 결과입니다. 전국 흐름 배치가 반영된 품목은 <strong>원물 → 가공품 → 서비스</strong> 단계별 <strong>지정상품</strong>과 확장 방향 제안까지 함께 나옵니다.</p>`;
@@ -1506,7 +1701,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const flowPartHtml = selected.flow
       ? `${nationwideFlowCardHtml(selected.flow, selected.name, origins)}${expansionSuggestionsHtml(selected.flow, selected.name, surging)}`
       : '<p class="strategy-flow-pending">이 품목은 전국 흐름(원물 → 가공품 → 서비스) 배치가 아직 반영되지 않아 단계별 지정상품·확장 방향 제안이 비어 있습니다. 아래 지역 확인 출원 현황은 지금 데이터입니다.</p>';
-    return `${heading}${picker}${searchNote}<div class="strategy-flow-detail">${flowPartHtml}${shareHtml}${trendHtml}${briefingHtml}</div>`;
+    return `${heading}${picker}${searchNote}<div class="strategy-flow-detail">${expansionReportHtml(selected)}${flowPartHtml}${shareHtml}${trendHtml}${briefingHtml}</div>`;
   }
   function strategyScreen() {
     const rows = strategyRows();

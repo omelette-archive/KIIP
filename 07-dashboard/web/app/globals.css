@@ -111,6 +111,39 @@ a { color: inherit; text-decoration: none; }
    세로 스크롤(.ranking-table-wrap). 축소 화면(≤1280px 1단 적층)에서는 static 흐름 배치. */
 .ranking-columns { position: relative; min-height: 0; }
 .ranking-stack { display: flex; flex-direction: column; gap: 16px; }
+/* 2026-09-08(사용자): 비즈니스 확장 경로 분석 — "쌀로 어디까지? 토마토는? 이색적인 건?
+   서비스·창업은?" 네 질문에 답하는 진단 보고서. 근거(실제 지정상품)를 항상 곁들이므로
+   본문보다 예시 줄이 길어지기 쉽다 — 예시는 한 단계 작고 흐리게 두고 줄바꿈을 허용한다. */
+.expansion-report { margin-top: 18px; padding: 20px 22px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.expansion-report.empty { background: var(--paper); }
+.expansion-lede { margin: 12px 0 0; color: var(--ink); font-size: 14px; line-height: 1.7; }
+.expansion-lede b { color: var(--green-dark); }
+.expansion-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; margin-top: 16px; }
+.expansion-grid article { min-width: 0; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
+.expansion-grid h3 { margin: 0 0 8px; font-size: 13px; font-weight: 800; color: var(--green-dark); }
+.expansion-hint { margin: 0 0 10px; color: var(--muted); font-size: 11.5px; line-height: 1.6; }
+.expansion-hint b { color: var(--ink); }
+
+.expansion-held { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; list-style: none; }
+.expansion-held li { flex: 1 1 190px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line); border-left-width: 3px; border-radius: 9px; background: #fff; }
+.expansion-held li.goods { border-left-color: var(--green); }
+.expansion-held li.svc { border-left-color: #b26a00; }
+.expansion-held b { display: block; font-size: 12.5px; color: var(--ink); }
+.expansion-held span { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.expansion-held small { display: block; margin-top: 4px; color: var(--muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+
+.expansion-list { margin: 0; padding: 0 0 0 0; list-style: none; counter-reset: exp; }
+.expansion-list li { display: grid; grid-template-columns: auto 1fr; gap: 2px 10px; padding: 8px 0; border-top: 1px solid var(--line); }
+.expansion-list li:first-child { border-top: 0; }
+.expansion-class { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.expansion-why { font-size: 11.5px; color: var(--muted); text-align: right; font-variant-numeric: tabular-nums; }
+.expansion-list small { grid-column: 1 / -1; color: var(--muted); font-size: 10.5px; line-height: 1.5; overflow-wrap: anywhere; }
+.expansion-list.rare .expansion-class { color: #7a3ea8; }
+.expansion-list.svc .expansion-class { color: #b26a00; }
+
+.expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
+.expansion-caveat b { color: var(--ink); }
+
 @media (min-width: 1281px) {
   .ranking-stack { position: absolute; inset: 0; }
 }
@@ -1084,6 +1117,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .map-heading { align-items: flex-start; flex-direction: column; }
   .map-stage { min-height: 390px; }
   .map-metric-description { height: calc(5 * 1.55em); }
+  .expansion-grid { grid-template-columns: 1fr; }
   .map-label { font-size: 11px; }
   .map-label-province { font-size: 11px; }
   .coverage-kpis { grid-template-columns: 1fr; }
