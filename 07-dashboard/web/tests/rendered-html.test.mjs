@@ -90,15 +90,19 @@ test("renders the data-connected Korean dashboard", async () => {
   );
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장, 완료율이 아니라 공백(해야 할 일) 중심
   // 서술로("전국 특산품 수"·"지역별 출원 수 표시 가능"은 제거, 그 값은 데이터 개요 탭에만).
-  assert.match(html, /출원 확인 안 된 특산품\(공백\)/);
+  assert.match(html, /class="rights-board"/);
   assert.match(html, new RegExp(snapshot.coverage.regionItemCount.toLocaleString("ko-KR")));
-  assert.match(html, /출원인 주소 미확보/);
+  // 2026-09-08: 출원인 주소 확보 현황은 운영 지표라 요약에서 빼고 데이터 개요 탭에만 둔다
+  // (컨셉 4판 "운영 지표는 분리"). 요약 첫 칸은 권리 상태 네 칸이 대신한다.
+  assert.doesNotMatch(html, /출원인 주소 미확보/, "운영 지표는 요약이 아니라 데이터 개요 몫");
   assert.match(html, /전국 지역 브랜드 지도/);
   // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
   // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
   assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
   assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
-  assert.match(html, /특화작목 비교/);
+  // 2026-09-08: 특화작목 비교는 단위가 "도"라 지역별 화면(시도 선택)으로 내렸다.
+  // 최상위 탭은 요약 / 지역·품목별 조회 / 데이터 개요 셋이다.
+  assert.doesNotMatch(html.split("</nav>")[0], /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
   assert.match(html, /데이터 개요/);
   assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
   assert.match(html, />특산품 수<\/button>/);
@@ -112,18 +116,23 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
   // 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮겼다. 특산품 수·
   // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
-  assert.match(mapInsight, /class="metrics metrics-inset"/, "요약 핵심 지표 바는 지도 옆 왼쪽 열로 이동해야 함");
+  // 2026-09-08: 그 자리를 권리 상태 네 칸이 대신한다(컨셉 4판의 대표 지표).
+  assert.match(mapInsight, /class="rights-board"/, "요약 핵심 지표는 지도 옆 왼쪽 열에 권리 상태 네 칸으로 있어야 함");
   assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장(항상 100%에 가까운 "전국 특산품 수"·
   // "지역별 출원 수 표시 가능"은 정보량이 적어 제거).
   assert.doesNotMatch(mapInsight, /전국 특산품 수|지역별 출원 수 표시 가능/, "정보량이 적은 KPI 2장은 요약에서 빠져야 함");
-  const metricsInsetArticleCount = (mapInsight.match(/<article>/g) || []).length;
-  assert.equal(metricsInsetArticleCount, 2, "요약 핵심 지표는 2장이어야 함(4장→2장)");
+  // 2026-09-08: KPI 카드 2장을 권리 상태 네 칸 하나로 바꿨다. 네 칸은 각각 다른 지표가
+  // 아니라 한 모집단(지역×특산품)을 네 상태로 가른 것이라 카드가 아니라 한 덩어리다.
+  const rightsSegmentCount = (mapInsight.match(/class="seg seg-/g) || []).length;
+  assert.ok(rightsSegmentCount >= 2 && rightsSegmentCount <= 4, `권리 상태 막대는 값이 있는 칸만 그린다(현재 ${rightsSegmentCount}칸)`);
+  const rightsLegendCount = (mapInsight.match(/<li class="seg-/g) || []).length;
+  assert.equal(rightsLegendCount, 4, "권리 상태 범례는 네 칸 모두 표시해야 함(0건이어도)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
-  assert.match(standaloneHtml, /class="metrics metrics-inset"><article><span>출원 확인 안 된 특산품\(공백\)/);
+  assert.match(standaloneHtml, /class="rights-board" aria-label="권리 상태"/);
   assert.match(standaloneHtml, /상표 출원 상위 특산품|등록 상위 특산품|특산품별 출원 확인 현황/);
   assert.match(standaloneHtml, /dashboardUpdatedAt = latestDate\([\s\S]*metric\.calculatedAt/);
   assert.match(standaloneHtml, /dateOnly\(latestDate\(source\.sourceFetchedAt, source\.sourceLastVerifiedAt\)\)/);
@@ -213,10 +222,15 @@ test("uses every collected region-item specialty as the application-rate denomin
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   // 2026-09-01(#116): 요약 첫 칸에 분모(전체 수집 수)와 출원 확인 수가 모두 노출돼야
   // 한다는 요구사항. 2026-09-06 S2 재설계로 문구는 완료율("전국 특산품 수")에서
-  // 공백 중심("출원 확인 안 된 특산품(공백)")으로 바뀌었지만, 분모(total)와 그로부터
+  // 공백 중심으로, 2026-09-08에는 권리 상태 네 칸으로 다시 바뀌었다. 공백은 그중
+  // "무권리"이고 분모(total)는 지역×특산품 총수로 함께 노출된다.
   // 유도되는 미출원 수(gap = total - applied)는 여전히 함께 노출된다.
-  assert.match(visibleTextHtml, new RegExp(`전체 수집 ${localeNumber(coverage.total)}개 중 미출원`));
-  assert.match(visibleTextHtml, new RegExp(`출원 확인 안 된 특산품\\(공백\\)[\\s\\S]{0,40}${localeNumber(coverage.total - coverage.applied)}개`));
+  assert.match(visibleTextHtml, new RegExp(`지역 × 특산품 ${localeNumber(coverage.total)}개`));
+  for (const label of ["무권리", "행위만 보호", "상품류 보유", "권리 내용 미확인"]) {
+    assert.match(visibleTextHtml, new RegExp(label), `권리 상태 네 칸에 "${label}"이 있어야 함`);
+  }
+  // 무권리 수(= total - applied)가 네 칸 중 첫 칸에 숫자로 노출돼야 한다.
+  assert.match(visibleTextHtml, new RegExp(`${localeNumber(coverage.total - coverage.applied)}[\\s\\S]{0,30}무권리`));
   // 2026-08-21: "출원율 계산" 설명 박스는 요약 탭에서 제거했다(사용자 요청 — 데이터
   // 개요 탭에 같은 내용이 있어 중복). 요약 탭에는 더 이상 노출되지 않아야 한다.
   assert.doesNotMatch(html, /출원율 계산/);
@@ -891,7 +905,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /const coverageListRowHtml = \(row\) =>/, "전국 뷰 전용 압축 목록 렌더 함수가 있어야 함");
   assert.match(
     html,
-    /if \(!state\.province\) \{\s*return key\s*\? `<div class="coverage-region-grid">/,
+    /if \(!state\.province\) \{[\s\S]{0,400}?return key\s*\? `<div class="coverage-region-grid">/,
     "검색 중일 때만 카드 그리드로, 그 외엔 압축 목록으로 렌더링해야 함"
   );
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
@@ -966,10 +980,11 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /function shareDonutHtml\(counts, label\)/);
   assert.match(html, /class="item-share-bar"/);
   assert.match(html, /class="item-share-bar-segment"/);
-  // 사용자 요청(2026-09-08): 차트마다 붙던 모집단 각주는 화면마다 같은 문장이 반복돼
-  // 걷어냈다. 같은 내용은 요약 상단 leader-scope-note 한 줄이 대신 담는다.
-  assert.doesNotMatch(html, /class="trend-population-note"/, "차트별 모집단 각주는 제거돼야 함");
-  assert.match(html, /class="leader-scope-note">전국 키워드 검색 기준/, "모집단 안내는 요약 한 줄로 남아야 함");
+  // UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 추이 차트가 전국 검색 결과
+  // 전체를 합산한 값이라 지역 확인 출원 KPI보다 훨씬 클 수 있다는 걸 차트마다 명시해야 함.
+  assert.match(html, /class="trend-population-note"/);
+  const populationNoteCount = (html.match(/class="trend-population-note"/g) || []).length;
+  assert.equal(populationNoteCount, 2, "regionTrendHtml·지역별 조회 자체 추이 차트 둘 다에 모집단 안내가 있어야 함");
   // UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": <title> 마우스 호버 툴팁만이 아니라
   // 값 표 토글(키보드·스크린리더·CSV로도 확인 가능)이 추이 차트마다 있어야 함.
   const valueTableToggleCount = (html.match(/class="trend-value-table-toggle"/g) || []).length;
@@ -1004,14 +1019,12 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /data-strategy-row=/);
   assert.match(html, /data-strategy-sort=/);
   assert.doesNotMatch(html, /class="strategy-featured-options"|data-strategy-sample=/, "카드 나열용 주요 특산품 토글은 표로 교체돼야 함");
-  assert.match(html, /특화작목 비교/);
+  assert.match(html, /class="compare-embed"/, "특화작목 대조는 지역별 화면에 끼워 넣은 섹션으로 있어야 함");
+  assert.match(html, /function compareEmbedHtml\(\)/);
   assert.doesNotMatch(html, /class="compare-readiness"/);
-  // 사용자 요청(2026-09-08): "공식 원본 반영 완료"·수집 방침 문구는 배포 화면 톤이 아니라
-  // 빼고, 9·18·42 배정 수만 등급 색 타일로 보여준다.
-  assert.doesNotMatch(html, /공식 원본 반영 완료|class="compare-banner"/, "개발 톤 배너는 제거돼야 함");
-  assert.match(html, /class="compare-tier-tiles"/);
-  assert.match(html, /class="compare-tier-tile crop-badge-대표작목"><span>대표작목<\/span><strong>9<\/strong>/);
+  assert.match(html, /공식 원본 반영 완료/);
   assert.match(html, /등급별 특화작목 출원 현황/);
+  assert.match(html, /대표작목 9 · 집중육성작목 18 · 자체육성작목 42/);
   // 이슈 #117(2026-08-31, 2026-09-02 재요청): 표 컬럼 라벨을 "특화작목(대표/자체육성/집중육성)"·
   // "집계상태"로 요청과 맞춘다(컬럼 순서·의미는 이미 요청대로였고 라벨만 남아 있었음).
   assert.match(html, /<span>특화작목<small>대표<\/small><\/span><span>특화작목<small>자체육성<\/small><\/span><span>특화작목<small>집중육성<\/small><\/span>/);
@@ -1034,8 +1047,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /9개 도 전체 표로 보기/);
   assert.match(html, /compare-strip-match|compare-strip-mismatch/, "도 스트립에 일치\/불일치 표식이 있어야 함");
   assert.match(html, /데이터 개요/);
-  // 사용자 요청(2026-09-08): 데이터 개요 인트로 한 줄은 불필요("이건 필요없어") → 제거.
-  assert.doesNotMatch(html, /수집한 특산물을 표준화하고/, "데이터 개요 인트로 문구는 제거돼야 함");
+  assert.match(html, /수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다\./);
   assert.match(html, /고유 특산품명/);
   assert.match(html, /상표 매칭 결과/);
   assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);

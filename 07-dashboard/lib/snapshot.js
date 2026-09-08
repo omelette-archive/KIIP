@@ -466,6 +466,36 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
             blockingIssue: regionalMetricAvailable ? null : "#50",
           }
         ),
+        // 2026-09-08: 컨설팅 보고서 Ⅲ장 1.2.1 전략모듈 판정의 "권리주체가 몇 곳인가" 축.
+        // 출원인 이름은 개인정보라 싣지 않고 고유 수와 생산자형 비율만 옮긴다.
+        localApplicantCount: makeMetric(
+          regionalMetricAvailable ? row.localApplicantCount ?? null : null,
+          row,
+          {
+            state,
+            sourceIds: registryMetricSourceIds,
+            availability: regionalMetricAvailable ? "available" : "blocked",
+            partial: regionalMetricPartial,
+            calculatedAt,
+            methodVersion: analysis.analysisVersion || null,
+            rationale: "지역 확인된 출원의 고유 출원인 수(이름은 저장하지 않음)" + partialNote,
+            blockingIssue: regionalMetricAvailable ? null : "#50",
+          }
+        ),
+        producerApplicantShare: makeMetric(
+          regionalMetricAvailable ? row.producerApplicantShare ?? null : null,
+          row,
+          {
+            state,
+            sourceIds: registryMetricSourceIds,
+            availability: regionalMetricAvailable ? "available" : "blocked",
+            partial: regionalMetricPartial,
+            calculatedAt,
+            methodVersion: analysis.analysisVersion || null,
+            rationale: "고유 출원인 중 생산자단체·지자체로 판정된 비율(이름 문자열 규칙)" + partialNote,
+            blockingIssue: regionalMetricAvailable ? null : "#50",
+          }
+        ),
         localApplicantShare: makeMetric(
           regionalMetricAvailable ? row.localApplicantShare ?? null : null,
           row,
