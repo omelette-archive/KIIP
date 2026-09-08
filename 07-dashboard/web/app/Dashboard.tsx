@@ -2378,7 +2378,14 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .map((row) => {
         const fresh = prior(row) < Math.max(1, minBase / 3);
         const growth = fresh ? Infinity : current(row) / prior(row);
-        return { ...row, fresh, growth, delta: current(row) - prior(row) };
+        return {
+          ...row,
+          fresh,
+          growth,
+          delta: current(row) - prior(row),
+          currentValue: current(row),
+          priorValue: prior(row),
+        };
       })
       .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
       .slice(0, LEADER_LIMIT);
@@ -2874,7 +2881,7 @@ const STRATEGY_CHIP_LIMIT = 12;
           <div className="leader-grid leader-grid-primary">
             <article className="leader-card">
               <div className="leader-card-head"><h4>{leaderMetric === "application" ? "출원" : "등록"} 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
-              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 {leaderMetric === "application" ? "출원" : "등록"} {leaderboard.minBase}건).</p> : <ol className="leader-list leader-list-surge">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val">{number(row.priorApp)}→{number(row.app)}</b><small className="leader-sub">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</small></button></li>)}</ol>}
+              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 {leaderMetric === "application" ? "출원" : "등록"} {leaderboard.minBase}건).</p> : <ol className="leader-list leader-list-surge">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><b className="leader-val">{number(row.priorValue)}→{number(row.currentValue)}</b><small className="leader-sub">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</small></button></li>)}</ol>}
             </article>
 
             <article className="leader-card">

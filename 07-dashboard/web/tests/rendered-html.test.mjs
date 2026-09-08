@@ -138,6 +138,9 @@ test("renders the data-connected Korean dashboard", async () => {
   assert.equal(rightsLegendCount, 4, "권리 상태 범례는 네 칸 모두 표시해야 함(0건이어도)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
+  // #190: 등록 토글에서 급증 품목은 등록 기준인데 숫자는 출원 기준으로 남는 혼합 표시를 막는다.
+  assert.match(standaloneHtml, /currentValue: current\(row\), priorValue: prior\(row\)/);
+  assert.match(standaloneHtml, /number\(row\.priorValue\).*number\(row\.currentValue\)/s);
   assert.match(standaloneHtml, /state\.mapMetric === "applicationCoverage"[\s\S]*rateRing\(visibleSpecialtyCoverage\.rate, "출원율"\)/);
   assert.match(standaloneHtml, /state\.mapMetric === "registration"[\s\S]*rateRing\(visibleRegistrationRate, "등록률"\)/);
   assert.match(standaloneHtml, /class="rights-board" aria-label="권리 상태"/);
