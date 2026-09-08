@@ -980,11 +980,10 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /function shareDonutHtml\(counts, label\)/);
   assert.match(html, /class="item-share-bar"/);
   assert.match(html, /class="item-share-bar-segment"/);
-  // UI 검토(3차, 2026-09-06) 시각화 교체안 "추이의 모집단": 추이 차트가 전국 검색 결과
-  // 전체를 합산한 값이라 지역 확인 출원 KPI보다 훨씬 클 수 있다는 걸 차트마다 명시해야 함.
-  assert.match(html, /class="trend-population-note"/);
-  const populationNoteCount = (html.match(/class="trend-population-note"/g) || []).length;
-  assert.equal(populationNoteCount, 2, "regionTrendHtml·지역별 조회 자체 추이 차트 둘 다에 모집단 안내가 있어야 함");
+  // 사용자 요청(2026-09-08): 차트마다 붙던 모집단 각주는 화면마다 같은 문장이 반복돼
+  // 걷어냈다. 같은 내용은 요약 상단 leader-scope-note 한 줄이 대신 담는다.
+  assert.doesNotMatch(html, /class="trend-population-note"/, "차트별 모집단 각주는 제거돼야 함");
+  assert.match(html, /class="leader-scope-note">전국 키워드 검색 기준/, "모집단 안내는 요약 한 줄로 남아야 함");
   // UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": <title> 마우스 호버 툴팁만이 아니라
   // 값 표 토글(키보드·스크린리더·CSV로도 확인 가능)이 추이 차트마다 있어야 함.
   const valueTableToggleCount = (html.match(/class="trend-value-table-toggle"/g) || []).length;
@@ -1022,9 +1021,12 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /class="compare-embed"/, "특화작목 대조는 지역별 화면에 끼워 넣은 섹션으로 있어야 함");
   assert.match(html, /function compareEmbedHtml\(\)/);
   assert.doesNotMatch(html, /class="compare-readiness"/);
-  assert.match(html, /공식 원본 반영 완료/);
+  // 사용자 요청(2026-09-08): "공식 원본 반영 완료"·수집 방침 문구는 배포 화면 톤이 아니라
+  // 빼고, 9·18·42 배정 수만 등급 색 타일로 보여준다.
+  assert.doesNotMatch(html, /공식 원본 반영 완료|class="compare-banner"/, "개발 톤 배너는 제거돼야 함");
+  assert.match(html, /class="compare-tier-tiles"/);
+  assert.match(html, /class="compare-tier-tile crop-badge-대표작목"><span>대표작목<\/span><strong>9<\/strong>/);
   assert.match(html, /등급별 특화작목 출원 현황/);
-  assert.match(html, /대표작목 9 · 집중육성작목 18 · 자체육성작목 42/);
   // 이슈 #117(2026-08-31, 2026-09-02 재요청): 표 컬럼 라벨을 "특화작목(대표/자체육성/집중육성)"·
   // "집계상태"로 요청과 맞춘다(컬럼 순서·의미는 이미 요청대로였고 라벨만 남아 있었음).
   assert.match(html, /<span>특화작목<small>대표<\/small><\/span><span>특화작목<small>자체육성<\/small><\/span><span>특화작목<small>집중육성<\/small><\/span>/);
@@ -1047,7 +1049,8 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /9개 도 전체 표로 보기/);
   assert.match(html, /compare-strip-match|compare-strip-mismatch/, "도 스트립에 일치\/불일치 표식이 있어야 함");
   assert.match(html, /데이터 개요/);
-  assert.match(html, /수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다\./);
+  // 사용자 요청(2026-09-08): 데이터 개요 인트로 한 줄은 불필요("이건 필요없어") → 제거.
+  assert.doesNotMatch(html, /수집한 특산물을 표준화하고/, "데이터 개요 인트로 문구는 제거돼야 함");
   assert.match(html, /고유 특산품명/);
   assert.match(html, /상표 매칭 결과/);
   assert.doesNotMatch(html, /<script\s+src=|<link\s+[^>]*href=/);
