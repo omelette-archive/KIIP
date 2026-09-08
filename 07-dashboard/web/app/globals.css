@@ -540,6 +540,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .nationwide-flow-origins strong { color: var(--green-dark); margin-right: 6px; }
 .nationwide-flow-eg { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; white-space: normal; }
 .nationwide-flow-eg b { display: inline-block; margin-right: 4px; padding: 0 5px; border-radius: 4px; background: rgba(16,25,43,.08); color: var(--ink); font-size: 11px; font-weight: 800; vertical-align: 1px; }
+/* 이슈 #136: 확장 방향 제안 — 전국 흐름 데이터에서 규칙 파생한 권고. */
+.expansion-card { margin-top: 14px; padding: 16px 20px; border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 12px; background: var(--surface); }
+.expansion-card .section-heading h2 { font-size: 16px; }
+.expansion-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.expansion-list li { position: relative; padding-left: 18px; color: var(--ink); font-size: 12.5px; line-height: 1.6; }
+.expansion-dot { position: absolute; left: 2px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .business-strategy { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
 .business-strategy.alert { border-color: #e2c59b; background: var(--amber-soft); }
 .strategy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
@@ -974,6 +980,57 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking-stack { gap: 14px; }
 }
 
+/* 이슈 #118: 최근 동향(추이 그래프 + 리더보드) — 요약 탭 하단 한 묶음. */
+.summary-recent { margin-top: 28px; padding-top: 22px; border-top: 2px solid var(--line); }
+.summary-recent .section-heading h2 { font-size: 22px; }
+.summary-recent .trend-chart { margin-top: 14px; }
+.leader-scope-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; max-width: 92ch; }
+.leader-scope-note strong { color: var(--ink); font-weight: 800; }
+.summary-leaderboard { margin-top: 22px; }
+.leader-subhead { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; }
+.leader-subhead h3 { margin: 0; font-size: 14px; letter-spacing: -0.02em; }
+.leader-subhead > span { color: var(--faint); font-size: 11px; }
+.leader-subhead-minor { margin-top: 22px; padding-top: 12px; border-top: 1px dashed var(--line); }
+.leader-subhead-minor h3 { color: var(--muted); font-size: 12.5px; }
+.leader-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-left: auto; }
+.leader-window, .leader-metric { display: flex; gap: 5px; }
+.leader-window button, .leader-metric button { padding: 5px 11px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
+.leader-window button:hover, .leader-metric button:hover { color: var(--ink); }
+.leader-window button.active, .leader-metric button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
+.leader-metric { padding-left: 8px; border-left: 1px solid var(--line); }
+.leader-window-range { color: var(--faint); font-size: 11px; }
+.leader-grid { display: grid; gap: 12px; margin-top: 12px; }
+.leader-grid-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.leader-grid-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.leader-card { display: flex; flex-direction: column; padding: 14px 14px 10px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
+.leader-grid-secondary .leader-card { background: var(--paper); }
+.leader-card-head { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; }
+.leader-card-head h4 { margin: 0; font-size: 13px; font-weight: 800; letter-spacing: -0.02em; }
+.leader-card-note { margin-left: auto; color: var(--faint); font-size: 10px; white-space: nowrap; }
+.leader-list { list-style: none; margin: 0; padding: 0; }
+.leader-list li + li { border-top: 1px solid var(--line); }
+.leader-list button { display: grid; grid-template-columns: 16px minmax(0, 1fr) 44px auto; align-items: center; gap: 7px; width: 100%; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+.leader-list button:hover { background: var(--green-soft); }
+.leader-rank { color: var(--faint); font-size: 11px; font-weight: 800; text-align: center; }
+.leader-name { min-width: 0; font-size: 12px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.leader-tag { margin-left: 5px; padding: 0 5px; border-radius: 5px; background: #eef2f7; color: var(--muted); font-size: 9px; font-style: normal; font-weight: 700; }
+.leader-bar { height: 6px; border-radius: 99px; background: #eef2f7; overflow: hidden; }
+.leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
+.leader-bar-low i { background: var(--amber); }
+.leader-list b { font-size: 12px; font-weight: 800; white-space: nowrap; text-align: right; }
+.leader-list b small { margin-left: 4px; color: var(--faint); font-size: 9px; font-weight: 700; }
+.leader-delta { text-align: center; }
+.leader-fresh { padding: 0 5px; border-radius: 5px; background: var(--green-soft); color: var(--green-dark); font-size: 9px; font-style: normal; font-weight: 800; }
+.leader-growth { color: var(--green-dark); font-size: 11px; font-style: normal; font-weight: 800; }
+.summary-leaderboard .method-note { margin-top: 16px; padding: 12px 14px; }
+.leader-csv-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.leader-csv-row .csv-download-button { margin-left: 0; }
+@media (max-width: 1100px) {
+  .leader-grid-primary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .leader-controls { margin-left: 0; }
+}
+@media (max-width: 620px) { .leader-grid-primary, .leader-grid-secondary { grid-template-columns: 1fr; } }
+
 /* UI 검토(#136) 03번: 인쇄용 스타일시트가 전혀 없어 정책 담당자가 표를 보고서로 옮기려면
    화면을 캡처하거나 손으로 옮겨 적는 수밖에 없었다. 탭 내비게이션·검색·버튼류를 숨기고
    표가 인쇄 페이지 폭에 맞게 늘어나도록 하는 정도로 충분하다(과한 인쇄 전용 레이아웃은
@@ -981,7 +1038,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media print {
   .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
   .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
-  .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider,
+  .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider, .leader-controls,
   .province-municipalities summary, .coverage-municipality-toggle summary,
   .coverage-specialty-toggle summary, footer { display: none !important; }
   body { background: #fff; }
