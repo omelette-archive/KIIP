@@ -460,6 +460,54 @@ async function run() {
     ok("같은 원물명 변형을 결정론적으로 묶고 후보가 같아도 자동 승인하지 않음");
   }
 
+  {
+    console.log("10) 가공품 품목명에서 원물 행 파생 — 치환이 아니라 추가");
+    const { deriveRawItemRows, deriveRawItemName } = require("./lib/derivedRawItems");
+    const dictionary = [
+      { item: "신선한 블루베리", niceClass: "31" },
+      { item: "신선한 사과", niceClass: "31" },
+      { item: "조청", niceClass: "30" },
+    ];
+    const rows = [
+      { sido: "강원특별자치도", sigungu: "화천군", rawItemName: "블루베리잼", sourceItemName: "블루베리 잼" },
+      { sido: "강원특별자치도", sigungu: "화천군", rawItemName: "사과즙", sourceItemName: "사과즙" },
+      { sido: "경상북도", sigungu: "영천시", rawItemName: "사과", sourceItemName: "사과" },
+      { sido: "경상북도", sigungu: "영천시", rawItemName: "사과즙", sourceItemName: "사과즙" },
+      { sido: "강원특별자치도", sigungu: "동해시", rawItemName: "더담막걸리", sourceItemName: "더담막걸리" },
+      { sido: "충청남도", sigungu: "서산시", rawItemName: "조청", sourceItemName: "조청" },
+      { sido: "전남광주통합특별시", sigungu: "여수시", rawItemName: "유자차", sourceItemName: "유자차" },
+      { sido: "경상남도", sigungu: "남해군", rawItemName: "유자", sourceItemName: "유자" },
+    ];
+    const { rows: derived } = deriveRawItemRows(rows, dictionary);
+    const names = derived.map((row) => `${row.sigungu}/${row.rawItemName}`).sort();
+    assert.deepStrictEqual(names, ["여수시/유자", "화천군/블루베리", "화천군/사과"]);
+
+    const jam = derived.find((row) => row.rawItemName === "블루베리");
+    assert.strictEqual(jam.derivedFromItemName, "블루베리잼");
+    assert.strictEqual(jam.derivedSuffix, "잼");
+    assert.strictEqual(jam.derivedBasis, "dictionary");
+    assert.strictEqual(jam.sourceItemName, "블루베리 잼", "원문은 sourceItemName에 보존한다");
+
+    const citron = derived.find((row) => row.rawItemName === "유자");
+    assert.strictEqual(citron.derivedBasis, "catalog", "사전에 없어도 다른 지역 수집 품목이면 원물로 인정");
+
+    assert.ok(!derived.some((row) => row.sigungu === "영천시"), "같은 지역에 원물 행이 이미 있으면 만들지 않는다");
+    assert.ok(!derived.some((row) => row.rawItemName === "더담"), "브랜드명은 원물이 아니므로 파생하지 않는다");
+    assert.ok(!derived.some((row) => row.rawItemName === "조"), "조청은 그 자체가 완성 품목이라 조를 파생하지 않는다");
+
+    const vocab = { dictionaryNames: new Set(["감"]), catalogNames: new Set() };
+    assert.strictEqual(deriveRawItemName("감말랭이", vocab).base, "감", "1글자 원물도 사전에 있으면 파생한다");
+    assert.strictEqual(deriveRawItemName("조청", { dictionaryNames: new Set(["조"]), catalogNames: new Set() }), null, "완성 품목은 앞부분이 사전에 있어도 파생하지 않는다");
+    assert.strictEqual(deriveRawItemName("엿기름", { dictionaryNames: new Set(["엿"]), catalogNames: new Set() }), null);
+    assert.strictEqual(deriveRawItemName("막걸리", vocab), null, "원물명이 이름에 없으면 파생 대상이 아니다");
+    assert.strictEqual(
+      deriveRawItemName("생강조청", { dictionaryNames: new Set(["생강"]), catalogNames: new Set() }).suffix,
+      "조청",
+      "긴 접미사를 먼저 매칭해 생강조+청으로 잘리지 않는다"
+    );
+    ok("원물 행은 추가로만 만들고 원문·파생 근거를 함께 남김");
+  }
+
   console.log("\n모든 자체 테스트 통과");
 }
 

@@ -13,6 +13,7 @@
  *   gi        국립농산물품질관리원 지리적표시 등록정보 (GI_API_KEY 필요)
  *   nongsaro  농촌진흥청 지역특산물 (NONGSARO_API_KEY, NONGSARO_API_BASE_URL 필요)
  *   sejong_official_specialties  세종시 공식 특산품 검증 스냅샷
+ *   naqs_gi_specialties          농관원 지리적표시 농산물 전체 등록 목록 검증 스냅샷
  *   jeju_naqs_gi_specialties     농관원 제주 지리적표시 검증 스냅샷
  *   seogwipo_grandculture_specialties 디지털서귀포문화대전 특산물 검증 스냅샷
  *   nfqs_quality_cert            국립수산물품질관리원 품질인증수산물(NFQS_QUALITY_API_KEY 필요)
@@ -50,7 +51,7 @@ loadEnv();
 
 function parseArgs(argv) {
   const args = {
-    sources: "gi,nongsaro,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,rda_regional_specialty_crops,sejong_official_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
+    sources: "gi,nongsaro,nfqs_quality_cert,nfqs_geographical_indication,kofpi_forest_product,rda_regional_specialty_crops,sejong_official_specialties,naqs_gi_specialties,jeju_naqs_gi_specialties,seogwipo_grandculture_specialties",
   };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -72,7 +73,7 @@ function printUsageAndExit(message) {
       "  node 01-collect-specialties/collectSpecialties.js [옵션]",
       "",
       "옵션:",
-      "  --sources <목록>   콤마 구분 (기본 gi,nongsaro,sejong_official_specialties,jeju_naqs_gi_specialties)",
+      "  --sources <목록>   콤마 구분 (기본 gi,nongsaro,sejong_official_specialties,naqs_gi_specialties,jeju_naqs_gi_specialties)",
       "  --out <path>       결과 CSV 저장 경로 (기본 01-collect-specialties/output/specialties.csv)",
       "  --db <path>        누적 SQLite 경로 (기본: CSV와 같은 이름의 .sqlite)",
       "  --limit <n>        소스별 최대 수집 건수 (샘플 검증용)",
@@ -303,6 +304,10 @@ async function collectRdaRegionalSpecialtyCrops(adminList, warnings, options = {
 
 const OFFICIAL_SUPPLEMENT_PATHS = {
   sejong_official_specialties: path.join(__dirname, "data", "sejong-official-specialties.json"),
+  // #22로 확보한 농관원 지리적표시 전체 목록(93건). 파일은 2026-08-26부터 data/에 있었으나
+  // 이 맵과 COLLECTORS에 등록되지 않아 수집기가 읽지 않았고, 대시보드에는 제주(3건)와
+  // 지리적표시수산물(24건)만 반영돼 있었다.
+  naqs_gi_specialties: path.join(__dirname, "data", "naqs-gi-specialties.json"),
   jeju_naqs_gi_specialties: path.join(__dirname, "data", "jeju-naqs-gi-specialties.json"),
   seogwipo_grandculture_specialties: path.join(__dirname, "data", "seogwipo-grandculture-specialties.json"),
 };
@@ -333,6 +338,7 @@ const COLLECTORS = {
   gi: collectGi,
   nongsaro: collectNongsaro,
   sejong_official_specialties: collectOfficialSupplement,
+  naqs_gi_specialties: collectOfficialSupplement,
   jeju_naqs_gi_specialties: collectOfficialSupplement,
   seogwipo_grandculture_specialties: collectOfficialSupplement,
   nfqs_quality_cert: collectNfqs,
