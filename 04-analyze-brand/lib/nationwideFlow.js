@@ -183,7 +183,15 @@ function designatedGoodsExamples(goodsPool, coreTerm, limit = 3) {
  * 한 단계 hits의 상위 N개 출원번호로 지정상품 명칭 풀을 모은다(getBibliographyDetailInfoSearch).
  * goodsCache는 { get(appNo), set(appNo, entry) } Map 인터페이스(출원번호→{status,designatedGoods}).
  */
-async function collectStageDesignatedGoods(stageHits, kiprisClient, { perStage = 30, concurrency = 4, goodsCache } = {}) {
+async function collectStageDesignatedGoods(stageHits, kiprisClient, { perStage = 30, concurrency = 4, goodsCache, stageClasses, coreTerm } = {}) {
+  // 다류(多類) 상표는 서지상세가 모든 류의 지정상품을 준다 — 예: 상표명에 원물명이 든
+  // 16류(접착테이프) + 29류 복합출원이 "가공품"으로 분류되면 16류 지정상품이 노이즈로 낀다.
+  // 단계의 기대 상품류(stageClasses)가 주어지면 그 류의 지정상품만 남긴다.
+  const classSet = stageClasses instanceof Set ? stageClasses : null;
+  // "블루베리 딸기 망고 세트"처럼 상표명엔 원물명이 있지만 지정상품엔 원물명이 하나도
+  // 없는 출원은 제외 — 그런 출원의 지정상품("딸기 우유음료" 등)은 이 품목의 예시로 부적절.
+  // coreTerm이 주어지면, 지정상품 중 최소 하나가 원물명을 담은 출원만 풀에 넣는다.
+  const coreCompact = String(coreTerm || "").replace(/\s+/g, "");
   const appNos = [];
   const seen = new Set();
   for (const hit of stageHits || []) {
@@ -208,7 +216,10 @@ async function collectStageDesignatedGoods(stageHits, kiprisClient, { perStage =
         }
         goodsCache?.set(no, entry);
       }
-      for (const g of entry.designatedGoods || []) if (g && g.name) names.push(g.name);
+      const goods = (entry.designatedGoods || [])
+        .filter((g) => g && g.name && (!classSet || classSet.has(normalizeClassCode(g.classCode))));
+      if (coreCompact.length >= 2 && !goods.some((g) => g.name.replace(/\s+/g, "").includes(coreCompact))) continue;
+      for (const g of goods) names.push(g.name);
     }
   }
   await Promise.all(Array.from({ length: Math.min(concurrency, appNos.length) }, worker));

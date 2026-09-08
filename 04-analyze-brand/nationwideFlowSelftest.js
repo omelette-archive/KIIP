@@ -221,7 +221,33 @@ async function runNationwideFlowTests() {
     assert.ok(names.includes("상품-4020200000001"));
     assert.ok(names.includes("캐시상품"));
     assert.ok(cache.has("4020200000001"), "새로 조회한 건 캐시에 저장");
-    ok("중복·빈 출원번호 제거, perStage 상한, 캐시 히트는 API 미호출");
+
+    // stageClasses 필터: 단계 기대 상품류 밖의 지정상품(다류 상표 노이즈)은 제외
+    const goodsByNo = {
+      "4020200000005": [
+        { classCode: "30", name: "블루베리주스", subCode: "G0503" },
+        { classCode: "16", name: "접착테이프 문방구용", subCode: "G1601" },
+        { classCode: "30", name: "과일 체험농장 운영업", subCode: "G0502" },
+      ],
+      "4020200000006": [ // 상표명엔 블루베리, 지정상품엔 블루베리 없음 → 출원 전체 제외
+        { classCode: "30", name: "딸기를 함유한 우유음료", subCode: "G0502" },
+        { classCode: "30", name: "망고주스", subCode: "G0503" },
+      ],
+    };
+    const multiClient = {
+      async designatedGoods(no) {
+        return { found: true, resultCode: "00", designatedGoods: goodsByNo[no] || [] };
+      },
+    };
+    const filtered = await collectStageDesignatedGoods(
+      [hit({ applicationNumber: "4020200000005" }), hit({ applicationNumber: "4020200000006" })],
+      multiClient,
+      { perStage: 5, goodsCache: new Map(), stageClasses: new Set(["29", "30", "31", "32", "33"]), coreTerm: "블루베리" }
+    );
+    assert.ok(filtered.includes("블루베리주스") && filtered.includes("과일 체험농장 운영업"), "블루베리 지정상품이 있는 출원의 다른 지정상품(확장형)은 유지");
+    assert.ok(!filtered.includes("접착테이프 문방구용"), "16류는 단계 상품류 밖이라 제외");
+    assert.ok(!filtered.includes("딸기를 함유한 우유음료") && !filtered.includes("망고주스"), "지정상품에 원물명이 하나도 없는 출원은 전체 제외");
+    ok("중복·빈 출원번호 제거, perStage 상한, 캐시 히트 미호출, 단계 상품류·원물명 없는 출원 필터");
   }
 
   console.log("7c) stageClassDistribution / stageTopRegions — 단계별 주요 상품류·상위 지역 (#119)");

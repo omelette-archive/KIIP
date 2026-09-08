@@ -16,6 +16,8 @@ const {
   stageExamples,
   designatedGoodsExamples,
   collectStageDesignatedGoods,
+  GOODS_CLASSES,
+  SERVICE_CLASSES,
   stageClassDistribution,
   stageTopRegions,
   collectNationwideHits,
@@ -142,9 +144,14 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
     // 기존 상표명 예시로 폴백한다. exampleSource로 소비 측이 라벨을 분기한다.
     let examples = { ...stageExamples(stages[key], term), source: "trademark_title" };
     if (goodsPerStage > 0 && stages[key].length) {
+      const stageClasses = key === "service" ? SERVICE_CLASSES
+        : key === "raw" || key === "processed" ? GOODS_CLASSES
+        : null; // craft product/excluded는 필터 없이
       const goodsPool = await collectStageDesignatedGoods(stages[key], kiprisClient, {
         perStage: goodsPerStage,
         goodsCache,
+        stageClasses,
+        coreTerm: term,
       });
       const fromGoods = designatedGoodsExamples(goodsPool, term);
       if (fromGoods.representative.length || fromGoods.unusual.length) {
