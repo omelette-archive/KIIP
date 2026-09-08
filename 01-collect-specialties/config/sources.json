@@ -105,6 +105,31 @@
       }
     },
     {
+      "id": "naqs_gi_specialties",
+      "name": "국립농산물품질관리원 지리적표시 농산물",
+      "role": "collector",
+      "dataVersion": "naqs-gi-20260826",
+      "lastVerifiedAt": "2026-08-26",
+      "catalogUrl": "https://www.naqs.go.kr/hp/contents/relicList.do?menuId=MN40246",
+      "providerUrl": "https://www.naqs.go.kr/",
+      "formats": ["HTML", "JSON snapshot"],
+      "authentication": {
+        "required": false,
+        "keyEnv": null,
+        "baseUrlEnv": null,
+        "approval": "none"
+      },
+      "quota": {
+        "type": "not_applicable",
+        "value": null,
+        "verification": "공식 등록 목록 5페이지 전수 스냅샷(2026-08-26 기준 101건 중 전국 범위 인삼류 8건 제외 93건). data.go.kr 파일형 메타데이터와 5건 차이가 남아 있어 전체 확정 커버리지 선언이 아님(#22)"
+      },
+      "implementation": {
+        "status": "verified_snapshot",
+        "adapter": "lib/officialSupplement.js + data/naqs-gi-specialties.json"
+      }
+    },
+    {
       "id": "jeju_naqs_gi_specialties",
       "name": "국립농산물품질관리원 제주 지리적표시 특산품",
       "role": "collector",

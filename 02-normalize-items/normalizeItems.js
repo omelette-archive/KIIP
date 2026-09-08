@@ -14,6 +14,7 @@ const fs = require("fs");
 const path = require("path");
 const { loadDictionary, parseCsvLine } = require("./lib/noticeDictionary");
 const { normalizeByRules } = require("./lib/ruleNormalizer");
+const { deriveRawItemRows } = require("./lib/derivedRawItems");
 
 const NORMALIZATION_VERSION = "specialty-normalization-rules-v2-approved-aliases";
 const DICTIONARY_VERSION = "kipo-notice-goods-13-2026";
@@ -147,6 +148,9 @@ const OUTPUT_FIELDS = [
   "sourceItemName",
   "sourceRecordUrl",
   "sourceScope",
+  "derivedFromItemName",
+  "derivedSuffix",
+  "derivedBasis",
   "itemName",
   "noticeName",
   "niceClass",
@@ -229,7 +233,17 @@ async function main() {
   const dictionary = loadDictionary();
   console.error(`[normalizeItems] 고시상품명칭 사전 ${dictionary.length.toLocaleString()}건 로드`);
 
-  const results = rawRows.map((row, inputIndex) => ({
+  // 2026-09-08 사용자 결정: "블루베리잼"처럼 원물명 + 가공 형태로 수집된 품목은 원물 행을
+  // 하나 더 만든다(치환이 아니라 추가 — 가공품 자체도 그 지역 특산품이므로 둘 다 남긴다).
+  // "막걸리"·"한과"처럼 원물명이 이름에 없는 것은 파생 대상이 아니다.
+  const { rows: derivedRows, notes: derivedNotes } = deriveRawItemRows(rawRows, dictionary);
+  if (derivedRows.length) {
+    console.error(`[normalizeItems] 가공품 품목명에서 원물 행 ${derivedRows.length}건 파생`);
+    for (const note of derivedNotes) console.error(`  + ${note}`);
+  }
+  const inputRows = [...rawRows, ...derivedRows];
+
+  const results = inputRows.map((row, inputIndex) => ({
     inputIndex,
     ...normalizeRow(row, { dictionary, topK }),
     sourceId: row.sourceId,
@@ -242,6 +256,9 @@ async function main() {
     sourceRegionName: row.sourceRegionName,
     sourceRegionCode: row.sourceRegionCode,
     sourceItemName: row.sourceItemName,
+    derivedFromItemName: row.derivedFromItemName || "",
+    derivedSuffix: row.derivedSuffix || "",
+    derivedBasis: row.derivedBasis || "",
     sourceRecordUrl: row.sourceRecordUrl,
     sourceScope: row.sourceScope,
     normalizationVersion: NORMALIZATION_VERSION,
