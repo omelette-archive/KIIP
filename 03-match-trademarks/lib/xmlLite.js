@@ -64,4 +64,30 @@ function parseTrademarkResponse(xml) {
   return { ...header, hits };
 }
 
-module.exports = { parseTrademarkResponse, parseHeader, extractItemBlocks, extractTag };
+// getBibliographyDetailInfoSearch 응답에서 지정상품(asignProductArray)만 뽑는다.
+// 성공: <response><header><resultCode>00</resultCode></header><body><item>
+//   <asignProductArray><asignProduct><mainCode>30</mainCode><productName>블루베리주스</productName>
+//   <productNameEng/><seq>1</seq><subCode>G0503</subCode></asignProduct>...</asignProductArray>
+// 실패: <response><header><successYN>N</successYN><resultCode>10</resultCode></header></response>
+// (getWordSearch의 <items> 봉투와 다른 구조라 별도 파서.)
+function parseBibliographyDesignatedGoods(xml) {
+  const resultCode = extractTag(xml, "resultCode");
+  const resultMsg = extractTag(xml, "resultMsg");
+  const productBlocks = xml.match(/<asignProduct>([\s\S]*?)<\/asignProduct>/g) || [];
+  const designatedGoods = productBlocks
+    .map((block) => ({
+      classCode: extractTag(block, "mainCode") || null,
+      name: extractTag(block, "productName") || null,
+      subCode: extractTag(block, "subCode") || null,
+    }))
+    .filter((row) => row.name);
+  return { resultCode, resultMsg, designatedGoods };
+}
+
+module.exports = {
+  parseTrademarkResponse,
+  parseBibliographyDesignatedGoods,
+  parseHeader,
+  extractItemBlocks,
+  extractTag,
+};

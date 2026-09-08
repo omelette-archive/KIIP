@@ -32,8 +32,14 @@ function stageSummary(stage, includeRegion) {
   // 이슈 #116(2026-09-01): 단계별 상표명 예시(대표/이색)는 지역 귀속과 무관하므로
   // includeRegion 여부와 상관없이 항상 통과시킨다. 예시 수집 전 실행분(examples 없음)은
   // null로 둬서 대시보드가 조용히 건너뛴다.
+  // 이슈 #136: examples.source("designated_goods" | "trademark_title")로 대시보드가 라벨을
+  // 분기한다("대표 지정상품" vs "대표"). 없으면(구 산출) "trademark_title"로 본다.
   const examples = stage.examples && (stage.examples.representative?.length || stage.examples.unusual?.length)
-    ? { representative: stage.examples.representative || [], unusual: stage.examples.unusual || [] }
+    ? {
+        representative: stage.examples.representative || [],
+        unusual: stage.examples.unusual || [],
+        source: stage.examples.source === "designated_goods" ? "designated_goods" : "trademark_title",
+      }
     : null;
   return {
     count: stage.count,

@@ -14,6 +14,8 @@ const {
   aggregateHits,
   topApplicantsByStage,
   stageExamples,
+  designatedGoodsExamples,
+  collectStageDesignatedGoods,
   stageClassDistribution,
   stageTopRegions,
   collectNationwideHits,
@@ -32,6 +34,8 @@ function parseArgs(argv) {
     topApplicants: 5,
     out: path.join(__dirname, "output", "nationwide-flow.json"),
     cache: path.join(__dirname, "output", "nationwide-flow-applicant-cache.json"),
+    "goods-cache": path.join(__dirname, "output", "nationwide-flow-goods-cache.json"),
+    "goods-per-stage": 0,
   };
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
@@ -61,6 +65,9 @@ function usage(message) {
       "  --numOfRows <n>         페이지당 건수 (기본 100)",
       "  --maxHits <n>           검색어당 최대 수집 건수 (기본 3000)",
       "  --topApplicants <n>     단계별 주소를 조회할 상위 출원인 수 (기본 5)",
+      "  --goods-per-stage <n>   단계별 상위 n개 출원의 지정상품명을 조회해 대표·이색 예시를",
+      "                          상표명 대신 지정상품명에서 뽑는다(#136). 0=끔(기본, 상표명 예시)",
+      "  --goods-cache <path>    지정상품 조회 캐시 (기본: output/nationwide-flow-goods-cache.json)",
       "  --dry-run               API 호출 없이 추출된 검색어 목록만 출력",
       "  --force                 --out에 이미 있는 품목도 다시 수집(기본은 이어서 처리)",
     ].join("\n")
@@ -82,7 +89,30 @@ function writeOutput(outPath, document) {
   fs.renameSync(tempPath, outPath);
 }
 
-async function processTerm(term, mode, { kiprisClient, applicantClient, adminList, applicantCache, options }) {
+// 지정상품 조회 캐시(출원번호 → { status, designatedGoods }). Map 인터페이스로 감싼다.
+const GOODS_CACHE_SCHEMA = "nationwide-flow-goods-cache-v1";
+function loadGoodsCache(cachePath) {
+  const map = new Map();
+  if (cachePath && fs.existsSync(cachePath)) {
+    const parsed = JSON.parse(fs.readFileSync(cachePath, "utf8").replace(/^﻿/, ""));
+    if (parsed.schemaVersion === GOODS_CACHE_SCHEMA) {
+      for (const [key, value] of Object.entries(parsed.entries || {})) map.set(key, value);
+    }
+  }
+  return map;
+}
+function saveGoodsCache(cachePath, map) {
+  if (!cachePath) return;
+  const entries = Object.fromEntries([...map.entries()].sort(([a], [b]) => a.localeCompare(b)));
+  const document = { schemaVersion: GOODS_CACHE_SCHEMA, updatedAt: new Date().toISOString(), entries };
+  fs.mkdirSync(path.dirname(cachePath), { recursive: true });
+  const tempPath = `${cachePath}.tmp`;
+  fs.writeFileSync(tempPath, JSON.stringify(document, null, 2) + "\n", "utf8");
+  fs.renameSync(tempPath, cachePath);
+}
+
+async function processTerm(term, mode, { kiprisClient, applicantClient, adminList, applicantCache, goodsCache, options }) {
+  const goodsPerStage = Number(options["goods-per-stage"]) || 0;
   const collected = await collectNationwideHits(kiprisClient, term, {
     maxPages: Number(options.maxPages),
     numOfRows: Number(options.numOfRows),
@@ -108,12 +138,23 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
       }
       withRegion.push({ ...applicant, region: region.status === "matched" ? region.normalizedRegion : null });
     }
+    // 이슈 #136: goods-per-stage가 켜지면 지정상품명 풀에서 대표·이색을 뽑고, 풀이 비면
+    // 기존 상표명 예시로 폴백한다. exampleSource로 소비 측이 라벨을 분기한다.
+    let examples = { ...stageExamples(stages[key], term), source: "trademark_title" };
+    if (goodsPerStage > 0 && stages[key].length) {
+      const goodsPool = await collectStageDesignatedGoods(stages[key], kiprisClient, {
+        perStage: goodsPerStage,
+        goodsCache,
+      });
+      const fromGoods = designatedGoodsExamples(goodsPool, term);
+      if (fromGoods.representative.length || fromGoods.unusual.length) {
+        examples = { ...fromGoods, source: "designated_goods" };
+      }
+    }
     stageSummary[key] = {
       count: stages[key].length,
       topApplicants: withRegion,
-      // 이슈 #116(2026-09-01): 단계별 상표명 예시(대표/이색). 지정상품 텍스트가 아니라
-      // 실제 출원된 상표명이며 지역 귀속과 무관하다.
-      examples: stageExamples(stages[key], term),
+      examples,
       // 이슈 #119(2026-09-02): 단계별 주요 상품류(NICE), 상위 지역·점유율.
       classes: stageClassDistribution(stages[key]),
       topRegions: stageTopRegions(withRegion),
@@ -156,8 +197,11 @@ async function main() {
 
   const outPath = path.resolve(args.out);
   const cachePath = path.resolve(args.cache);
+  const goodsPerStage = Number(args["goods-per-stage"]) || 0;
+  const goodsCachePath = goodsPerStage > 0 ? path.resolve(args["goods-cache"]) : null;
   const output = loadExistingOutput(outPath);
   const applicantCache = loadCache(cachePath);
+  const goodsCache = goodsCachePath ? loadGoodsCache(goodsCachePath) : new Map();
 
   const apiKey = args.apiKey || process.env.KIPRIS_API_KEY;
   if (!apiKey) throw new Error("KIPRIS_API_KEY가 필요합니다 (.env 또는 --apiKey).");
@@ -171,11 +215,12 @@ async function main() {
   for (const [index, term] of pending.entries()) {
     console.error(`[${index + 1}/${pending.length}] ${term} 검색 중...`);
     try {
-      const result = await processTerm(term, "agri", { kiprisClient, applicantClient, adminList, applicantCache, options: args });
+      const result = await processTerm(term, "agri", { kiprisClient, applicantClient, adminList, applicantCache, goodsCache, options: args });
       output.items[term] = result;
       output.generatedAt = new Date().toISOString();
       writeOutput(outPath, output);
       saveCache(cachePath, applicantCache);
+      if (goodsCachePath) saveGoodsCache(goodsCachePath, goodsCache);
       console.error(`  -> totalCount=${result.totalCount} fetched=${result.fetchedCount} 원물=${result.stages.raw.count} 가공품=${result.stages.processed.count} 서비스=${result.stages.service.count}`);
     } catch (error) {
       console.error(`  -> 오류: ${error.message} (건너뜀, 다음 실행에서 재시도)`);

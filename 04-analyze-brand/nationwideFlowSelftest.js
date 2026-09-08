@@ -10,6 +10,8 @@ const {
   aggregateHits,
   topApplicantsByStage,
   stageExamples,
+  designatedGoodsExamples,
+  collectStageDesignatedGoods,
   stageClassDistribution,
   stageTopRegions,
   collectNationwideHits,
@@ -166,6 +168,60 @@ async function runNationwideFlowTests() {
     assert.ok(examples.representative.every((title) => title.replace(/\s+/g, "").length >= 2));
     assert.ok(![...examples.representative, ...examples.unusual].some((title) => title.replace(/\s+/g, "").length > 40));
     ok("한 글자·기호 상표 제외, 40자 초과 슬로건형 제외");
+  }
+
+  console.log("7d) designatedGoodsExamples — 지정상품명 풀에서 대표(원물명 포함)·이색(확장형) 분리 (#136)");
+  {
+    const pool = [
+      "신선한 블루베리",
+      "블루베리주스",
+      "블루베리 퓨레음료",
+      "블루베리 추출물을 함유한 기능성 화장품",
+      "블루베리 체험농장 운영업",
+      "냉동 블루베리",
+      "신선한 블루 베리", // 공백 변형도 원물명 포함으로 인정
+      "",                 // 빈 값 제외
+      "블루베리 추출물을 유효성분으로 하는 항산화 건강기능식품으로서 이 지정상품명은 예시로서 60자를 넘겨 후보에서 빠져야 한다 정말로",
+    ];
+    const ex = designatedGoodsExamples(pool, "블루베리", 3);
+    assert.ok(ex.representative.every((n) => n.replace(/\s+/g, "").includes("블루베리")), "대표는 원물명 포함");
+    assert.ok(["냉동 블루베리", "블루베리주스"].includes(ex.representative[0]), "가장 짧은 원물명 후보가 대표 1위");
+    assert.ok(ex.unusual.some((n) => n.includes("화장품") || n.includes("운영업")), "확장형이 이색에");
+    assert.ok(![...ex.representative, ...ex.unusual].some((n) => n.replace(/\s+/g, "").length > 60), "60자 초과 제외");
+    assert.ok(![...ex.representative, ...ex.unusual].includes(""), "빈 값 제외");
+
+    // 폴백: 원물명 담은 지정상품이 하나도 없으면 짧은 순으로 대표 채움
+    const noCore = designatedGoodsExamples(["과일 판매대행업", "농산물 유통업", "과실 가공식품"], "블루베리", 2);
+    assert.strictEqual(noCore.representative.length, 2);
+
+    assert.deepStrictEqual(designatedGoodsExamples([], "블루베리"), { representative: [], unusual: [] });
+    ok("원물명 포함=대표, 미포함 확장형=이색, 60자 상한, 폴백은 짧은 순");
+  }
+
+  console.log("7e) collectStageDesignatedGoods — 상위 N개 출원의 지정상품을 캐시 경유로 모음 (#136)");
+  {
+    const calls = [];
+    const fakeClient = {
+      async designatedGoods(no) {
+        calls.push(no);
+        return { found: true, resultCode: "00", designatedGoods: [{ classCode: "31", name: `상품-${no}`, subCode: "G0201" }] };
+      },
+    };
+    const cache = new Map([["4020200000009", { status: "complete", designatedGoods: [{ classCode: "31", name: "캐시상품", subCode: null }] }]]);
+    const hits = [
+      hit({ applicationNumber: "4020200000001" }),
+      hit({ applicationNumber: "4020200000001" }), // 중복 출원번호는 한 번만
+      hit({ applicationNumber: "4020200000009" }), // 캐시 히트 — API 안 부름
+      hit({ applicationNumber: "" }),              // 빈 출원번호 스킵
+      hit({ applicationNumber: "4020200000002" }),
+      hit({ applicationNumber: "4020200000003" }),
+    ];
+    const names = await collectStageDesignatedGoods(hits, fakeClient, { perStage: 2, concurrency: 2, goodsCache: cache });
+    assert.deepStrictEqual([...calls].sort(), ["4020200000001"]); // perStage=2 → 001, 009 두 개인데 009는 캐시
+    assert.ok(names.includes("상품-4020200000001"));
+    assert.ok(names.includes("캐시상품"));
+    assert.ok(cache.has("4020200000001"), "새로 조회한 건 캐시에 저장");
+    ok("중복·빈 출원번호 제거, perStage 상한, 캐시 히트는 API 미호출");
   }
 
   console.log("7c) stageClassDistribution / stageTopRegions — 단계별 주요 상품류·상위 지역 (#119)");

@@ -8,7 +8,7 @@
  */
 
 const { fetchWithRetry } = require("./fetchWithRetry");
-const { parseTrademarkResponse } = require("./xmlLite");
+const { parseTrademarkResponse, parseBibliographyDesignatedGoods } = require("./xmlLite");
 const { KiprisApiError } = require("./errors");
 
 const PROTO = process.env.KIPRIS_API_PROTOCOL === "http" ? "http" : "https";
@@ -79,7 +79,41 @@ function createClient({ apiKey, fetchImpl } = {}) {
     return parsed; // resultCode 20(결과없음)은 hits=[] 로 정상 반환
   }
 
-  return { trademarkSearch };
+  /**
+   * 출원번호로 서지상세를 조회해 지정상품(designated goods) 명칭을 얻는다.
+   * getWordSearch에는 지정상품 텍스트가 없지만 getBibliographyDetailInfoSearch에는 있다 —
+   * 출원중·포기·등록 무관하게 반환된다(등록원부와 달리 등록번호 불필요). 초당 제한 없음.
+   * @param {string} applicationNumber
+   * @returns {Promise<{ found: boolean, resultCode: string, designatedGoods: {classCode:string|null,name:string,subCode:string|null}[] }>}
+   */
+  async function designatedGoods(applicationNumber) {
+    const normalized = String(applicationNumber || "").replace(/\D/g, "");
+    if (!normalized) throw new Error("designatedGoods: applicationNumber가 필요합니다.");
+    const query = buildQuery({ applicationNumber: normalized, ServiceKey: apiKey });
+    const res = await fetchWithRetry(
+      `${TRADEMARK_BASE}/getBibliographyDetailInfoSearch?${query}`,
+      {},
+      fetchImpl
+    );
+    if (!res.ok) throw new Error(`designatedGoods: API 오류 (${res.status})`);
+    const xml = (await res.text()).trim();
+    if (!xml) throw new Error("designatedGoods: 빈 응답");
+    const head = xml.slice(0, 200).toLowerCase();
+    if (head.startsWith("<!doctype html") || head.startsWith("<html")) {
+      throw new Error("designatedGoods: KIPRIS 서비스 오류 응답(HTML)");
+    }
+    const parsed = parseBibliographyDesignatedGoods(xml);
+    if (parsed.resultCode && parsed.resultCode !== "00" && parsed.resultCode !== "20") {
+      throw new KiprisApiError(parsed.resultCode, parsed.resultMsg || "서지상세 조회 실패");
+    }
+    return {
+      found: parsed.designatedGoods.length > 0,
+      resultCode: parsed.resultCode || "00",
+      designatedGoods: parsed.designatedGoods,
+    };
+  }
+
+  return { trademarkSearch, designatedGoods };
 }
 
 module.exports = {

@@ -136,6 +136,85 @@ function stageExamples(stageHits, coreTerm, limit = 3) {
   return { representative, unusual };
 }
 
+// 이슈 #136(2026-09-06): "대표·이색은 상표명이 아니라 지정상품 명칭 중에서". 상표
+// 단어검색엔 지정상품이 없지만 getBibliographyDetailInfoSearch(출원번호)엔 있다 —
+// stageExamples와 같은 구조지만 상표명 대신 지정상품명 풀에서 뽑는다.
+// 대표 = 원물명(coreTerm/고시명칭)을 담은 지정상품(예: "신선한 블루베리", "블루베리주스"),
+// 이색 = 원물명에서 멀어진 확장형(예: "블루베리 추출물을 함유한 화장품", "블루베리 체험농장 운영업").
+// 지정상품명은 상표명보다 길어 길이 상한을 관대하게(2~60자) 둔다.
+const GOODS_EXAMPLE_MIN_LEN = 2;
+const GOODS_EXAMPLE_MAX_LEN = 60;
+function designatedGoodsExamples(goodsPool, coreTerm, limit = 3) {
+  const core = String(coreTerm || "").trim();
+  const coreCompact = core.replace(/\s+/g, "");
+  const seen = new Set();
+  const names = [];
+  for (const raw of goodsPool || []) {
+    const name = String(raw || "").replace(/\s+/g, " ").trim();
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
+    names.push(name);
+  }
+  const compactLen = (s) => s.replace(/\s+/g, "").length;
+  const hasCore = (s) => coreCompact.length >= 2 && s.replace(/\s+/g, "").includes(coreCompact);
+  const pool = names.filter((s) => {
+    const len = compactLen(s);
+    return len >= GOODS_EXAMPLE_MIN_LEN && len <= GOODS_EXAMPLE_MAX_LEN && /[가-힣A-Za-z]{2,}/.test(s.replace(/\s+/g, ""));
+  });
+  if (pool.length === 0) return { representative: [], unusual: [] };
+  const byLength = [...pool].sort((a, b) => compactLen(a) - compactLen(b) || a.localeCompare(b, "ko-KR"));
+  const coreNames = byLength.filter(hasCore);
+  // 대표: 원물명을 담은 지정상품 짧은 순. 하나도 없으면(원물명 미포함) 그냥 짧은 순으로 채운다.
+  const representative = (coreNames.length ? coreNames : byLength).slice(0, limit);
+  const repSet = new Set(representative);
+  // 이색: 대표에 없는 것 중 — 원물명 미포함 우선(확장형), 그다음 긴 순(구체적일수록 이색적)
+  const unusual = pool
+    .filter((s) => !repSet.has(s))
+    .sort((a, b) => {
+      const ac = hasCore(a) ? 1 : 0;
+      const bc = hasCore(b) ? 1 : 0;
+      return ac - bc || compactLen(b) - compactLen(a) || a.localeCompare(b, "ko-KR");
+    })
+    .slice(0, limit);
+  return { representative, unusual };
+}
+
+/**
+ * 한 단계 hits의 상위 N개 출원번호로 지정상품 명칭 풀을 모은다(getBibliographyDetailInfoSearch).
+ * goodsCache는 { get(appNo), set(appNo, entry) } Map 인터페이스(출원번호→{status,designatedGoods}).
+ */
+async function collectStageDesignatedGoods(stageHits, kiprisClient, { perStage = 30, concurrency = 4, goodsCache } = {}) {
+  const appNos = [];
+  const seen = new Set();
+  for (const hit of stageHits || []) {
+    const no = String(hit.applicationNumber || "").replace(/\D/g, "");
+    if (!no || seen.has(no)) continue;
+    seen.add(no);
+    appNos.push(no);
+    if (appNos.length >= perStage) break;
+  }
+  const names = [];
+  let cursor = 0;
+  async function worker() {
+    while (cursor < appNos.length) {
+      const no = appNos[cursor++];
+      let entry = goodsCache?.get(no);
+      if (!entry) {
+        try {
+          const res = await kiprisClient.designatedGoods(no);
+          entry = { status: "complete", designatedGoods: res.designatedGoods };
+        } catch (error) {
+          entry = { status: "error", designatedGoods: [], error: error.message };
+        }
+        goodsCache?.set(no, entry);
+      }
+      for (const g of entry.designatedGoods || []) if (g && g.name) names.push(g.name);
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(concurrency, appNos.length) }, worker));
+  return names;
+}
+
 // 이슈 #119(2026-09-02): 단계별 "주요 지정상품(류)" — 지정상품 텍스트는 없지만 NICE
 // 상품류 코드는 모든 hit에 있으므로, 그 단계에서 많이 쓰인 상품류를 상위 N개 보여준다.
 function stageClassDistribution(stageHits, limit = 5) {
@@ -266,6 +345,8 @@ module.exports = {
   isProducerLikeApplicant,
   rawSignalConfidence,
   stageExamples,
+  designatedGoodsExamples,
+  collectStageDesignatedGoods,
   stageClassDistribution,
   stageTopRegions,
   topApplicantsByStage,
