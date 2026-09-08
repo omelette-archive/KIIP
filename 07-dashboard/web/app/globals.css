@@ -974,44 +974,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking-stack { gap: 14px; }
 }
 
-/* 이슈 #118: 동향(리더보드) 화면. */
-.trends-screen .screen-note strong { color: var(--ink); font-weight: 800; }
-.leader-controls { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; margin: 16px 0 4px; }
-.leader-window, .leader-metric { display: flex; gap: 6px; }
-.leader-window button, .leader-metric button { padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 12px; font-weight: 700; cursor: pointer; }
-.leader-window button:hover, .leader-metric button:hover { color: var(--ink); }
-.leader-window button.active, .leader-metric button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
-.leader-metric { margin-left: 4px; padding-left: 12px; border-left: 1px solid var(--line); }
-.leader-window-range { color: var(--faint); font-size: 11px; }
-.leader-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 16px; }
-.leader-grid .leader-card:nth-child(3) { grid-column: 1 / -1; }
-.leader-card { display: flex; flex-direction: column; padding: 20px 20px 14px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.leader-card-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 10px; }
-.leader-card-head h3 { margin: 0; font-size: 15px; letter-spacing: -0.02em; }
-.leader-card-head .csv-download-button { margin-left: auto; }
-.leader-card-note { margin-left: auto; color: var(--faint); font-size: 11px; white-space: nowrap; }
-.leader-list { list-style: none; margin: 0; padding: 0; }
-.leader-list li + li { border-top: 1px solid var(--line); }
-.leader-list button { display: grid; grid-template-columns: 22px minmax(0, 1fr) 90px auto; align-items: center; gap: 10px; width: 100%; padding: 9px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
-.leader-list button:hover { background: var(--green-soft); }
-.leader-rank { color: var(--faint); font-size: 12px; font-weight: 800; text-align: center; }
-.leader-name { min-width: 0; font-size: 13px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.leader-tag { margin-left: 6px; padding: 1px 6px; border-radius: 6px; background: #eef2f7; color: var(--muted); font-size: 10px; font-style: normal; font-weight: 700; }
-.leader-bar { height: 7px; border-radius: 99px; background: #eef2f7; overflow: hidden; }
-.leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); }
-.leader-bar-low i { background: var(--amber); }
-.leader-list b { font-size: 13px; font-weight: 800; white-space: nowrap; text-align: right; }
-.leader-list b small { margin-left: 5px; color: var(--faint); font-size: 10px; font-weight: 700; }
-.leader-delta { text-align: center; }
-.leader-fresh { padding: 1px 6px; border-radius: 6px; background: var(--green-soft); color: var(--green-dark); font-size: 10px; font-style: normal; font-weight: 800; }
-.leader-growth { color: var(--green-dark); font-size: 12px; font-style: normal; font-weight: 800; }
-.trends-screen .method-note { margin-top: 18px; padding: 14px 16px; }
-@media (max-width: 900px) {
-  .leader-grid { grid-template-columns: 1fr; }
-  .leader-grid .leader-card:nth-child(3) { grid-column: auto; }
-  .leader-list button { grid-template-columns: 20px minmax(0, 1fr) 64px auto; }
-}
-
 /* UI 검토(#136) 03번: 인쇄용 스타일시트가 전혀 없어 정책 담당자가 표를 보고서로 옮기려면
    화면을 캡처하거나 손으로 옮겨 적는 수밖에 없었다. 탭 내비게이션·검색·버튼류를 숨기고
    표가 인쇄 페이지 폭에 맞게 늘어나도록 하는 정도로 충분하다(과한 인쇄 전용 레이아웃은
@@ -1019,7 +981,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media print {
   .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
   .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
-  .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider, .leader-controls,
+  .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider,
   .province-municipalities summary, .coverage-municipality-toggle summary,
   .coverage-specialty-toggle summary, footer { display: none !important; }
   body { background: #fff; }

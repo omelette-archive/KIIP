@@ -13,7 +13,7 @@ type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registration
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[] } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
 type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
-type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
@@ -21,7 +21,7 @@ type Snapshot = { schemaVersion: string; snapshotId: string; mode: "sample" | "f
 type ProvinceShape = { name: string; d: string; labelX: number; labelY: number };
 type MunicipalityShape = { name: string; d: string; labelX: number; labelY: number };
 type MapGeometry = { schemaVersion: string; viewBox: string; boundaryReference: { sourceName: string; sourceUrl: string; sourceBasis: string; status: string; warning: string }; provinces: ProvinceShape[]; municipalities: Record<string, { viewBox: string; items: MunicipalityShape[] }> };
-type Tab = "summary" | "trends" | "applications" | "regions" | "items" | "strategy" | "compare" | "data";
+type Tab = "summary" | "applications" | "regions" | "items" | "strategy" | "compare" | "data";
 type MapMetric = "trademarks" | "registration" | "coverage" | "applicationCoverage";
 type SpecialtyCoverage = { total: number; decided: number; applied: number; pending: number; rate: number | null };
 type PositionedMapLabel = { name: string; displayName: string; x: number; y: number; targetX: number; targetY: number; leader: boolean };
@@ -32,7 +32,6 @@ const STATE_LABELS: Record<string, string> = { complete_nonzero: "현황 확인"
 const EXPLORE_TABS: Tab[] = ["applications", "regions", "items"];
 const PRIMARY_NAV: { key: Tab; label: string }[] = [
   { key: "summary", label: "요약" },
-  { key: "trends", label: "동향" },
   { key: "applications", label: "지역·품목별 조회" },
   { key: "strategy", label: "비즈니스 전략" },
   { key: "compare", label: "특화작목 비교" },
@@ -174,47 +173,6 @@ function sumYearCounts(items: Item[], field: "applicationYearCounts" | "registra
     }
   }
   return totals;
-}
-// 이슈 #118: 최근 출원·등록 동향 리더보드. 월 단위 집계(applicationMonthCounts/
-// registrationMonthCounts, 키 YYYY-MM)는 ④ analyzer가 전국 키워드 검색 결과 전체를
-// 대상으로 채운다 — 출원인 주소로 지역 귀속이 확인된 uniqueTrademarkCount와는 다른
-// 모집단이라, 리더보드는 "전국 규모 최근 동향"으로 라벨링한다(#50).
-const LEADER_WINDOWS: { months: number; label: string }[] = [
-  { months: 1, label: "최근 1개월" },
-  { months: 3, label: "최근 3개월" },
-  { months: 6, label: "최근 6개월" },
-  { months: 12, label: "최근 1년" },
-];
-const LEADER_LIMIT = 10;
-// 급증·등록전환 순위가 표본이 작은 품목(창 기간 출원 1~2건)으로 왜곡되지 않도록
-// 창 길이에 비례한 최소 출원 건수 컷오프를 둔다(#118 열린 질문).
-function leaderMinBase(months: number) { return Math.max(6, months * 2); }
-function ymKey(year: number, monthIndex0: number) { return `${year}-${String(monthIndex0 + 1).padStart(2, "0")}`; }
-// KIPRIS 출원공개 지연 + 주간 갱신이라 생성월(진행 중)은 과소 집계된다 — 직전 월까지를
-// "최근"의 끝으로 삼는다.
-function leaderEndMonth(generatedAt: string): { year: number; monthIndex0: number } {
-  const date = new Date(generatedAt);
-  const prev = new Date(date.getFullYear(), date.getMonth() - 1, 1);
-  return { year: prev.getFullYear(), monthIndex0: prev.getMonth() };
-}
-function monthWindowKeys(end: { year: number; monthIndex0: number }, months: number): string[] {
-  const keys: string[] = [];
-  for (let offset = months - 1; offset >= 0; offset--) {
-    const date = new Date(end.year, end.monthIndex0 - offset, 1);
-    keys.push(ymKey(date.getFullYear(), date.getMonth()));
-  }
-  return keys;
-}
-function sumMonthCounts(counts: Record<string, number> | null | undefined, keys: string[]): number {
-  if (!counts) return 0;
-  let total = 0;
-  for (const key of keys) total += counts[key] || 0;
-  return total;
-}
-function monthRangeLabel(keys: string[]): string {
-  if (keys.length === 0) return "";
-  const fmt = (key: string) => { const [y, m] = key.split("-"); return `${y}.${m}`; };
-  return keys.length === 1 ? fmt(keys[0]) : `${fmt(keys[0])}–${fmt(keys[keys.length - 1])}`;
 }
 const TREND_CHART = { width: 960, height: 220, padLeft: 46, padRight: 16, padTop: 14, padBottom: 28 };
 function trendScales(startYear: number, endYear: number, maxValue: number) {
@@ -865,9 +823,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [selectedCompareProvince, setSelectedCompareProvince] = useState<string | null>(null);
   // UI 검토(3차, 2026-09-06) S2: 요약 화면 출원/등록 랭킹 표 2개를 전환 탭 하나로.
   const [summaryRankingMetric, setSummaryRankingMetric] = useState<"application" | "registration">("application");
-  // 이슈 #118: 동향(리더보드) 화면의 시간 윈도우·기준 토글.
-  const [leaderMonths, setLeaderMonths] = useState(3);
-  const [leaderMetric, setLeaderMetric] = useState<"application" | "registration">("application");
   const [regionQuery, setRegionQuery] = useState("");
   // 이슈 #116: 품목별 조회에서 목록의 다른 품목을 고르면 오른쪽 상세가 바뀌는데,
   // 스크롤 위치가 이전 상세를 읽던 자리(중간·하단)에 그대로 남아 새 상세의 맨 위가
@@ -889,7 +844,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 수 없고, 뒤로가기도 history.state에만 의존했다(#119 — 주소창은 안 바뀌어 실제로 다른
   // 화면을 봤다는 근거가 URL에 안 남음). 탭 전환마다 history 항목을 쌓던 그 로직을 확장해,
   // 화면과 관련된 선택값을 쿼리스트링(?tab=...&region=...&item=...)에도 반영한다.
-  const VALID_NAV_TABS: Tab[] = ["summary", "trends", "applications", "regions", "items", "strategy", "compare", "data"];
+  const VALID_NAV_TABS: Tab[] = ["summary", "applications", "regions", "items", "strategy", "compare", "data"];
   const VALID_NAV_METRICS: MapMetric[] = ["trademarks", "registration", "coverage", "applicationCoverage"];
   // UI 검토(3차, 2026-09-06) N3: "지역·품목별 조회"(지역별)의 연도 범위 슬라이더는 이
   // 화면 안에 단일 인스턴스로 존재하는 공유 상태(trendStartYear/trendEndYear)라 URL에
@@ -1205,78 +1160,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const visibleRegions = selectedProvince ? regionalRegions.filter((region) => (region.sido || region.region) === selectedProvince && (!selectedMunicipality || region.sigungu === selectedMunicipality || (isUnclassifiedRegion(region) && !provinceHasRealMunicipalities))) : regionalRegions;
   const nationalSpecialtyCoverage = specialtyCoverage(regionalRegions);
   const nationalTrendItems = useMemo(() => regionalRegions.flatMap((region) => region.items), [regionalRegions]);
-  // 이슈 #118: 동향(리더보드) 집계. 품목 순위는 품목별 조회와 같은 기준(officialItemLabel로
-  // 고시명칭 확정 품목만 하나로 묶음)을 쓰고, 카테고리 롤업은 category가 붙은 모든 품목행을
-  // 대상으로 한다(고시명칭 미확정 원물도 유형은 있으므로).
-  const leaderboard = useMemo(() => {
-    const end = leaderEndMonth(snapshot.generatedAt);
-    const windowKeys = monthWindowKeys(end, leaderMonths);
-    const priorEndDate = new Date(end.year, end.monthIndex0 - leaderMonths, 1);
-    const priorKeys = monthWindowKeys({ year: priorEndDate.getFullYear(), monthIndex0: priorEndDate.getMonth() }, leaderMonths);
-    const minBase = leaderMinBase(leaderMonths);
-    type ItemAgg = { name: string; category: ItemCategory | null; app: number; reg: number; priorApp: number; priorReg: number };
-    type CatAgg = { label: string; code: string | null; app: number; reg: number; priorApp: number; priorReg: number };
-    const items = new Map<string, ItemAgg>();
-    const cats = new Map<string, CatAgg>();
-    for (const region of regionalRegions) {
-      for (const item of region.items) {
-        const app = sumMonthCounts(item.applicationMonthCounts, windowKeys);
-        const reg = sumMonthCounts(item.registrationMonthCounts, windowKeys);
-        const priorApp = sumMonthCounts(item.applicationMonthCounts, priorKeys);
-        const priorReg = sumMonthCounts(item.registrationMonthCounts, priorKeys);
-        if (!app && !reg && !priorApp && !priorReg) continue;
-        const label = officialItemLabel(item);
-        if (label) {
-          const row = items.get(label) || { name: label, category: item.category || null, app: 0, reg: 0, priorApp: 0, priorReg: 0 };
-          row.app += app; row.reg += reg; row.priorApp += priorApp; row.priorReg += priorReg;
-          if (!row.category && item.category) row.category = item.category;
-          items.set(label, row);
-        }
-        // 카테고리 순위는 유형이 실제로 매겨진 품목행만 — 미분류(전국 검색 노이즈 다수)를
-        // "기타"로 뭉치면 순위가 왜곡된다(#118 열린 질문).
-        if (item.category) {
-          const cat = cats.get(item.category.label) || { label: item.category.label, code: item.category.code, app: 0, reg: 0, priorApp: 0, priorReg: 0 };
-          cat.app += app; cat.reg += reg; cat.priorApp += priorApp; cat.priorReg += priorReg;
-          cats.set(item.category.label, cat);
-        }
-      }
-    }
-    const itemList = [...items.values()];
-    const metricValue = (row: { app: number; reg: number }) => leaderMetric === "application" ? row.app : row.reg;
-    const topItems = [...itemList].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.name.localeCompare(b.name, "ko-KR")).slice(0, LEADER_LIMIT);
-    const topCategories = [...cats.values()].filter((row) => metricValue(row) > 0).sort((a, b) => metricValue(b) - metricValue(a) || a.label.localeCompare(b.label, "ko-KR"));
-    const categoryTotal = topCategories.reduce((sum, row) => sum + metricValue(row), 0);
-    // 급증: 창 기간 출원이 컷오프 이상이고 직전 동일 기간보다 늘어난 품목. 직전 0건이면
-    // "신규", 아니면 증가율. 증가율 왜곡을 막으려 직전이 컷오프의 1/3 미만이면 신규로 본다.
-    const surging = itemList
-      .filter((row) => row.app >= minBase && row.app > row.priorApp)
-      .map((row) => {
-        const fresh = row.priorApp < Math.max(1, minBase / 3);
-        const growth = fresh ? Infinity : row.app / row.priorApp;
-        return { ...row, fresh, growth, delta: row.app - row.priorApp };
-      })
-      .sort((a, b) => (b.growth - a.growth) || (b.delta - a.delta) || a.name.localeCompare(b.name, "ko-KR"))
-      .slice(0, LEADER_LIMIT);
-    // 등록 전환: 누적(연 단위) 출원·등록 기준. 창 안의 등록/출원은 서로 다른 시점 코호트라
-    // 비율로 쓰기 어렵다 — 리더보드에서 "정착이 잘/안 되는 품목"은 전체 이력으로 본다.
-    const lifetime = new Map<string, { name: string; category: ItemCategory | null; lifeApp: number; lifeReg: number }>();
-    for (const region of regionalRegions) {
-      for (const item of region.items) {
-        const label = officialItemLabel(item);
-        if (!label) continue;
-        const row = lifetime.get(label) || { name: label, category: item.category || null, lifeApp: 0, lifeReg: 0 };
-        for (const v of Object.values(item.applicationYearCounts || {})) row.lifeApp += v;
-        for (const v of Object.values(item.registrationYearCounts || {})) row.lifeReg += v;
-        lifetime.set(label, row);
-      }
-    }
-    const lifetimeRows = [...lifetime.values()]
-      .filter((row) => row.lifeApp >= 20)
-      .map((row) => ({ ...row, rate: row.lifeApp ? row.lifeReg / row.lifeApp : 0 }));
-    const conversionHigh = [...lifetimeRows].sort((a, b) => b.rate - a.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
-    return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
-  }, [snapshot.generatedAt, regionalRegions, leaderMonths, leaderMetric]);
   const visibleSpecialtyCoverage = specialtyCoverage(visibleRegions);
   // 2026-08-24(이슈 #111): 고시명칭 확정 여부로 미리보기를 걸러내면, 지역 특산품 수(예: 6개)와
   // 미리보기에 뜨는 개수(예: 2개)가 안 맞아 보인다는 지적. 고시명칭 매칭은 판정 기준의
@@ -1454,9 +1337,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }
   // 이슈 #116(2026-09-01): 지역·품목별 조회 탭 안의 지역별/품목별 토글.
   const goExplore = (mode: "region" | "item") => { setTab(mode === "item" ? "items" : "applications"); setSelectedRegionCode(""); setSelectedItemId(""); };
-  // 이슈 #118: 리더보드 항목/카테고리 클릭 시 품목별 조회로 이동.
-  const gotoItemDetail = (name: string) => { setItemQuery(""); setCategoryFilter(""); setItemShowAll(true); setSelectedItemName(name); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
-  const gotoCategory = (code: string | null) => { setItemQuery(""); setSelectedItemName(""); setCategoryFilter(code || ""); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   // UI 검토(#136) 14번: 상단 탭이 role·aria-selected·aria-controls 없는 일반 버튼이라
   // 스크린리더에 "탭"으로 전달되지 않았다 — 서브내비(exploreSubnav)는 이미 role="tablist"
   // 패턴을 쓰고 있어 같은 기준을 최상단 탭에도 맞춘다. 화살표 키로 탭 사이를 이동하며
@@ -1540,50 +1420,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>
       {/* 이슈 #118: 요약 화면에 전국 출원·등록 추이 그래프를 부각한다. */}
       <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
-    </section>}
-
-    {tab === "trends" && <section className="screen-section trends-screen" role="tabpanel" id="primary-tabpanel-trends" aria-labelledby="primary-tab-trends">
-      <div className="section-heading"><div><h2>최근 출원·등록 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>
-      <p className="screen-note">전국 키워드 검색으로 모은 상표 출원·등록을 실제 출원일·등록일 기준 월별로 집계한 순위입니다. 출원인 주소로 지역이 확인된 건수(요약·지역별 조회의 수치)와는 <strong>다른 모집단</strong>이며, KIPRIS 출원공개 지연과 주간 갱신 때문에 ‘최근’은 마지막 반영분 기준입니다.</p>
-      {leaderboard.itemCount === 0
-        ? <p className="empty">이 스냅샷에는 아직 월 단위 집계가 없습니다. 다음 파이프라인 재실행 후 표시됩니다.</p>
-        : <>
-        <div className="leader-controls">
-          <div className="leader-window" role="group" aria-label="기간 선택">{LEADER_WINDOWS.map(({ months, label }) => <button type="button" key={months} className={leaderMonths === months ? "active" : ""} onClick={() => setLeaderMonths(months)}>{label}</button>)}</div>
-          <div className="leader-metric" role="group" aria-label="출원·등록 기준">
-            <button type="button" className={leaderMetric === "application" ? "active" : ""} aria-pressed={leaderMetric === "application"} onClick={() => setLeaderMetric("application")}>출원</button>
-            <button type="button" className={leaderMetric === "registration" ? "active" : ""} aria-pressed={leaderMetric === "registration"} onClick={() => setLeaderMetric("registration")}>등록</button>
-          </div>
-          <span className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} · 직전 대비 {monthRangeLabel(leaderboard.priorKeys)}</span>
-        </div>
-        <div className="leader-grid">
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>{leaderMetric === "application" ? "출원" : "등록"}이 많은 품목 TOP {LEADER_LIMIT}</h3><CsvDownloadButton onClick={() => downloadCsv(`동향_품목${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "품목", "유형", leaderMetric === "application" ? "출원" : "등록"], leaderboard.topItems.map((row, index) => [index + 1, row.name, row.category?.label ?? "", leaderMetric === "application" ? row.app : row.reg]))} /></div>
-            {leaderboard.topItems.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topItems.map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const top = leaderMetric === "application" ? leaderboard.topItems[0].app : leaderboard.topItems[0].reg; return <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${top ? Math.max(4, value / top * 100) : 0}%` }} /></span><b>{number(value)}</b></button></li>; })}</ol>}
-          </article>
-
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>{leaderMetric === "application" ? "출원" : "등록"}이 많은 유형</h3><CsvDownloadButton onClick={() => downloadCsv(`동향_유형${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "유형", leaderMetric === "application" ? "출원" : "등록", "비중"], leaderboard.topCategories.map((row, index) => [index + 1, row.label, leaderMetric === "application" ? row.app : row.reg, leaderboard.categoryTotal ? `${Math.round((leaderMetric === "application" ? row.app : row.reg) / leaderboard.categoryTotal * 100)}%` : ""]))} /></div>
-            {leaderboard.topCategories.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topCategories.map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const share = leaderboard.categoryTotal ? value / leaderboard.categoryTotal : 0; return <li key={row.label}><button type="button" onClick={() => gotoCategory(row.code)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.label}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, share * 100)}%`, background: categoryShareColor(row.label) }} /></span><b>{number(value)}<small>{percent(share)}</small></b></button></li>; })}</ol>}
-          </article>
-
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>출원 급증 품목</h3><span className="leader-card-note">직전 동일 기간 대비</span></div>
-            {leaderboard.surging.length === 0 ? <p className="empty">이 기간에 뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건 기준).</p> : <ol className="leader-list">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-delta">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</span><b>{number(row.priorApp)}→{number(row.app)}</b></button></li>)}</ol>}
-          </article>
-
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>출원 대비 등록률 상위 {LEADER_LIMIT}</h3><span className="leader-card-note">누적 · 출원 20건 이상</span></div>
-            {leaderboard.conversionHigh.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionHigh.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
-          </article>
-
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>출원 대비 등록률 하위 {LEADER_LIMIT}</h3><span className="leader-card-note">보호 전략 검토 대상</span></div>
-            {leaderboard.conversionLow.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionLow.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar leader-bar-low"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
-          </article>
-        </div>
-        <details className="method-note"><summary>집계 기준 보기</summary><p>품목 순위는 고시명칭이 확정된 품목만 하나로 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 모든 품목행을 대상으로 합니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며, 표본이 작은 품목이 왜곡하지 않도록 최소 출원 {leaderboard.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록과 출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p></details>
-      </>}
     </section>}
 
     {tab === "applications" && <section className="screen-section coverage-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
