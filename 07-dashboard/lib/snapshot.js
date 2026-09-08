@@ -9,6 +9,19 @@ const ITEM_CATEGORIES = require("../../02-normalize-items/data/item-categories-v
 // 나누고, 여기서 온 유형은 provisional: true로 표시해 화면에서 「검토 전」으로 구분한다
 // (#16 — 생성형 AI가 특산품 데이터를 직접 판정하지 않는다). 검토를 마치면 확정 표로 옮긴다.
 const ITEM_CATEGORY_PROPOSALS = require("../../02-normalize-items/data/item-categories-proposed-v1.json");
+// 2026-09-09(사용자): "회사·법인·시설 44개는 삭제. 품목을 못 짚는 브랜드명도 삭제."
+// 수집 원본에 섞여 들어온 사업체·시설 이름, 「2차가공식품」 같은 총칭, 어떤 품목인지 알
+// 수 없는 브랜드명은 유형을 붙일 대상이 아니라 목록에서 뺄 대상이다. 이름 정확 일치로만
+// 걸러 낸다 — 부분 일치로 지우면 멀쩡한 품목까지 사라진다.
+const ITEM_EXCLUSIONS = require("../../02-normalize-items/data/item-exclusions-v1.json");
+function isExcludedItemName(row) {
+  const notice = clean(row.noticeName);
+  const raw = clean(row.itemName);
+  return Boolean(ITEM_EXCLUSIONS.items[notice] || ITEM_EXCLUSIONS.items[raw]);
+}
+// 2026-09-09(사용자): "기타는 일괄 삭제해줘 대쉬보드에서 보여주지 말고." 유형이 정해지지
+// 않는 이름은 분류가 아니라 제외 대상이다 — 화면에 유형 없는 덩어리를 남기지 않는다.
+const CATEGORY_EXCLUDED_CODES = new Set(["other"]);
 const { checkMapGeographyCoverage } = require("./mapGeographyCoverage");
 
 const DASHBOARD_SCHEMA_VERSION = "dashboard-snapshot-v1";
@@ -49,11 +62,15 @@ function itemCategory(row) {
   const confirmed =
     lookupCategory(ITEM_CATEGORIES.items, row.noticeName) ||
     lookupCategory(ITEM_CATEGORIES.items, row.itemName);
-  if (confirmed) return { code: confirmed, label: ITEM_CATEGORIES.categories[confirmed] || confirmed };
+  if (confirmed) {
+    return CATEGORY_EXCLUDED_CODES.has(confirmed)
+      ? null
+      : { code: confirmed, label: ITEM_CATEGORIES.categories[confirmed] || confirmed };
+  }
   const proposed =
     lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.noticeName) ||
     lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.itemName);
-  if (!proposed) return null;
+  if (!proposed || CATEGORY_EXCLUDED_CODES.has(proposed)) return null;
   return { code: proposed, label: ITEM_CATEGORIES.categories[proposed] || proposed, provisional: true };
 }
 
@@ -248,6 +265,21 @@ function assertInputs(analysis, gap, strategy) {
   }
   if (!strategy || !Array.isArray(strategy.briefings)) {
     throw new Error("strategy는 ⑥단계 출력이어야 합니다 (briefings 배열 필요).");
+  }
+  // 2026-09-09(사용자): 품목이 아닌 이름(사업체·총칭·불명 브랜드)은 여기서 통째로 뺀다.
+  // 유형만 비워 두면 화면 어디에나 계속 끼어들고 분모도 부풀린다.
+  const isDropped = (row) =>
+    isExcludedItemName(row) ||
+    CATEGORY_EXCLUDED_CODES.has(
+      lookupCategory(ITEM_CATEGORIES.items, row.noticeName) ||
+        lookupCategory(ITEM_CATEGORIES.items, row.itemName) ||
+        lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.noticeName) ||
+        lookupCategory(ITEM_CATEGORY_PROPOSALS.items, row.itemName) ||
+        ""
+    );
+  const excludedRows = analysis.regionItems.filter(isDropped);
+  if (excludedRows.length > 0) {
+    analysis = { ...analysis, regionItems: analysis.regionItems.filter((row) => !isDropped(row)) };
   }
   if (
     strategy.sourceScoreVersion &&
@@ -903,6 +935,7 @@ module.exports = {
   canonicalItem,
   createRegionIndex,
   itemCategory,
+  isExcludedItemName,
   dataState,
   resolveRegion,
   rowKey,

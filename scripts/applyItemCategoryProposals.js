@@ -17,7 +17,7 @@
 
 const fs = require("fs");
 const path = require("path");
-const { itemCategory } = require("../07-dashboard/lib/snapshot");
+const { itemCategory, isExcludedItemName } = require("../07-dashboard/lib/snapshot");
 
 function parseArgs(argv) {
   const args = {};
@@ -39,15 +39,22 @@ function main() {
   );
   const snapshot = JSON.parse(fs.readFileSync(snapshotPath, "utf8").replace(/^﻿/, ""));
 
-  const counts = { filled: 0, provisional: 0, already: 0, stillNull: 0 };
+  // 행을 지우지는 않는다. coverage·pipelineStatus의 집계(1,826 / 2,215 …)는 파이프라인
+  // 단계에서 계산된 값이라 여기서 행만 빼면 화면 숫자가 서로 어긋난다. 제외는 빌더
+  // (buildDashboardSnapshot)에서 하고, 그 결과는 다음 파이프라인 실행 때 집계와 함께
+  // 일관되게 반영된다. 여기서는 유형만 채운다 — 제외 대상은 itemCategory()가 null을
+  // 돌려주므로 「기타」로 뜨지 않고 미분류로 남는다.
+  const counts = { filled: 0, provisional: 0, already: 0, stillNull: 0, cleared: 0 };
   for (const region of snapshot.regions || []) {
     for (const item of region.items || []) {
-      if (item.category) { counts.already += 1; continue; }
-      const category = itemCategory({
-        noticeName: item.noticeName,
-        itemName: item.itemName,
-        matchingBasis: item.matchingBasis,
-      });
+      const row = { noticeName: item.noticeName, itemName: item.itemName, matchingBasis: item.matchingBasis };
+      const category = itemCategory(row);
+      if (item.category) {
+        // 앞선 실행에서 「기타」로 채워졌던 행은 되돌린다(이제 제외 대상이다).
+        if (!category && isExcludedItemName(row)) { item.category = null; counts.cleared += 1; continue; }
+        counts.already += 1;
+        continue;
+      }
       if (!category) { counts.stillNull += 1; continue; }
       item.category = category;
       counts.filled += 1;
@@ -57,7 +64,7 @@ function main() {
 
   console.log(
     `유형 채움 ${counts.filled}행(그중 검토 전 제안 ${counts.provisional}) · ` +
-      `이미 있음 ${counts.already} · 여전히 미분류 ${counts.stillNull}`
+      `제외 대상 되돌림 ${counts.cleared}행 · 이미 있음 ${counts.already} · 미분류 ${counts.stillNull}`
   );
   if (args["dry-run"]) {
     console.log("--dry-run: 파일을 쓰지 않았습니다.");
