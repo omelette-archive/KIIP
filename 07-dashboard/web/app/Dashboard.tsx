@@ -190,6 +190,8 @@ const LEADER_LIMIT = 5;
 // 1.3배는 4개 창(1·3·6·12개월) 전부에서 TOP5가 안 바뀌는 견고한 값으로 확인됨(교차검증).
 const LEADER_ACCEL_MIN_GROWTH = 1.3;
 const LEADER_FRESH_LIMIT = 3;
+// #119: 비즈니스 전략 탭의 "주요 품목" 칩 개수. 나머지는 수기 검색으로(협업자 요청).
+const STRATEGY_CHIP_LIMIT = 12;
 // 급증·등록전환 순위가 표본이 작은 품목(창 기간 출원 1~2건)으로 왜곡되지 않도록
 // 창 길이에 비례한 최소 출원 건수 컷오프를 둔다(#118 열린 질문).
 function leaderMinBase(months: number) { return Math.max(6, months * 2); }
@@ -907,6 +909,12 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [strategySortDir, setStrategySortDir] = useState<"asc" | "desc">("desc");
   const [strategySelectedKey, setStrategySelectedKey] = useState("");
   const [strategyFilter, setStrategyFilter] = useState("");
+  // 이슈 #119(협업자 2026-09-02): "비즈니스 전략 탭은 삭제하지 말고 두자. 각 단계별로
+  // 지정상품 예시 나오는 거 구현해줘. 주요 샘플은 탭에서 선택할 수 있도록 하고, 나머지는
+  // 수기 입력해서 검색하는 걸로." → 탭을 품목 중심으로 재구성한다(#116 09-01 "주요
+  // 품목별로 조회", #74 "해당 지역이 아니라 전체 상표DB로부터 탐색").
+  const [strategyItem, setStrategyItem] = useState("");
+  const [strategyItemQuery, setStrategyItemQuery] = useState("");
   const [strategyShowAll, setStrategyShowAll] = useState(false);
   useEffect(() => { setStrategyShowAll(false); }, [strategyFilter]);
   // UI 검토(3차, 2026-09-06) S4: 특화작목 비교 — 9개 도 × 8개 열 넓은 표 대신, 도 9칸
@@ -1462,6 +1470,37 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // UI 검토(3차, 2026-09-06) S3: 비즈니스 전략 — 브리핑이 있는 모든 지역×품목 조합을
   // 한 줄씩 담은 표. 이슈 #116(2026-08-26)에서 만든 브리핑 데이터를 카드 나열 대신
   // 표+상세 패널로 보여준다.
+  // #119: 비즈니스 전략 탭의 품목 중심 목록 — businessFlow(전국 원물→가공→서비스)가 붙은
+  // 품목만 대상. 품목별 조회의 itemRows와 달리 그 탭의 검색·유형 필터에 묶이지 않는다.
+  const strategyFlowRows = useMemo(() => {
+    const rows = new Map<string, { name: string; category: ItemCategory | null; flow: NationwideFlow | null; trademarks: number; regions: string[]; regionCounts: Record<string, number>; provinceCounts: Record<string, number>; matchedItems: Item[] }>();
+    for (const region of regionalRegions) {
+      for (const item of region.items) {
+        const name = officialItemLabel(item);
+        if (!name) continue;
+        const row = rows.get(name) || { name, category: item.category || null, flow: null, trademarks: 0, regions: [], regionCounts: {}, provinceCounts: {}, matchedItems: [] };
+        if (!row.flow && item.businessFlow) row.flow = item.businessFlow;
+        if (!row.category && item.category) row.category = item.category;
+        if (item.metrics.uniqueTrademarkCount.availability === "available") {
+          const value = item.metrics.uniqueTrademarkCount.value || 0;
+          row.trademarks += value;
+          row.regionCounts[region.region] = (row.regionCounts[region.region] || 0) + value;
+          const province = region.sido || region.region;
+          row.provinceCounts[province] = (row.provinceCounts[province] || 0) + value;
+        }
+        if (!row.regions.includes(region.region)) row.regions.push(region.region);
+        row.matchedItems.push(item);
+        rows.set(name, row);
+      }
+    }
+    return [...rows.values()].filter((row) => row.flow).sort((a, b) => (b.flow!.totalCount - a.flow!.totalCount) || b.trademarks - a.trademarks);
+  }, [regionalRegions]);
+  const strategyFlowFiltered = useMemo(() => {
+    const keyword = strategyItemQuery.trim().toLocaleLowerCase("ko-KR");
+    if (!keyword) return strategyFlowRows;
+    return strategyFlowRows.filter((row) => row.name.toLocaleLowerCase("ko-KR").includes(keyword) || (row.category?.label || "").toLocaleLowerCase("ko-KR").includes(keyword));
+  }, [strategyFlowRows, strategyItemQuery]);
+  const strategySelectedFlow = strategyFlowFiltered.find((row) => row.name === strategyItem) || strategyFlowFiltered[0] || null;
   const strategyRows = useMemo(() => {
     const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; isGapAlert: boolean }[] = [];
     for (const region of regionalRegions) {
@@ -1830,7 +1869,31 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     </section>}
 
     {tab === "strategy" && <section className="screen-section strategy-screen" role="tabpanel" id="primary-tabpanel-strategy" aria-labelledby="primary-tab-strategy">
-      <p className="screen-note">지역×품목 단위 비즈니스 확장 전략 브리핑입니다. 표에서 행을 고르면 오른쪽에 브리핑과 근거가 열립니다.</p>
+      <div className="section-heading"><div><h2>품목별 비즈니스 확장 경로</h2></div><span>전국 상표DB 기준 · 지역 한정 아님</span></div>
+      <p className="screen-note">품목을 고르면 그 품목의 전국 상표가 <strong>원물 → 가공품 → 서비스</strong> 어느 단계까지 나와 있는지, 단계별로 어떤 <strong>지정상품</strong>이 출원됐는지, 그리고 아직 비어 있는 확장 방향을 함께 보여줍니다. 특정 지역의 현황이 아니라 전체 상표DB에서 탐색한 결과입니다.</p>
+
+      {strategyFlowRows.length === 0
+        ? <p className="empty">전국 흐름 데이터가 아직 이 스냅샷에 없습니다. 전국 흐름 배치 재실행 후 표시됩니다.</p>
+        : <>
+          <div className="strategy-item-picker">
+            <div className="strategy-item-chips" role="group" aria-label="주요 품목 선택">
+              {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.flow!.totalCount)}</small></button>)}
+            </div>
+            <label className="search-field strategy-item-search"><span className="sr-only">품목 직접 검색</span><input type="search" value={strategyItemQuery} placeholder={`품목명 직접 입력 · 전체 ${strategyFlowRows.length}개`} onChange={(event) => { setStrategyItemQuery(event.target.value); setStrategyItem(""); }} /></label>
+          </div>
+          {strategyItemQuery.trim() && <p className="screen-note">검색 결과 {strategyFlowFiltered.length}개{strategyFlowFiltered.length > 0 ? ` · ${strategySelectedFlow?.name} 표시 중` : ""}</p>}
+
+          {strategySelectedFlow?.flow ? <div className="strategy-flow-detail">
+            <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
+            <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.accelerating.some((s) => s.name === strategySelectedFlow.name) || leaderboard.freshEntries.some((s) => s.name === strategySelectedFlow.name)} />
+            {/* 협업자 요청(#116 2026-08-26): "전체 쌀 상표 출원 중에 지역별 출원 비중도 분석결과에 포함". */}
+            <section className="item-share-block"><div className="section-heading"><div><h2>{strategySelectedFlow.name} 광역 단위 출원 비중</h2></div><span>지역 주소 일치 출원 {number(strategySelectedFlow.trademarks)}건 기준</span></div><ProvinceShareDonut counts={strategySelectedFlow.provinceCounts} label={strategySelectedFlow.name} /></section>
+            {(() => { const briefingItem = strategySelectedFlow.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences.length) || strategySelectedFlow.matchedItems.find((entry) => entry.briefing?.sentences.length); return briefingItem?.briefing ? <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${strategySelectedFlow.name} 지역 브랜드 진단`} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></> : null; })()}
+          </div> : <p className="empty">검색 결과가 없습니다.</p>}
+        </>}
+
+      <details className="strategy-table-toggle">
+      <summary><span>지역×품목 공백 알림 표 전체 보기</span><small>{strategyRows.length}건</small></summary>
       {strategyRows.length === 0 && <p className="empty">아직 표시할 브리핑이 없습니다.</p>}
       {strategyRows.length > 0 && <>
         <div className="strategy-table-toolbar">
@@ -1880,6 +1943,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           </aside>
         </div>
       </>}
+      </details>
     </section>}
 
     {tab === "compare" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-compare" aria-labelledby="primary-tab-compare">
