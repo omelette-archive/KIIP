@@ -29,11 +29,10 @@ type PositionedMapLabel = { name: string; displayName: string; x: number; y: num
 const STATE_LABELS: Record<string, string> = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "검토중", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
 // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
 // "지역·품목별 조회" 탭으로 합치고, 탭 안에서 지역별/품목별을 토글로 고른다.
-const EXPLORE_TABS: Tab[] = ["applications", "regions", "items"];
+const EXPLORE_TABS: Tab[] = ["applications", "regions", "items", "strategy"];
 const PRIMARY_NAV: { key: Tab; label: string }[] = [
   { key: "summary", label: "요약" },
   { key: "applications", label: "지역·품목별 조회" },
-  { key: "strategy", label: "비즈니스 전략" },
   { key: "compare", label: "특화작목 비교" },
   { key: "data", label: "데이터 개요" },
 ];
@@ -1044,6 +1043,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const [strategySelectedKey, setStrategySelectedKey] = useState("");
   const [strategyFilter, setStrategyFilter] = useState("");
   const [strategyShowAll, setStrategyShowAll] = useState(false);
+  const [strategyPolicyOnly, setStrategyPolicyOnly] = useState(false);
   useEffect(() => { setStrategyShowAll(false); }, [strategyFilter]);
   // UI 검토(3차, 2026-09-06) S4: 특화작목 비교 — 9개 도 × 8개 열 넓은 표 대신, 도 9칸
   // 스트립에서 하나를 고르면 그 도만 상세로 보여준다(전체 표는 토글 뒤에 남김).
@@ -1704,19 +1704,23 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   // 한 줄씩 담은 표. 이슈 #116(2026-08-26)에서 만든 브리핑 데이터를 카드 나열 대신
   // 표+상세 패널로 보여준다.
   const strategyRows = useMemo(() => {
-    const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; isGapAlert: boolean }[] = [];
+    const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; policyTier: string | null; isTopPriority: boolean; isGapAlert: boolean }[] = [];
     for (const region of regionalRegions) {
       for (const item of region.items) {
-        if (!item.briefing?.sentences.length) continue;
+        const policyBadge = item.regionalSpecialtyCropBadge;
+        const noRights = rightsStatusOf(item).key === "none";
+        // 정책 지정 작목 + 무권리는 브리핑이 없어도 후보 목록에 올린다(최우선).
+        const topPriority = Boolean(policyBadge) && noRights;
+        if (!item.briefing?.sentences.length && !topPriority) continue;
         rows.push({
           key: `${regionKey(region)}::${item.specialtyId || itemName(item)}`,
           region,
           item,
           regionLabel: displayRegionName(region.region),
           itemLabel: officialItemLabel(item) || itemName(item),
-          uniqueTrademarkCount: item.briefing.evidence?.uniqueTrademarkCount ?? null,
-          registrationRate: item.briefing.evidence?.registrationRate ?? null,
-          localApplicantShare: item.briefing.evidence?.localApplicantShare ?? null,
+          uniqueTrademarkCount: item.briefing?.evidence?.uniqueTrademarkCount ?? (noRights ? 0 : null),
+          registrationRate: item.briefing?.evidence?.registrationRate ?? null,
+          localApplicantShare: item.briefing?.evidence?.localApplicantShare ?? null,
           // 이슈 #136(2026-09-07) 요청: 지역 확인 출원만 보면 3건이 많은지 적은지 가늠이
           // 안 된다 — 그 품목의 전국 검색 건수와 지역이 차지하는 비중을 같이 보여준다.
           // 전국 검색 건수는 지역 귀속 검증 전 후보라 확정 수치와 다른 모집단이다
@@ -1724,7 +1728,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           nationwideCount: nationwideReach(item).count,
           nationwideShare: nationwideReach(item).share,
           nationwideCapped: nationwideReach(item).capped,
-          isGapAlert: item.briefing.isGapAlert,
+          // 정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건이면 최우선 권리화 후보다.
+          policyTier: policyBadge?.tier || null,
+          isTopPriority: topPriority,
+          isGapAlert: item.briefing?.isGapAlert ?? true,
         });
       }
     }
@@ -1732,12 +1739,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   }, [regionalRegions]);
   const strategyRowsFiltered = useMemo(() => {
     const query = strategyFilter.trim().toLowerCase();
-    const filtered = query ? strategyRows.filter((row) => row.regionLabel.toLowerCase().includes(query) || row.itemLabel.toLowerCase().includes(query)) : strategyRows;
+    const searched = query ? strategyRows.filter((row) => row.regionLabel.toLowerCase().includes(query) || row.itemLabel.toLowerCase().includes(query)) : strategyRows;
+    const filtered = strategyPolicyOnly ? searched.filter((row) => row.policyTier) : searched;
     const dir = strategySortDir === "asc" ? 1 : -1;
     const numeric = (value: number | null) => value ?? -Infinity;
     return [...filtered].sort((a, b) => {
       let cmp = 0;
-      if (strategySortKey === "verdict") cmp = Number(a.isGapAlert) - Number(b.isGapAlert);
+      if (strategySortKey === "verdict") cmp = (Number(a.isTopPriority) * 2 + Number(a.isGapAlert)) - (Number(b.isTopPriority) * 2 + Number(b.isGapAlert));
       else if (strategySortKey === "region") cmp = a.regionLabel.localeCompare(b.regionLabel, "ko-KR");
       else if (strategySortKey === "item") cmp = a.itemLabel.localeCompare(b.itemLabel, "ko-KR");
       else if (strategySortKey === "trademark") cmp = numeric(a.uniqueTrademarkCount) - numeric(b.uniqueTrademarkCount);
@@ -1749,7 +1757,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       if (cmp !== 0) return cmp;
       return numeric(b.uniqueTrademarkCount) - numeric(a.uniqueTrademarkCount) || a.regionLabel.localeCompare(b.regionLabel, "ko-KR") || a.itemLabel.localeCompare(b.itemLabel, "ko-KR");
     });
-  }, [strategyRows, strategyFilter, strategySortKey, strategySortDir]);
+  }, [strategyRows, strategyFilter, strategySortKey, strategySortDir, strategyPolicyOnly]);
   const strategySelectedRow = strategyRowsFiltered.find((row) => row.key === strategySelectedKey) || strategyRowsFiltered[0] || null;
   // 528건 표를 한 번에 다 그리면 상세 패널이 축소 화면(1단 적층)에서 한참 아래로 밀린다.
   // S5(품목별 조회)와 같은 방식으로 상위 100건만 먼저 보여주고 "전체 보기"로 확장한다.
@@ -1778,7 +1786,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     }
     setTab(next);
   }
-  const goExplore = (mode: "region" | "item") => { setTab(mode === "item" ? "items" : "applications"); setSelectedRegionCode(""); setSelectedItemId(""); };
+  const goExplore = (mode: "region" | "item" | "strategy") => { setTab(mode === "item" ? "items" : mode === "strategy" ? "strategy" : "applications"); setSelectedRegionCode(""); setSelectedItemId(""); };
   // 이슈 #118: 리더보드 항목/카테고리 클릭 시 품목별 조회로 이동.
   const gotoItemDetail = (name: string) => { setItemQuery(""); setCategoryFilter(""); setItemShowAll(true); setSelectedItemName(name); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   const gotoCategory = (code: string | null) => { setItemQuery(""); setSelectedItemName(""); setCategoryFilter(code || ""); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
@@ -1800,9 +1808,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     goPrimaryTab(nextKey);
     requestAnimationFrame(() => document.getElementById(`primary-tab-${nextKey}`)?.focus());
   }
-  const exploreSubnav = (mode: "region" | "item") => <div className="explore-subnav" role="tablist" aria-label="지역·품목별 조회 전환">
+  const exploreSubnav = (mode: "region" | "item" | "strategy") => <div className="explore-subnav" role="tablist" aria-label="지역·품목별 조회 전환">
     <button type="button" role="tab" aria-selected={mode === "region"} className={mode === "region" ? "active" : ""} onClick={() => goExplore("region")}>지역별</button>
     <button type="button" role="tab" aria-selected={mode === "item"} className={mode === "item" ? "active" : ""} onClick={() => goExplore("item")}>품목별</button>
+    <button type="button" role="tab" aria-selected={mode === "strategy"} className={mode === "strategy" ? "active" : ""} onClick={() => goExplore("strategy")}>전략 브리핑</button>
   </div>;
   return <main className="shell">
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => goPrimaryTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><h1>지역 특산품-상표 분석·정책지원 플랫폼</h1></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span><button type="button" className="copy-link-button" onClick={copyCurrentLink}>{linkCopied ? "복사됨" : "이 화면 링크 복사"}</button></div></header>
@@ -2203,13 +2212,14 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </div>
     </section>}
 
-    {tab === "strategy" && <section className="screen-section strategy-screen" role="tabpanel" id="primary-tabpanel-strategy" aria-labelledby="primary-tab-strategy">
+    {tab === "strategy" && <section className="screen-section strategy-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
+      {exploreSubnav("strategy")}
       <p className="screen-note">지역×품목 단위 비즈니스 확장 전략 브리핑입니다. 표에서 행을 고르면 오른쪽에 브리핑과 근거가 열립니다. <b>지역 확인 출원</b>은 출원인 주소가 그 지역과 일치한 확정 건수, <b>전국 검색</b>은 같은 품목명의 전국 검색 결과(지역 확인 전 후보)로 서로 다른 모집단이며, <b>전국 대비</b>는 두 값의 비율입니다.</p>
       {strategyRows.length === 0 && <p className="empty">아직 표시할 브리핑이 없습니다.</p>}
       {strategyRows.length > 0 && <>
         <div className="strategy-table-toolbar">
           <label className="strategy-filter-field"><span>지역·품목 검색</span><input type="search" value={strategyFilter} placeholder="지역명 또는 품목명" onChange={(event) => setStrategyFilter(event.target.value)} /></label>
-          <CsvDownloadButton onClick={() => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], strategyRowsFiltered.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", row.isGapAlert ? "공백 알림" : "양호"]))} />
+          <label className="strategy-policy-filter"><input type="checkbox" checked={strategyPolicyOnly} onChange={(event) => setStrategyPolicyOnly(event.target.checked)} /><span>특화작목만</span><b>{number(strategyRows.filter((row) => row.isTopPriority).length)}건 최우선</b></label><CsvDownloadButton onClick={() => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], strategyRowsFiltered.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", row.isGapAlert ? "공백 알림" : "양호"]))} />
         </div>
         <div className="strategy-table-layout">
           <div className="strategy-table-wrap">
@@ -2231,13 +2241,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
                   onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setStrategySelectedKey(row.key); } }}
                 >
                   <td>{row.regionLabel}</td>
-                  <td>{row.itemLabel}</td>
+                  <td>{row.itemLabel}{row.policyTier && <em className={`crop-badge crop-badge-${row.policyTier}`} title="농촌진흥청 지역특화작목">{row.policyTier}</em>}</td>
                   <td>{row.uniqueTrademarkCount !== null ? `${number(row.uniqueTrademarkCount)}건` : "—"}</td>
                   <td className="strategy-nationwide" title={row.nationwideCapped ? "검색 상한(1,800건)에 걸려 실제 전국 건수는 이보다 많습니다" : undefined}>{nationwideCountLabel(row.nationwideCount, row.nationwideCapped)}</td>
                   <td className="strategy-nationwide" title={row.nationwideCapped ? "분모가 검색 상한에 걸려 실제 비중은 이보다 작습니다" : undefined}>{nationwideShareLabel(row.nationwideShare, row.nationwideCapped)}</td>
                   <td>{row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td>
                   <td>{row.localApplicantShare !== null ? percent(row.localApplicantShare) : "—"}</td>
-                  <td><span className={row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}>{row.isGapAlert ? "공백 알림" : "양호"}</span></td>
+                  <td>{row.isTopPriority ? <span className="strategy-table-badge priority" title="정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건입니다">최우선</span> : <span className={row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}>{row.isGapAlert ? "공백 알림" : "양호"}</span>}</td>
                 </tr>)}
               </tbody>
             </table>
@@ -2245,7 +2255,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             {!strategyShowAll && strategyRowsFiltered.length > STRATEGY_ROW_LIMIT && <button type="button" className="item-list-show-all" onClick={() => setStrategyShowAll(true)}>전체 {number(strategyRowsFiltered.length)}건 보기 →</button>}
           </div>
           <aside className="strategy-detail">
-            {strategySelectedRow && strategySelectedRow.item.briefing ? <>
+            {strategySelectedRow && !strategySelectedRow.item.briefing ? <div className="strategy-no-briefing">
+              <strong>{strategySelectedRow.regionLabel} · {strategySelectedRow.itemLabel}</strong>
+              <p>정책이 육성하기로 지정한 작목인데 지역 주소가 확인된 상표 출원이 <b>0건</b>입니다. 자동 생성 브리핑은 출원 실적이 있는 품목에만 만들어지므로 아직 없습니다 — 권리화를 먼저 검토할 대상입니다.</p>
+              <button type="button" className="strategy-jump-link" onClick={() => { chooseRegion(strategySelectedRow.region); setSelectedItemId(strategySelectedRow.item.specialtyId || ""); setTab("regions"); }}>지자체별 조회에서 자세히 보기 →</button>
+            </div> : strategySelectedRow && strategySelectedRow.item.briefing ? <>
               <BusinessStrategyCard
                 briefing={strategySelectedRow.item.briefing}
                 title={`${strategySelectedRow.regionLabel} · ${strategySelectedRow.itemLabel}`}
