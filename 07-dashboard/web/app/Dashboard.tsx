@@ -750,6 +750,46 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
     </section>
   );
 }
+// 이슈 #136(협업자 2026-09-06): "DB 내에서 찾은 발견 외에, 비즈니스 확장 방향을 제안해
+// 줄 수는 없어?" — 전국 흐름(businessFlow)의 단계별 건수·상품류·지역 분포에서 규칙으로
+// 확장 방향을 파생한다. 문장은 흐름 데이터에서 바로 나오는 사실이라 caveat 없이 조용히
+// 보여준다([[feedback_no_ai_labels_on_dashboard]] — "AI 판정"류 표기 금지).
+function expansionSuggestions(flow: NationwideFlow, opts: { surging?: boolean } = {}): { kind: string; text: string }[] {
+  const { raw, processed, service } = flow.stages;
+  const out: { kind: string; text: string }[] = [];
+  const rawRegion = raw.topRegions?.[0]?.region;
+  const processedRegion = processed.topRegions?.[0]?.region;
+  const topRawClass = raw.classes?.[0];
+  if (raw.count >= 20 && service.count / Math.max(1, raw.count) < 0.15) {
+    out.push({ kind: "service_gap", text: `서비스·확장 단계 상표가 원물 대비 ${Math.round(service.count / Math.max(1, raw.count) * 100)}%뿐입니다 — 체험·유통·식음(41·43·44류) 진출 여지가 큽니다.` });
+  }
+  if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < 0.3) {
+    out.push({ kind: "processed_gap", text: `가공품 브랜딩(${number(processed.count)}건)이 원물(${number(raw.count)}건)에 비해 적습니다 — 가공식품·음료류(29·30·32) 상표가 아직 미개척입니다.` });
+  }
+  if (topRawClass && topRawClass.share > 0.6) {
+    out.push({ kind: "class_concentration", text: `원물 상표가 ${niceClassLabel(topRawClass.classCode)}에 ${Math.round(topRawClass.share * 100)}% 집중돼 있습니다 — 인접 상품류로 포트폴리오를 넓힐 여지가 있습니다.` });
+  }
+  if (rawRegion && processedRegion && rawRegion !== processedRegion) {
+    out.push({ kind: "cluster_split", text: `원물 상표 활동은 ${displayRegionName(rawRegion)}, 가공은 ${displayRegionName(processedRegion)}에서 두드러집니다 — 산지에서 가공 브랜드를 키울 때 산지 연계 스토리를 활용할 수 있습니다.` });
+  }
+  if (opts.surging) {
+    out.push({ kind: "momentum", text: "최근 출원이 급증하는 품목입니다 — 선점 경쟁이 빨라지고 있어 조기 출원 전략이 필요합니다." });
+  }
+  if (out.length === 0 && service.count > processed.count * 0.3) {
+    out.push({ kind: "balanced", text: "원물·가공·서비스 전 단계에 상표 활동이 고르게 있습니다 — 지역 특화 세부 상품류를 겨냥한 차별화가 다음 과제입니다." });
+  }
+  return out.slice(0, 4);
+}
+function ExpansionSuggestionsCard({ flow, itemLabel, surging }: { flow: NationwideFlow; itemLabel: string; surging?: boolean }) {
+  const suggestions = expansionSuggestions(flow, { surging });
+  if (suggestions.length === 0) return null;
+  return (
+    <section className="expansion-card">
+      <div className="section-heading"><div><h2>{itemLabel} 확장 방향 제안</h2></div><span>전국 흐름 데이터 기반</span></div>
+      <ul className="expansion-list">{suggestions.map((s) => <li key={s.kind}><span className="expansion-dot" aria-hidden="true" />{s.text}</li>)}</ul>
+    </section>
+  );
+}
 // UI 검토(#136) 07번: "고유 상표 1건·등록률 100%는 공백 알림, 6건·등록률 17%는 양호"처럼
 // 배지 판정이 눈에 보이는 근거와 반대로 보인다는 지적 — 실제로는 출원 건수(5건 도달 시
 // 포화)와 등록률을 7:3 가중으로 종합한 결과라(05-detect-brand-gap/lib/scorer.js), 건수가
@@ -1757,6 +1797,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             </>}
             {nationwideOnly > 0 && <p className="provisional-note">지역 확인 전 전국 검색 후보 {number(nationwideOnly)}건은 위 확정 수치에 포함하지 않았습니다.</p>}
             {flowItem?.businessFlow && <NationwideFlowCard flow={flowItem.businessFlow} itemLabel={row.name} origins={[...row.regions].sort((a, b) => (row.regionCounts[b] || 0) - (row.regionCounts[a] || 0)).slice(0, 3)} />}
+            {flowItem?.businessFlow && <ExpansionSuggestionsCard flow={flowItem.businessFlow} itemLabel={row.name} surging={leaderboard.surging.some((s) => s.name === row.name)} />}
             {briefingItem?.briefing && <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${row.name} 비즈니스 확장 전략`} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></>}
           </>; })() : <p className="empty">왼쪽 목록에서 품목을 선택하세요.</p>}</div>
         </div>
@@ -1992,6 +2033,7 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>
     {item.businessFlow && <NationwideFlowCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
+    {item.businessFlow && <ExpansionSuggestionsCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
     {item.briefing && item.briefing.sentences.length > 0 && <><BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" /><BusinessStrategyDisclaimer templateVersion={item.briefing.templateVersion} /></>}
     <section className="trademark-examples"><div className="example-heading"><strong>{itemName(item)} 등록 사례</strong><span>등록 {number(registeredCount)}건 중 사례 {number(registeredExamples.length)}건</span></div>{registeredExamples.length ? <div className="example-list">{registeredExamples.map((example, index) => <article key={example.applicationNumber || `${example.title}-${index}`}><div><strong>{example.title || "상표명 미기록"}</strong><small>{[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).join(" · ")}</small></div><span className="goods-chip">등록</span>{giMarkLabel(example.applicationNumber) && <span className="gi-mark-chip">{giMarkLabel(example.applicationNumber)}</span>}{example.goodsEvidence.length > 0 && <p>지정상품: {example.goodsEvidence.map((row) => `${row.designatedProductName || "명칭 미기록"}${row.classCode ? ` (${row.classCode}류)` : ""}`).join(", ")}</p>}<small className="example-region-note">지역 주소 일치</small>{example.applicationNumber && <button type="button" className="kipris-link" title={`KIPRIS에서 이 상표(출원번호 ${example.applicationNumber})의 검색 결과를 새 창으로 엽니다`} onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS에서 결과 보기 ↗</button>}</article>)}</div> : <p className="empty">등록 항목이 확인되지 않았습니다.</p>}</section>
   </div>;

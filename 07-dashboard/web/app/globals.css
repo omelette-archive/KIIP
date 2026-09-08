@@ -540,6 +540,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .nationwide-flow-origins strong { color: var(--green-dark); margin-right: 6px; }
 .nationwide-flow-eg { margin-top: 5px; color: var(--muted); font-size: 11px; line-height: 1.4; white-space: normal; }
 .nationwide-flow-eg b { display: inline-block; margin-right: 4px; padding: 0 5px; border-radius: 4px; background: rgba(16,25,43,.08); color: var(--ink); font-size: 11px; font-weight: 800; vertical-align: 1px; }
+/* 이슈 #136: 확장 방향 제안 — 전국 흐름 데이터에서 규칙 파생한 권고. */
+.expansion-card { margin-top: 14px; padding: 16px 20px; border: 1px solid var(--line); border-left: 3px solid var(--green); border-radius: 12px; background: var(--surface); }
+.expansion-card .section-heading h2 { font-size: 16px; }
+.expansion-list { list-style: none; margin: 12px 0 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+.expansion-list li { position: relative; padding-left: 18px; color: var(--ink); font-size: 12.5px; line-height: 1.6; }
+.expansion-dot { position: absolute; left: 2px; top: 7px; width: 6px; height: 6px; border-radius: 50%; background: var(--green); }
 .business-strategy { margin-top: 18px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 14px; background: var(--green-soft); }
 .business-strategy.alert { border-color: #e2c59b; background: var(--amber-soft); }
 .strategy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
