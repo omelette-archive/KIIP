@@ -457,9 +457,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       + cell("지리적표시 등록", registry, registry ? "품목 등록됨" : "미확인",
              "농수산물 품질관리법에 따른 지리적표시 등록(농관원·산림청·수산물품질관리원). 상표권이 아닙니다. 이 품목이 GI 목록에 있다는 뜻이며, 이 지역이 등록권자라는 뜻은 아닙니다.")
       + cell("단체표장", collective > 0, collective > 0 ? `${number(collective)}건` : "없음",
-             "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+             "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")
       + cell("증명표장", certification > 0, certification > 0 ? `${number(certification)}건` : "없음",
-             "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+             "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")
       + `</span><small>등록은 농수산물 품질관리법(상표권 아님), 단체·증명표장은 상표법 — 서로 다른 제도입니다</small></div>`;
   }
   const markTypeBreakdown = (examples) => {
@@ -1269,6 +1269,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const verifiedExamples = registrationExamples.entries.find((entry) => entry.region === region.region && entry.specialtyId === item.specialtyId)?.examples || [];
     const examples = [...verifiedExamples, ...(item.trademarkExamples || [])]
       .filter((example, index, rows) => rows.findIndex((row) => row.applicationNumber === example.applicationNumber) === index);
+    // 2026-09-08(사용자 "표장은 예시로 최근 출원 10건만 보여주는 거야? 전체 지역에서?
+    // 아님 지역별로?"): 예시 10건은 지역×품목 행마다 뽑지만, 후보 풀이 품목명으로 돌린
+    // 전국 검색 결과라 지역 확인 건이 적으면 나머지 칸이 전국 공통으로 채워진다 —
+    // 소고기는 34개 지역이 사실상 같은 32건을 돌려 보고 있었다. 그런 표본으로 표장 종류나
+    // 지리적표시 보유를 세면 남의 지역 상표가 이 지역 것으로 잡힌다. 지역 귀속이 필요한
+    // 집계는 inside만 쓴다(어제 지역 상표 패널을 고친 것과 같은 기준).
+    const localExamples = examples.filter((example) => example.applicantRegionMatch === "inside");
     const registeredExamples = examples.filter((example) => {
       const registered = example.statusCategory === "registered" || (example.applicationStatus || "").includes("등록");
       const local = example.applicantRegionMatch === "inside" ||
@@ -1292,7 +1299,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
         ${typeof item.metrics.localApplicantCount?.value === "number" ? `<article><span>권리주체</span><strong>${number(item.metrics.localApplicantCount.value)}곳</strong><small>${typeof item.metrics.producerApplicantShare?.value === "number" ? `생산자단체·지자체 ${percent(item.metrics.producerApplicantShare.value)}` : "지역 확인된 출원의 고유 출원인 수"}</small></article>` : ""}${(() => { const rights = rightsStatusOf(item); return `<article class="rights-status rights-status-${rights.key}"><span>권리 상태</span><strong>${esc(rights.label)}</strong><small>${esc(rights.note)}</small></article>`; })()}<article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
-      ${examples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(examples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>예시 ${number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : ""}${giHoldingsHtml(item, examples)}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
+      ${localExamples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(localExamples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>이 지역 확인 출원 ${number(localExamples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : examples.length > 0 ? `<div class="mark-type-row"><strong>표장 종류</strong><small>이 지역 주소로 확인된 출원이 표본에 없어 표장 종류를 셀 수 없습니다 — 표본 ${number(examples.length)}건은 전국 검색 후보라 이 지역 것이 아닙니다.</small></div>` : ""}${giHoldingsHtml(item, localExamples)}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
       ${item.briefing && item.briefing.sentences.length > 0 ? `${businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략", "", nationwideReach(item))}${businessStrategyDisclaimerHtml(item.briefing.templateVersion)}` : ""}
       <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${goodsStageLabel(example.goodsEvidence) ? `<span class="goods-stage-chip" title="${esc("지정상품 명칭으로 판정한 밸류체인 단계입니다. 류가 아니라 지정상품 기준입니다.")}">${esc(goodsStageLabel(example.goodsEvidence))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="KIPRIS에서 이 상표(출원번호 ${esc(example.applicationNumber)})의 검색 결과를 새 창으로 엽니다" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 결과 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;
