@@ -1500,13 +1500,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 없어 별도 등록원부 수집이 끝난 뒤 붙인다(analyzeNationwideFlow.js 재실행 필요).
     const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
     const hasExamples = ["raw", "processed", "service"].some((key) => { const eg = flow.stages[key].examples; return eg && ((eg.representative || []).length || (eg.unusual || []).length); });
+    const hasDesignatedGoods = ["raw", "processed", "service"].some((key) => flow.stages[key].examples && flow.stages[key].examples.source === "designated_goods");
     const stagesHtml = ["raw", "processed", "service"].map((key, index) => {
       const stage = flow.stages[key]; const eg = stage.examples;
       const classesHtml = Array.isArray(stage.classes) && stage.classes.length ? `<small class="nationwide-flow-eg"><b>주요 상품류</b> ${esc(stage.classes.slice(0, 3).map((row) => `${niceClassLabel(row.classCode)} ${Math.round(row.share * 100)}%`).join(" · "))}</small>` : "";
       const regionsHtml = Array.isArray(stage.topRegions) && stage.topRegions.length
         ? `<small class="nationwide-flow-eg"><b>상위 지역</b> ${esc(stage.topRegions.slice(0, 3).map((row) => `${row.region} ${Math.round(row.share * 100)}%`).join(" · "))}</small>`
         : (stage.topRegion ? `<small class="nationwide-flow-region">${esc(stage.topRegion)}</small>` : "");
-      return `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(stage.count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(stage.count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${classesHtml}${regionsHtml}${eg && (eg.representative || []).length ? `<small class="nationwide-flow-eg"><b>대표</b> ${esc(eg.representative.join(", "))}</small>` : ""}${eg && (eg.unusual || []).length ? `<small class="nationwide-flow-eg"><b>이색</b> ${esc(eg.unusual.join(", "))}</small>` : ""}</div>`;
+      return `${index > 0 ? '<i class="nationwide-flow-arrow" aria-hidden="true">→</i>' : ""}<div class="nationwide-flow-stage nationwide-flow-stage-${key}"><span>${FLOW_STAGE_LABELS[key]}</span><strong>${number(stage.count)}건</strong><small class="nationwide-flow-share">전체의 ${flowPct(stage.count)}</small><small class="nationwide-flow-hint">${FLOW_STAGE_HINTS[key]}</small>${classesHtml}${regionsHtml}${eg && (eg.representative || []).length ? `<small class="nationwide-flow-eg"><b>${eg.source === "designated_goods" ? "대표 지정상품" : "대표 상표명"}</b> ${esc(eg.representative.join(", "))}</small>` : ""}${eg && (eg.unusual || []).length ? `<small class="nationwide-flow-eg"><b>${eg.source === "designated_goods" ? "이색 지정상품" : "이색 상표명"}</b> ${esc(eg.unusual.join(", "))}</small>` : ""}</div>`;
     }).join("");
     const originsHtml = Array.isArray(origins) && origins.length ? `<p class="nationwide-flow-origins"><strong>주요 원산지</strong> ${esc(origins.map(displayRegionName).join(", "))}</p>` : "";
     return `<section class="nationwide-flow-card">
@@ -1515,7 +1516,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       <div class="nationwide-flow-stages">${stagesHtml}</div>
       ${originsHtml}
       ${clusterNote}
-      <p class="nationwide-flow-caveat">${hasExamples ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 텍스트 대조는 등록원부 보강 후 반영됩니다." : "단계별 상품류·상위 지역·상표명 예시는 전국 흐름 재수집 후 채워집니다."}</p>
+      <p class="nationwide-flow-caveat">${hasExamples ? (hasDesignatedGoods ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 예시는 각 단계 상위 출원의 실제 지정상품 명칭에서 뽑았습니다." : "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 예시는 상표명 기준이며 지정상품 명칭 대조는 재수집 후 반영됩니다.") : "단계별 상품류·상위 지역·예시는 전국 흐름 재수집 후 채워집니다."}</p>
     </section>`;
   };
   // 이슈 #136(협업자 2026-09-06): 전국 흐름에서 규칙 파생한 확장 방향 제안. Dashboard.tsx

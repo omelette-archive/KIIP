@@ -11,7 +11,7 @@ type ItemCategory = { code: string; label: string };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
-type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[] } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
+type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[]; source?: "designated_goods" | "trademark_title" } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
 type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
@@ -725,6 +725,7 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
   // 없어 별도 등록원부 수집(analyzeNationwideFlow.js 재실행)이 끝난 뒤 붙인다.
   const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
   const hasExamples = (["raw", "processed", "service"] as const).some((key) => flow.stages[key].examples && (flow.stages[key].examples!.representative.length || flow.stages[key].examples!.unusual.length));
+  const hasDesignatedGoods = (["raw", "processed", "service"] as const).some((key) => flow.stages[key].examples?.source === "designated_goods");
   return (
     <section className="nationwide-flow-card">
       <div className="section-heading"><div><h2>{itemLabel} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
@@ -739,14 +740,14 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
             <small className="nationwide-flow-hint">{FLOW_STAGE_HINTS[key]}</small>
             {stage.classes && stage.classes.length > 0 && <small className="nationwide-flow-eg"><b>주요 상품류</b> {stage.classes.slice(0, 3).map((row) => `${niceClassLabel(row.classCode)} ${Math.round(row.share * 100)}%`).join(" · ")}</small>}
             {stage.topRegions && stage.topRegions.length > 0 ? <small className="nationwide-flow-eg"><b>상위 지역</b> {stage.topRegions.slice(0, 3).map((row) => `${row.region} ${Math.round(row.share * 100)}%`).join(" · ")}</small> : stage.topRegion && <small className="nationwide-flow-region">{stage.topRegion}</small>}
-            {stage.examples && stage.examples.representative.length > 0 && <small className="nationwide-flow-eg"><b>대표</b> {stage.examples.representative.join(", ")}</small>}
-            {stage.examples && stage.examples.unusual.length > 0 && <small className="nationwide-flow-eg"><b>이색</b> {stage.examples.unusual.join(", ")}</small>}
+            {stage.examples && stage.examples.representative.length > 0 && <small className="nationwide-flow-eg"><b>{stage.examples.source === "designated_goods" ? "대표 지정상품" : "대표 상표명"}</b> {stage.examples.representative.join(", ")}</small>}
+            {stage.examples && stage.examples.unusual.length > 0 && <small className="nationwide-flow-eg"><b>{stage.examples.source === "designated_goods" ? "이색 지정상품" : "이색 상표명"}</b> {stage.examples.unusual.join(", ")}</small>}
           </div>
         </Fragment>; })}
       </div>
       {origins && origins.length > 0 && <p className="nationwide-flow-origins"><strong>주요 원산지</strong> {origins.map(displayRegionName).join(", ")}</p>}
       {clusterNote && <p className="nationwide-flow-note">{clusterNote}</p>}
-      <p className="nationwide-flow-caveat">{hasExamples ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 텍스트 대조는 등록원부 보강 후 반영됩니다." : "단계별 상품류·상위 지역·상표명 예시는 전국 흐름 재수집 후 채워집니다."}</p>
+      <p className="nationwide-flow-caveat">{hasExamples ? (hasDesignatedGoods ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 예시는 각 단계 상위 출원의 실제 지정상품 명칭에서 뽑았습니다." : "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 예시는 상표명 기준이며 지정상품 명칭 대조는 재수집 후 반영됩니다.") : "단계별 상품류·상위 지역·예시는 전국 흐름 재수집 후 채워집니다."}</p>
     </section>
   );
 }
