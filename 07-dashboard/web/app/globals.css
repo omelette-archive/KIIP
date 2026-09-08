@@ -36,16 +36,19 @@ button, a { -webkit-tap-highlight-color: transparent; }
 a { color: inherit; text-decoration: none; }
 
 .shell { width: 100%; max-width: none; margin: 0; padding: 0 clamp(16px, 2.5vw, 52px) 48px; }
+/* 이슈 #136(2026-09-07): PC에서 머리말(상단 바 + 탭 + 서브탭 + 칩 + 검색 + 안내)이
+   화면 위쪽 340px가량을 차지해 본문이 접힘선 아래로 밀렸다는 지적 — 줄 수를 줄이고
+   각 줄의 높이도 낮춘다. 정보는 빼지 않고 배치만 압축한다. */
 .topbar {
-  min-height: 86px; display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  min-height: 60px; display: flex; align-items: center; justify-content: space-between; gap: 24px;
   border-bottom: 1px solid rgba(16, 25, 43, 0.1);
 }
 .brand { display: inline-flex; align-items: center; gap: 12px; }
 .brand-button { padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }
-.brand-mark { display: block; width: 56px; height: 37px; object-fit: contain; }
+.brand-mark { display: block; width: 40px; height: 26px; object-fit: contain; }
 .footer-logo { display: block; height: 26px; width: auto; opacity: 0.92; }
 .brand strong, .brand small, .brand h1 { display: block; }
-.brand h1 { margin: 0; font-size: 25px; font-weight: 700; letter-spacing: -0.035em; }
+.brand h1 { margin: 0; font-size: 20px; font-weight: 700; letter-spacing: -0.035em; }
 .brand small { margin-top: 2px; color: var(--muted); font-size: 11px; }
 .snapshot-meta { display: flex; align-items: center; gap: 12px; color: var(--muted); font-size: 12px; }
 .sample-badge { padding: 6px 10px; border: 1px solid #c3e0a0; border-radius: 999px; color: #3f7a1f; background: #eef7e3; font-weight: 700; }
@@ -248,11 +251,21 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   backdrop-filter: blur(14px);
 }
 /* 이슈 #116(2026-09-01): "지역·품목별 조회" 탭 안에서 지역별/품목별을 고르는 토글 */
-.explore-subnav { display: inline-flex; gap: 4px; margin-bottom: 14px; padding: 4px; border: 1px solid var(--line); border-radius: 11px; background: #eef2f7; }
-.explore-subnav button { min-width: 96px; padding: 8px 16px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
+.explore-subnav { display: inline-flex; gap: 4px; margin-bottom: 14px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: #eef2f7; }
+/* 이슈 #136(2026-09-07): 지역별/품목별 토글·검색·정렬이 각각 한 줄씩 차지하던 것을
+   한 줄로 합친다(지자체별 상세에서는 토글 + "전국 시도 비교로" 버튼). */
+.explore-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+.explore-toolbar > .explore-subnav { flex: none; margin-bottom: 0; }
+.explore-toolbar > .drill-back { margin: 0; }
+.explore-toolbar > .item-search-row { flex: 1; min-width: 0; }
+@media (max-width: 760px) {
+  .explore-toolbar { flex-wrap: wrap; }
+  .explore-toolbar > .item-search-row { flex-basis: 100%; }
+}
+.explore-subnav button { min-width: 88px; padding: 7px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
 .explore-subnav button:hover { color: var(--ink); }
 .explore-subnav button.active { background: #fff; color: var(--green-dark); box-shadow: var(--shadow); }
-.primary-tabs button { min-height: 46px; padding: 8px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.primary-tabs button { min-height: 38px; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
 
@@ -325,8 +338,8 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-kpis small { margin-top: 8px; font-size: 11px; line-height: 1.55; }
 .coverage-rate-kpi { background: var(--green-dark); color: white; }
 .coverage-rate-kpi span, .coverage-rate-kpi small { color: #cfe0f2; }
-.coverage-map-card, .coverage-insight, .coverage-directory { padding: 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.coverage-directory { margin-top: 20px; }
+.coverage-map-card, .coverage-insight, .coverage-directory { padding: 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.coverage-directory { margin-top: 14px; }
 .trend-chart { width: 100%; margin: 20px 0 0; padding: 18px 22px 14px; border: 1px solid #d9e3ef; border-radius: 14px; background: linear-gradient(180deg, #fff 0%, #f5f8fc 100%); box-shadow: 0 6px 18px rgba(16, 45, 76, .06); }
 .trend-chart .section-heading { margin-bottom: 12px; align-items: flex-end; }
 .trend-chart .section-heading h2 { margin: 0; font-size: 19px; }
@@ -474,11 +487,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-unclassified-grid { margin-bottom: 14px; }
 .coverage-region-card.unclassified { border-style: dashed; background: #fff7ed; }
 .coverage-category-shares { margin: 0 0 20px; padding-top: 0; border-top: none; }
-.coverage-municipality-toggle { margin-top: 4px; padding: 0; border: 1px solid var(--line); border-radius: 12px; background: #f8f9fb; }
-.coverage-municipality-toggle summary { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 15px 17px; color: var(--green-dark); font-weight: 800; cursor: pointer; }
-.coverage-municipality-toggle summary small { color: var(--muted); font-size: 12px; font-weight: 600; }
-.coverage-municipality-toggle[open] summary { border-bottom: 1px solid var(--line); }
-.coverage-municipality-toggle > div:last-child { padding: 14px; }
+/* 이슈 #136(2026-09-07): 지역별 조회를 품목별 조회와 같은 마스터-디테일로 맞춘다 —
+   시군구 카드를 <details>(coverage-municipality-toggle) 뒤에 숨기는 대신, 왼쪽에 늘
+   보이는 지자체 스크롤 목록(품목별의 .item-list-panel과 같은 규격)을 두고 오른쪽에 고른
+   지자체 상세를 연다. 토글 방식은 시군구를 하나 고르면 목록 자체가 사라져 다른
+   시군구로 옮겨갈 수 없었고, 펼치면 문서 높이가 7,900px까지 늘었다. */
+.coverage-explorer { margin-top: 4px; }
+.coverage-explorer .item-list button b { min-width: 44px; text-align: right; }
+.coverage-detail-panel { min-width: 0; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.coverage-detail-panel > .empty { margin: 0; padding: 14px 2px 0; color: var(--muted); font-size: 12.5px; }
+.coverage-detail-panel .coverage-region-card { background: #fff; }
 .coverage-region-head { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 12px; }
 .coverage-region-head strong, .coverage-region-head small { display: block; }
 .coverage-region-head strong { font-size: 19px; font-weight: 800; }
@@ -617,16 +635,157 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .strategy-table tbody tr:hover { background: #f4f6f9; }
 .strategy-table tbody tr.active { background: var(--green-soft); }
 .strategy-table tbody tr:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
+/* 이슈 #136(2026-09-07): 전국 검색·전국 대비는 지역 확인 출원과 모집단이 다른 참고값이라
+   확정 수치와 같은 무게로 읽히지 않게 옅게 둔다. */
+.strategy-table td.strategy-nationwide { color: var(--muted); }
 .strategy-table-badge { display: inline-flex; padding: 3px 9px; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; font-weight: 800; }
 .strategy-table-badge.alert { background: var(--amber-soft); color: var(--amber); }
 .strategy-detail .business-strategy { margin-top: 0; }
 .goods-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: var(--green-soft); color: var(--green); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .goods-chip.review { background: var(--amber-soft); color: var(--amber); }
 .gi-mark-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #eef1fb; color: #4a4fc4; font-size: 11px; font-weight: 800; white-space: nowrap; }
+/* 2026-09-08 요청: 품목별 화면의 지역 칩을 눌러 그 지역 출원 상표를 바로 본다.
+   워드클라우드는 크기로 출원량을 이미 나타내므로, 버튼으로 바꿔도 글자 크기는 유지한다. */
+.region-chip-button { padding: 2px 6px; border: 1px solid transparent; border-radius: 7px; background: transparent; font-weight: 700; line-height: 1.5; cursor: pointer; }
+.region-chip-button:hover { border-color: var(--line); background: #f4f6f9; }
+.region-chip-button.active { border-color: var(--green); background: var(--green-soft); box-shadow: inset 0 0 0 1px var(--green); }
+.item-regions-detail summary small { margin-left: 8px; color: var(--faint); font-size: 11px; font-weight: 600; }
+.region-trademark-panel { margin-top: 12px; padding: 14px 16px; border: 1px solid var(--green); border-radius: 12px; background: var(--green-soft); }
+.region-trademark-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.region-trademark-head strong { display: block; font-size: 14px; }
+.region-trademark-head small { display: block; margin-top: 3px; color: var(--muted); font-size: 11.5px; }
+.region-trademark-close { padding: 4px 10px; border: 1px solid var(--line); border-radius: 999px; background: #fff; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
+.region-trademark-list { display: flex; flex-direction: column; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.region-trademark-list li { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 9px; background: #fff; }
+.region-trademark-name { font-size: 12.5px; font-weight: 700; color: var(--ink); }
+.region-trademark-status { padding: 2px 8px; border-radius: 999px; font-size: 10.5px; font-weight: 800; }
+.region-trademark-status.registered { background: var(--green-soft); color: var(--green-dark); }
+.region-trademark-status.pending { background: #eef2f7; color: var(--muted); }
+.region-trademark-goods { flex-basis: 100%; color: var(--muted); font-size: 11px; line-height: 1.5; }
+.region-trademark-panel .kipris-link { margin-left: auto; }
+/* 2026-09-08: 지역·품목별 조회 정리. 범위 요약을 지도·추이 위 가로 스트립으로 올려
+   "이 범위가 어떤가"를 먼저 읽게 하고, 유형별 통계는 표와 원그래프를 한 섹션에 모은다. */
+.coverage-insight-strip { display: flex; align-items: center; flex-wrap: wrap; gap: 14px 28px; margin-bottom: 14px; padding: 14px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.coverage-insight-strip h2 { margin: 0; font-size: 17px; white-space: nowrap; }
+.coverage-insight-strip .rate-hero { display: flex; align-items: center; gap: 12px; margin: 0; }
+.coverage-insight-strip .coverage-insight-stats { display: flex; flex-wrap: wrap; gap: 10px 24px; margin: 0 0 0 auto; }
+.coverage-insight-strip .coverage-insight-stats > div { display: flex; align-items: baseline; gap: 7px; }
+.coverage-insight-strip dt { color: var(--muted); font-size: 11.5px; }
+.coverage-insight-strip dd { margin: 0; font-size: 13px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.category-stats-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.category-stats-donuts h3 { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
+@media (max-width: 760px) { .coverage-insight-strip .coverage-insight-stats { margin-left: 0; } }
+/* 2026-09-08: 권리 상태 네 칸을 요약 첫 지표로. 네 칸은 순서가 있는 진단 단계라
+   순차가 아니라 상태 색(위험→양호)을 쓰고, 값은 숫자로 함께 적는다. */
+.rights-board { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.rights-board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.rights-board-head strong { font-size: 14px; }
+.rights-board-head span { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
+.rights-board-bar { display: flex; height: 12px; border-radius: 999px; overflow: hidden; background: #eef2f7; }
+.rights-board-bar .seg { display: block; }
+.seg-none { background: var(--red); }
+.seg-service-only { background: var(--amber); }
+.seg-goods { background: var(--green); }
+.seg-unknown { background: repeating-linear-gradient(135deg, #dfe5ee, #dfe5ee 5px, #eef2f7 5px, #eef2f7 6px); }
+.rights-board-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.rights-board-legend li { padding-left: 10px; border-left: 3px solid var(--line); }
+.rights-board-legend li.seg-none { border-left-color: var(--red); background: none; }
+.rights-board-legend li.seg-service-only { border-left-color: var(--amber); background: none; }
+.rights-board-legend li.seg-goods { border-left-color: var(--green); background: none; }
+.rights-board-legend li.seg-unknown { border-left-color: #c7cfdb; background: none; }
+.rights-board-legend b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rights-board-legend span { display: block; margin-top: 1px; font-size: 12px; font-weight: 700; }
+.rights-board-legend small { display: block; margin-top: 2px; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
+.rights-board-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
+/* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
+   진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
+.matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.matrix-table { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 2px; font-size: 11.5px; }
+.matrix-table thead th { padding: 6px 4px; color: var(--muted); font-size: 10.5px; font-weight: 800; text-align: center; white-space: nowrap; }
+.matrix-table thead th:first-child { text-align: left; }
+.matrix-table tbody th { padding: 4px 8px 4px 0; font-size: 11.5px; font-weight: 700; text-align: left; white-space: nowrap; }
+.matrix-cell { padding: 6px 4px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.matrix-cell.step--1 { background: #f4f6f9; color: var(--faint); }
+.matrix-cell.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-cell.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-cell.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-cell.step-3 { background: #4a8ac4; color: var(--ink); } /* 흰 글자는 대비 3.67로 AA 미달 — 먹 글자 4.79 */
+.matrix-cell.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-cell.matrix-total { font-weight: 800; }
+.matrix-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; font-size: 11px; color: var(--muted); }
+.matrix-legend > span { font-weight: 700; color: var(--ink); }
+.matrix-legend em { padding: 3px 8px; border-radius: 4px; font-style: normal; font-weight: 700; }
+.matrix-legend em.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-legend em.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-legend em.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-legend em.step-3 { background: #4a8ac4; color: var(--ink); }
+.matrix-legend em.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-legend b { margin-left: auto; color: var(--faint); font-weight: 600; }
+/* 2026-09-08: 품목 유형별 출원 현황 표. 단일 지표(출원율) 크기 비교라 순차 단일 색
+   막대 하나면 충분하고, 값은 옆에 숫자로 함께 적어 색만으로 읽히지 않게 한다. */
+.category-stats { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+/* 넓은 화면에서는 표와 원그래프를 나란히 둔다 — 세로로 쌓으면 같은 주어를 두 번
+   스크롤하게 된다(2026-09-08 "한 항목씩 아래로 나온다"). */
+@media (min-width: 1180px) {
+  .category-stats-body { display: grid; grid-template-columns: minmax(0, 1.7fr) minmax(240px, .8fr); gap: 20px; align-items: start; }
+  .category-stats-body .tablewrap-scroll { margin-top: 0; }
+  .category-stats-donuts { grid-template-columns: 1fr; margin-top: 0; padding-top: 0; border-top: 0; }
+}
+.tablewrap-scroll { overflow-x: auto; margin-top: 12px; }
+.category-stats-table { width: 100%; min-width: 620px; border-collapse: collapse; font-size: 12.5px; }
+.category-stats-table th, .category-stats-table td { padding: 8px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.category-stats-table thead th { color: var(--muted); font-size: 11px; font-weight: 800; letter-spacing: .02em; background: #f4f6f9; }
+.category-stats-table thead th:first-child, .category-stats-table tbody th { text-align: left; }
+.category-stats-table tbody th { font-size: 12.5px; font-weight: 700; }
+.category-stats-table tbody tr:hover { background: #f4f6f9; }
+.category-stats-table tbody tr:last-child th, .category-stats-table tbody tr:last-child td { border-bottom: 0; }
+.category-stats-table td.num { font-variant-numeric: tabular-nums; color: var(--ink); }
+.category-stats-table td.rate { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.category-stats-table td.rate b { min-width: 38px; font-variant-numeric: tabular-nums; color: var(--green-dark); }
+.rate-bar { flex: 1; min-width: 60px; max-width: 130px; height: 8px; border-radius: 999px; background: #e6ebf2; overflow: hidden; }
+.rate-bar i { display: block; height: 100%; border-radius: 999px; background: var(--green); }
+@media (max-width: 900px) { .category-stats { padding: 18px 16px; } }
+/* 컨설팅 보고서 Ⅲ장 4.2(2026-09-08): 권리 상태 네 칸. "행위만 보호"가 가장 위험한데
+   지금까지 "출원 확인 · 양호"로 잡히고 있었으므로 경고색으로 눈에 띄게 한다. */
+.detail-grid article.rights-status strong { font-size: 17px; }
+.detail-grid article.rights-status-none strong { color: var(--red); }
+.detail-grid article.rights-status-service-only { border-color: var(--amber); background: var(--amber-soft); }
+.detail-grid article.rights-status-service-only strong { color: var(--amber); }
+.detail-grid article.rights-status-goods strong { color: var(--green); }
+.detail-grid article.rights-status-unknown strong { color: var(--muted); }
+/* 컨설팅 보고서 Ⅲ장 1.2.4(2026-09-08): 권리 현황에서 가장 먼저 확인할 것이 표장 종류다.
+   단체표장·증명표장은 눈에 띄어야 하고, 일반상표는 대다수라 조용해야 한다. */
+/* 컨설팅 보고서 Ⅲ장 4.1(2026-09-08): "출발점이 곧 기축 상품류"를 화면에서 확인할 수 있게
+   류(NICE) 기준 4구간 분포를 흐름 카드 안에 둔다. 위 3단계(상표명 기준 근사)와는 기준이
+   다르므로 시각적으로도 분리한다. */
+.report-chain { margin-top: 16px; padding: 14px 16px; border: 1px solid var(--line); border-radius: 12px; background: #f8fafc; }
+.report-chain-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 6px 14px; margin-bottom: 10px; }
+.report-chain-head strong { font-size: 12.5px; }
+.report-chain-head span { color: var(--muted); font-size: 11.5px; }
+.report-chain-head b { color: var(--green-dark); }
+.report-chain-rows { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 6px 10px; }
+.report-chain-label { font-size: 12px; font-weight: 700; color: var(--ink); white-space: nowrap; }
+.report-chain-label small { margin-left: 5px; color: var(--faint); font-size: 10.5px; font-weight: 600; }
+.report-chain-track { height: 9px; border-radius: 999px; background: #e6ebf2; overflow: hidden; }
+.report-chain-track i { display: block; height: 100%; border-radius: 999px; background: var(--green); }
+.report-chain-value { font-size: 11.5px; font-weight: 700; color: var(--green-dark); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.report-chain-caveat { margin: 10px 0 0; color: var(--faint); font-size: 11px; line-height: 1.6; }
+/* 지정상품 명칭으로 판정한 밸류체인 단계(2026-09-08). 류가 아니라 지정상품 기준이라
+   같은 29류라도 「소고기」와 「곰취말랭이」가 다르게 잡힌다. */
+.goods-stage-chip { align-self: start; padding: 5px 7px; border-radius: 999px; background: #e9f3ec; color: #256b45; font-size: 11px; font-weight: 800; white-space: nowrap; }
+.mark-type-row { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 14px; margin-top: 14px; padding: 12px 15px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.mark-type-row > strong { font-size: 12.5px; }
+.mark-type-row > small { color: var(--faint); font-size: 11px; }
+.mark-type-chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.mark-type-chip { padding: 4px 10px; border-radius: 999px; font-size: 11.5px; font-weight: 800; font-style: normal; white-space: nowrap; }
+.mark-type-chip.mark-type-plain { background: #eef2f7; color: var(--muted); }
+.mark-type-chip.mark-type-collective { background: #eef1fb; color: #4a4fc4; }
+.mark-type-chip.mark-type-certification { background: var(--violet-soft); color: var(--violet); }
+.mark-type-chip.mark-type-other { background: #f4f6f9; color: var(--faint); }
 .example-region-note { grid-column: 1 / -1; margin-top: 2px; color: var(--green); font-size: 11px; font-weight: 700; }
 
-.screen-section { padding-top: 28px; }
-.screen-note { margin: 0 0 18px; color: var(--muted); font-size: 12px; }
+.screen-section { padding-top: 16px; }
+.screen-note { margin: 0 0 10px; color: var(--muted); font-size: 12px; }
 /* 이슈 #119: "지역 상세"는 탭 바에서 빼고 "전국 지역 비교"에서 지역을 클릭해 들어오는
    하위 화면으로 합쳤다. 돌아가는 경로를 화면 상단에 항상 노출한다. */
 .drill-back { display: inline-flex; align-items: center; gap: 6px; margin: 0 0 12px; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--green-dark); font-size: 12px; font-weight: 700; cursor: pointer; }
@@ -634,10 +793,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-screen { margin-top: 25px; padding: 25px; }
 .item-screen-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 18px; margin-bottom: 18px; }
 .item-screen-toolbar label { flex: 1; }.item-screen-toolbar input { width: min(100%, 430px); padding: 11px 13px; border: 1px solid var(--line); border-radius: 10px; background: #f4f6f9; outline: none; }.item-screen-toolbar input:focus { border-color: var(--green); box-shadow: 0 0 0 3px rgba(31,109,86,.12); }.item-screen-toolbar span { color: var(--muted); font-size: 12px; }
-.item-category-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
+.item-category-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .item-category-filter button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 .item-category-filter button.active { border-color: var(--green); background: var(--green); color: #fff; }
-.province-tabbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 14px 0 18px; }
+.province-tabbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
 .province-tabbar button { padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
 .province-tabbar button.active { border-color: var(--green); background: var(--green); color: #fff; }
 /* 이슈 #119: 지역별 모드의 17개 시도 빠른 선택 — 품목별 카테고리 칩과 같은 위치·모양 */
@@ -977,25 +1136,24 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    (2026-09-02: 지도를 키우려고 행을 span하거나 전체 폭으로 뺐다가 텍스트가 지도 옆까지
    늘어나는 문제가 있었음 — 2×2를 유지하되, 지도 stage에 최소 높이를 줘서 행1을 늘리고
    광역 구성 목록은 그 안에서 스크롤하게 해 지도를 조금 더 크게 한다.) */
-.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 18px; align-items: stretch; margin-bottom: 20px; }
+.applications-compact-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr); gap: 14px; align-items: stretch; margin-bottom: 14px; }
 .applications-compact-row > * { min-width: 0; margin: 0; }
 .applications-compact-row .province-composition { grid-column: 1; grid-row: 1; max-height: 720px; }
-.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 22px; }
-.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 18px 20px 14px; }
-.applications-compact-row .coverage-insight { grid-column: 2; grid-row: 2; padding: 22px; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row .coverage-insight-stats { grid-template-columns: 1fr; }
-.applications-compact-row .coverage-map-stage { min-height: 480px; display: flex; align-items: center; justify-content: center; }
-.applications-compact-row .coverage-map { width: 100%; max-height: 560px; }
+.applications-compact-row .coverage-map-card { grid-column: 2; grid-row: 1; padding: 18px; }
+.applications-compact-row .trend-chart { grid-column: 1; grid-row: 2; padding: 16px 18px 12px; }
+.applications-compact-row .coverage-map-stage { min-height: 340px; display: flex; align-items: center; justify-content: center; }
+.applications-compact-row .coverage-map { width: 100%; max-height: 400px; }
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
 /* national(전국, 지역 미선택): 이슈 #119 지도 중복 정리 — 전국 지도는 요약 탭에 이미
    있어 이 화면엔 안 그린다. 광역 구성표가 행1 전체 폭을 쓰고, 추이·요약은 그대로 행2. */
 .applications-compact-row.national .province-composition { grid-column: 1 / span 2; grid-row: 1; max-height: none; }
+.applications-compact-row.national .trend-chart { grid-column: 1 / span 2; grid-row: 2; }
 .applications-compact-row.national .composition-list { max-height: 420px; }
 .composition-map-link { align-self: flex-start; margin-top: 10px; }
 /* solo(지역 선택): 광역 구성 없음 → 왼쪽에 추이·요약, 오른쪽에 시군구 지도(두 행) */
+.applications-compact-row.solo { grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); }
 .applications-compact-row.solo .trend-chart { grid-column: 1; grid-row: 1; display: flex; flex-direction: column; justify-content: center; }
-.applications-compact-row.solo .coverage-insight { grid-column: 1; grid-row: 2; }
-.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1 / span 2; }
+.applications-compact-row.solo .coverage-map-card { grid-column: 2; grid-row: 1; }
 @media (max-width: 1040px) {
   .applications-compact-row,
   .applications-compact-row.solo { grid-template-columns: 1fr; }
@@ -1095,15 +1253,16 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
   .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
   .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider, .leader-controls,
-  .province-municipalities summary, .coverage-municipality-toggle summary,
+  .province-municipalities summary,
   .coverage-specialty-toggle summary, footer { display: none !important; }
   body { background: #fff; }
   .shell { max-width: none; padding: 0; }
   a { text-decoration: none; color: inherit; }
-  .ranking-table-wrap, .source-table-wrap, .coverage-region-grid { overflow: visible !important; max-height: none !important; }
+  .ranking-table-wrap, .source-table-wrap, .coverage-region-grid,
+  .item-list { overflow: visible !important; max-height: none !important; }
   table { width: 100%; table-layout: auto; }
   /* 닫혀 있던 목록(#136 01번 아코디언)도 인쇄에는 전부 펼쳐서 담는다(원래 display 유지). */
-  .province-municipalities > div, .coverage-municipality-toggle > div { display: grid !important; }
+  .province-municipalities > div { display: grid !important; }
   .coverage-specialty-toggle > div { display: flex !important; flex-wrap: wrap !important; }
 }
 /* 이슈 #119: 전국 흐름 배치 미반영 품목 안내 — 막힌 상태가 아니라 "아직 없음"으로. */

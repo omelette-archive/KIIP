@@ -1,5 +1,7 @@
 "use strict";
 
+const { isProducerLikeApplicant } = require("../../03-match-trademarks/lib/producerApplicant");
+
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
 const ANALYSIS_VERSION = "brand-analysis-v5-partial-verified-subset";
@@ -389,6 +391,13 @@ function finalizeBucket(bucket, options) {
   let invalidApplicationDateCount = 0;
   let invalidRegistrationDateCount = 0;
   let applicantAddressEvidenceCount = 0;
+  // 2026-09-08: 컨설팅 보고서 Ⅲ장 1.2.1의 전략모듈 판정은 "권리주체가 몇 곳인가"와
+  // "어떤 권리유형이 이미 있는가" 두 축으로 갈린다. 앞 축을 화면에서 답하려면 출원인
+  // 수와 성격 분포가 필요하다. 다만 출원인 이름 자체는 개인정보라 저장하지 않는다
+  // (03-match-trademarks/lib/producerApplicant.js와 같은 원칙) — 지역 확인된 출원의
+  // 고유 출원인 수와 생산자형 여부만 집계한다.
+  const localApplicantKeys = new Set();
+  const producerApplicantKeys = new Set();
   let rawGoodsNationwideCandidateCount = 0;
   let rawGoodsRegionalAddressMatchCount = 0;
   const recentBrands = [];
@@ -427,6 +436,13 @@ function finalizeBucket(bucket, options) {
     }
     goodsMatchCounts[goodsMatchCategory(hit)]++;
     ipRegistryStatusCounts[ipRegistryStatusCategory(hit)]++;
+    if (applicantRegion === "inside") {
+      const applicantName = clean(hit.applicant);
+      if (applicantName) {
+        localApplicantKeys.add(applicantName);
+        if (isProducerLikeApplicant(applicantName)) producerApplicantKeys.add(applicantName);
+      }
+    }
     trademarkExamples.push({
       title: clean(hit.title) || null,
       applicationNumber: clean(hit.applicationNumber) || null,
@@ -628,6 +644,11 @@ function finalizeBucket(bucket, options) {
     regionVerificationRate: safeRate(regionVerifiedHitCount, uniqueTrademarkCount),
     applicantAddressEvidenceCount,
     applicantAddressEvidenceRate: safeRate(applicantAddressEvidenceCount, uniqueTrademarkCount),
+    // 이름은 남기지 않고 개수·비율만 남긴다. 0이면 지역 확인 출원인 이름이 하나도
+    // 붙지 않은 상태이지 "출원인이 없다"는 뜻이 아니다.
+    localApplicantCount: localApplicantKeys.size,
+    producerApplicantCount: producerApplicantKeys.size,
+    producerApplicantShare: safeRate(producerApplicantKeys.size, localApplicantKeys.size),
     localApplicantShare: safeRate(regionCounts.inside, regionVerifiedHitCount),
     regionalBrandCounts,
     regionalBrandReferenceHitCount: regionalBrandCounts ? regionalBrandReferenceHitCount : null,
