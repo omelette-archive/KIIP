@@ -22,20 +22,27 @@ function hash(value, length = 16) {
   return crypto.createHash("sha256").update(value, "utf8").digest("hex").slice(0, length);
 }
 
-// 이슈 #109(품목 카테고리화). 고시명칭이 확정된 항목(notice_name_and_nice_class /
-// raw_item_goods_matched)만 02-normalize-items/data/item-categories-v1.json과 대조한다.
-// "신선한 "/"미가공 " 접두어는 매칭 규칙이 붙인 수식어라 대조 전에 떼어낸다 — Dashboard.tsx의
-// officialItemLabel()과 동일 규칙. 매핑에 없는 명칭(아직 미분류)은 category: null로 둔다.
-const CATEGORY_OFFICIAL_MATCHING_BASES = new Set(["notice_name_and_nice_class", "raw_item_goods_matched"]);
-const CATEGORY_DISPLAY_PREFIXES = ["신선한 ", "미가공 "];
-function itemCategory(row) {
-  const basis = clean(row.matchingBasis) || "notice_name_and_nice_class";
-  if (!CATEGORY_OFFICIAL_MATCHING_BASES.has(basis)) return null;
-  let name = clean(row.noticeName);
+// 이슈 #109(품목 카테고리화). 02-normalize-items/data/item-categories-v1.json은 사람이
+// 직접 유형화한 정적 조회표다(#16 — 생성형 AI가 특산품 데이터를 직접 판정하지 않는다).
+// "신선한 "/"미가공 " 같은 접두어는 매칭 규칙이 붙인 수식어라 대조 전에 떼어낸다 —
+// Dashboard.tsx의 officialItemLabel()과 동일 규칙. 표에 없는 명칭은 category: null로 둔다.
+//
+// 2026-09-08(사용자 "이 정도는 유형별로 분류할 수 있어야 AI 아니니? 한라봉 -> 과일"):
+// 원래는 고시명칭이 확정된 경로(notice_name_and_nice_class / raw_item_goods_matched)에서만
+// 표를 봤다. 그래서 제주 GI 목록으로 들어온 「한라봉」은 표에 「과일」로 있는데도 미분류로
+// 남았고, 같은 이름이 나주시에서는 과일, 제주도에서는 미분류로 갈렸다. 표 조회는 이름
+// 정확 일치라 경로와 무관하게 안전하다 — 게이트를 없애고 이름으로만 본다(114개 행 회복).
+const CATEGORY_DISPLAY_PREFIXES = ["신선한 ", "미가공 ", "보존처리한 ", "건조한 ", "말린 "];
+function categoryByName(rawName) {
+  const name = clean(rawName);
   if (!name) return null;
   const prefix = CATEGORY_DISPLAY_PREFIXES.find((candidate) => name.startsWith(candidate));
-  if (prefix) name = name.slice(prefix.length);
-  const code = ITEM_CATEGORIES.items[name];
+  const stripped = prefix ? name.slice(prefix.length) : name;
+  return ITEM_CATEGORIES.items[name] || ITEM_CATEGORIES.items[stripped] || null;
+}
+function itemCategory(row) {
+  // 고시명칭을 먼저 보고, 없거나 표에 없으면 수집 원본명으로도 한 번 본다.
+  const code = categoryByName(row.noticeName) || categoryByName(row.itemName);
   return code ? { code, label: ITEM_CATEGORIES.categories[code] || code } : null;
 }
 
