@@ -998,7 +998,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-window button:hover, .leader-metric button:hover { color: var(--ink); }
 .leader-window button.active, .leader-metric button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
 .leader-metric { padding-left: 8px; border-left: 1px solid var(--line); }
-.leader-window-range { color: var(--faint); font-size: 11px; }
+.leader-window-range { margin: 7px 0 0; color: var(--faint); font-size: 11px; }
 .leader-grid { display: grid; gap: 12px; margin-top: 12px; }
 .leader-grid-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .leader-grid-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
