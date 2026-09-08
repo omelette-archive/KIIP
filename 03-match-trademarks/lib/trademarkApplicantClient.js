@@ -43,7 +43,12 @@ function normalizeApplicationNumber(value) {
 function parseApplicantResponse(xml) {
   const resultCode = tagValue(xml, "resultCode");
   const resultMsg = tagValue(xml, "resultMsg");
-  if (resultCode !== "00" && resultCode !== "20") {
+  const successYN = tagValue(xml, "successYN");
+  // resultCode 20은 "결과 없음"과 "SERVICE_ACCESS_DENIED_ERROR"(일일 한도 등)에 모두 쓰인다 —
+  // 후자를 빈 결과로 삼키면 접근 거부 상태의 대량 조회가 조용히 손상된다(2026-09-08).
+  const accessDenied20 = resultCode === "20" &&
+    (String(successYN).toUpperCase() === "N" || /DENIED|ERROR/i.test(String(resultMsg || "")));
+  if ((resultCode !== "00" && resultCode !== "20") || accessDenied20) {
     throw new Error(
       `KIPRIS 상표 출원인 API 오류 [${resultCode || "UNKNOWN"}] ${resultMsg || "메시지 없음"}`
     );

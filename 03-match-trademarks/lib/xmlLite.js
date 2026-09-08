@@ -41,13 +41,25 @@ function extractItemBlocks(xml) {
   return matches.map((block) => block.replace(/^<item>/, "").replace(/<\/item>$/, ""));
 }
 
-/** KIPRIS 공통 헤더: resultCode/resultMsg/totalCount */
+/** KIPRIS 공통 헤더: resultCode/resultMsg/totalCount/successYN */
 function parseHeader(xml) {
   const resultCode = extractTag(xml, "resultCode");
   const resultMsg = extractTag(xml, "resultMsg");
+  const successYN = extractTag(xml, "successYN");
   const totalCountRaw = extractTag(xml, "totalCount");
   const totalCount = totalCountRaw ? parseInt(totalCountRaw, 10) || 0 : 0;
-  return { resultCode, resultMsg, totalCount };
+  return { resultCode, resultMsg, successYN, totalCount };
+}
+
+// KIPRIS는 resultCode 20을 "검색 결과 없음"과 "SERVICE_ACCESS_DENIED_ERROR"(일일 한도
+// 초과·IP 미등록 등)에 모두 쓴다. successYN=N 이거나 resultMsg가 DENIED/ERROR면 접근
+// 오류로 봐야 한다 — 안 그러면 접근 거부 상태에서 대량 검색을 돌릴 때 전부 "결과 0건 완료"로
+// 조용히 기록돼 산출물이 손상된다(2026-09-08 실측).
+function isResultCode20AccessError(header) {
+  if (header.resultCode !== "20") return false;
+  if (String(header.successYN).toUpperCase() === "N") return true;
+  const msg = String(header.resultMsg || "").toUpperCase();
+  return (msg.includes("DENIED") || msg.includes("ERROR")) && !msg.includes("NO_RESULT");
 }
 
 /** 상표 검색(getWordSearch) 응답 전체를 { resultCode, resultMsg, totalCount, hits } 로 파싱 */
@@ -73,6 +85,7 @@ function parseTrademarkResponse(xml) {
 function parseBibliographyDesignatedGoods(xml) {
   const resultCode = extractTag(xml, "resultCode");
   const resultMsg = extractTag(xml, "resultMsg");
+  const successYN = extractTag(xml, "successYN");
   const productBlocks = xml.match(/<asignProduct>([\s\S]*?)<\/asignProduct>/g) || [];
   const designatedGoods = productBlocks
     .map((block) => ({
@@ -81,13 +94,14 @@ function parseBibliographyDesignatedGoods(xml) {
       subCode: extractTag(block, "subCode") || null,
     }))
     .filter((row) => row.name);
-  return { resultCode, resultMsg, designatedGoods };
+  return { resultCode, resultMsg, successYN, designatedGoods };
 }
 
 module.exports = {
   parseTrademarkResponse,
   parseBibliographyDesignatedGoods,
   parseHeader,
+  isResultCode20AccessError,
   extractItemBlocks,
   extractTag,
 };

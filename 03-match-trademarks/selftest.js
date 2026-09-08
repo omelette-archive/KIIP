@@ -309,6 +309,14 @@ async function run() {
     ok("resultCode 20은 에러가 아니라 빈 배열로 처리됨");
   }
 
+  console.log("4b) resultCode 20 + SERVICE_ACCESS_DENIED_ERROR -> throw (빈 결과로 삼키지 않음)");
+  {
+    const deniedXml = `<?xml version="1.0"?><response><header><successYN>N</successYN><resultCode>20</resultCode><resultMsg>SERVICE_ACCESS_DENIED_ERROR</resultMsg></header></response>`;
+    const client = createClient({ apiKey: "test-key", fetchImpl: async () => ({ ok: true, status: 200, text: async () => deniedXml }) });
+    await assert.rejects(() => client.trademarkSearch({ searchString: "사과" }), /접근 거부|DENIED/);
+    ok("일일 한도·접근 거부(resultCode 20)를 결과 0건으로 오인하지 않고 오류로 던짐");
+  }
+
   console.log("5) resultCode 30 (미신청) -> KiprisApiError throw");
   {
     const fakeFetch = async () => ({ ok: true, status: 200, text: async () => SAMPLE_ERROR_XML });

@@ -8,7 +8,12 @@
  */
 
 const { fetchWithRetry } = require("./fetchWithRetry");
-const { parseTrademarkResponse, parseBibliographyDesignatedGoods } = require("./xmlLite");
+const {
+  parseTrademarkResponse,
+  parseBibliographyDesignatedGoods,
+  parseHeader,
+  isResultCode20AccessError,
+} = require("./xmlLite");
 const { KiprisApiError } = require("./errors");
 
 const PROTO = process.env.KIPRIS_API_PROTOCOL === "http" ? "http" : "https";
@@ -73,6 +78,10 @@ function createClient({ apiKey, fetchImpl } = {}) {
     if (!parsed.resultCode) {
       throw new KiprisApiError("99", "응답에 resultCode 가 없습니다(빈 응답일 수 있음)");
     }
+    // resultCode 20이 "SERVICE_ACCESS_DENIED_ERROR"(일일 한도 등)면 빈 결과로 삼키면 안 된다.
+    if (isResultCode20AccessError(parsed)) {
+      throw new KiprisApiError("20", parsed.resultMsg || "SERVICE_ACCESS_DENIED_ERROR");
+    }
     if (parsed.resultCode !== "00" && parsed.resultCode !== "20") {
       throw new KiprisApiError(parsed.resultCode, parsed.resultMsg);
     }
@@ -103,6 +112,9 @@ function createClient({ apiKey, fetchImpl } = {}) {
       throw new Error("designatedGoods: KIPRIS 서비스 오류 응답(HTML)");
     }
     const parsed = parseBibliographyDesignatedGoods(xml);
+    if (isResultCode20AccessError(parsed)) {
+      throw new KiprisApiError("20", parsed.resultMsg || "SERVICE_ACCESS_DENIED_ERROR");
+    }
     if (parsed.resultCode && parsed.resultCode !== "00" && parsed.resultCode !== "20") {
       throw new KiprisApiError(parsed.resultCode, parsed.resultMsg || "서지상세 조회 실패");
     }
