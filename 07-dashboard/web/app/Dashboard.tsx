@@ -1540,47 +1540,53 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
          </div>
         </div>
       </section>
-      {/* 이슈 #118: 요약 화면에 전국 출원·등록 추이 그래프를 부각한다. */}
-      <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="전국 연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
+      {/* 이슈 #118(2026-09-08): 요약 재정리 — 시간축 콘텐츠(추이 그래프 + 리더보드)를
+          "최근 동향" 한 묶음으로. 위쪽은 현황(지표·지도·랭킹), 아래쪽은 동향. */}
+      <section className="summary-recent">
+        <div className="section-heading"><div><h2>최근 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>
+        <p className="leader-scope-note">아래 추이·순위는 전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준으로 집계한 값입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>
+        <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
 
-      {/* 이슈 #118: 최근 출원·등록 동향 리더보드. 별도 탭 대신 요약 하단에 compact로. */}
-      {leaderboard.itemCount > 0 && <section className="summary-leaderboard">
-        <div className="section-heading"><div><h2>최근 출원·등록 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>
-        <p className="leader-scope-note">전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준 월별로 집계한 순위입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹의 수치)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>
-        <div className="leader-controls">
-          <div className="leader-window" role="group" aria-label="기간 선택">{LEADER_WINDOWS.map(({ months, label }) => <button type="button" key={months} className={leaderMonths === months ? "active" : ""} onClick={() => setLeaderMonths(months)}>{label}</button>)}</div>
-          <div className="leader-metric" role="group" aria-label="출원·등록 기준">
-            <button type="button" className={leaderMetric === "application" ? "active" : ""} aria-pressed={leaderMetric === "application"} onClick={() => setLeaderMetric("application")}>출원</button>
-            <button type="button" className={leaderMetric === "registration" ? "active" : ""} aria-pressed={leaderMetric === "registration"} onClick={() => setLeaderMetric("registration")}>등록</button>
+        {leaderboard.itemCount > 0 && <div className="summary-leaderboard">
+          <div className="leader-subhead"><h3>품목·유형별 최근 순위</h3>
+            <div className="leader-controls">
+              <div className="leader-window" role="group" aria-label="기간 선택">{LEADER_WINDOWS.map(({ months, label }) => <button type="button" key={months} className={leaderMonths === months ? "active" : ""} onClick={() => setLeaderMonths(months)}>{label}</button>)}</div>
+              <div className="leader-metric" role="group" aria-label="출원·등록 기준">
+                <button type="button" className={leaderMetric === "application" ? "active" : ""} aria-pressed={leaderMetric === "application"} onClick={() => setLeaderMetric("application")}>출원</button>
+                <button type="button" className={leaderMetric === "registration" ? "active" : ""} aria-pressed={leaderMetric === "registration"} onClick={() => setLeaderMetric("registration")}>등록</button>
+              </div>
+              <span className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} · 직전 대비 {monthRangeLabel(leaderboard.priorKeys)}</span>
+            </div>
           </div>
-          <span className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} · 직전 대비 {monthRangeLabel(leaderboard.priorKeys)}</span>
-        </div>
-        <div className="leader-grid">
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>{leaderMetric === "application" ? "출원" : "등록"} 많은 품목</h3><span className="leader-card-note">TOP {LEADER_LIMIT}</span></div>
-            {leaderboard.topItems.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topItems.map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const top = leaderMetric === "application" ? leaderboard.topItems[0].app : leaderboard.topItems[0].reg; return <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${top ? Math.max(4, value / top * 100) : 0}%` }} /></span><b>{number(value)}</b></button></li>; })}</ol>}
-          </article>
+          <div className="leader-grid leader-grid-primary">
+            <article className="leader-card">
+              <div className="leader-card-head"><h4>출원 급증 품목</h4><span className="leader-card-note">직전 기간 대비</span></div>
+              {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건).</p> : <ol className="leader-list">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-delta">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</span><b>{number(row.priorApp)}→{number(row.app)}</b></button></li>)}</ol>}
+            </article>
 
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>{leaderMetric === "application" ? "출원" : "등록"} 많은 유형</h3><span className="leader-card-note">비중</span></div>
-            {leaderboard.topCategories.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const share = leaderboard.categoryTotal ? value / leaderboard.categoryTotal : 0; return <li key={row.label}><button type="button" onClick={() => gotoCategory(row.code)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.label}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, share * 100)}%`, background: categoryShareColor(row.label) }} /></span><b>{number(value)}<small>{percent(share)}</small></b></button></li>; })}</ol>}
-          </article>
+            <article className="leader-card">
+              <div className="leader-card-head"><h4>{leaderMetric === "application" ? "출원" : "등록"} 많은 품목</h4><span className="leader-card-note">TOP {LEADER_LIMIT}</span></div>
+              {leaderboard.topItems.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topItems.map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const top = leaderMetric === "application" ? leaderboard.topItems[0].app : leaderboard.topItems[0].reg; return <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${top ? Math.max(4, value / top * 100) : 0}%` }} /></span><b>{number(value)}</b></button></li>; })}</ol>}
+            </article>
 
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>출원 급증 품목</h3><span className="leader-card-note">직전 기간 대비</span></div>
-            {leaderboard.surging.length === 0 ? <p className="empty">뚜렷한 급증 품목이 없습니다(최소 출원 {leaderboard.minBase}건).</p> : <ol className="leader-list">{leaderboard.surging.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-delta">{row.fresh ? <em className="leader-fresh">신규</em> : <em className="leader-growth">×{row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>}</span><b>{number(row.priorApp)}→{number(row.app)}</b></button></li>)}</ol>}
-          </article>
+            <article className="leader-card">
+              <div className="leader-card-head"><h4>{leaderMetric === "application" ? "출원" : "등록"} 많은 유형</h4><span className="leader-card-note">비중</span></div>
+              {leaderboard.topCategories.length === 0 ? <p className="empty">해당 기간 집계가 없습니다.</p> : <ol className="leader-list">{leaderboard.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = leaderMetric === "application" ? row.app : row.reg; const share = leaderboard.categoryTotal ? value / leaderboard.categoryTotal : 0; return <li key={row.label}><button type="button" onClick={() => gotoCategory(row.code)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.label}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, share * 100)}%`, background: categoryShareColor(row.label) }} /></span><b>{number(value)}<small>{percent(share)}</small></b></button></li>; })}</ol>}
+            </article>
+          </div>
 
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>등록률 상위</h3><span className="leader-card-note">누적 · 출원 20건+</span></div>
-            {leaderboard.conversionHigh.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionHigh.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
-          </article>
+          <div className="leader-subhead leader-subhead-minor"><h3>출원 대비 등록 전환</h3><span>누적 기준 · 출원 20건 이상 · 브랜드 정착/보호 전략 검토</span></div>
+          <div className="leader-grid leader-grid-secondary">
+            <article className="leader-card">
+              <div className="leader-card-head"><h4>등록률 상위</h4><span className="leader-card-note">정착이 잘 되는 품목</span></div>
+              {leaderboard.conversionHigh.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionHigh.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
+            </article>
 
-          <article className="leader-card">
-            <div className="leader-card-head"><h3>등록률 하위</h3><span className="leader-card-note">보호 전략 검토</span></div>
-            {leaderboard.conversionLow.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionLow.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar leader-bar-low"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
-          </article>
-        </div>
+            <article className="leader-card">
+              <div className="leader-card-head"><h4>등록률 하위</h4><span className="leader-card-note">전환이 안 되는 품목</span></div>
+              {leaderboard.conversionLow.length === 0 ? <p className="empty">누적 출원 20건 이상 품목이 없습니다.</p> : <ol className="leader-list">{leaderboard.conversionLow.map((row, index) => <li key={row.name}><button type="button" onClick={() => gotoItemDetail(row.name)}><span className="leader-rank">{index + 1}</span><span className="leader-name">{row.name}{row.category && <em className="leader-tag">{row.category.label}</em>}</span><span className="leader-bar leader-bar-low"><i style={{ width: `${Math.max(4, row.rate * 100)}%` }} /></span><b>{percent(row.rate)}<small>{number(row.lifeReg)}/{number(row.lifeApp)}</small></b></button></li>)}</ol>}
+            </article>
+          </div>
         <details className="method-note"><summary>집계 기준 · CSV</summary>
           <p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 {leaderboard.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p>
           <div className="leader-csv-row">
@@ -1588,7 +1594,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             <CsvDownloadButton label="유형 순위 CSV" onClick={() => downloadCsv(`동향_유형${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "유형", leaderMetric === "application" ? "출원" : "등록", "비중"], leaderboard.topCategories.map((row, index) => [index + 1, row.label, leaderMetric === "application" ? row.app : row.reg, leaderboard.categoryTotal ? `${Math.round((leaderMetric === "application" ? row.app : row.reg) / leaderboard.categoryTotal * 100)}%` : ""]))} />
           </div>
         </details>
-      </section>}
+        </div>}
+      </section>
     </section>}
 
     {tab === "applications" && <section className="screen-section coverage-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">

@@ -743,7 +743,10 @@ test("shows an adjustable year-range application/registration trend chart", asyn
   );
   // 이슈 #118: 요약·지역·품목 화면에서 추이 그래프를 같은 모양으로 부각(prominent).
   assert.match(standaloneHtml, /options\.prominent \? "trend-chart trend-chart-prominent region-trend"/);
-  assert.match(standaloneHtml, /전국 연도별 출원·등록 추이/);
+  // 이슈 #118(2026-09-08): 요약 추이 그래프는 "최근 동향" 섹션 안으로 들어가며 헤딩에서
+  // "전국" 중복 제거(섹션·스코프 노트가 이미 전국임을 밝힘).
+  assert.match(standaloneHtml, /<section class="summary-recent">/);
+  assert.match(standaloneHtml, /"연도별 출원·등록 추이", "전국 · 실제 출원일자·등록일자 기준"/);
   assert.match(
     standaloneHtml,
     /\$\{regionTrendHtml\(region, "지역 연도별 출원·등록 추이"[\s\S]*class="item-tabs word-cloud"/,

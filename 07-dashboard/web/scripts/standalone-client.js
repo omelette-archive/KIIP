@@ -693,8 +693,12 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
      </div>
     </div>
     </section>
-    ${regionTrendHtml({ region: "전국", items: regionalRegions.flatMap((region) => region.items) }, "전국 연도별 출원·등록 추이", "전국 · 실제 출원일자·등록일자 기준", { prominent: true, adjustable: true, emptyLabel: "아직 연도별 출원 데이터가 수집되지 않았습니다." })}
-    ${leaderboardHtml()}
+    <section class="summary-recent">
+      <div class="section-heading"><div><h2>최근 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>
+      <p class="leader-scope-note">아래 추이·순위는 전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준으로 집계한 값입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>
+      ${regionTrendHtml({ region: "전국", items: regionalRegions.flatMap((region) => region.items) }, "연도별 출원·등록 추이", "전국 · 실제 출원일자·등록일자 기준", { prominent: true, adjustable: true, emptyLabel: "아직 연도별 출원 데이터가 수집되지 않았습니다." })}
+      ${leaderboardHtml()}
+    </section>
     `;
   }
 
@@ -755,7 +759,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const conversionLow = [...lifetimeRows].sort((a, b) => a.rate - b.rate || b.lifeApp - a.lifeApp).slice(0, LEADER_LIMIT);
     return { windowKeys, priorKeys, minBase, topItems, topCategories, categoryTotal, surging, conversionHigh, conversionLow, itemCount: itemList.length };
   }
-  // 이슈 #118: 별도 탭 대신 요약 하단에 compact로.
+  // 이슈 #118: 별도 탭 대신 요약 "최근 동향" 묶음 안에 compact로.
   function leaderboardHtml() {
     const lb = computeLeaderboard();
     if (lb.itemCount === 0) return "";
@@ -763,8 +767,6 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const winStamp = `${lb.windowKeys[0]}_${lb.windowKeys[lb.windowKeys.length - 1]}`;
     currentCsvExporters.leaderItems = () => downloadCsv(`동향_품목${metricWord}_${winStamp}`, ["순위", "품목", "유형", metricWord], lb.topItems.map((row, index) => [index + 1, row.name, row.category?.label ?? "", state.leaderMetric === "application" ? row.app : row.reg]));
     currentCsvExporters.leaderCategories = () => downloadCsv(`동향_유형${metricWord}_${winStamp}`, ["순위", "유형", metricWord, "비중"], lb.topCategories.map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; return [index + 1, row.label, value, lb.categoryTotal ? `${Math.round(value / lb.categoryTotal * 100)}%` : ""]; }));
-    const heading = `<div class="section-heading"><div><h2>최근 출원·등록 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>`;
-    const note = `<p class="leader-scope-note">전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준 월별로 집계한 순위입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹의 수치)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>`;
     const controls = `<div class="leader-controls">
       <div class="leader-window" role="group" aria-label="기간 선택">${LEADER_WINDOWS.map(([months, label]) => `<button type="button" data-leader-window="${months}" class="${state.leaderMonths === months ? "active" : ""}">${label}</button>`).join("")}</div>
       <div class="leader-metric" role="group" aria-label="출원·등록 기준"><button type="button" data-leader-metric="application" aria-pressed="${state.leaderMetric === "application"}" class="${state.leaderMetric === "application" ? "active" : ""}">출원</button><button type="button" data-leader-metric="registration" aria-pressed="${state.leaderMetric === "registration"}" class="${state.leaderMetric === "registration" ? "active" : ""}">등록</button></div>
@@ -773,14 +775,20 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const tag = (cat) => cat ? `<em class="leader-tag">${esc(cat.label)}</em>` : "";
     const topValue = (row) => state.leaderMetric === "application" ? row.app : row.reg;
     const topMax = lb.topItems.length ? topValue(lb.topItems[0]) : 0;
-    const itemsCard = `<article class="leader-card"><div class="leader-card-head"><h3>${metricWord} 많은 품목</h3><span class="leader-card-note">TOP ${LEADER_LIMIT}</span></div>${lb.topItems.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topItems.map((row, index) => { const value = topValue(row); return `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar"><i style="width:${topMax ? Math.max(4, value / topMax * 100) : 0}%"></i></span><b>${number(value)}</b></button></li>`; }).join("")}</ol>`}</article>`;
-    const catsCard = `<article class="leader-card"><div class="leader-card-head"><h3>${metricWord} 많은 유형</h3><span class="leader-card-note">비중</span></div>${lb.topCategories.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; const share = lb.categoryTotal ? value / lb.categoryTotal : 0; return `<li><button type="button" data-goto-category="${esc(row.code || "")}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.label)}</span><span class="leader-bar"><i style="width:${Math.max(4, share * 100)}%;background:${categoryShareColor(row.label)}"></i></span><b>${number(value)}<small>${percent(share)}</small></b></button></li>`; }).join("")}</ol>`}</article>`;
-    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h3>출원 급증 품목</h3><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `<ol class="leader-list">${lb.surging.map((row, index) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-delta">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</span><b>${number(row.priorApp)}→${number(row.app)}</b></button></li>`).join("")}</ol>`}</article>`;
+    const itemsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 품목</h4><span class="leader-card-note">TOP ${LEADER_LIMIT}</span></div>${lb.topItems.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topItems.map((row, index) => { const value = topValue(row); return `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar"><i style="width:${topMax ? Math.max(4, value / topMax * 100) : 0}%"></i></span><b>${number(value)}</b></button></li>`; }).join("")}</ol>`}</article>`;
+    const catsCard = `<article class="leader-card"><div class="leader-card-head"><h4>${metricWord} 많은 유형</h4><span class="leader-card-note">비중</span></div>${lb.topCategories.length === 0 ? '<p class="empty">해당 기간 집계가 없습니다.</p>' : `<ol class="leader-list">${lb.topCategories.slice(0, LEADER_LIMIT).map((row, index) => { const value = state.leaderMetric === "application" ? row.app : row.reg; const share = lb.categoryTotal ? value / lb.categoryTotal : 0; return `<li><button type="button" data-goto-category="${esc(row.code || "")}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.label)}</span><span class="leader-bar"><i style="width:${Math.max(4, share * 100)}%;background:${categoryShareColor(row.label)}"></i></span><b>${number(value)}<small>${percent(share)}</small></b></button></li>`; }).join("")}</ol>`}</article>`;
+    const surgeCard = `<article class="leader-card"><div class="leader-card-head"><h4>출원 급증 품목</h4><span class="leader-card-note">직전 기간 대비</span></div>${lb.surging.length === 0 ? `<p class="empty">뚜렷한 급증 품목이 없습니다(최소 출원 ${lb.minBase}건).</p>` : `<ol class="leader-list">${lb.surging.map((row, index) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-delta">${row.fresh ? '<em class="leader-fresh">신규</em>' : `<em class="leader-growth">×${row.growth >= 10 ? Math.round(row.growth) : row.growth.toFixed(1)}</em>`}</span><b>${number(row.priorApp)}→${number(row.app)}</b></button></li>`).join("")}</ol>`}</article>`;
     const convRow = (row, index, low) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar${low ? " leader-bar-low" : ""}"><i style="width:${Math.max(4, row.rate * 100)}%"></i></span><b>${percent(row.rate)}<small>${number(row.lifeReg)}/${number(row.lifeApp)}</small></b></button></li>`;
-    const highCard = `<article class="leader-card"><div class="leader-card-head"><h3>등록률 상위</h3><span class="leader-card-note">누적 · 출원 20건+</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
-    const lowCard = `<article class="leader-card"><div class="leader-card-head"><h3>등록률 하위</h3><span class="leader-card-note">보호 전략 검토</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
+    const highCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 상위</h4><span class="leader-card-note">정착이 잘 되는 품목</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
+    const lowCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 하위</h4><span class="leader-card-note">전환이 안 되는 품목</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
     const methodNote = `<details class="method-note"><summary>집계 기준 · CSV</summary><p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 ${lb.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p><div class="leader-csv-row">${csvDownloadButtonHtml("leaderItems").replace("CSV 다운로드", "품목 순위 CSV")}${csvDownloadButtonHtml("leaderCategories").replace("CSV 다운로드", "유형 순위 CSV")}</div></details>`;
-    return `<section class="summary-leaderboard">${heading}${note}${controls}<div class="leader-grid">${itemsCard}${catsCard}${surgeCard}${highCard}${lowCard}</div>${methodNote}</section>`;
+    return `<div class="summary-leaderboard">
+      <div class="leader-subhead"><h3>품목·유형별 최근 순위</h3>${controls}</div>
+      <div class="leader-grid leader-grid-primary">${surgeCard}${itemsCard}${catsCard}</div>
+      <div class="leader-subhead leader-subhead-minor"><h3>출원 대비 등록 전환</h3><span>누적 기준 · 출원 20건 이상 · 브랜드 정착/보호 전략 검토</span></div>
+      <div class="leader-grid leader-grid-secondary">${highCard}${lowCard}</div>
+      ${methodNote}
+    </div>`;
   }
 
   function applicationsScreen() {
