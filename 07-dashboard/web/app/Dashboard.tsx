@@ -511,7 +511,6 @@ function RegionTrend({ region, heading = "연도별 출원·등록 추이", subt
         지역×품목 검색의 전국 검색 결과 전체(applicationYearCounts)를 합산한 값이라,
         같은 화면의 KPI(출원인 주소로 이 지역/품목이 확인된 고유 출원 수)보다 훨씬 클 수
         있다 — 두 수치가 서로 다른 모집단이라는 걸 차트에도 명시한다. */}
-    <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
     {/* UI 검토(3차, 2026-09-06) 시각화 교체안 "값 확인": 그래프 점의 정확한 값이 <title>
         마우스 호버로만 확인 가능했다 — 키보드·스크린리더·복사(CSV)로도 확인할 수 있게
         값 표 토글을 추가한다. */}
@@ -720,6 +719,28 @@ const FLOW_STAGE_HINTS: Record<"raw" | "processed" | "service", string> = { raw:
 // 이슈 #119: 단계별 주요 상품류 — NICE 13판 대분류 이름(자주 나오는 것만).
 const NICE_CLASS_LABELS: Record<string, string> = { "29": "가공식품(29)", "30": "곡물·커피·조미(30)", "31": "원물·농수산물(31)", "32": "음료·맥주(32)", "33": "주류(33)", "35": "도소매·광고(35)", "39": "운송·유통(39)", "40": "재료가공(40)", "41": "교육·체험(41)", "43": "식음·숙박(43)", "44": "농업 서비스(44)", "45": "기타 서비스(45)" };
 const niceClassLabel = (code: string) => NICE_CLASS_LABELS[code] || `${code}류`;
+// 이슈 #119(협업자 2026-09-02): 단계별 상위 5개 지역 출원 점유율을 원그래프로. topRegions는
+// 상위 출원인 주소 기준 근사치이고(특산품 관리 지역과 무관) 합이 1이 아닐 수 있어, 보이는
+// 항목 안에서 정규화해 각을 나누고 원래 점유율은 범례에 그대로 적는다.
+function StageRegionDonut({ stage, label }: { stage: NationwideFlowStage; label: string }) {
+  const rows = (stage.topRegions || []).slice(0, 5).filter((row) => row.count > 0);
+  if (rows.length === 0) return <article className="flow-region-donut empty"><h4>{label}</h4><p className="empty">상위 지역 데이터가 없습니다.</p></article>;
+  const total = rows.reduce((sum, row) => sum + row.count, 0);
+  const stops = rows.reduce<{ cursor: number; stops: string[] }>((state, row) => {
+    const start = state.cursor * 360;
+    const next = state.cursor + (total ? row.count / total : 0);
+    return { cursor: next, stops: [...state.stops, `${provinceColor(row.region)} ${start.toFixed(1)}deg ${(next * 360).toFixed(1)}deg`] };
+  }, { cursor: 0, stops: [] }).stops.join(", ");
+  return (
+    <article className="flow-region-donut">
+      <h4>{label}<small>상위 {rows.length}개 지역</small></h4>
+      <div className="flow-region-donut-body">
+        <div className="item-share-donut" style={{ background: `conic-gradient(${stops})` }} role="img" aria-label={`${label} 단계 상위 지역 출원 점유율`} />
+        <ul className="item-share-legend">{rows.map((row) => <li key={row.region}><i style={{ background: provinceColor(row.region) }} /><span className="item-share-region">{displayRegionName(row.region)}</span><b>{percent(row.share)}</b></li>)}</ul>
+      </div>
+    </article>
+  );
+}
 function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow; itemLabel: string; origins?: string[] }) {
   const { raw, processed, service } = flow.stages;
   const classified = raw.count + processed.count + service.count;
@@ -753,6 +774,11 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
           </div>
         </Fragment>; })}
       </div>
+      {/* 이슈 #119(협업자 2026-09-02): "원물 → 가공품 → 서비스 단계별 상표출원 기준 Top 5
+          지역과 출원 점유율(특산품 관리 지역 고려하지 않고) 보여줘. (원 그래프로 각각)" */}
+      {(["raw", "processed", "service"] as const).some((key) => (flow.stages[key].topRegions || []).length > 0) && <div className="nationwide-flow-region-donuts">
+        {(["raw", "processed", "service"] as const).map((key) => <StageRegionDonut key={key} stage={flow.stages[key]} label={FLOW_STAGE_LABELS[key]} />)}
+      </div>}
       {origins && origins.length > 0 && <p className="nationwide-flow-origins"><strong>주요 원산지</strong> {origins.map(displayRegionName).join(", ")}</p>}
       {clusterNote && <p className="nationwide-flow-note">{clusterNote}</p>}
       <p className="nationwide-flow-caveat">{hasExamples ? (hasDesignatedGoods ? "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 지정상품 예시는 각 단계 상위 출원의 실제 지정상품 명칭에서 뽑았습니다." : "상품류·상위 지역은 상위 출원인 기준 근사치입니다. 예시는 상표명 기준이며 지정상품 명칭 대조는 재수집 후 반영됩니다.") : "단계별 상품류·상위 지역·예시는 전국 흐름 재수집 후 채워집니다."}</p>
@@ -1515,7 +1541,10 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         rows.set(name, row);
       }
     }
-    return [...rows.values()].filter((row) => row.flow).sort((a, b) => (b.flow!.totalCount - a.flow!.totalCount) || b.trademarks - a.trademarks);
+    // 전국 흐름(businessFlow)이 아직 스냅샷에 없어도(현재 프로덕션 상태, #137 회귀) 화면을
+    // 막지 않는다 — 지금 있는 데이터(지역 확인 출원·광역 비중·브리핑·추이)로 먼저 보여주고,
+    // 흐름 배치가 반영되면 단계별 카드·지정상품 예시·확장 제안이 그 위에 붙는다.
+    return [...rows.values()].sort((a, b) => ((b.flow?.totalCount || 0) - (a.flow?.totalCount || 0)) || b.trademarks - a.trademarks);
   }, [regionalRegions]);
   const strategyFlowFiltered = useMemo(() => {
     const keyword = strategyItemQuery.trim().toLocaleLowerCase("ko-KR");
@@ -1659,8 +1688,8 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       {/* 이슈 #118(2026-09-08): 요약 재정리 — 시간축 콘텐츠(추이 그래프 + 리더보드)를
           "최근 동향" 한 묶음으로. 위쪽은 현황(지표·지도·랭킹), 아래쪽은 동향. */}
       <section className="summary-recent">
-        <div className="section-heading"><div><h2>최근 동향</h2></div><span>전국 규모 · 지역 귀속 확인 전</span></div>
-        <p className="leader-scope-note">아래 추이·순위는 전국 키워드 검색으로 모은 상표를 실제 출원일·등록일 기준으로 집계한 값입니다. 출원인 주소로 지역이 확인된 건수(위 지도·랭킹)와는 <strong>다른 모집단</strong>이며, KIPRIS 공개 지연·주간 갱신으로 ‘최근’은 마지막 반영분 기준입니다.</p>
+        <div className="section-heading"><div><h2>최근 동향</h2></div></div>
+        <p className="leader-scope-note">전국 키워드 검색 기준 — 위 지도·랭킹의 <strong>지역 확인 건수와는 다른 모집단</strong>입니다.</p>
         <RegionTrend region={{ region: "전국", items: nationalTrendItems }} heading="연도별 출원·등록 추이" subtitle="전국 · 실제 출원일자·등록일자 기준" prominent adjustable emptyLabel="아직 연도별 출원 데이터가 수집되지 않았습니다." />
 
         {leaderboard.itemCount > 0 && <div className="summary-leaderboard">
@@ -1760,7 +1789,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             {trendYearLabels(trendYears).map((year) => <text key={`label-${year}`} x={trendScale.x(year)} y={TREND_CHART.height - 6} className="trend-axis-label trend-axis-x">{year}</text>)}
           </svg>
           <p className="trend-legend"><span className="trend-legend-swatch trend-legend-application" />출원<span className="trend-legend-swatch trend-legend-registered" />등록(등록원부 보강 완료 건)</p>
-          <p className="trend-population-note">전국 검색 결과 기준 · 지역·품목으로 확인된 위 출원 건수와는 다른 모집단입니다</p>
           <details className="trend-value-table-toggle">
             <summary><span>값 표로 보기</span><CsvDownloadButton onClick={() => downloadCsv(`${coverageAreaDisplayName}_연도별출원등록추이_${csvDateStamp(dashboardUpdatedAt)}`, ["연도", "출원", "등록"], trendYears.map((year) => [year, trendApplicationTotals[year] || 0, trendRegisteredTotals[year] || 0]))} /></summary>
             <div className="trend-value-table-wrap"><table className="trend-value-table"><thead><tr><th scope="col">연도</th><th scope="col">출원</th><th scope="col">등록</th></tr></thead><tbody>{trendYears.map((year) => <tr key={year}><td>{year}</td><td>{number(trendApplicationTotals[year] || 0)}</td><td>{number(trendRegisteredTotals[year] || 0)}</td></tr>)}</tbody></table></div>
@@ -1892,24 +1920,27 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     {tab === "strategy" && <section className="screen-section strategy-screen" role="tabpanel" id="primary-tabpanel-strategy" aria-labelledby="primary-tab-strategy">
       <div className="section-heading"><div><h2>품목별 비즈니스 확장 경로</h2></div><span>전국 상표DB 기준 · 지역 한정 아님</span></div>
-      <p className="screen-note">품목을 고르면 그 품목의 전국 상표가 <strong>원물 → 가공품 → 서비스</strong> 어느 단계까지 나와 있는지, 단계별로 어떤 <strong>지정상품</strong>이 출원됐는지, 그리고 아직 비어 있는 확장 방향을 함께 보여줍니다. 특정 지역의 현황이 아니라 전체 상표DB에서 탐색한 결과입니다.</p>
+      <p className="screen-note">품목을 고르면 그 품목의 전국 상표 활동을 보여줍니다. 특정 지역의 현황이 아니라 전체 상표DB에서 탐색한 결과입니다. 전국 흐름 배치가 반영된 품목은 <strong>원물 → 가공품 → 서비스</strong> 단계별 <strong>지정상품</strong>과 확장 방향 제안까지 함께 나옵니다.</p>
 
       {strategyFlowRows.length === 0
-        ? <p className="empty">전국 흐름 데이터가 아직 이 스냅샷에 없습니다. 전국 흐름 배치 재실행 후 표시됩니다.</p>
+        ? <p className="empty">표시할 품목이 없습니다.</p>
         : <>
           <div className="strategy-item-picker">
             <div className="strategy-item-chips" role="group" aria-label="주요 품목 선택">
-              {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.flow!.totalCount)}</small></button>)}
+              {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.flow ? row.flow.totalCount : row.trademarks)}</small></button>)}
             </div>
             <label className="search-field strategy-item-search"><span className="sr-only">품목 직접 검색</span><input type="search" value={strategyItemQuery} placeholder={`품목명 직접 입력 · 전체 ${strategyFlowRows.length}개`} onChange={(event) => { setStrategyItemQuery(event.target.value); setStrategyItem(""); }} /></label>
           </div>
           {strategyItemQuery.trim() && <p className="screen-note">검색 결과 {strategyFlowFiltered.length}개{strategyFlowFiltered.length > 0 ? ` · ${strategySelectedFlow?.name} 표시 중` : ""}</p>}
 
-          {strategySelectedFlow?.flow ? <div className="strategy-flow-detail">
-            <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
-            <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.accelerating.some((s) => s.name === strategySelectedFlow.name) || leaderboard.freshEntries.some((s) => s.name === strategySelectedFlow.name)} />
+          {strategySelectedFlow ? <div className="strategy-flow-detail">
+            {strategySelectedFlow.flow ? <>
+              <NationwideFlowCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} origins={[...strategySelectedFlow.regions].sort((a, b) => (strategySelectedFlow.regionCounts[b] || 0) - (strategySelectedFlow.regionCounts[a] || 0)).slice(0, 3)} />
+              <ExpansionSuggestionsCard flow={strategySelectedFlow.flow} itemLabel={strategySelectedFlow.name} surging={leaderboard.accelerating.some((s) => s.name === strategySelectedFlow.name) || leaderboard.freshEntries.some((s) => s.name === strategySelectedFlow.name)} />
+            </> : <p className="strategy-flow-pending">이 품목은 전국 흐름(원물 → 가공품 → 서비스) 배치가 아직 반영되지 않아 단계별 지정상품·확장 방향 제안이 비어 있습니다. 아래 지역 확인 출원 현황은 지금 데이터입니다.</p>}
             {/* 협업자 요청(#116 2026-08-26): "전체 쌀 상표 출원 중에 지역별 출원 비중도 분석결과에 포함". */}
             <section className="item-share-block"><div className="section-heading"><div><h2>{strategySelectedFlow.name} 광역 단위 출원 비중</h2></div><span>지역 주소 일치 출원 {number(strategySelectedFlow.trademarks)}건 기준</span></div><ProvinceShareDonut counts={strategySelectedFlow.provinceCounts} label={strategySelectedFlow.name} /></section>
+            <RegionTrend region={{ region: strategySelectedFlow.name, items: strategySelectedFlow.matchedItems }} heading="연도별 출원·등록 추이" subtitle={`${strategySelectedFlow.name} · 전체 지역 합계`} prominent emptyLabel="이 품목은 아직 연도별 데이터가 없습니다." />
             {(() => { const briefingItem = strategySelectedFlow.matchedItems.find((entry) => entry.briefing?.isGapAlert && entry.briefing.sentences.length) || strategySelectedFlow.matchedItems.find((entry) => entry.briefing?.sentences.length); return briefingItem?.briefing ? <><BusinessStrategyCard briefing={briefingItem.briefing} title={`${strategySelectedFlow.name} 지역 브랜드 진단`} /><BusinessStrategyDisclaimer templateVersion={briefingItem.briefing.templateVersion} /></> : null; })()}
           </div> : <p className="empty">검색 결과가 없습니다.</p>}
         </>}
@@ -1970,7 +2001,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     {tab === "compare" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-compare" aria-labelledby="primary-tab-compare">
       <p className="screen-note">농촌진흥청이 2025년에 지정한 9개 도·69개 특화작목과 지역 주소 일치 상표 현황을 비교합니다.</p>
-      <div className="compare-banner"><span>공식 원본 반영 완료</span><strong>대표작목 9 · 집중육성작목 18 · 자체육성작목 42</strong><p>모든 작목을 공식 지정 범위인 도 단위 특산품으로 수집했습니다. 시군구는 원본에 없으므로 임의로 배분하지 않습니다.</p></div>
+      {/* 사용자 요청(2026-09-08): "공식 원본 반영 완료"·수집 방침 문구는 개발쪽 톤이라 배포에
+          안 어울린다 → 제거하고 9·18·42 숫자를 더 잘 보이게. */}
+      <div className="compare-tier-tiles">
+        {([["대표작목", 9], ["집중육성작목", 18], ["자체육성작목", 42]] as const).map(([tier, count]) => <article key={tier} className={`compare-tier-tile crop-badge-${tier}`}><span>{tier}</span><strong>{count}</strong></article>)}
+      </div>
       {/* UI 검토(3차, 2026-09-06) S4: 9개 도 × 8개 열 넓은 표 대신, 도 스트립에서 하나를
           고르면 그 도만 상세로 보여준다 — 일치/불일치 표식은 이미 있던 "대표작목 vs
           실제 등록 상표 TOP5" 대조 결과를 재사용한다. */}
@@ -2089,7 +2124,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         </div>
         <span className="criteria-source" title={sourceLine}>출처 {snapshot.sources.length}개</span>
       </section>
-      <p className="screen-note">수집한 특산물을 표준화하고 상표·출원인 주소와 연결해 지역별 지표로 만드는 전 과정을 보여줍니다.</p>
       <div className="data-flow" aria-label="데이터 처리 흐름"><article><span>01 · 수집 입력</span><strong>{number(pipeline.rowCounts.total)}</strong><small>지역-특산물 원본 행</small></article><i>→</i><article><span>02 · 표준화 완료</span><strong>{number(snapshot.coverage.regionItemCount)}</strong><small>정제된 지역-품목 조합{snapshot.coverage.regionItemCount > pipeline.rowCounts.total ? ` · 복수 품목 행 분리 +${number(snapshot.coverage.regionItemCount - pipeline.rowCounts.total)}` : ""}</small></article><i>→</i><article><span>03 · 고유 검색어</span><strong>{number(pipeline.uniqueQueryCounts.total)}</strong><small>고시명칭 + NICE류</small></article><i>→</i><article><span>04 · 상표 매칭</span><strong>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}</strong><small>출원번호 기준 전국 고유 후보</small></article><i>→</i><article className="flow-highlight"><span>05 · 지역별 집계</span><strong>{number(pipeline.regionalMetricGate.availableRegionItemCount)}</strong><small>지역 출원 수 표시 가능 항목</small></article></div>
       <div className="data-summary-grid"><article className="data-summary-card"><h2>특산물 데이터</h2><div className="data-stat"><strong>{number(uniqueSpecialtyCount)}개</strong><span>고유 특산품명</span></div><div className="data-stat"><strong>{number(snapshot.coverage.regionItemCount)}개</strong><span>지역-품목 조합</span></div><div className="data-stat"><strong>{number(snapshot.coverage.observedRegionCount)}개</strong><span>관측 지역</span></div><p className="data-card-note">같은 특산물도 지역이 다르면 별도 관측 단위로 관리합니다.</p></article><article className="data-summary-card"><h2>상표 매칭 결과</h2><div className="match-bars"><div><span>특산품 출원율 <b>{percent(nationalSpecialtyCoverage.rate)}</b></span><em><i style={{ width: `${Math.round((nationalSpecialtyCoverage.rate || 0) * 100)}%` }} /></em><small>출원 확인 {number(nationalSpecialtyCoverage.applied)} / 전체 수집 특산품 {number(nationalSpecialtyCoverage.total)}(지역별 집계 완료 {number(nationalSpecialtyCoverage.decided)})</small></div><div><span>고유 상표 주소 확보 <b>{number(pipeline.applicantRegionVerification.verifiedCount)}건</b></span><em><i style={{ width: `${Math.round((pipeline.applicantRegionVerification.rate || 0) * 100)}%` }} /></em><small>전국 고유 후보 중 {percent(pipeline.applicantRegionVerification.rate)}</small></div><div><span>지역별 출원 수 표시 가능 <b>{number(pipeline.regionalMetricGate.availableRegionItemCount)}개</b></span><em><i style={{ width: `${Math.round(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal) * 100)}%` }} /></em><small>전체 {number(gateTotal)}개 지역-품목 중 {percent(pipeline.regionalMetricGate.availableRegionItemCount / Math.max(1, gateTotal))}</small></div></div><p className="match-explanation">특산품 출원율은 현재 수집된 지역×특산품 전체 중 지역 주소 일치 출원이 1건 이상 확인된 항목의 비율입니다. 전체 {number(nationalSpecialtyCoverage.total)}개 중 명칭 확인이나 지역별 집계가 덜 끝난 항목도 분모에 포함하며, 출원이 확인될 때만 분자에 더합니다 — 후속 확인이 진행되면 값이 올라갈 수 있습니다.</p></article></div>
       <div className="data-reading-note"><strong>숫자를 읽는 법</strong><p><b>특산품 출원율 = 지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수</b>입니다. 명칭 확인이나 지역별 집계가 아직 끝나지 않은 항목도 분모에 포함하고 분자에는 넣지 않습니다. <b>{number(pipeline.nationwideCandidates.uniqueTrademarkCount)}건</b>은 출원번호 중복을 제거한 전국 검색 후보이며, 등록 비율은 지역 주소 일치 출원 중 등록 상태인 건의 비율로 별도 계산합니다. 검색이 부분 수집 상태인 품목은 0건으로 확정하지 않고 <b>지역별 집계 대기</b>로 표시합니다.</p></div>
