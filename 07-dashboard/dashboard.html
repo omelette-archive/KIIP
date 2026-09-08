@@ -143,6 +143,16 @@ a { color: inherit; text-decoration: none; }
 
 .expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
 .expansion-caveat b { color: var(--ink); }
+/* 2026-09-08(사용자): "예시로 딱 5개 품목만 샘플을 상상해서 만들어주자." 데이터가 아니라
+   손으로 쓴 가상 보고서다 — 실제 집계와 헷갈리면 안 되므로 보라색 계열로 확실히 가르고
+   섹션마다 「예시」 표를 단다. */
+.sample-reports { margin-top: 16px; border: 1px dashed var(--violet); border-radius: 14px; background: var(--violet-soft); }
+.sample-reports > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 12px 16px; color: var(--violet); font-size: 13px; font-weight: 800; cursor: pointer; }
+.sample-reports > summary small { color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.sample-banner { margin: 0 16px; padding: 10px 12px; border-left: 3px solid var(--violet); border-radius: 0 6px 6px 0; background: #fff; color: var(--ink); font-size: 11.5px; line-height: 1.65; }
+.sample-banner b { color: var(--violet); }
+.expansion-report.sample { margin: 12px 16px 16px; border-color: var(--violet); }
+.sample-tag { margin-left: 8px; padding: 1px 7px; border-radius: 4px; background: var(--violet-soft); color: var(--violet); font-size: 10.5px; font-style: normal; font-weight: 800; vertical-align: 3px; }
 /* 상위 5개 목록 위에 모집단을 적는다 — 순위만 보면 "전체가 얼마인지"를 모른다. */
 .insight-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
 .insight-total strong { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--green-dark); font-variant-numeric: tabular-nums; }
@@ -3224,6 +3234,447 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       <p class="expansion-caveat"><b>제안</b> 문안은 그 상품류에서 <b>두 개 이상의 품목이 실제로 쓴</b> 지정상품 표현에 이 품목 이름을 넣은 것입니다 — 등록 가능성을 보장하지 않으며 그대로 출원할 문안이 아니라 검토용 초안입니다. 이 진단은 스냅샷에 실린 <b>실제 출원의 지정상품</b>만으로 규칙에 따라 생성했습니다. 지정상품이 확인된 출원은 전체의 일부이고 그 일부도 고시명칭과 맞물린 것만이라, <b>실제 보유 범위는 여기 보이는 것보다 넓습니다</b>. 여기 나온 상품류는 <b>검토 출발점</b>입니다 — 실제 출원 가능 여부와 선등록 상표 저촉은 별도로 조사해야 합니다.</p>
     </section>`;
   }
+  // 2026-09-08(사용자): "DB에서 분석하는 거 말고.. 예시로 딱 5개 품목만 샘플을 상상해서
+  // 만들어주자." 지정상품 대조가 질의 류 안쪽만 남기는 구조라(evaluateGoods) 실제 집계로는
+  // 확장 경로가 31류 한 칸으로 눌린다. 데이터가 갖춰졌을 때 이 화면이 무엇을 보여 주는지를
+  // 다섯 품목으로 미리 그려 둔다.
+  //
+  // 이 다섯 건은 스냅샷에서 나온 값이 아니라 사람이 쓴 가상 예시다. 실제 집계와 절대 섞이지
+  // 않도록 별도 섹션에 넣고, 모든 수치·문안에 예시 표시를 단다.
+  const SAMPLE_EXPANSION_REPORTS = [
+      {
+          "name": "딸기",
+          "region": "경상남도 진주시",
+          "category": "과일",
+          "lede": "원물(31류)만 확보했습니다. 딸기는 <b>디저트·체험</b>으로 값이 붙는 품목인데 그 갈래가 통째로 비어 있습니다.",
+          "held": [
+              {
+                  "code": "31",
+                  "count": 128,
+                  "goods": [
+                      "신선한딸기",
+                      "미가공딸기"
+                  ]
+              }
+          ],
+          "next": [
+              {
+                  "code": "29",
+                  "why": "같은 과일 11개 품목이 확보",
+                  "suggest": [
+                      "딸기잼",
+                      "냉동딸기",
+                      "건조딸기"
+                  ]
+              },
+              {
+                  "code": "30",
+                  "why": "같은 과일 3개 품목이 확보",
+                  "suggest": [
+                      "딸기케이크",
+                      "딸기초콜릿"
+                  ]
+              },
+              {
+                  "code": "32",
+                  "why": "같은 과일 5개 품목이 확보",
+                  "suggest": [
+                      "딸기주스",
+                      "딸기음료"
+                  ]
+              }
+          ],
+          "unusual": [
+              {
+                  "code": "3",
+                  "why": "전국 특산품 중 2개 품목만 도달",
+                  "suggest": [
+                      "딸기추출물함유화장품"
+                  ],
+                  "note": "선별에서 빠지는 비품(못난이) 딸기가 원료가 됩니다 — 버리던 것을 파는 갈래."
+              }
+          ],
+          "service": [
+              {
+                  "code": "41",
+                  "why": "딸기는 체험 수요가 가장 큰 과일",
+                  "suggest": [
+                      "딸기따기체험농장운영업"
+                  ]
+              },
+              {
+                  "code": "43",
+                  "why": "산지 디저트",
+                  "suggest": [
+                      "딸기디저트카페업"
+                  ]
+              },
+              {
+                  "code": "35",
+                  "why": "산지 직판",
+                  "suggest": [
+                      "딸기소매업",
+                      "딸기도매업"
+                  ]
+              }
+          ],
+          "regional": "진주는 시설재배가 몰려 있어 <b>겨울 체험 관광</b>과 맞물립니다. 농가마다 따로 체험장을 여는 대신 시 단위 <b>증명표장(48)</b>으로 위생·당도 기준을 걸고 개별 농가에 쓰게 하면, 확장과 품질 관리를 한 권리로 처리할 수 있습니다."
+      },
+      {
+          "name": "인삼",
+          "region": "충청남도 금산군",
+          "category": "특용작물",
+          "lede": "원물(31류)과 건강기능식품(5류)은 확보했으나, <b>마시고 먹는 형태</b>와 <b>파는 행위</b>가 비어 있습니다.",
+          "held": [
+              {
+                  "code": "31",
+                  "count": 42,
+                  "goods": [
+                      "신선한인삼",
+                      "수삼",
+                      "미가공인삼"
+                  ]
+              },
+              {
+                  "code": "5",
+                  "count": 11,
+                  "goods": [
+                      "홍삼농축액",
+                      "인삼성분함유건강기능식품"
+                  ]
+              }
+          ],
+          "next": [
+              {
+                  "code": "30",
+                  "why": "같은 특용작물 9개 품목이 확보",
+                  "suggest": [
+                      "인삼차",
+                      "홍삼정과",
+                      "인삼분말"
+                  ]
+              },
+              {
+                  "code": "32",
+                  "why": "같은 특용작물 4개 품목이 확보",
+                  "suggest": [
+                      "인삼음료",
+                      "음료용인삼추출액"
+                  ]
+              },
+              {
+                  "code": "33",
+                  "why": "전국 특산품 17개 품목이 확보",
+                  "suggest": [
+                      "인삼주",
+                      "인삼막걸리"
+                  ]
+              }
+          ],
+          "unusual": [
+              {
+                  "code": "3",
+                  "why": "전국 특산품 중 2개 품목만 도달",
+                  "suggest": [
+                      "인삼추출물함유화장품",
+                      "인삼비누"
+                  ],
+                  "note": "K-뷰티 수출과 맞물리는 구간 — 원료 표시로 산지가 브랜드를 가져갈 수 있습니다."
+              }
+          ],
+          "service": [
+              {
+                  "code": "35",
+                  "why": "직판·유통 권리화의 출발점",
+                  "suggest": [
+                      "인삼소매업",
+                      "인삼도매업"
+                  ]
+              },
+              {
+                  "code": "43",
+                  "why": "산지 식당·카페",
+                  "suggest": [
+                      "인삼요리전문식당업",
+                      "인삼차카페업"
+                  ]
+              },
+              {
+                  "code": "41",
+                  "why": "체험·관광 연계",
+                  "suggest": [
+                      "인삼재배체험농장운영업"
+                  ]
+              }
+          ],
+          "regional": "금산 인삼시장 상인들이 개별 상표를 쓰고 있어 산지 이름이 분산됩니다. 40류 「인삼가공위탁업」을 묶은 <b>단체표장(44)</b>으로 공동 브랜드를 세우면 시장 전체가 하나의 산지 표시를 공유합니다."
+      },
+      {
+          "name": "포도",
+          "region": "충청북도 영동군",
+          "category": "과일",
+          "lede": "원물(31류)만 확보했습니다. 포도는 <b>주류(33류)</b>로 가는 길이 가장 뚜렷한 품목인데 그 칸이 비어 있습니다.",
+          "held": [
+              {
+                  "code": "31",
+                  "count": 111,
+                  "goods": [
+                      "신선한포도",
+                      "미가공포도"
+                  ]
+              }
+          ],
+          "next": [
+              {
+                  "code": "33",
+                  "why": "전국 특산품 17개 품목이 확보",
+                  "suggest": [
+                      "포도주",
+                      "포도증류주"
+                  ]
+              },
+              {
+                  "code": "32",
+                  "why": "같은 과일 5개 품목이 확보",
+                  "suggest": [
+                      "포도주스",
+                      "음료용포도추출액"
+                  ]
+              },
+              {
+                  "code": "29",
+                  "why": "같은 과일 11개 품목이 확보",
+                  "suggest": [
+                      "건포도",
+                      "포도잼"
+                  ]
+              }
+          ],
+          "unusual": [
+              {
+                  "code": "3",
+                  "why": "전국 특산품 중 2개 품목만 도달",
+                  "suggest": [
+                      "포도씨추출물함유화장품"
+                  ],
+                  "note": "와인 양조 부산물(씨·껍질)이 원료입니다 — 33류로 확장하면 자동으로 열리는 갈래."
+              }
+          ],
+          "service": [
+              {
+                  "code": "43",
+                  "why": "와이너리 식음",
+                  "suggest": [
+                      "와인전문식당업",
+                      "포도디저트카페업"
+                  ]
+              },
+              {
+                  "code": "41",
+                  "why": "양조 체험",
+                  "suggest": [
+                      "포도따기체험농장운영업",
+                      "와인양조체험업"
+                  ]
+              },
+              {
+                  "code": "35",
+                  "why": "직판",
+                  "suggest": [
+                      "포도소매업",
+                      "포도주소매업"
+                  ]
+              }
+          ],
+          "regional": "영동은 와이너리가 여럿 모여 있어 <b>33류와 43·41류를 한 묶음</b>으로 잡아야 합니다. 개별 와이너리 상표만 있으면 「영동 와인」이라는 산지 이름은 누구의 것도 아닌 채로 남습니다 — 군 단위 단체표장이 그 자리를 채웁니다."
+      },
+      {
+          "name": "생버섯",
+          "region": "경기도 여주시",
+          "category": "임산물",
+          "lede": "원물(31류)만 확보했습니다. 버섯은 <b>말리면 값이 오르고</b> 추출하면 기능성으로 넘어가는데 둘 다 비어 있습니다.",
+          "held": [
+              {
+                  "code": "31",
+                  "count": 84,
+                  "goods": [
+                      "생버섯",
+                      "신선한표고버섯"
+                  ]
+              }
+          ],
+          "next": [
+              {
+                  "code": "29",
+                  "why": "같은 임산물 13개 품목이 확보",
+                  "suggest": [
+                      "건조버섯",
+                      "버섯장아찌"
+                  ]
+              },
+              {
+                  "code": "30",
+                  "why": "같은 임산물 3개 품목이 확보",
+                  "suggest": [
+                      "버섯차",
+                      "버섯가루"
+                  ]
+              },
+              {
+                  "code": "32",
+                  "why": "전국 특산품 12개 품목이 확보",
+                  "suggest": [
+                      "버섯음료",
+                      "음료용버섯추출액"
+                  ]
+              }
+          ],
+          "unusual": [
+              {
+                  "code": "1",
+                  "why": "전국 특산품 중 1개 품목만 도달",
+                  "suggest": [
+                      "버섯재배용배지"
+                  ],
+                  "note": "농자재 갈래 — 재배 기술을 파는 쪽이라 원물 시세와 무관한 매출이 됩니다."
+              }
+          ],
+          "service": [
+              {
+                  "code": "35",
+                  "why": "도시 근교 직판",
+                  "suggest": [
+                      "버섯소매업",
+                      "버섯도매업"
+                  ]
+              },
+              {
+                  "code": "40",
+                  "why": "건조·가공 위탁",
+                  "suggest": [
+                      "버섯가공위탁업",
+                      "건버섯가공업"
+                  ]
+              },
+              {
+                  "code": "39",
+                  "why": "신선 배송",
+                  "suggest": [
+                      "버섯정기배송업"
+                  ]
+              }
+          ],
+          "regional": "경기도는 <b>수도권 소비지와 붙어 있는 것</b>이 최대 강점입니다. 39류 「버섯정기배송업」과 35류를 함께 잡으면 산지가 유통 단계까지 브랜드를 유지할 수 있습니다 — 지금은 중간 유통이 그 값을 가져갑니다."
+      },
+      {
+          "name": "고추",
+          "region": "충청남도 청양군",
+          "category": "채소",
+          "lede": "원물(31류)만 확보했습니다. 고추는 <b>거의 전량이 가루·장으로 가공돼 팔리는데</b> 그 30류가 비어 있습니다.",
+          "held": [
+              {
+                  "code": "31",
+                  "count": 130,
+                  "goods": [
+                      "신선한고추",
+                      "미가공고추"
+                  ]
+              }
+          ],
+          "next": [
+              {
+                  "code": "30",
+                  "why": "같은 채소 6개 품목이 확보",
+                  "suggest": [
+                      "고춧가루",
+                      "고추장",
+                      "고추양념"
+                  ]
+              },
+              {
+                  "code": "29",
+                  "why": "같은 채소 8개 품목이 확보",
+                  "suggest": [
+                      "건조고추",
+                      "고추절임"
+                  ]
+              },
+              {
+                  "code": "32",
+                  "why": "같은 채소 3개 품목이 확보",
+                  "suggest": [
+                      "음료용고추추출액"
+                  ]
+              }
+          ],
+          "unusual": [
+              {
+                  "code": "5",
+                  "why": "전국 특산품 중 3개 품목만 도달",
+                  "suggest": [
+                      "캡사이신함유건강기능식품"
+                  ],
+                  "note": "매운맛 성분을 기능성으로 파는 갈래 — 원물 등급 밖 물량을 흡수합니다."
+              }
+          ],
+          "service": [
+              {
+                  "code": "40",
+                  "why": "건조·분쇄 위탁이 산지의 실질 사업",
+                  "suggest": [
+                      "고추건조가공업",
+                      "고춧가루가공위탁업"
+                  ]
+              },
+              {
+                  "code": "35",
+                  "why": "직판",
+                  "suggest": [
+                      "고춧가루소매업",
+                      "고추도매업"
+                  ]
+              },
+              {
+                  "code": "43",
+                  "why": "산지 식당",
+                  "suggest": [
+                      "고추요리전문식당업"
+                  ]
+              }
+          ],
+          "regional": "청양은 이름 자체가 품종명(청양고추)과 얽혀 <b>산지 표시가 보통명칭으로 흡수될 위험</b>이 가장 큰 사례입니다. 30류 「고춧가루」를 군 단위 <b>지리적표시 단체표장(44)</b>으로 먼저 잡아 두지 않으면, 어디서 난 고추든 청양이라 부르는 상태가 굳습니다."
+      }
+  ];
+  function sampleSectionHtml(title, hint, rows, kind) {
+    const list = rows.map((row) => `<li><span class="expansion-class">${esc(niceClassLabel(row.code))}</span>`
+      + `<span class="expansion-why">${esc(row.why)}</span>`
+      + `<small class="expansion-suggest"><b>제안</b> ${row.suggest.map((text) => `「${esc(text)}」`).join(" · ")}</small>`
+      + `${row.note ? `<small class="expansion-basis">${esc(row.note)}</small>` : ""}</li>`).join("");
+    return `<article><h3>${esc(title)}</h3><p class="expansion-hint">${esc(hint)}</p><ol class="expansion-list ${kind}">${list}</ol></article>`;
+  }
+  function sampleReportHtml(sample) {
+    const held = sample.held.map((row) => `<li class="${Number(row.code) >= REPORT_SERVICE_FLOOR ? "svc" : "goods"}">`
+      + `<b>${esc(niceClassLabel(row.code))}</b><span>${number(row.count)}건</span>`
+      + `<small>${row.goods.map(esc).join(" · ")}</small></li>`).join("");
+    return `<section class="expansion-report sample">
+      <div class="section-heading"><div><h2>${esc(sample.name)} 확장 경로 진단<em class="sample-tag">예시</em></h2></div><span>${esc(sample.category)} · ${esc(sample.region)}</span></div>
+      <p class="expansion-lede">${sample.lede}</p>
+      <div class="expansion-grid">
+        <article><h3>① 지정상품이 확인된 범위</h3><ul class="expansion-held">${held}</ul></article>
+        ${sampleSectionHtml("② 다음 확장 후보", "같은 유형이 이미 확보했는데 이 품목만 비어 있는 상품류입니다.", sample.next, "")}
+        ${sampleSectionHtml("③ 이색 확장 사례", "선례가 드문 만큼 차별화 여지도 큰 구간입니다.", sample.unusual, "rare")}
+        ${sampleSectionHtml("④ 서비스 · 지역 창업", "제품이 아니라 파는 행위·체험에 붙이는 권리입니다(35류 이상).", sample.service, "svc")}
+        <article class="expansion-region"><h3>⑤ ${esc(sample.region)} 관점</h3><p class="expansion-hint">${sample.regional}</p></article>
+      </div>
+    </section>`;
+  }
+  function sampleReportsHtml() {
+    return `<details class="sample-reports"><summary><span>예시 보고서 ${number(SAMPLE_EXPANSION_REPORTS.length)}건 보기</span>`
+      + `<small>${SAMPLE_EXPANSION_REPORTS.map((s) => esc(s.name)).join(" · ")}</small></summary>`
+      + `<p class="sample-banner"><b>이 다섯 건은 데이터가 아닙니다.</b> 지정상품 대조가 질의한 상품류 안쪽만 남기는 구조라, 지금 집계로는 확장 경로가 원물 한 칸으로 눌립니다. 데이터가 갖춰졌을 때 이 화면이 무엇을 보여 주는지를 <b>사람이 손으로 쓴 가상 예시</b>입니다 — 건수·문안 모두 실제 출원 현황이 아니며 그대로 인용하면 안 됩니다.</p>`
+      + SAMPLE_EXPANSION_REPORTS.map(sampleReportHtml).join("")
+      + `</details>`;
+  }
   function strategyFlowHtml() {
     const all = strategyFlowRows();
     const heading = `<div class="section-heading"><div><h2>품목별 비즈니스 확장 경로</h2></div><span>전국 상표DB 기준 · 지역 한정 아님</span></div><p class="screen-note">품목을 고르면 그 품목의 전국 상표 활동을 보여줍니다. 특정 지역의 현황이 아니라 전체 상표DB에서 탐색한 결과입니다. 전국 흐름 배치가 반영된 품목은 <strong>원물 → 가공품 → 서비스</strong> 단계별 <strong>지정상품</strong>과 확장 방향 제안까지 함께 나옵니다.</p>`;
@@ -3251,7 +3702,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const flowPartHtml = selected.flow
       ? `${nationwideFlowCardHtml(selected.flow, selected.name, origins)}${expansionSuggestionsHtml(selected.flow, selected.name, surging)}`
       : '<p class="strategy-flow-pending">이 품목은 전국 흐름(원물 → 가공품 → 서비스) 배치가 아직 반영되지 않아 단계별 지정상품·확장 방향 제안이 비어 있습니다. 아래 지역 확인 출원 현황은 지금 데이터입니다.</p>';
-    return `${heading}${picker}${searchNote}<div class="strategy-flow-detail">${expansionReportHtml(selected, state.strategyRegion)}${flowPartHtml}${shareHtml}${trendHtml}${briefingHtml}</div>`;
+    return `${heading}${picker}${searchNote}${sampleReportsHtml()}<div class="strategy-flow-detail">${expansionReportHtml(selected, state.strategyRegion)}${flowPartHtml}${shareHtml}${trendHtml}${briefingHtml}</div>`;
   }
 
   function strategyScreen() {
