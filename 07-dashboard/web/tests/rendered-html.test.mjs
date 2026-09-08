@@ -891,7 +891,7 @@ test("generates a self-contained standalone dashboard", async () => {
   assert.match(html, /const coverageListRowHtml = \(row\) =>/, "전국 뷰 전용 압축 목록 렌더 함수가 있어야 함");
   assert.match(
     html,
-    /if \(!state\.province\) \{\s*return key\s*\? `<div class="coverage-region-grid">/,
+    /if \(!state\.province\) \{[\s\S]{0,400}?return key\s*\? `<div class="coverage-region-grid">/,
     "검색 중일 때만 카드 그리드로, 그 외엔 압축 목록으로 렌더링해야 함"
   );
   assert.match(html, /\$\{shapePaths\}\$\{shapeLabels\}/, "standalone map labels should render after every map shape");
