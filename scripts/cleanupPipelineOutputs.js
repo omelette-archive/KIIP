@@ -30,6 +30,10 @@ const NEVER_DELETE_PATTERNS = [
   /^ip-registry-cache-/,
   /^ip-registry-daily-budget-/,
   /^trademark-applicant-region-cache-/,
+  // 전국 비즈니스 흐름 파일럿 산출물(#116 #74 #110): gitignore라 스냅샷으로만 커밋되고,
+  // 07c_nationwide_flow가 파일 없으면 조용히 스킵한다. 3일 룰로 지워지자 businessFlow가
+  // 재실행마다 스냅샷에서 소리 없이 빠졌다(2026-09-07, f90fca1 이후). 나이와 무관하게 보존.
+  /^nationwide-flow(-applicant-cache)?\.json$/,
   /^\.gitkeep$/,
 ];
 
