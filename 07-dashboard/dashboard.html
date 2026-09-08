@@ -1219,7 +1219,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-window button:hover, .leader-metric button:hover { color: var(--ink); }
 .leader-window button.active, .leader-metric button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
 .leader-metric { padding-left: 8px; border-left: 1px solid var(--line); }
-.leader-window-range { margin: 7px 0 0; color: var(--faint); font-size: 11px; }
 .leader-grid { display: grid; gap: 12px; margin-top: 12px; }
 .leader-grid-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .leader-grid-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1231,8 +1230,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-list { list-style: none; margin: 0; padding: 0; }
 .leader-list li + li { border-top: 1px solid var(--line); }
 /* 이슈 #136(2026-09-08): 게이지 바를 맨 오른쪽 고정 열에 두고, 그 사이에 값을 둔다 —
-   모든 행의 바가 같은 x에서 시작해 길이 비교로 순위가 한눈에 보이게. 회색 채움만으로는
-   얼마나 찼는지 안 보여 트랙에 테두리를 준다(빈 부분이 보이도록). */
+   모든 행의 바가 같은 x에서 시작해 길이 비교로 순위가 한눈에 보이게. */
 .leader-list button { display: grid; grid-template-columns: 16px minmax(0, 1fr) 52px 76px; align-items: center; column-gap: 10px; width: 100%; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .leader-list button:hover { background: var(--green-soft); }
 .leader-rank { color: var(--faint); font-size: 11px; font-weight: 800; text-align: center; }
@@ -1240,7 +1238,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-tag { margin-left: 5px; padding: 0 5px; border-radius: 5px; background: #eef2f7; color: var(--muted); font-size: 9px; font-style: normal; font-weight: 700; vertical-align: 1px; }
 .leader-val { font-size: 12px; font-weight: 800; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .leader-val-wide { grid-column: 3 / 5; }
-.leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
+/* 트랙은 앱의 다른 게이지(.rate-bar·.match-bars)와 같은 solid 채움 — 투명+테두리로는
+   흰 카드 위에서 빈 부분이 안 보인다는 지적(사용자 2026-09-08). */
+.leader-bar { height: 9px; border-radius: 99px; background: #e3e6ec; overflow: hidden; }
 .leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
 .leader-bar-low i { background: var(--amber); }
 /* 급증 카드(사용자 2026-09-08): 게이지 바 없앰 — priorApp→app 전이와 배수(×N)/신규 표식만
@@ -2242,7 +2242,6 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const controls = `<div class="leader-controls">
       <div class="leader-window" role="group" aria-label="기간 선택">${LEADER_WINDOWS.map(([months, label]) => `<button type="button" data-leader-window="${months}" class="${state.leaderMonths === months ? "active" : ""}">${label}</button>`).join("")}</div>
       <div class="leader-metric" role="group" aria-label="출원·등록 기준"><button type="button" data-leader-metric="application" aria-pressed="${state.leaderMetric === "application"}" class="${state.leaderMetric === "application" ? "active" : ""}">출원</button><button type="button" data-leader-metric="registration" aria-pressed="${state.leaderMetric === "registration"}" class="${state.leaderMetric === "registration" ? "active" : ""}">등록</button></div>
-      <span class="leader-window-range">${esc(monthRangeLabel(lb.windowKeys))} · 직전 대비 ${esc(monthRangeLabel(lb.priorKeys))}</span>
     </div>`;
     const tag = (cat) => cat ? `<em class="leader-tag">${esc(cat.label)}</em>` : "";
     const topValue = (row) => state.leaderMetric === "application" ? row.app : row.reg;
@@ -2253,7 +2252,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const convRow = (row, index, low) => `<li><button type="button" data-goto-item="${esc(row.name)}"><span class="leader-rank">${index + 1}</span><span class="leader-name">${esc(row.name)}${tag(row.category)}</span><span class="leader-bar${low ? " leader-bar-low" : ""}"><i style="width:${Math.max(4, row.rate * 100)}%"></i></span><b class="leader-val">${percent(row.rate)}</b><small class="leader-sub">${number(row.lifeReg)}/${number(row.lifeApp)}</small></button></li>`;
     const highCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 상위</h4><span class="leader-card-note">정착이 잘 되는 품목</span></div>${lb.conversionHigh.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionHigh.map((row, index) => convRow(row, index, false)).join("")}</ol>`}</article>`;
     const lowCard = `<article class="leader-card"><div class="leader-card-head"><h4>등록률 하위</h4><span class="leader-card-note">전환이 안 되는 품목</span></div>${lb.conversionLow.length === 0 ? '<p class="empty">누적 출원 20건 이상 품목이 없습니다.</p>' : `<ol class="leader-list">${lb.conversionLow.map((row, index) => convRow(row, index, true)).join("")}</ol>`}</article>`;
-    const methodNote = `<details class="method-note"><summary>집계 기준 · CSV</summary><p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 ${lb.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p><div class="leader-csv-row">${csvDownloadButtonHtml("leaderItems").replace("CSV 다운로드", "품목 순위 CSV")}${csvDownloadButtonHtml("leaderCategories").replace("CSV 다운로드", "유형 순위 CSV")}</div></details>`;
+    const methodNote = `<details class="method-note"><summary>집계 기준 · CSV</summary><p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 ${esc(monthRangeLabel(lb.windowKeys))} 출원 합을 직전 같은 길이(${esc(monthRangeLabel(lb.priorKeys))}) 기간과 비교하며 최소 출원 ${lb.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p><div class="leader-csv-row">${csvDownloadButtonHtml("leaderItems").replace("CSV 다운로드", "품목 순위 CSV")}${csvDownloadButtonHtml("leaderCategories").replace("CSV 다운로드", "유형 순위 CSV")}</div></details>`;
     return `<div class="summary-leaderboard">
       <div class="leader-subhead"><h3>품목·유형별 최근 순위</h3>${controls}</div>
       <div class="leader-grid leader-grid-primary">${surgeCard}${itemsCard}${catsCard}</div>

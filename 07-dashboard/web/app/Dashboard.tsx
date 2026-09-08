@@ -1924,7 +1924,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
                 <button type="button" className={leaderMetric === "application" ? "active" : ""} aria-pressed={leaderMetric === "application"} onClick={() => setLeaderMetric("application")}>출원</button>
                 <button type="button" className={leaderMetric === "registration" ? "active" : ""} aria-pressed={leaderMetric === "registration"} onClick={() => setLeaderMetric("registration")}>등록</button>
               </div>
-              <span className="leader-window-range">{monthRangeLabel(leaderboard.windowKeys)} · 직전 대비 {monthRangeLabel(leaderboard.priorKeys)}</span>
             </div>
           </div>
           <div className="leader-grid leader-grid-primary">
@@ -1957,7 +1956,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
             </article>
           </div>
         <details className="method-note"><summary>집계 기준 · CSV</summary>
-          <p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 N개월 출원 합을 직전 같은 길이 기간과 비교하며 최소 출원 {leaderboard.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p>
+          <p>품목 순위는 고시명칭 확정 품목만 묶고(품목별 조회와 동일), 유형 순위는 유형이 매겨진 품목행 전체가 대상입니다. 급증은 최근 {monthRangeLabel(leaderboard.windowKeys)} 출원 합을 직전 같은 길이({monthRangeLabel(leaderboard.priorKeys)}) 기간과 비교하며 최소 출원 {leaderboard.minBase}건 컷오프를 둡니다. 등록률 상·하위는 최근 창이 아니라 누적(연 단위) 출원·등록으로 계산합니다 — 창 안의 등록·출원은 서로 다른 시점의 상표라 비율로 쓰기 어렵기 때문입니다.</p>
           <div className="leader-csv-row">
             <CsvDownloadButton label="품목 순위 CSV" onClick={() => downloadCsv(`동향_품목${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "품목", "유형", leaderMetric === "application" ? "출원" : "등록"], leaderboard.topItems.map((row, index) => [index + 1, row.name, row.category?.label ?? "", leaderMetric === "application" ? row.app : row.reg]))} />
             <CsvDownloadButton label="유형 순위 CSV" onClick={() => downloadCsv(`동향_유형${leaderMetric === "application" ? "출원" : "등록"}_${leaderboard.windowKeys[0]}_${leaderboard.windowKeys[leaderboard.windowKeys.length - 1]}`, ["순위", "유형", leaderMetric === "application" ? "출원" : "등록", "비중"], leaderboard.topCategories.map((row, index) => [index + 1, row.label, leaderMetric === "application" ? row.app : row.reg, leaderboard.categoryTotal ? `${Math.round((leaderMetric === "application" ? row.app : row.reg) / leaderboard.categoryTotal * 100)}%` : ""]))} />
