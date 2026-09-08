@@ -29,11 +29,15 @@ type PositionedMapLabel = { name: string; displayName: string; x: number; y: num
 const STATE_LABELS: Record<string, string> = { complete_nonzero: "현황 확인", complete_zero: "검색 결과 없음", partial: "검토중", error: "확인 오류", skipped: "분류 확인 필요", not_collected: "확인 전", complete: "집계 완료" };
 // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
 // "지역·품목별 조회" 탭으로 합치고, 탭 안에서 지역별/품목별을 토글로 고른다.
-const EXPLORE_TABS: Tab[] = ["applications", "regions", "items"];
+// 2026-09-08(사용자): "지역·품목별 조회" 한 탭에 다 밀어넣으니 하위 탭이 생겨 불편하다 —
+// 지역별·품목별·비즈니스 확장 경로를 다시 최상위 탭으로 꺼낸다. 지역 상세(regions)는
+// 지역별 화면의 드릴다운이라 계속 그 탭에 묶어 둔다.
+const EXPLORE_TABS: Tab[] = ["applications", "regions"];
 const PRIMARY_NAV: { key: Tab; label: string }[] = [
   { key: "summary", label: "요약" },
-  { key: "applications", label: "지역·품목별 조회" },
-  { key: "strategy", label: "비즈니스 전략" },
+  { key: "applications", label: "지역별 특산품 상표 현황" },
+  { key: "items", label: "품목별 특산품 상표 현황" },
+  { key: "strategy", label: "비즈니스 확장 경로 분석" },
   { key: "compare", label: "특화작목 비교" },
   { key: "data", label: "데이터 개요" },
 ];
@@ -1882,13 +1886,11 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     }
     setTab(next);
   }
-  const goExplore = (mode: "region" | "item") => { setTab(mode === "item" ? "items" : "applications"); setSelectedRegionCode(""); setSelectedItemId(""); };
   // 이슈 #118: 리더보드 항목/카테고리 클릭 시 품목별 조회로 이동.
   const gotoItemDetail = (name: string) => { setItemQuery(""); setCategoryFilter(""); setItemShowAll(true); setSelectedItemName(name); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   const gotoCategory = (code: string | null) => { setItemQuery(""); setSelectedItemName(""); setCategoryFilter(code || ""); setTab("items"); if (typeof window !== "undefined") window.scrollTo({ top: 0, behavior: "smooth" }); };
   // UI 검토(#136) 14번: 상단 탭이 role·aria-selected·aria-controls 없는 일반 버튼이라
-  // 스크린리더에 "탭"으로 전달되지 않았다 — 서브내비(exploreSubnav)는 이미 role="tablist"
-  // 패턴을 쓰고 있어 같은 기준을 최상단 탭에도 맞춘다. 화살표 키로 탭 사이를 이동하며
+  // 스크린리더에 "탭"으로 전달되지 않았다 — WAI-ARIA APG 탭 패턴을 그대로 맞춘다. 화살표 키로 탭 사이를 이동하며
   // 이동과 동시에 활성화한다(WAI-ARIA APG의 automatic activation 패턴).
   function handlePrimaryTabsKeyDown(event: React.KeyboardEvent<HTMLElement>) {
     if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
@@ -1904,10 +1906,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     goPrimaryTab(nextKey);
     requestAnimationFrame(() => document.getElementById(`primary-tab-${nextKey}`)?.focus());
   }
-  const exploreSubnav = (mode: "region" | "item") => <div className="explore-subnav" role="tablist" aria-label="지역·품목별 조회 전환">
-    <button type="button" role="tab" aria-selected={mode === "region"} className={mode === "region" ? "active" : ""} onClick={() => goExplore("region")}>지역별</button>
-    <button type="button" role="tab" aria-selected={mode === "item"} className={mode === "item" ? "active" : ""} onClick={() => goExplore("item")}>품목별</button>
-  </div>;
   return <main className="shell">
     <header className="topbar" id="top"><button className="brand brand-button" type="button" onClick={() => goPrimaryTab("summary")} aria-label="지역 특산품-상표 분석·정책지원 플랫폼 홈"><img className="brand-mark" src="/images/kiip-logo-mark.png" alt="KIIP" width={36} height={24} /><span><h1>지역 특산품-상표 분석·정책지원 플랫폼</h1></span></button><div className="snapshot-meta"><span className="sample-badge">{scopeLabel}</span><span>마지막 업데이트 {date(dashboardUpdatedAt)}</span><button type="button" className="copy-link-button" onClick={copyCurrentLink}>{linkCopied ? "복사됨" : "이 화면 링크 복사"}</button></div></header>
     <nav className="primary-tabs" role="tablist" aria-label="대시보드 화면" onKeyDown={handlePrimaryTabsKeyDown}>{PRIMARY_NAV.map(({ key, label }) => { const active = tab === key || (key === "applications" && EXPLORE_TABS.includes(tab)); return <button type="button" key={key} id={`primary-tab-${key}`} role="tab" aria-selected={active} aria-controls={`primary-tabpanel-${key}`} tabIndex={active ? 0 : -1} className={active ? "active" : ""} onClick={() => { if (key === "applications" && EXPLORE_TABS.includes(tab)) return; goPrimaryTab(key); }}>{label}</button>; })}</nav>
@@ -2050,7 +2048,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       {/* 이슈 #136(2026-09-07): 토글·검색·정렬을 한 줄로 묶고(머리말 높이 축소), 검색·정렬은
           품목별 조회와 같은 자리·같은 모양으로 둔다. */}
       <div className="explore-toolbar">
-        {exploreSubnav("region")}
         <div className="item-search-row">
           <label className="search-field explore-search"><span className="sr-only">지역 또는 품목 검색</span><input type="search" value={regionQuery} onChange={(event) => setRegionQuery(event.target.value)} placeholder="지역 또는 품목 검색" /></label>
           <label className="item-sort-field"><span className="sr-only">정렬 기준</span><select value={regionSort} onChange={(event) => setRegionSort(event.target.value as typeof regionSort)}>
@@ -2207,7 +2204,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
 
     {tab === "regions" && <section className="screen-section region-detail-screen" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       <div className="explore-toolbar">
-        {exploreSubnav("region")}
         <button type="button" className="drill-back" onClick={() => goPrimaryTab("applications")}>← 전국 시도 비교로</button>
       </div>
       <p className="screen-note">선택한 지역의 특산품·상표를 시도 → 시군구 → 품목 순으로 파고듭니다. 다른 시도를 눌러 바로 이동할 수도 있습니다.</p>
@@ -2238,7 +2234,6 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     {tab === "items" && <section className="screen-section" role="tabpanel" id="primary-tabpanel-applications" aria-labelledby="primary-tab-applications">
       {/* 이슈 #136(2026-09-07): 토글·검색·정렬을 한 줄로 묶어 머리말 높이를 줄인다. */}
       <div className="explore-toolbar">
-        {exploreSubnav("item")}
         <div className="item-search-row">
           <label className="search-field explore-search"><span className="sr-only">품목 또는 지역 검색</span><input type="search" value={itemQuery} onChange={(event) => setItemQuery(event.target.value)} placeholder="품목명 또는 지역명 검색" /></label>
           {/* UI 검토(3차, 2026-09-06) S5: 정렬 기준을 고를 수 있게(검색 옆, P3: 칩·검색·정렬은 항상 같은 자리). */}

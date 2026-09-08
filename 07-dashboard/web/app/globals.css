@@ -246,25 +246,19 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
 
 .primary-tabs {
-  position: sticky; top: 0; z-index: 20; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); grid-auto-flow: row;
+  position: sticky; top: 0; z-index: 20; display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr);
   border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--paper) 92%, transparent);
   backdrop-filter: blur(14px);
 }
-/* 이슈 #116(2026-09-01): "지역·품목별 조회" 탭 안에서 지역별/품목별을 고르는 토글 */
-.explore-subnav { display: inline-flex; gap: 4px; margin-bottom: 14px; padding: 3px; border: 1px solid var(--line); border-radius: 11px; background: #eef2f7; }
 /* 이슈 #136(2026-09-07): 지역별/품목별 토글·검색·정렬이 각각 한 줄씩 차지하던 것을
    한 줄로 합친다(지자체별 상세에서는 토글 + "전국 시도 비교로" 버튼). */
 .explore-toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
-.explore-toolbar > .explore-subnav { flex: none; margin-bottom: 0; }
 .explore-toolbar > .drill-back { margin: 0; }
 .explore-toolbar > .item-search-row { flex: 1; min-width: 0; }
 @media (max-width: 760px) {
   .explore-toolbar { flex-wrap: wrap; }
   .explore-toolbar > .item-search-row { flex-basis: 100%; }
 }
-.explore-subnav button { min-width: 88px; padding: 7px 14px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-size: 13px; font-weight: 700; cursor: pointer; }
-.explore-subnav button:hover { color: var(--ink); }
-.explore-subnav button.active { background: #fff; color: var(--green-dark); box-shadow: var(--shadow); }
 .primary-tabs button { min-height: 38px; padding: 6px 10px; border: 0; border-bottom: 2px solid transparent; background: transparent; color: var(--muted); font-size: 13.5px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .primary-tabs button:hover { color: var(--ink); background: rgba(255,255,255,.36); }
 .primary-tabs button.active { border-bottom-color: var(--green); background: var(--green-soft); color: var(--green-dark); font-weight: 800; }
@@ -286,7 +280,10 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-metrics button.active { border-color: var(--green); background: var(--green); color: white; }
 .map-metrics button:disabled { opacity: .42; cursor: not-allowed; text-decoration: line-through; }
 .map-back { color: var(--green); font-weight: 800; }
-.map-metric-description { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; }
+/* 2026-09-08(사용자): 지표를 바꾸면 설명이 1~3줄로 오락가락해 아래 지도가 위아래로
+   움직였다. 설명 칸을 세 줄 높이로 고정해 지도 위치를 붙박이로 만든다. 더 좁은 화면에서
+   설명이 세 줄을 넘으면 칸 안에서만 스크롤하고 지도는 그대로 둔다. */
+.map-metric-description { display: flex; align-items: baseline; gap: 8px; margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.55; height: calc(3 * 1.55em); overflow-y: auto; overscroll-behavior: contain; }
 .map-metric-description strong { flex: none; color: var(--green-dark); }
 .map-metric-description span { min-width: 0; }
 .map-stage { display: grid; place-items: center; min-height: clamp(560px, 44vw, 860px); margin-top: 10px; overflow: hidden; }
@@ -1086,6 +1083,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .ranking .section-heading h2 { font-size: 16px; }
   .map-heading { align-items: flex-start; flex-direction: column; }
   .map-stage { min-height: 390px; }
+  .map-metric-description { height: calc(5 * 1.55em); }
   .map-label { font-size: 11px; }
   .map-label-province { font-size: 11px; }
   .coverage-kpis { grid-template-columns: 1fr; }
@@ -1250,7 +1248,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
    표가 인쇄 페이지 폭에 맞게 늘어나도록 하는 정도로 충분하다(과한 인쇄 전용 레이아웃은
    두지 않는다). */
 @media print {
-  .primary-tabs, .province-tabbar, .region-quick-filter, .explore-subnav, .search-field,
+  .primary-tabs, .province-tabbar, .region-quick-filter, .search-field,
   .copy-link-button, .csv-download-button, .map-back, .drill-back, .item-category-filter,
   .coverage-map-actions, .map-toolbar, .trend-controls, .trend-range-slider, .leader-controls,
   .province-municipalities summary,
