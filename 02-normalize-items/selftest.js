@@ -259,6 +259,14 @@ async function run() {
       ["장류콩", "신선한 대두"],
       ["대추", "보존처리한 대추"],
       ["차·커피", "녹차"],
+      ["오대쌀", "쌀"],
+      ["가와지쌀", "쌀"],
+      ["남토북수쌀", "쌀"],
+      ["우렁이쌀", "쌀"],
+      ["녹차미인쌀", "쌀"],
+      ["흥타령쌀", "쌀"],
+      ["다올찬 쌀", "쌀"],
+      ["생거 쌀", "쌀"],
     ]);
     for (const [rawItemName, noticeName] of expected) {
       const result = normalizeByRules({ rawItemName, source: "농사로" }, dictionary);

@@ -38,6 +38,7 @@ try {
     "03b_applicant_region",
     "03c_ip_registry",
     "03d_supplemental_scopes",
+    "03e_bibliography_goods",
     "04_analyze",
     "05_gap",
     "06_strategy",
@@ -80,14 +81,21 @@ try {
     analyzeStage.args[analyzeStage.args.indexOf("--raw-goods-review") + 1],
     plan.inputs.rawGoodsReview
   );
-  // ④는 03d 보완 스코프 정규화 결과를 입력으로 받아야 함(③c → 03d → ④)
-  assert.strictEqual(analyzeStage.args[analyzeStage.args.indexOf("--input") + 1], plan.files.scopedSearch);
+  // ④는 03e 서지상세 지정상품 대조 결과를 입력으로 받아야 함(③c → 03d → 03e → ④)
+  assert.strictEqual(analyzeStage.args[analyzeStage.args.indexOf("--input") + 1], plan.files.bibliographyGoodsEnriched);
   const scopeStage = plan.stages.find((stage) => stage.id === "03d_supplemental_scopes");
   assert.strictEqual(scopeStage.args[scopeStage.args.indexOf("--input") + 1], plan.files.registryEnriched);
+  // #12(경로 C): 03d → 03e, 등록원부 authoritative 유지하며 미등록 출원까지 지정상품 대조
+  const bibliographyStage = plan.stages.find((stage) => stage.id === "03e_bibliography_goods");
+  assert.strictEqual(bibliographyStage.args[bibliographyStage.args.indexOf("--input") + 1], plan.files.scopedSearch);
+  assert.strictEqual(bibliographyStage.args[bibliographyStage.args.indexOf("--out") + 1], plan.files.bibliographyGoodsEnriched);
+  assert.strictEqual(bibliographyStage.args[bibliographyStage.args.indexOf("--cache") + 1], plan.state.bibliographyGoodsCache);
+  assert.strictEqual(path.dirname(plan.state.bibliographyGoodsCache), plan.stateDir);
+  assert.strictEqual(path.dirname(plan.state.bibliographyGoodsBudget), plan.stateDir);
   const attachStage = plan.stages.find((stage) => stage.id === "07b_supplemental_attach");
   assert.strictEqual(attachStage.args[attachStage.args.indexOf("--input") + 1], plan.files.snapshotRaw);
   assert.strictEqual(attachStage.args[attachStage.args.indexOf("--out") + 1], plan.files.snapshotAttached);
-  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--match-doc") + 1], plan.files.scopedSearch);
+  assert.strictEqual(attachStage.args[attachStage.args.indexOf("--match-doc") + 1], plan.files.bibliographyGoodsEnriched);
   // 07c: 전국 흐름 연결이 07b 뒤. 07d: 직전 공개 스냅샷과 대조해 floor 유지·복원 후 최종 스냅샷.
   const flowStage = plan.stages.find((stage) => stage.id === "07c_nationwide_flow");
   assert.strictEqual(flowStage.args[flowStage.args.indexOf("--input") + 1], plan.files.snapshotAttached);

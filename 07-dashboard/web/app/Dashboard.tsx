@@ -12,7 +12,7 @@ type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceI
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[]; source?: "designated_goods" | "trademark_title" } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
-type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
+type NationwideFlow = { totalCount: number; hasRegionalSignal?: boolean; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; localApplicantCount?: Metric; producerApplicantShare?: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
@@ -908,7 +908,7 @@ function expansionSuggestions(flow: NationwideFlow, opts: { surging?: boolean } 
   if (topRawClass && topRawClass.share > 0.6) {
     out.push({ kind: "class_concentration", text: `원물 상표가 ${niceClassLabel(topRawClass.classCode)}에 ${Math.round(topRawClass.share * 100)}% 집중돼 있습니다 — 인접 상품류로 포트폴리오를 넓힐 여지가 있습니다.` });
   }
-  if (rawRegion && processedRegion && rawRegion !== processedRegion) {
+  if (flow.hasRegionalSignal && rawRegion && processedRegion && rawRegion !== processedRegion) {
     out.push({ kind: "cluster_split", text: `원물 상표 활동은 ${displayRegionName(rawRegion)}, 가공은 ${displayRegionName(processedRegion)}에서 두드러집니다 — 산지에서 가공 브랜드를 키울 때 산지 연계 스토리를 활용할 수 있습니다.` });
   }
   if (opts.surging) {
