@@ -138,15 +138,38 @@ async function runIpRegistryTests() {
     assert.strictEqual(outside.match, "outside");
     assert.strictEqual(outside.confidence, "exact_registry_address_sido");
 
-    // #118: 공동출원인 주소가 서로 다르면 기본은 unverified지만, 생산자 주체형(producerOrg)이
-    // 해당 지역(inside)이면 지역 출원으로 인정한다(제외하지 않음).
+    // 2026-09-08(사용자): "공동출원인인 경우 더블 카운트로 각 지역별로 집계하되, 상표출원수는
+    // unique한 출원번호 기준으로." 공동출원인은 그 상표가 여러 지역에 실제로 걸쳐 있는 것이지
+    // 주소가 틀린 게 아니다 — 전원 일치가 아니라고 unverified로 버리면 두 지역 모두에서
+    // 사라진다. 출원인 중 하나라도 이 지역이면 이 지역 출원으로 센다(#118의 생산자 주체형
+    // 예외를 모든 공동출원인으로 넓힌 것).
     const coApplicantPlain = evaluateApplicantRegions(
       "경상북도 안동시",
       [{ address: "경상북도 안동시 비공개" }, { address: "서울특별시 중구 비공개" }],
       ADMIN_LIST
     );
-    assert.strictEqual(coApplicantPlain.match, "unverified");
-    assert.strictEqual(coApplicantPlain.confidence, "multiple_conflicting_applicant_addresses");
+    assert.strictEqual(coApplicantPlain.match, "inside", "공동출원인 중 하나가 이 지역이면 이 지역 출원");
+    assert.strictEqual(coApplicantPlain.confidence, "coapplicant_inside");
+    // 반대편 지역에서 같은 상표를 봐도 inside다 — 의도된 더블 카운트.
+    const coApplicantBoth = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [{ address: "경상북도 안동시 비공개" }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST
+    );
+    const coApplicantOtherSide = evaluateApplicantRegions(
+      "경상남도 사천시",
+      [{ address: "경상북도 안동시 비공개" }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantBoth.match, "inside");
+    assert.strictEqual(coApplicantOtherSide.match, "inside", "같은 상표가 양쪽 지역에서 집계돼야 함");
+    // 이 지역 출원인이 하나도 없으면 외부다(미확인만 남을 때에만 보류).
+    const coApplicantNone = evaluateApplicantRegions(
+      "강원특별자치도 양양군",
+      [{ address: "경상북도 안동시 비공개" }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantNone.match, "outside");
     const coApplicantProducerInside = evaluateApplicantRegions(
       "경상북도 안동시",
       [
@@ -168,6 +191,17 @@ async function runIpRegistryTests() {
     );
     assert.strictEqual(coApplicantProducerOutside.match, "unverified");
 
+    // 2026-09-08(사용자): "동명지역인 경우 광역지자체 단위를 우선 체크해줘."
+    // 시군구를 못 고르더라도 주소에 시도가 들어 있으면 광역 단위로는 확정한다 —
+    // 지금까지는 통째로 버려 미확인으로 남았다.
+    const sidoOnly = normalizeApplicantAddress("경상북도 없는읍 12-3 비공개", ADMIN_LIST);
+    assert.strictEqual(sidoOnly.status, "matched", "시군구를 못 읽어도 시도가 있으면 확정");
+    assert.strictEqual(sidoOnly.level, "sido");
+    assert.strictEqual(sidoOnly.sido, "경상북도");
+    assert.strictEqual(sidoOnly.sigungu, "");
+    // 시도조차 없으면 여전히 미확인이다 — 없는 근거를 지어내지 않는다.
+    const noSido = normalizeApplicantAddress("없는도 없는읍 12-3", ADMIN_LIST);
+    assert.strictEqual(noSido.status, "unmatched");
     const aliasAdminList = [
       { code: "1114000000", sido: "서울특별시", sigungu: "중구" },
       { code: "2611000000", sido: "부산광역시", sigungu: "중구" },

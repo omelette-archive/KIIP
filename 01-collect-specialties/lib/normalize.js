@@ -102,12 +102,24 @@ function resultFromCandidates(candidates, normalized, matchMethod) {
       matchMethod,
     };
   }
+  // 2026-09-08(사용자): 동명 시군구라도 후보가 모두 한 시도 안이면 광역은 확정된다
+  // (예: 같은 도 안의 동명 읍면 표기). 시군구만 비워 광역 단위로 인정한다.
+  const candidateSidos = [...new Set(candidates.map((row) => row.sido))];
+  if (candidateSidos.length === 1) {
+    return {
+      sido: candidateSidos[0],
+      sigungu: "",
+      matched: true,
+      matchMethod: `${matchMethod}_sido_only`,
+      sigunguUnresolved: normalized,
+    };
+  }
   return {
     sido: "",
     sigungu: normalized,
     matched: false,
     ambiguous: true,
-    candidateSidos: [...new Set(candidates.map((row) => row.sido))],
+    candidateSidos,
     reason: "ambiguous_region_alias",
   };
 }
@@ -204,6 +216,24 @@ function resolveRegion(regionText, adminList) {
       normalized,
       "sigungu_suffix_restored"
     );
+  }
+
+  // 2026-09-08(사용자): "동명지역인 경우 광역지자체 단위를 우선 체크해줘."
+  // 「중구」처럼 여러 시도에 같은 이름이 있으면 시군구로는 못 고르지만, 주소 문자열에
+  // 시도가 함께 있으면(「부산광역시 중구 …」) 그 시도로 확정할 수 있다. 시군구가 아예
+  // 마스터에 없을 때도 마찬가지다 — 「경상남도 어느읍 …」은 지금까지 통째로 버려졌다.
+  // 시군구는 비워 두므로 이 결과는 광역 단위 근거로만 쓰인다(matched level = "sido").
+  const sidoInAddress = sidos.filter((sido) =>
+    sidoMatchTokens(sido).some((token) => compact.includes(compactRegionText(token)))
+  );
+  if (sidoInAddress.length === 1) {
+    return {
+      sido: sidoInAddress[0],
+      sigungu: "",
+      matched: true,
+      matchMethod: "sido_in_address",
+      sigunguUnresolved: normalized,
+    };
   }
 
   return {

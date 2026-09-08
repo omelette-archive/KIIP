@@ -96,13 +96,17 @@ test("renders the data-connected Korean dashboard", async () => {
   // (컨셉 4판 "운영 지표는 분리"). 요약 첫 칸은 권리 상태 네 칸이 대신한다.
   assert.doesNotMatch(html, /출원인 주소 미확보/, "운영 지표는 요약이 아니라 데이터 개요 몫");
   assert.match(html, /전국 지역 브랜드 지도/);
-  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 하나의
-  // "지역·품목별 조회" 탭으로 합쳤다 — 상단 탭 목록(nav)에는 병합된 이름만 남는다.
-  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
-  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
-  // 2026-09-08: 특화작목 비교는 단위가 "도"라 지역별 화면(시도 선택)으로 내렸다.
-  // 최상위 탭은 요약 / 지역·품목별 조회 / 데이터 개요 셋이다.
-  assert.doesNotMatch(html.split("</nav>")[0], /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  // 2026-09-08(사용자): 한 탭 안의 하위 토글이 불편해 지역별·품목별·비즈니스 확장 경로를
+  // 다시 최상위 탭으로 꺼냈다. 지역 상세만 지역별 탭의 드릴다운, 특화작목은 지역별 화면 안.
+  {
+    const nav = html.split("</nav>")[0];
+    assert.match(nav, /지역별 특산품 상표 현황/);
+    assert.match(nav, /품목별 특산품 상표 현황/);
+    assert.match(nav, /비즈니스 확장 경로 분석/);
+    assert.doesNotMatch(nav, /지역·품목별 조회/, "합쳐 놓은 옛 탭 이름이 남아 있으면 안 됨");
+    assert.doesNotMatch(nav, />지역 상세<|>전국 지역 비교</);
+    assert.doesNotMatch(nav, /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  }
   assert.match(html, /데이터 개요/);
   assert.match(html, /참고 경계 · <!-- -->2026-07-01/);
   assert.match(html, />특산품 수<\/button>/);
@@ -116,17 +120,21 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
   // 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮겼다. 특산품 수·
   // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
-  // 2026-09-08: 그 자리를 권리 상태 네 칸이 대신한다(컨셉 4판의 대표 지표).
-  assert.match(mapInsight, /class="rights-board"/, "요약 핵심 지표는 지도 옆 왼쪽 열에 권리 상태 네 칸으로 있어야 함");
+  // 2026-09-08(사용자 "구석으로 보내줄래"): 권리 상태 네 칸은 좁은 왼쪽 열에서 세로로 길게
+  // 쌓여 요약 첫 화면을 차지했다 — 요약 맨 아래 전체 너비 띠로 내렸다. 지표는 그대로 있고
+  // 자리만 바뀌었으므로, 왼쪽 열에는 없고 요약 화면 안에는 있어야 한다.
+  assert.doesNotMatch(mapInsight, /class="rights-board"/, "권리 상태는 좁은 왼쪽 열이 아니라 요약 맨 아래에 있어야 함");
+  assert.match(html, /class="rights-board"/, "권리 상태 네 칸 자체는 요약 화면에 계속 있어야 함");
   assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장(항상 100%에 가까운 "전국 특산품 수"·
   // "지역별 출원 수 표시 가능"은 정보량이 적어 제거).
   assert.doesNotMatch(mapInsight, /전국 특산품 수|지역별 출원 수 표시 가능/, "정보량이 적은 KPI 2장은 요약에서 빠져야 함");
   // 2026-09-08: KPI 카드 2장을 권리 상태 네 칸 하나로 바꿨다. 네 칸은 각각 다른 지표가
   // 아니라 한 모집단(지역×특산품)을 네 상태로 가른 것이라 카드가 아니라 한 덩어리다.
-  const rightsSegmentCount = (mapInsight.match(/class="seg seg-/g) || []).length;
+  // 권리 상태는 왼쪽 열이 아니라 요약 맨 아래로 내려갔으므로 화면 전체에서 센다.
+  const rightsSegmentCount = (html.match(/class="seg seg-/g) || []).length;
   assert.ok(rightsSegmentCount >= 2 && rightsSegmentCount <= 4, `권리 상태 막대는 값이 있는 칸만 그린다(현재 ${rightsSegmentCount}칸)`);
-  const rightsLegendCount = (mapInsight.match(/<li class="seg-/g) || []).length;
+  const rightsLegendCount = (html.match(/<li class="seg-/g) || []).length;
   assert.equal(rightsLegendCount, 4, "권리 상태 범례는 네 칸 모두 표시해야 함(0건이어도)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");
@@ -319,10 +327,18 @@ test("renders tab navigation and separate application/registration ranking table
   const response = await render();
   const html = await response.text();
   const snapshot = await loadSnapshot();
-  assert.match(html, /class="primary-tabs"/, "요약/지역·품목별 조회/비즈니스 전략/특화작목/데이터 개요 5개 탭이 있어야 함");
-  // 이슈 #116(2026-09-01): "전국 지역 비교"·"지역 상세"·"품목별 조회"를 "지역·품목별 조회" 하나로 병합.
-  assert.match(html.split("</nav>")[0], /지역·품목별 조회/);
-  assert.doesNotMatch(html.split("</nav>")[0], />지역 상세<|>전국 지역 비교</);
+  assert.match(html, /class="primary-tabs"/, "요약/지역별/품목별/비즈니스 확장 경로/데이터 개요 5개 탭이 있어야 함");
+  // 2026-09-08(사용자): 한 탭 안의 하위 토글이 불편해 지역별·품목별·비즈니스 확장 경로를
+  // 다시 최상위 탭으로 꺼냈다. 지역 상세만 지역별 탭의 드릴다운, 특화작목은 지역별 화면 안.
+  {
+    const nav = html.split("</nav>")[0];
+    assert.match(nav, /지역별 특산품 상표 현황/);
+    assert.match(nav, /품목별 특산품 상표 현황/);
+    assert.match(nav, /비즈니스 확장 경로 분석/);
+    assert.doesNotMatch(nav, /지역·품목별 조회/, "합쳐 놓은 옛 탭 이름이 남아 있으면 안 됨");
+    assert.doesNotMatch(nav, />지역 상세<|>전국 지역 비교</);
+    assert.doesNotMatch(nav, /특화작목 비교/, "특화작목은 최상위 탭이 아니라 지역별 화면 안에 있어야 함");
+  }
   // 2026-08-21 사용자 요청: "등록상표 랭킹"만 있던 걸 출원 랭킹/등록 랭킹 두 개로 나누고,
   // TOP10/50 토글은 없애고 TOP 10 고정으로 단순화했다.
   // UI 검토(3차, 2026-09-06) S2: 출원 랭킹 표·등록 랭킹 표 2개를 전환 탭 하나로 합쳤다 —
@@ -709,11 +725,13 @@ test("sizes region/item tag clouds by application count instead of listing them 
   );
   assert.match(standaloneHtml, /class="item-tabs word-cloud"/, "지자체별 조회의 품목 탭이 태그 클라우드여야 함");
   assert.match(standaloneHtml, /class="region-chips word-cloud"/, "품목별 조회의 지역 목록이 태그 클라우드여야 함");
-  assert.match(
-    standaloneHtml,
-    /style="font-size:\$\{wordCloudFontSize\(value, max\)\}px;color:\$\{wordCloudColor\(region\)\}"/,
-    "각 태그의 font-size는 인라인 style로 출원건수에 비례해 지정해야 함",
-  );
+  // 2026-09-08(사용자 "이 중에 공백지역은 안 보이는 건가?"): 출원이 있는 지역은 건수에
+  // 비례한 크기 그대로 두되, 공백·집계대기 지역은 고정 크기로 키우고 표시를 붙인다 —
+  // 찾아야 할 대상이 가장 작게 보이면 안 된다.
+  assert.match(standaloneHtml, /wordCloudFontSize\(value, max\)/, "출원이 있는 지역 태그는 건수에 비례한 크기를 유지해야 함");
+  assert.match(standaloneHtml, /region-chip-button\$\{state\.itemRegionPick === region \? " active" : ""\}\$\{state2\}/, "공백·집계대기 상태가 칩 class로 구분돼야 함");
+  assert.match(standaloneHtml, /공백 — 확인된 출원이 없습니다/, "공백 지역은 title로 이유를 밝혀야 함");
+  assert.match(standaloneHtml, /region-chip-tally gap/, "공백 지역 수가 목록 머리에 집계돼야 함");
   // 2026-08-24(이슈 #112 후속): 태그 클라우드를 더 컬러풀하게 해달라는 요청 —
   // dataviz 스킬로 검증한(all-pairs CVD·정상시각 하한 통과) 4색 텍스트 팔레트를
   // 이름 해시로 고정 배정한다. 선택된 특산품 탭은 초록 배경에 흰 글자를 유지해야
