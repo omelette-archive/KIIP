@@ -13,7 +13,7 @@ type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registration
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[]; source?: "designated_goods" | "trademark_title" } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
 type NationwideFlow = { totalCount: number; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
-type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
+type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; localApplicantCount?: Metric; producerApplicantShare?: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
 type PipelineStatus = { stage: string; inputScope: string; rowCounts: { total: number; searchable: number; complete: number; partial: number; error: number; skipped: number }; uniqueQueryCounts: { total: number | null; complete: number | null; partial: number | null }; nationwideCandidates: { uniqueTrademarkCount: number; returnedHitCount: number; duplicateHitCount: number }; applicantRegionVerification: { inside: number; outside: number; unverified: number; verifiedCount: number; rate: number | null; regionalAttributionCounts?: { inside: number; outside: number; unverified: number }; unit?: string }; regionalMetricGate: { availableRegionItemCount: number; blockedRegionItemCount: number; coverageThreshold?: number; policy: string }; collectionExperiment: { queryHitCap: number | null; serializationFailureObservedAtOrAbove: number | null; outputShape: string } };
@@ -1575,6 +1575,38 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       .sort((a, b) => b.total - a.total);
   }, [coverageAreaRegions]);
   const categoryStatsMaxRate = Math.max(0.01, ...categoryStats.map((row) => row.coverageRate || 0));
+  // 2026-09-08: 광역 × 품목 유형 교차표. "어느 지역이 어느 유형에 강한가/약한가"는
+  // 목록을 아무리 봐도 안 보이는데 K-브랜드 후보를 고를 때 가장 먼저 필요한 그림이다.
+  // 색은 출원율 하나만 싣는 순차 단일 색(브랜드 블루) 5단계이고, 값은 셀 안에 숫자로도
+  // 적어 색만으로 읽히지 않게 한다. 전국 뷰에서만 의미가 있어 그때만 그린다.
+  const COVERAGE_STEPS = [0.2, 0.4, 0.6, 0.8];
+  const coverageStepOf = (rate: number | null) => rate === null ? -1 : COVERAGE_STEPS.filter((edge) => rate >= edge).length;
+  const provinceCategoryMatrix = useMemo(() => {
+    const categories = new Map<string, number>();
+    const byProvince = new Map<string, Map<string, { total: number; applied: number }>>();
+    for (const region of regionalRegions) {
+      const province = region.sido || region.region;
+      for (const item of region.items) {
+        const category = item.category?.label || "미분류";
+        categories.set(category, (categories.get(category) || 0) + 1);
+        if (!byProvince.has(province)) byProvince.set(province, new Map());
+        const cell = byProvince.get(province)!.get(category) || { total: 0, applied: 0 };
+        cell.total += 1;
+        const metric = item.metrics.uniqueTrademarkCount;
+        if (metric.availability === "available" && (metric.value || 0) > 0) cell.applied += 1;
+        byProvince.get(province)!.set(category, cell);
+      }
+    }
+    const columns = [...categories.entries()].sort((a, b) => b[1] - a[1]).map(([label]) => label);
+    const rows = [...byProvince.entries()]
+      .map(([province, cells]) => {
+        const total = [...cells.values()].reduce((sum, cell) => sum + cell.total, 0);
+        const applied = [...cells.values()].reduce((sum, cell) => sum + cell.applied, 0);
+        return { province, cells, total, applied, rate: total ? applied / total : null };
+      })
+      .sort((a, b) => b.total - a.total);
+    return { columns, rows };
+  }, [regionalRegions]);
   const coverageListedItemCount = coverageBreakdown.reduce((sum, row) => sum + row.items.length, 0);
   // 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 행("경기도" 자체)과 실제 시군구
   // 카드(가평군 등)를 나란한 카드로 보여주면 헷갈린다는 지적 — 도 단위 항목은 "도 전체"
@@ -1940,6 +1972,20 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </section>}
       
       </div>
+      {!selectedProvince && provinceCategoryMatrix.rows.length > 1 && <section className="matrix-section">
+        <div className="section-heading"><div><h2>광역 × 품목 유형 출원율</h2></div><span>색이 진할수록 출원율이 높습니다 · 칸의 숫자는 출원 확인 / 수집</span><CsvDownloadButton onClick={() => downloadCsv(`광역별유형별출원율_${csvDateStamp(dashboardUpdatedAt)}`, ["광역", ...provinceCategoryMatrix.columns, "합계 출원율"], provinceCategoryMatrix.rows.map((row) => [displayRegionName(row.province), ...provinceCategoryMatrix.columns.map((column) => { const cell = row.cells.get(column); return cell ? `${cell.applied}/${cell.total}` : ""; }), row.rate !== null ? percent(row.rate) : ""]))} /></div>
+        <div className="tablewrap-scroll">
+          <table className="matrix-table">
+            <thead><tr><th scope="col">광역</th>{provinceCategoryMatrix.columns.map((column) => <th key={column} scope="col">{column}</th>)}<th scope="col">전체</th></tr></thead>
+            <tbody>{provinceCategoryMatrix.rows.map((row) => <tr key={row.province}>
+              <th scope="row">{displayRegionName(row.province)}</th>
+              {provinceCategoryMatrix.columns.map((column) => { const cell = row.cells.get(column); const rate = cell && cell.total ? cell.applied / cell.total : null; return <td key={column} className={`matrix-cell step-${coverageStepOf(rate)}`} title={cell ? `${displayRegionName(row.province)} · ${column} — 수집 ${number(cell.total)}개 중 출원 확인 ${number(cell.applied)}개 (${percent(rate)})` : `${displayRegionName(row.province)} · ${column} — 수집된 특산품 없음`}>{cell ? `${cell.applied}/${cell.total}` : "—"}</td>; })}
+              <td className={`matrix-cell matrix-total step-${coverageStepOf(row.rate)}`}>{row.rate !== null ? percent(row.rate) : "—"}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        <p className="matrix-legend"><span>출원율</span>{["0~20%", "20~40%", "40~60%", "60~80%", "80~100%"].map((label, index) => <em key={label} className={`step-${index}`}>{label}</em>)}<b>칸이 비면 그 지역에 그 유형 특산품이 수집되지 않았다는 뜻입니다</b></p>
+      </section>}
       {categoryStats.length > 1 && <section className="category-stats">
         <div className="section-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>품목 유형별 출원 현황</h2></div><span>유형 {categoryStats.length}개 · 특산품 {number(coverageArea.total)}개</span><CsvDownloadButton onClick={() => downloadCsv(`유형별출원현황_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["유형", "수집 특산품", "출원 확인", "무권리", "집계 대기", "출원율", "지역 확인 출원", "등록", "등록률"], categoryStats.map((row) => [row.label, row.total, row.applied, row.noRights, row.pending, row.coverageRate !== null ? percent(row.coverageRate) : "", row.trademarks, row.registered, row.registrationRate !== null ? percent(row.registrationRate) : ""]))} /></div>
         <div className="category-stats-body">
@@ -2356,6 +2402,10 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     <div className="detail-grid">
       <article><span>{region.sigungu || displayName} {itemName(item)} 출원</span><strong>{regionalAvailable ? `${number(localCount)}건${regionalPartial ? "+" : ""}` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? (regionalPartial ? `출원인 주소가 ${displayName}으로 확인된 최소값 — 전국 검색이 상한에 도달해 더 있을 수 있습니다` : `출원인 주소가 ${displayName}으로 확인된 고유 출원`) : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${pendingReason}`}</small>{item.outputHitCap && <small className="output-hit-cap-note" title="전국 검색 결과가 저장 용량 한도를 넘어 일부만 저장했습니다. 실제로 확인된 전체 건수 중 이만큼만 상세 데이터로 보존합니다.">전국 검색 {number(item.outputHitCap.collectedCount)}건 수집(저장 상한 {number(item.outputHitCap.cap)}건)</small>}</article>
       <article><span>등록 건수</span><strong>{regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>{regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
+      {/* 컨설팅 보고서 Ⅲ장 1.2.1: 전략모듈은 "권리주체가 몇 곳인가"로 갈린다.
+          출원인 이름은 개인정보라 싣지 않고 고유 수와 생산자형 비율만 쓴다.
+          스냅샷에 아직 없는 값이면(재실행 전) 카드를 그리지 않는다. */}
+      {typeof item.metrics.localApplicantCount?.value === "number" && <article><span>권리주체</span><strong>{number(item.metrics.localApplicantCount.value)}곳</strong><small>{typeof item.metrics.producerApplicantShare?.value === "number" ? `생산자단체·지자체 ${percent(item.metrics.producerApplicantShare.value)}` : "지역 확인된 출원의 고유 출원인 수"}</small></article>}
       <article className={`rights-status rights-status-${rightsStatusOf(item).key}`}><span>권리 상태</span><strong>{rightsStatusOf(item).label}</strong><small>{rightsStatusOf(item).note}</small></article>
       <article><span>출원 여부</span><strong>{regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>{regionalAvailable ? localCount > 0 ? `특산품 출원율 계산에서 출원 확인 1개로 집계` : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
     </div>

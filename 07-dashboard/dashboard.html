@@ -649,6 +649,30 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .category-stats-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .category-stats-donuts h3 { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
 @media (max-width: 760px) { .coverage-insight-strip .coverage-insight-stats { margin-left: 0; } }
+/* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
+   진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
+.matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.matrix-table { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 2px; font-size: 11.5px; }
+.matrix-table thead th { padding: 6px 4px; color: var(--muted); font-size: 10.5px; font-weight: 800; text-align: center; white-space: nowrap; }
+.matrix-table thead th:first-child { text-align: left; }
+.matrix-table tbody th { padding: 4px 8px 4px 0; font-size: 11.5px; font-weight: 700; text-align: left; white-space: nowrap; }
+.matrix-cell { padding: 6px 4px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.matrix-cell.step--1 { background: #f4f6f9; color: var(--faint); }
+.matrix-cell.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-cell.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-cell.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-cell.step-3 { background: #4a8ac4; color: var(--ink); } /* 흰 글자는 대비 3.67로 AA 미달 — 먹 글자 4.79 */
+.matrix-cell.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-cell.matrix-total { font-weight: 800; }
+.matrix-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; font-size: 11px; color: var(--muted); }
+.matrix-legend > span { font-weight: 700; color: var(--ink); }
+.matrix-legend em { padding: 3px 8px; border-radius: 4px; font-style: normal; font-weight: 700; }
+.matrix-legend em.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-legend em.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-legend em.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-legend em.step-3 { background: #4a8ac4; color: var(--ink); }
+.matrix-legend em.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-legend b { margin-left: auto; color: var(--faint); font-weight: 600; }
 /* 2026-09-08: 품목 유형별 출원 현황 표. 단일 지표(출원율) 크기 비교라 순차 단일 색
    막대 하나면 충분하고, 값은 옆에 숫자로 함께 적어 색만으로 읽히지 않게 한다. */
 .category-stats { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
@@ -2200,6 +2224,45 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const categoryStatsMaxRate = Math.max(0.01, ...categoryStats.map((row) => row.coverageRate || 0));
     currentCsvExporters.categoryStats = () => downloadCsv(`유형별출원현황_${areaName}_${csvDateStamp(dashboardUpdatedAt)}`, ["유형", "수집 특산품", "출원 확인", "무권리", "집계 대기", "출원율", "지역 확인 출원", "등록", "등록률"], categoryStats.map((row) => [row.label, row.total, row.applied, row.noRights, row.pending, row.coverageRate !== null ? percent(row.coverageRate) : "", row.trademarks, row.registered, row.registrationRate !== null ? percent(row.registrationRate) : ""]));
     const categoryStatsHtml = categoryStats.length > 1 ? `<section class="category-stats"><div class="section-heading"><div><span class="coverage-directory-region">${esc(areaName)}</span><h2>품목 유형별 출원 현황</h2></div><span>유형 ${categoryStats.length}개 · 특산품 ${number(area.total)}개</span>${csvDownloadButtonHtml("categoryStats")}</div><div class="category-stats-body"><div class="tablewrap-scroll"><table class="category-stats-table"><thead><tr><th scope="col">유형</th><th scope="col">수집</th><th scope="col">출원 확인</th><th scope="col">무권리</th><th scope="col">출원율</th><th scope="col">지역 확인 출원</th><th scope="col">등록</th><th scope="col">등록률</th></tr></thead><tbody>${categoryStats.map((row) => `<tr title="${esc(`${row.label} · 수집 ${number(row.total)}개 중 출원 확인 ${number(row.applied)}개${row.pending ? ` · 집계 대기 ${number(row.pending)}개` : ""}`)}"><th scope="row">${esc(row.label)}</th><td class="num">${number(row.total)}</td><td class="num">${number(row.applied)}</td><td class="num">${row.noRights ? number(row.noRights) : "—"}</td><td class="rate"><span class="rate-bar"><i style="width:${Math.round((row.coverageRate || 0) / categoryStatsMaxRate * 100)}%"></i></span><b>${row.coverageRate !== null ? percent(row.coverageRate) : "—"}</b></td><td class="num">${row.trademarks ? number(row.trademarks) : "—"}</td><td class="num">${row.registered ? number(row.registered) : "—"}</td><td class="num">${row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td></tr>`).join("")}</tbody></table></div>${state.province && !state.municipality ? `<div class="category-stats-donuts"><div class="province-category-share-grid"><article><h3>출원 비중</h3>${categoryShareDonutHtml(areaRegions.flatMap((region) => region.items), "uniqueTrademarkCount", "출원")}</article><article><h3>등록 비중</h3>${categoryShareDonutHtml(areaRegions.flatMap((region) => region.items), "registeredTrademarkCount", "등록")}</article></div></div>` : ""}</div><p class="screen-note">출원율은 수집된 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 비율(분모에 명칭 확인·집계 대기 포함), 등록률은 지역 확인 출원 중 등록 완료 비율입니다 — 분모가 다르므로 두 비율을 직접 비교하지 마십시오.</p></section>` : "";
+    // 2026-09-08: 광역 × 품목 유형 교차표(전국 뷰 전용). 색은 출원율 하나만 싣는
+    // 순차 단일 색 5단계이고, 값은 칸 안에 "출원 확인/수집"으로도 적어 색만으로 읽히지 않게 한다.
+    const COVERAGE_STEPS = [0.2, 0.4, 0.6, 0.8];
+    const coverageStepOf = (rate) => rate === null ? -1 : COVERAGE_STEPS.filter((edge) => rate >= edge).length;
+    const matrixHtml = (() => {
+      if (state.province) return "";
+      const categories = new Map();
+      const byProvince = new Map();
+      for (const region of regionalRegions) {
+        const province = region.sido || region.region;
+        for (const item of region.items) {
+          const category = item.category?.label || "미분류";
+          categories.set(category, (categories.get(category) || 0) + 1);
+          if (!byProvince.has(province)) byProvince.set(province, new Map());
+          const cell = byProvince.get(province).get(category) || { total: 0, applied: 0 };
+          cell.total += 1;
+          const metric = item.metrics.uniqueTrademarkCount;
+          if (metric.availability === "available" && (metric.value || 0) > 0) cell.applied += 1;
+          byProvince.get(province).set(category, cell);
+        }
+      }
+      const columns = [...categories.entries()].sort((a, b) => b[1] - a[1]).map(([label]) => label);
+      const rows = [...byProvince.entries()].map(([province, cells]) => {
+        const total = [...cells.values()].reduce((sum, c) => sum + c.total, 0);
+        const applied = [...cells.values()].reduce((sum, c) => sum + c.applied, 0);
+        return { province, cells, total, applied, rate: total ? applied / total : null };
+      }).sort((a, b) => b.total - a.total);
+      if (rows.length < 2) return "";
+      currentCsvExporters.provinceCategoryMatrix = () => downloadCsv(`광역별유형별출원율_${csvDateStamp(dashboardUpdatedAt)}`, ["광역", ...columns, "합계 출원율"], rows.map((row) => [displayRegionName(row.province), ...columns.map((column) => { const cell = row.cells.get(column); return cell ? `${cell.applied}/${cell.total}` : ""; }), row.rate !== null ? percent(row.rate) : ""]));
+      const head = `<tr><th scope="col">광역</th>${columns.map((c) => `<th scope="col">${esc(c)}</th>`).join("")}<th scope="col">전체</th></tr>`;
+      const body = rows.map((row) => `<tr><th scope="row">${esc(displayRegionName(row.province))}</th>${columns.map((column) => {
+        const cell = row.cells.get(column);
+        const rate = cell && cell.total ? cell.applied / cell.total : null;
+        const title = cell ? `${displayRegionName(row.province)} · ${column} — 수집 ${number(cell.total)}개 중 출원 확인 ${number(cell.applied)}개 (${percent(rate)})` : `${displayRegionName(row.province)} · ${column} — 수집된 특산품 없음`;
+        return `<td class="matrix-cell step-${coverageStepOf(rate)}" title="${esc(title)}">${cell ? `${cell.applied}/${cell.total}` : "—"}</td>`;
+      }).join("")}<td class="matrix-cell matrix-total step-${coverageStepOf(row.rate)}">${row.rate !== null ? percent(row.rate) : "—"}</td></tr>`).join("");
+      const legend = ["0~20%", "20~40%", "40~60%", "60~80%", "80~100%"].map((label, index) => `<em class="step-${index}">${label}</em>`).join("");
+      return `<section class="matrix-section"><div class="section-heading"><div><h2>광역 × 품목 유형 출원율</h2></div><span>색이 진할수록 출원율이 높습니다 · 칸의 숫자는 출원 확인 / 수집</span>${csvDownloadButtonHtml("provinceCategoryMatrix")}</div><div class="tablewrap-scroll"><table class="matrix-table"><thead>${head}</thead><tbody>${body}</tbody></table></div><p class="matrix-legend"><span>출원율</span>${legend}<b>칸이 비면 그 지역에 그 유형 특산품이 수집되지 않았다는 뜻입니다</b></p></section>`;
+    })();
     const provinceFilterHtml = `<div class="province-tabbar region-quick-filter" role="group" aria-label="시도 바로가기"><button type="button" data-province-filter="" class="${state.province ? "" : "active"}">전국</button>${[...geometry.provinces].sort((a, b) => compareProvince(a.name, b.name)).map((shape) => `<button type="button" data-province-filter="${esc(shape.name)}" class="${state.province === shape.name ? "active" : ""}">${esc(displayRegionName(shape.name))}</button>`).join("")}</div>`;
     const regionSearchHtml = `<div class="item-search-row"><label class="search-field explore-search"><span class="sr-only">지역 또는 품목 검색</span><input type="search" id="region-directory-search" value="${esc(state.regionQuery)}" placeholder="지역 또는 품목 검색"></label><label class="item-sort-field"><span class="sr-only">정렬 기준</span><select id="region-sort-select">${[["name", "가나다순"], ["coverage", "출원율순"], ["total", "특산품 수순"], ["applied", "출원 확인순"]].map(([value, label]) => `<option value="${value}"${state.regionSort === value ? " selected" : ""}>${label}</option>`).join("")}</select></label></div>`;
     return `<section class="screen-section coverage-screen"><div class="explore-toolbar">${exploreSubnavHtml("region")}${regionSearchHtml}</div>${provinceFilterHtml}<p class="screen-note">전국 16개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 위 시도 목록·지도·아래 목록에서 지역이나 품목을 누르면 그 지역 상세로 들어갑니다.</p>
@@ -2211,6 +2274,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       ${state.province ? `<section class="coverage-map-card"><div class="map-heading"><div><h2>${esc(displayRegionName(state.province))} 시군구 출원율</h2></div><div class="coverage-map-actions"><button class="map-back" id="map-back" type="button">← 전국</button></div></div><p class="map-metric-description"><strong>특산품 출원율</strong><span>지역 주소 일치 출원이 확인된 특산품 수 ÷ 수집된 전체 특산품 수 · 명칭 확인·집계 대기도 분모에 포함합니다.</span></p><div class="map-stage coverage-map-stage"><svg class="korea-map coverage-map" viewBox="${activeViewBox}" role="img" aria-label="${esc(displayRegionName(state.province))} 시군구별 특산품 출원율 지도">${shapePaths}${mapLabelsHtml}</svg></div><div class="coverage-legend quantile-legend">${quantileLegendHtml(municipal ? coverageMunicipalBreaks : coverageNationalBreaks, (value) => percent(value))}<b>회색은 데이터 없음</b></div><p class="map-warning">특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다.</p></section>` : ""}
       
       </div>
+      ${matrixHtml}
       ${categoryStatsHtml}
       <section class="coverage-directory"><div class="section-heading coverage-directory-heading"><div><span class="coverage-directory-region">${esc(areaName)}</span><h2>지자체별 특산품 현황</h2></div><span>특산품 ${number(listedItemCount)}개 · 출원 확인 ${number(area.applied)}개 · 출원율 ${percent(area.rate)}</span>${csvDownloadButtonHtml("coverageDirectory")}</div>${
         // 이슈 #117 코멘트(2026-09-03): 도를 클릭하면 시군구 목록이 나오기 전에 그 도 전체의
@@ -2293,7 +2357,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       <div class="detail-grid">
         <article><span>${esc(region.sigungu || displayName)} ${esc(itemName(item))} 출원</span><strong>${regionalAvailable ? `${number(localCount)}건${regionalPartial ? "+" : ""}` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? (regionalPartial ? `출원인 주소가 ${esc(displayName)}으로 확인된 최소값 — 전국 검색이 상한에 도달해 더 있을 수 있습니다` : `출원인 주소가 ${esc(displayName)}으로 확인된 고유 출원`) : `전국 검색 후보 ${number(item.metrics.nationwideSearchTrademarkCount?.value)}건 · ${esc(pendingReason)}`}</small>${item.outputHitCap ? `<small class="output-hit-cap-note" title="전국 검색 결과가 저장 용량 한도를 넘어 일부만 저장했습니다. 실제로 확인된 전체 건수 중 이만큼만 상세 데이터로 보존합니다.">전국 검색 ${number(item.outputHitCap.collectedCount)}건 수집(저장 상한 ${number(item.outputHitCap.cap)}건)</small>` : ""}</article>
         <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
-        ${(() => { const rights = rightsStatusOf(item); return `<article class="rights-status rights-status-${rights.key}"><span>권리 상태</span><strong>${esc(rights.label)}</strong><small>${esc(rights.note)}</small></article>`; })()}<article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
+        ${typeof item.metrics.localApplicantCount?.value === "number" ? `<article><span>권리주체</span><strong>${number(item.metrics.localApplicantCount.value)}곳</strong><small>${typeof item.metrics.producerApplicantShare?.value === "number" ? `생산자단체·지자체 ${percent(item.metrics.producerApplicantShare.value)}` : "지역 확인된 출원의 고유 출원인 수"}</small></article>` : ""}${(() => { const rights = rightsStatusOf(item); return `<article class="rights-status rights-status-${rights.key}"><span>권리 상태</span><strong>${esc(rights.label)}</strong><small>${esc(rights.note)}</small></article>`; })()}<article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
       ${examples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(examples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>예시 ${number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : ""}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
       ${item.briefing && item.briefing.sentences.length > 0 ? `${businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략", "", nationwideReach(item))}${businessStrategyDisclaimerHtml(item.briefing.templateVersion)}` : ""}

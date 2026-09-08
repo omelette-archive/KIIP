@@ -649,6 +649,30 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .category-stats-donuts { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .category-stats-donuts h3 { margin: 0 0 8px; font-size: 12.5px; color: var(--muted); }
 @media (max-width: 760px) { .coverage-insight-strip .coverage-insight-stats { margin-left: 0; } }
+/* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
+   진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
+.matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+.matrix-table { width: 100%; min-width: 720px; border-collapse: separate; border-spacing: 2px; font-size: 11.5px; }
+.matrix-table thead th { padding: 6px 4px; color: var(--muted); font-size: 10.5px; font-weight: 800; text-align: center; white-space: nowrap; }
+.matrix-table thead th:first-child { text-align: left; }
+.matrix-table tbody th { padding: 4px 8px 4px 0; font-size: 11.5px; font-weight: 700; text-align: left; white-space: nowrap; }
+.matrix-cell { padding: 6px 4px; border-radius: 4px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.matrix-cell.step--1 { background: #f4f6f9; color: var(--faint); }
+.matrix-cell.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-cell.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-cell.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-cell.step-3 { background: #4a8ac4; color: var(--ink); } /* 흰 글자는 대비 3.67로 AA 미달 — 먹 글자 4.79 */
+.matrix-cell.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-cell.matrix-total { font-weight: 800; }
+.matrix-legend { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 10px; margin: 12px 0 0; font-size: 11px; color: var(--muted); }
+.matrix-legend > span { font-weight: 700; color: var(--ink); }
+.matrix-legend em { padding: 3px 8px; border-radius: 4px; font-style: normal; font-weight: 700; }
+.matrix-legend em.step-0 { background: #e9eff7; color: var(--ink); }
+.matrix-legend em.step-1 { background: #c9dcf0; color: var(--ink); }
+.matrix-legend em.step-2 { background: #8fb9df; color: var(--ink); }
+.matrix-legend em.step-3 { background: #4a8ac4; color: var(--ink); }
+.matrix-legend em.step-4 { background: #0f5fa6; color: #fff; }
+.matrix-legend b { margin-left: auto; color: var(--faint); font-weight: 600; }
 /* 2026-09-08: 품목 유형별 출원 현황 표. 단일 지표(출원율) 크기 비교라 순차 단일 색
    막대 하나면 충분하고, 값은 옆에 숫자로 함께 적어 색만으로 읽히지 않게 한다. */
 .category-stats { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
