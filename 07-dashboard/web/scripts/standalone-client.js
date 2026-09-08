@@ -480,7 +480,8 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     if (raw.count >= 20 && service.count / Math.max(1, raw.count) < 0.15) out.push({ kind: "service_gap", text: `서비스·확장 단계 상표가 원물 대비 ${Math.round(service.count / Math.max(1, raw.count) * 100)}%뿐입니다 — 체험·유통·식음(41·43·44류) 진출 여지가 큽니다.` });
     if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < 0.3) out.push({ kind: "processed_gap", text: `가공품 브랜딩(${number(processed.count)}건)이 원물(${number(raw.count)}건)에 비해 적습니다 — 가공식품·음료류(29·30·32) 상표가 아직 미개척입니다.` });
     if (topRawClass && topRawClass.share > 0.6) out.push({ kind: "class_concentration", text: `원물 상표가 ${niceClassLabel(topRawClass.classCode)}에 ${Math.round(topRawClass.share * 100)}% 집중돼 있습니다 — 인접 상품류로 포트폴리오를 넓힐 여지가 있습니다.` });
-    if (rawRegion && processedRegion && rawRegion !== processedRegion) out.push({ kind: "cluster_split", text: `원물 상표 활동은 ${displayRegionName(rawRegion)}, 가공은 ${displayRegionName(processedRegion)}에서 두드러집니다 — 산지에서 가공 브랜드를 키울 때 산지 연계 스토리를 활용할 수 있습니다.` });
+    // 이슈 #110: 지역 클러스터 주장은 hasRegionalSignal(원물 상위 출원인이 생산 주체형)에만.
+    if (flow.hasRegionalSignal && rawRegion && processedRegion && rawRegion !== processedRegion) out.push({ kind: "cluster_split", text: `원물 상표 활동은 ${displayRegionName(rawRegion)}, 가공은 ${displayRegionName(processedRegion)}에서 두드러집니다 — 산지에서 가공 브랜드를 키울 때 산지 연계 스토리를 활용할 수 있습니다.` });
     if (opts.surging) out.push({ kind: "momentum", text: "최근 출원이 급증하는 품목입니다 — 선점 경쟁이 빨라지고 있어 조기 출원 전략이 필요합니다." });
     if (out.length === 0 && service.count > processed.count * 0.3) out.push({ kind: "balanced", text: "원물·가공·서비스 전 단계에 상표 활동이 고르게 있습니다 — 지역 특화 세부 상품류를 겨냥한 차별화가 다음 과제입니다." });
     return out.slice(0, 4);
