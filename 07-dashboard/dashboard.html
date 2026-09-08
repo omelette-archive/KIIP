@@ -20,6 +20,20 @@
   --violet: #5b4b9e;
   --violet-soft: #e8e4f5;
   --shadow: 0 18px 55px rgba(16, 25, 43, 0.06);
+  /* 2026-09-08(사용자): "데이터 개요의 이 숫자들이 다른 페이지에 비해 상당히 큰 것 같아 /
+     페이지별 폰트 규격 좀 맞춰줘." 화면마다 제목이 21~30px, 지표 숫자가 19~48px로 따로
+     굴러 같은 위계의 요소가 페이지를 옮길 때마다 커졌다 작아졌다 했다. 제목 3단·숫자 3단으로
+     묶고 모든 화면이 이 토큰만 쓰게 한다. 값은 기존 분포의 중앙값 근처로 잡아 특정 화면만
+     크게 바뀌지 않게 했다(가장 크던 데이터 개요 퍼널 32px → 26px).
+
+     제목  --h-lg 화면 제목 · --h-md 카드 제목 · --h-sm 패널/항목 제목
+     숫자  --num-lg 화면 대표 수치 · --num-md 카드 수치 · --num-sm 조밀한 목록 수치 */
+  --h-lg: 24px;
+  --h-md: 21px;
+  --h-sm: 18px;
+  --num-lg: 26px;
+  --num-md: 22px;
+  --num-sm: 19px;
 }
 
 * { box-sizing: border-box; }
@@ -80,7 +94,7 @@ a { color: inherit; text-decoration: none; }
 .metrics article:last-child { border-right: 0; }
 .metrics span, .metrics small { display: block; }
 .metrics span { color: var(--muted); font-size: 12px; }
-.metrics strong { display: block; margin: 6px 0 4px; font-size: 23px; font-weight: 800; letter-spacing: -0.02em; }
+.metrics strong { display: block; margin: 6px 0 4px; font-size: var(--num-md); font-weight: 800; letter-spacing: -0.02em; }
 .metrics small { color: var(--faint); font-size: 11px; line-height: 1.35; }
 
 .pipeline-progress { margin-top: 18px; padding: 26px 28px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
@@ -88,7 +102,7 @@ a { color: inherit; text-decoration: none; }
 .pipeline-grid article { min-height: 150px; padding: 18px; border: 1px solid var(--line); border-radius: 13px; background: #f4f6f9; }
 .pipeline-grid span, .pipeline-grid strong { display: block; }
 .pipeline-grid span { color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .04em; }
-.pipeline-grid strong { margin-top: 11px; font-size: 21px; letter-spacing: -.035em; }
+.pipeline-grid strong { margin-top: 11px; font-size: var(--num-md); letter-spacing: -.035em; }
 .pipeline-grid p { margin: 10px 0 0; color: var(--muted); font-size: 11px; line-height: 1.7; }
 .pipeline-grid .pipeline-bottleneck { grid-column: 1 / -1; min-height: auto; border-color: #e2c59b; background: var(--amber-soft); }
 .pipeline-grid .pipeline-bottleneck span { color: var(--amber); }
@@ -176,7 +190,7 @@ a { color: inherit; text-decoration: none; }
 .sample-tag { margin-left: 8px; padding: 1px 7px; border-radius: 4px; background: var(--violet-soft); color: var(--violet); font-size: 10.5px; font-style: normal; font-weight: 800; vertical-align: 3px; }
 /* 상위 5개 목록 위에 모집단을 적는다 — 순위만 보면 "전체가 얼마인지"를 모른다. */
 .insight-total { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; margin: 12px 0 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--paper); }
-.insight-total strong { font-size: 24px; font-weight: 800; letter-spacing: -.02em; color: var(--green-dark); font-variant-numeric: tabular-nums; }
+.insight-total strong { font-size: var(--num-md); font-weight: 800; letter-spacing: -.02em; color: var(--green-dark); font-variant-numeric: tabular-nums; }
 .insight-total span { font-size: 12px; font-weight: 700; color: var(--ink); }
 .insight-total small { flex-basis: 100%; color: var(--muted); font-size: 11px; line-height: 1.55; }
 /* 확인 범위의 한계를 첫 문장 바로 아래에 둔다 — 아래 빈 칸을 "권리 없음"으로 읽으면
@@ -268,7 +282,7 @@ a { color: inherit; text-decoration: none; }
 .detail-panel { min-height: 560px; padding: 30px; }
 .panel-heading, .detail-heading, .section-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
 .panel-heading h2, .detail-heading h2, .section-heading h2 { margin: 0; letter-spacing: -0.035em; }
-.panel-heading h2 { font-size: 21px; }
+.panel-heading h2 { font-size: var(--h-md); }
 .panel-heading > span, .section-heading > span { color: var(--faint); font-size: 11px; }
 .search-field { display: block; margin: 20px 0 12px; }
 /* 이슈 #119: 지역·품목별 조회의 칩 아래 검색창 — 두 모드 동일 위치 */
@@ -302,7 +316,7 @@ a { color: inherit; text-decoration: none; }
 .state { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .state-partial { background: var(--amber-soft); color: var(--amber); }
 .state-error { background: #f5deda; color: var(--red); }
-.detail-heading h2 { font-size: 30px; font-weight: 800; letter-spacing: -0.02em; }
+.detail-heading h2 { font-size: var(--h-lg); font-weight: 800; letter-spacing: -0.02em; }
 .detail-heading p:not(.eyebrow) { margin: 8px 0 0; color: var(--faint); font-size: 11px; }
 .item-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 26px 0 22px; padding-bottom: 18px; border-bottom: 1px solid var(--line); }
 .item-tabs button { padding: 7px 11px; border: 1px solid var(--line); border-radius: 999px; background: transparent; color: var(--muted); font-size: 11px; cursor: pointer; }
@@ -314,7 +328,7 @@ a { color: inherit; text-decoration: none; }
 .item-tabs.word-cloud button { line-height: 1.3; font-weight: 700; }
 .item-title { display: flex; justify-content: space-between; align-items: end; gap: 16px; }
 .item-title span { color: var(--muted); font-size: 11px; }
-.item-title h3 { margin: 5px 0 0; font-size: 24px; letter-spacing: -0.04em; }
+.item-title h3 { margin: 5px 0 0; font-size: var(--h-md); letter-spacing: -0.04em; }
 .class-chip { padding: 5px 9px; border-radius: 7px; background: #e7ecf2; }
 .metric-reading-note { display: grid; grid-template-columns: 120px 1fr; gap: 14px; margin-top: 16px; padding: 13px 15px; border-radius: 11px; background: var(--green-soft); color: var(--green-dark); }
 .metric-reading-note strong { font-size: 11px; }.metric-reading-note p { margin: 0; font-size: 11px; line-height: 1.65; }
@@ -322,7 +336,7 @@ a { color: inherit; text-decoration: none; }
 .detail-grid article { min-height: 140px; padding: 17px; border: 1px solid var(--line); border-radius: 13px; background: #f4f6f9; }
 .detail-grid span, .detail-grid small { display: block; }
 .detail-grid span { color: var(--muted); font-size: 11px; }
-.detail-grid strong { display: block; margin: 14px 0 10px; font-size: 22px; letter-spacing: -0.03em; }
+.detail-grid strong { display: block; margin: 14px 0 10px; font-size: var(--num-md); letter-spacing: -0.03em; }
 .detail-grid small { color: var(--faint); font-size: 11px; line-height: 1.5; }
 /* #137 "공개 뷰에 collectedCount + cap 표시": ③ --out-max-hits로 잘린 품목에만 조건부로 뜬다. */
 .detail-grid .output-hit-cap-note { margin-top: 6px; }
@@ -330,7 +344,7 @@ a { color: inherit; text-decoration: none; }
 .blocking-list a { color: var(--amber); font-size: 11px; font-weight: 700; }
 
 .provenance { margin-top: 24px; padding: 28px; }
-.section-heading h2 { font-size: 28px; }
+.section-heading h2 { font-size: var(--h-lg); }
 .source-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
 .source-grid a { min-height: 120px; padding: 16px; border: 1px solid var(--line); border-radius: 12px; transition: transform 0.16s ease, border-color 0.16s ease; }
 .source-grid a:hover { transform: translateY(-2px); border-color: #a9c3dd; }
@@ -385,7 +399,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 }
 .map-card { padding: 26px; }
 .map-heading, .map-toolbar { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; }
-.map-heading h2 { margin: 0; font-size: 27px; letter-spacing: -.04em; }
+.map-heading h2 { margin: 0; font-size: var(--h-lg); letter-spacing: -.04em; }
 .reference-chip { padding: 6px 9px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 11px; font-weight: 800; white-space: nowrap; }
 .map-toolbar { margin-top: 18px; align-items: center; }
 .map-metrics { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -420,12 +434,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .map-warning { margin: 13px 0 0; padding: 10px 12px; border-radius: 9px; background: #fff7e9; color: #795024; font-size: 11px; line-height: 1.55; }
 .unclassified-note { margin: 10px 0 0; padding: 10px 12px; border-radius: 9px; background: var(--green-soft); color: var(--green-dark); font-size: 11px; line-height: 1.6; }
 .map-insight { padding: 25px; }
-.map-insight h2 { margin: 18px 0 0; font-size: 22px; letter-spacing: -.04em; }
+.map-insight h2 { margin: 18px 0 0; font-size: var(--h-md); letter-spacing: -.04em; }
 /* 이슈 #116(2026-09-01): 요약 상단 지표 바를 지도 옆 왼쪽 열로 옮긴다 — 세로로 쌓아 컴팩트하게. */
 .metrics.metrics-inset { display: grid; grid-template-columns: 1fr; border-radius: 14px; box-shadow: none; background: var(--panel); }
 .metrics.metrics-inset article { min-height: 0; padding: 11px 13px; border-right: 0; border-bottom: 1px solid var(--line); }
 .metrics.metrics-inset article:last-child { border-bottom: 0; }
-.metrics.metrics-inset strong { margin: 3px 0 3px; font-size: 20px; }
+.metrics.metrics-inset strong { margin: 3px 0 3px; font-size: var(--num-sm); }
 .insight-summary { margin: 8px 0 20px; color: var(--muted); font-size: 11px; }
 .metric-count-hero { display: flex; align-items: center; gap: 20px; min-height: 128px; margin: 14px 0 4px; }
 .metric-count-hero > strong { min-width: 112px; color: var(--green-dark); font-size: 48px; line-height: 1; letter-spacing: -.055em; }
@@ -444,7 +458,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-kpis article:last-child { border-right: 0; }
 .coverage-kpis span, .coverage-kpis small { display: block; color: var(--muted); }
 .coverage-kpis span { font-size: 11px; font-weight: 800; }
-.coverage-kpis strong { display: block; margin-top: 10px; font-size: 30px; letter-spacing: -.04em; }
+.coverage-kpis strong { display: block; margin-top: 10px; font-size: var(--num-lg); letter-spacing: -.04em; }
 .coverage-kpis small { margin-top: 8px; font-size: 11px; line-height: 1.55; }
 .coverage-rate-kpi { background: var(--green-dark); color: white; }
 .coverage-rate-kpi span, .coverage-rate-kpi small { color: #cfe0f2; }
@@ -555,7 +569,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .province-category-share-grid { grid-template-columns: 1fr; }
   .province-municipalities summary { align-items: flex-start; flex-direction: column; }
 }
-.coverage-insight h2 { margin: 0; font-size: 26px; letter-spacing: -.04em; }
+.coverage-insight h2 { margin: 0; font-size: var(--h-lg); letter-spacing: -.04em; }
 .coverage-insight-stats { display: grid; gap: 10px; margin-top: 20px; padding-top: 18px; border-top: 1px solid var(--line); }
 .coverage-insight-stats div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; min-width: 0; }
 .coverage-insight-stats dt { margin: 0; flex: 0 0 auto; color: var(--muted); font-size: 11px; }
@@ -567,14 +581,14 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .rate-ring { flex: none; }
 .rate-ring-track { stroke: var(--line); }
 .rate-ring-fill { stroke: var(--green); transition: stroke-dashoffset .5s ease; }
-.rate-ring-label { font-size: 22px; font-weight: 800; fill: var(--ink); }
+.rate-ring-label { font-size: var(--num-md); font-weight: 800; fill: var(--ink); }
 .coverage-map-actions { display: flex; align-items: center; flex-wrap: wrap; justify-content: flex-end; gap: 8px; }
 .coverage-map-stage { min-height: 620px; }
 .coverage-map { width: min(100%, 900px); max-height: 720px; }
 .coverage-directory .section-heading { margin-bottom: 16px; }
 .coverage-directory-heading { align-items: flex-end; }
 .coverage-directory-heading > div { display: flex; align-items: baseline; gap: 12px; }
-.coverage-directory-heading h2 { margin: 0; font-size: 23px; }
+.coverage-directory-heading h2 { margin: 0; font-size: var(--h-md); }
 .coverage-directory-heading > span { font-size: 12px; }
 .coverage-region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 /* UI 검토(3차, 2026-09-06) S1: 전국 뷰(검색 없음) 전용 압축 목록 — 지역명·건수만, 특산품
@@ -611,9 +625,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .coverage-region-head strong, .coverage-region-head small { display: block; }
 .coverage-region-head strong { font-size: 19px; font-weight: 800; }
 .coverage-region-head small { margin-top: 5px; color: var(--muted); font-size: 11.5px; line-height: 1.5; }
-.coverage-region-head b { color: var(--green); font-size: 26px; }
+.coverage-region-head b { color: var(--green); font-size: var(--num-lg); }
 .coverage-region-head button { padding: 6px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--green); font-size: 11px; font-weight: 800; cursor: pointer; }
-.coverage-directory-region { color: var(--green); font-size: 23px; font-weight: 900; letter-spacing: -.03em; }
+.coverage-directory-region { color: var(--green); font-size: var(--h-md); font-weight: 900; letter-spacing: -.03em; }
 .coverage-region-summary { display: grid; justify-items: end; gap: 3px; }
 .coverage-region-summary span { color: var(--muted); font-size: 11px; font-weight: 700; white-space: nowrap; }
 .coverage-region-summary b { line-height: 1; }
@@ -816,7 +830,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .rights-board-legend li.seg-service-only { border-left-color: var(--amber); background: none; }
 .rights-board-legend li.seg-goods { border-left-color: var(--green); background: none; }
 .rights-board-legend li.seg-unknown { border-left-color: #c7cfdb; background: none; }
-.rights-board-legend b { display: block; font-size: 20px; font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
+.rights-board-legend b { display: block; font-size: var(--num-sm); font-weight: 800; font-variant-numeric: tabular-nums; letter-spacing: -.02em; }
 .rights-board-legend span { display: block; margin-top: 1px; font-size: 12px; font-weight: 700; }
 .rights-board-legend small { display: block; margin-top: 2px; color: var(--faint); font-size: 10.5px; line-height: 1.45; }
 .rights-board-note { margin: 12px 0 0; color: var(--muted); font-size: 11px; line-height: 1.65; }
@@ -923,9 +937,15 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-category-filter { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
 .item-category-filter button { padding: 7px 12px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 11px; font-weight: 700; cursor: pointer; }
 .item-category-filter button.active { border-color: var(--green); background: var(--green); color: #fff; }
-.province-tabbar { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
-.province-tabbar button { padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: #eef2f7; color: var(--muted); font-size: 12px; font-weight: 700; white-space: nowrap; cursor: pointer; }
-.province-tabbar button.active { border-color: var(--green); background: var(--green); color: #fff; }
+/* 2026-09-08(사용자): "이 안에 상당히 많은 메뉴가 있는데.. 상단에 텍스트로 얇게 바를
+   만들어주면 어때" — 시도 17개가 알약 칩으로 두 줄을 차지해 정작 지도·목록이 접혔다.
+   테두리·배경을 걷어내고 글자만 남긴 한 줄 바로 바꾼다. 넘치면 가로 스크롤하고, 고른
+   항목은 색과 밑줄로 표시한다(색만으로 구분하지 않는다). */
+.province-tabbar { display: flex; flex-wrap: nowrap; gap: 2px; margin: 0 0 10px; padding-bottom: 2px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: thin; border-bottom: 1px solid var(--line); }
+.province-tabbar button { flex: none; padding: 6px 9px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--muted); font-size: 12.5px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.province-tabbar button:hover { color: var(--ink); background: var(--green-soft); }
+.province-tabbar button.active { border-bottom-color: var(--green); background: transparent; color: var(--green-dark); font-weight: 800; }
+.province-tabbar button:focus-visible { outline: 2px solid var(--green); outline-offset: -2px; }
 /* 이슈 #119: 지역별 모드의 17개 시도 빠른 선택 — 품목별 카테고리 칩과 같은 위치·모양 */
 .region-quick-filter { margin: 0 0 12px; }
 .item-reading-guide { display: flex; align-items: center; flex-wrap: wrap; gap: 8px 18px; margin-bottom: 16px; padding: 13px 15px; border-radius: 11px; background: var(--green-soft); color: #445164; font-size: 12px; line-height: 1.5; }
@@ -955,7 +975,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .item-detail-panel { min-width: 0; min-height: 320px; padding: 22px; border: 1px solid var(--line); border-radius: 15px; background: #fff; }
 .item-detail-panel > .empty { color: var(--muted); font-size: 13px; }
 .item-detail-panel .item-card-head > div { display: block; }
-.item-detail-panel .item-card-head h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 800; }
+.item-detail-panel .item-card-head h2 { margin: 0; font-size: var(--h-sm); letter-spacing: -.03em; font-weight: 800; }
 .item-detail-panel .item-card-head small { display: block; margin-top: 4px; color: var(--muted); font-size: 12px; }
 @media (max-width: 1000px) {
   .item-explorer { grid-template-columns: 1fr; }
@@ -963,7 +983,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 }
 .item-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; }
 .item-card-head > div { display: grid; grid-template-columns: auto 1fr; align-items: baseline; gap: 4px 9px; min-width: 0; }
-.item-rank { grid-row: 1 / 3; color: #6f7c91; font-size: 13px; font-weight: 700; }.item-card-head h2 { margin: 0; font-size: 21px; letter-spacing: -.03em; font-weight: 800; }.item-card-head small { color: var(--muted); font-size: 12px; }
+.item-rank { grid-row: 1 / 3; color: #6f7c91; font-size: 13px; font-weight: 700; }.item-card-head h2 { margin: 0; font-size: var(--h-sm); letter-spacing: -.03em; font-weight: 800; }.item-card-head small { color: var(--muted); font-size: 12px; }
 .item-status { flex: 0 0 auto; padding: 6px 9px; border-radius: 999px; font-size: 11px; font-weight: 800; white-space: nowrap; }.item-status.complete { background: var(--green-soft); color: var(--green); }.item-status.partial { background: var(--violet-soft); color: var(--violet); }.item-status.pending { background: var(--amber-soft); color: var(--amber); }
 .item-regions-detail { margin-top: 14px; }.item-regions-detail summary { cursor: pointer; color: var(--green); font-size: 11px; font-weight: 800; }.item-regions-detail[open] summary { margin-bottom: 8px; }
 .region-chips { display: flex; flex-wrap: wrap; gap: 5px; }.region-chips span { padding: 5px 8px; border: 1px solid #d6dce6; border-radius: 999px; color: #445164; font-size: 11px; }
@@ -1065,7 +1085,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .compare-tier-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-top: 25px; }
 .compare-tier-tile { display: flex; flex-direction: column; gap: 4px; padding: 18px 20px; border-radius: 16px; }
 .compare-tier-tile span { font-size: 12px; font-weight: 800; letter-spacing: .02em; opacity: .85; }
-.compare-tier-tile strong { font-size: 30px; font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.compare-tier-tile strong { font-size: var(--num-lg); font-weight: 800; line-height: 1.1; font-variant-numeric: tabular-nums; }
 @media (max-width: 640px) {
   .compare-tier-tiles { grid-template-columns: 1fr; }
 }
@@ -1121,15 +1141,15 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .data-flow > i { display: grid; place-items: center; color: #93a0b3; font-style: normal; font-size: 18px; }
 .data-flow span, .data-flow strong, .data-flow small { display: block; }
 .data-flow span { color: var(--green); font-size: 11px; font-weight: 800; letter-spacing: .06em; }
-.data-flow strong { margin-top: 18px; font-size: 32px; font-weight: 800; letter-spacing: -0.02em; }
+.data-flow strong { margin-top: 18px; font-size: var(--num-lg); font-weight: 800; letter-spacing: -0.02em; }
 .data-flow small { margin-top: 9px; color: var(--muted); font-size: 11px; line-height: 1.5; }
 .data-flow .flow-highlight { border-color: var(--green); background: var(--green-dark); color: white; }
 .data-flow .flow-highlight span { color: #8fbde3; }.data-flow .flow-highlight small { color: #c7d9ee; }
 .data-summary-grid { display: grid; grid-template-columns: .8fr 1.2fr; gap: 14px; margin-top: 18px; }
 .data-summary-card { padding: 26px; border: 1px solid var(--line); border-radius: 18px; background: var(--surface); box-shadow: var(--shadow); }
-.data-summary-card h2 { margin: 0 0 20px; font-size: 25px; letter-spacing: -.04em; }
+.data-summary-card h2 { margin: 0 0 20px; font-size: var(--h-lg); letter-spacing: -.04em; }
 .data-stat { display: flex; align-items: baseline; justify-content: space-between; gap: 18px; padding: 12px 0; border-top: 1px solid var(--line); }
-.data-stat strong { font-size: 24px; font-weight: 800; }.data-stat span { color: var(--muted); font-size: 11px; }
+.data-stat strong { font-size: var(--num-md); font-weight: 800; }.data-stat span { color: var(--muted); font-size: 11px; }
 .data-card-note { margin: 16px 0 0; color: var(--faint); font-size: 11px; line-height: 1.65; }
 .match-bars { display: grid; gap: 18px; }
 .match-bars > div { display: grid; grid-template-columns: 1fr 92px; gap: 7px 16px; align-items: center; }
@@ -1198,7 +1218,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
   .data-reading-note { grid-template-columns: 1fr; }
   .region-list { grid-template-columns: 1fr; }
   .detail-panel { padding: 22px; }
-  .detail-heading h2 { font-size: 28px; }
+  .detail-heading h2 { font-size: var(--h-md); }
   .metric-reading-note { grid-template-columns: 1fr; gap: 5px; }
   .detail-grid { grid-template-columns: 1fr; }
   .source-grid { grid-template-columns: 1fr; }
@@ -1321,7 +1341,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 
 /* 이슈 #118: 최근 동향(추이 그래프 + 리더보드) — 요약 탭 하단 한 묶음. */
 .summary-recent { margin-top: 28px; padding-top: 22px; border-top: 2px solid var(--line); }
-.summary-recent .section-heading h2 { font-size: 22px; }
+.summary-recent .section-heading h2 { font-size: var(--h-md); }
 .summary-recent .trend-chart { margin-top: 14px; }
 .leader-scope-note { margin: 8px 0 0; color: var(--muted); font-size: 11px; line-height: 1.6; max-width: 92ch; }
 .leader-scope-note strong { color: var(--ink); font-weight: 800; }
@@ -1864,9 +1884,9 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       + cell("지리적표시 등록", registry, registry ? "품목 등록됨" : "미확인",
              "농수산물 품질관리법에 따른 지리적표시 등록(농관원·산림청·수산물품질관리원). 상표권이 아닙니다. 이 품목이 GI 목록에 있다는 뜻이며, 이 지역이 등록권자라는 뜻은 아닙니다.")
       + cell("단체표장", collective > 0, collective > 0 ? `${number(collective)}건` : "없음",
-             "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+             "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")
       + cell("증명표장", certification > 0, certification > 0 ? `${number(certification)}건` : "없음",
-             "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")
+             "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")
       + `</span><small>등록은 농수산물 품질관리법(상표권 아님), 단체·증명표장은 상표법 — 서로 다른 제도입니다</small></div>`;
   }
   const markTypeBreakdown = (examples) => {
@@ -2676,6 +2696,13 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const verifiedExamples = registrationExamples.entries.find((entry) => entry.region === region.region && entry.specialtyId === item.specialtyId)?.examples || [];
     const examples = [...verifiedExamples, ...(item.trademarkExamples || [])]
       .filter((example, index, rows) => rows.findIndex((row) => row.applicationNumber === example.applicationNumber) === index);
+    // 2026-09-08(사용자 "표장은 예시로 최근 출원 10건만 보여주는 거야? 전체 지역에서?
+    // 아님 지역별로?"): 예시 10건은 지역×품목 행마다 뽑지만, 후보 풀이 품목명으로 돌린
+    // 전국 검색 결과라 지역 확인 건이 적으면 나머지 칸이 전국 공통으로 채워진다 —
+    // 소고기는 34개 지역이 사실상 같은 32건을 돌려 보고 있었다. 그런 표본으로 표장 종류나
+    // 지리적표시 보유를 세면 남의 지역 상표가 이 지역 것으로 잡힌다. 지역 귀속이 필요한
+    // 집계는 inside만 쓴다(어제 지역 상표 패널을 고친 것과 같은 기준).
+    const localExamples = examples.filter((example) => example.applicantRegionMatch === "inside");
     const registeredExamples = examples.filter((example) => {
       const registered = example.statusCategory === "registered" || (example.applicationStatus || "").includes("등록");
       const local = example.applicantRegionMatch === "inside" ||
@@ -2699,7 +2726,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
         <article><span>등록 건수</span><strong>${regionalAvailable ? `${number(registeredCount)}건` : "지역별 집계 대기"}</strong><small>${regionalAvailable ? localCount ? `출원 ${number(localCount)}건 중 등록 ${number(registeredCount)}건 · 등록률 ${percent(item.metrics.registrationRate.value)}` : "출원 0건 · 등록률 계산 불가" : "지역 출원 건수가 확인된 뒤 계산합니다."}</small></article>
         ${typeof item.metrics.localApplicantCount?.value === "number" ? `<article><span>권리주체</span><strong>${number(item.metrics.localApplicantCount.value)}곳</strong><small>${typeof item.metrics.producerApplicantShare?.value === "number" ? `생산자단체·지자체 ${percent(item.metrics.producerApplicantShare.value)}` : "지역 확인된 출원의 고유 출원인 수"}</small></article>` : ""}${(() => { const rights = rightsStatusOf(item); return `<article class="rights-status rights-status-${rights.key}"><span>권리 상태</span><strong>${esc(rights.label)}</strong><small>${esc(rights.note)}</small></article>`; })()}<article><span>출원 여부</span><strong>${regionalAvailable ? localCount > 0 ? "출원 확인" : "출원 없음" : "집계 대기"}</strong><small>${regionalAvailable ? localCount > 0 ? "특산품 출원율 계산에서 출원 확인 1개로 집계" : "전체 특산품 수에는 포함되며 출원 확인 수에는 포함되지 않음" : "전체 특산품 수에는 포함되며 출원 확인 전까지 분자에는 넣지 않습니다"}</small></article>
       </div>
-      ${examples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(examples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>예시 ${number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : ""}${giHoldingsHtml(item, examples)}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
+      ${localExamples.length > 0 ? `<div class="mark-type-row" title="${esc(MARK_TYPE_HINT)}"><strong>표장 종류</strong><span class="mark-type-chips">${markTypeBreakdown(localExamples).map(([label, count]) => `<em class="mark-type-chip mark-type-${markTypeChipClass(label)}">${esc(label)} ${number(count)}</em>`).join("")}</span><small>이 지역 확인 출원 ${number(localExamples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small></div>` : examples.length > 0 ? `<div class="mark-type-row"><strong>표장 종류</strong><small>이 지역 주소로 확인된 출원이 표본에 없어 표장 종류를 셀 수 없습니다 — 표본 ${number(examples.length)}건은 전국 검색 후보라 이 지역 것이 아닙니다.</small></div>` : ""}${giHoldingsHtml(item, localExamples)}${item.businessFlow ? nationwideFlowCardHtml(item.businessFlow, itemName(item) || "이 품목") + expansionSuggestionsHtml(item.businessFlow, itemName(item) || "이 품목") : ""}
       ${item.briefing && item.briefing.sentences.length > 0 ? `${businessStrategyCardHtml(item.briefing, "비즈니스 확장 전략", "", nationwideReach(item))}${businessStrategyDisclaimerHtml(item.briefing.templateVersion)}` : ""}
       <section class="trademark-examples"><div class="example-heading"><strong>${esc(itemName(item))} 등록 사례</strong><span>등록 ${number(registeredCount)}건 중 사례 ${number(registeredExamples.length)}건</span></div>${registeredExamples.length ? `<div class="example-list">${registeredExamples.map((example) => `<article><div><strong>${esc(example.title || "상표명 미기록")}</strong><small>${[example.applicationNumber, example.applicant, example.niceClass ? `${example.niceClass}류` : null].filter(Boolean).map(esc).join(" · ")}</small></div><span class="goods-chip">등록</span>${giMarkLabel(example.applicationNumber) ? `<span class="gi-mark-chip">${esc(giMarkLabel(example.applicationNumber))}</span>` : ""}${goodsStageLabel(example.goodsEvidence) ? `<span class="goods-stage-chip" title="${esc("지정상품 명칭으로 판정한 밸류체인 단계입니다. 류가 아니라 지정상품 기준입니다.")}">${esc(goodsStageLabel(example.goodsEvidence))}</span>` : ""}${example.goodsEvidence.length > 0 ? `<p>지정상품: ${example.goodsEvidence.map((row) => `${esc(row.designatedProductName || "명칭 미기록")}${row.classCode ? ` (${esc(row.classCode)}류)` : ""}`).join(", ")}</p>` : ""}<small class="example-region-note">지역 주소 일치</small>${example.applicationNumber ? `<button type="button" class="kipris-link" title="KIPRIS에서 이 상표(출원번호 ${esc(example.applicationNumber)})의 검색 결과를 새 창으로 엽니다" data-kipris-application="${esc(example.applicationNumber)}">KIPRIS에서 결과 보기 ↗</button>` : ""}</article>`).join("")}</div>` : '<p class="empty">등록 항목이 확인되지 않았습니다.</p>'}</section>
     </div>`;

@@ -749,9 +749,9 @@ function GiHoldingsRow({ item, examples }: { item: Item; examples: TrademarkExam
       {cell("지리적표시 등록", registry, registry ? "품목 등록됨" : "미확인",
         "농수산물 품질관리법에 따른 지리적표시 등록(농관원·산림청·수산물품질관리원). 상표권이 아닙니다. 이 품목이 GI 목록에 있다는 뜻이며, 이 지역이 등록권자라는 뜻은 아닙니다.")}
       {cell("단체표장", collective > 0, collective > 0 ? `${number(collective)}건` : "없음",
-        "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")}
+        "상표법상 지리적표시 단체표장 — 출원번호 44로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")}
       {cell("증명표장", certification > 0, certification > 0 ? `${number(certification)}건` : "없음",
-        "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 아래 등록 사례 표본에서 센 값이라 하한입니다.")}
+        "상표법상 지리적표시 증명표장 — 출원번호 48로 시작합니다. 이 지역 주소로 확인된 출원 표본에서만 센 값이라 하한입니다.")}
     </span>
     <small>등록은 농수산물 품질관리법(상표권 아님), 단체·증명표장은 상표법 — 서로 다른 제도입니다</small>
   </div>;
@@ -3427,6 +3427,13 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
   const regionGoodsConfirmed = item.matchingBasis === "raw_item_goods_matched";
   const examples = [...verifiedExamples, ...(item.trademarkExamples || [])]
     .filter((example, index, rows) => rows.findIndex((row) => row.applicationNumber === example.applicationNumber) === index);
+  // 2026-09-08(사용자 "표장은 예시로 최근 출원 10건만 보여주는 거야? 전체 지역에서?
+  // 아님 지역별로?"): 예시 10건은 지역×품목 행마다 뽑지만, 후보 풀이 품목명으로 돌린
+  // 전국 검색 결과라 지역 확인 건이 적으면 나머지 칸이 전국 공통으로 채워진다 —
+  // 소고기는 34개 지역이 사실상 같은 32건을 돌려 보고 있었다. 그런 표본으로 표장 종류나
+  // 지리적표시 보유를 세면 남의 지역 상표가 이 지역 것으로 잡힌다. 지역 귀속이 필요한
+  // 집계는 inside만 쓴다(지역 상표 패널을 고친 것과 같은 기준).
+  const localExamples = examples.filter((example) => example.applicantRegionMatch === "inside");
   const registeredExamples = examples.filter((example) => {
     const registered = example.statusCategory === "registered" || (example.applicationStatus || "").includes("등록");
     const local = example.applicantRegionMatch === "inside" ||
@@ -3458,12 +3465,14 @@ function RegionDetail({ region, item, onItem, verifiedExamples }: { region: Regi
     </div>
     {/* 컨설팅 보고서 Ⅲ장 1.2.4: 권리 현황을 정리할 때 가장 먼저 볼 것이 표장 종류다.
         전체 건수가 아니라 예시 표본(최근 10건)에서 확인된 분포임을 문구로 못박는다. */}
-    {examples.length > 0 && <div className="mark-type-row" title={MARK_TYPE_HINT}>
+    {localExamples.length > 0 ? <div className="mark-type-row" title={MARK_TYPE_HINT}>
       <strong>표장 종류</strong>
-      <span className="mark-type-chips">{markTypeBreakdown(examples).map(([label, count]) => <em key={label} className={`mark-type-chip mark-type-${label === "단체표장" ? "collective" : label === "증명표장" ? "certification" : label === "일반상표" ? "plain" : "other"}`}>{label} {number(count)}</em>)}</span>
-      <small>예시 {number(examples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small>
-    </div>}
-    <GiHoldingsRow item={item} examples={examples} />
+      <span className="mark-type-chips">{markTypeBreakdown(localExamples).map(([label, count]) => <em key={label} className={`mark-type-chip mark-type-${label === "단체표장" ? "collective" : label === "증명표장" ? "certification" : label === "일반상표" ? "plain" : "other"}`}>{label} {number(count)}</em>)}</span>
+      <small>이 지역 확인 출원 {number(localExamples.length)}건 표본에서 확인 · 전체 건수가 아닙니다</small>
+    </div>
+      : examples.length > 0 ? <div className="mark-type-row"><strong>표장 종류</strong><small>이 지역 주소로 확인된 출원이 표본에 없어 표장 종류를 셀 수 없습니다 — 표본 {number(examples.length)}건은 전국 검색 후보라 이 지역 것이 아닙니다.</small></div>
+      : null}
+    <GiHoldingsRow item={item} examples={localExamples} />
     {item.businessFlow && <NationwideFlowCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
     {item.businessFlow && <ExpansionSuggestionsCard flow={item.businessFlow} itemLabel={itemName(item) || "이 품목"} />}
     {item.briefing && item.briefing.sentences.length > 0 && <><BusinessStrategyCard briefing={item.briefing} title="비즈니스 확장 전략" nationwideCount={nationwideReach(item).count} nationwideShare={nationwideReach(item).share} nationwideCapped={nationwideReach(item).capped} /><BusinessStrategyDisclaimer templateVersion={item.briefing.templateVersion} /></>}
