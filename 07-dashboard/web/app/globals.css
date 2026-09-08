@@ -707,7 +707,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 /* 2026-09-08: 특화작목 대조를 최상위 탭에서 내려 지역별 화면 안에 끼웠다. 단위가 "도"라
    시도를 고른 것과 같은 단위이고, 그때는 도 스트립을 숨긴다. */
 .compare-embed { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
-.compare-embed > .compare-banner { margin-top: 12px; }
+.compare-embed > .compare-tier-tiles { margin-top: 12px; }
 /* 2026-09-08: 광역 × 품목 유형 교차표. 순차 단일 색(브랜드 블루) 5단계 — 무지개 아님.
    진한 두 단계에서는 글자를 흰색으로 뒤집어 대비를 확보하고, 값은 칸 안에 숫자로도 적는다. */
 .matrix-section { margin-top: 14px; padding: 18px 20px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
@@ -1243,6 +1243,13 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
 .leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
 .leader-bar-low i { background: var(--amber); }
+/* 급증 카드(사용자 2026-09-08): 게이지 바 없앰 — priorApp→app 전이와 배수(×N)/신규 표식만
+   보여준다. 바가 빠졌으니 4칸 그리드로 재정의해 값·표식이 오른쪽에 붙게 한다. */
+.leader-list-surge button { grid-template-columns: 16px minmax(0, 1fr) max-content max-content; }
+.leader-sub { font-size: 10px; font-weight: 700; color: var(--faint); text-align: right; white-space: nowrap; }
+.leader-growth, .leader-fresh { font-style: normal; font-weight: 800; }
+.leader-growth { color: var(--muted); }
+.leader-fresh { color: var(--green-dark); }
 /* #175: 급증 카드 안의 "신규 진입" 소구분 — 가속 목록과 정렬 축이 달라 시각적으로 나눈다. */
 .leader-inline-head { display: flex; align-items: baseline; gap: 7px; margin-top: 9px; padding-top: 7px; border-top: 1px dashed var(--line); }
 .leader-inline-head span { color: var(--muted); font-size: 11px; font-weight: 800; }
