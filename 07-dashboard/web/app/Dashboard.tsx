@@ -3181,7 +3181,15 @@ const STRATEGY_CHIP_LIMIT = 12;
             {(() => {
               const picked = row.regionItems.filter((entry) => entry.region.region === itemRegionPick);
               if (!picked.length) return null;
-              const examples = picked.flatMap((entry) => entry.item.trademarkExamples || []).filter((example, index, all) => all.findIndex((other) => other.applicationNumber === example.applicationNumber) === index);
+              // 2026-09-08(사용자 "여기서 보여주는 상표가 해당 지역 출원건이 아닌 거 같아" /
+              // "공백지역에서도 상표가 보여져"): trademarkExamples는 전국 검색 결과 표본이라 그 지역과
+              // 무관한 출원이 섞여 있고, 같은 품목이면 여러 지역 행이 같은 표본을 그대로 공유한다 —
+              // 울산 소고기와 청양 소고기가 같은 출원번호를 보여주고 있었고, 청양은 지역 확인 출원이
+              // 0건인 공백인데도 10건이 떴다. 제목이 "지역 확인 출원"이므로 출원인 주소가 그 지역으로
+              // 확인된 건(inside)만 남긴다 — 두 모집단을 섞지 않는 것이 이 대시보드의 기본 규칙이다.
+              const allExamples = picked.flatMap((entry) => entry.item.trademarkExamples || []).filter((example, index, all) => all.findIndex((other) => other.applicationNumber === example.applicationNumber) === index);
+              const examples = allExamples.filter((example) => example.applicantRegionMatch === "inside");
+              const unrelatedCount = allExamples.length - examples.length;
               const local = picked.reduce((sum, entry) => sum + (entry.item.metrics.uniqueTrademarkCount.value || 0), 0);
               const reg = picked.reduce((sum, entry) => sum + (entry.item.metrics.registeredTrademarkCount.value || 0), 0);
               return <section className="region-trademark-panel">
@@ -3195,8 +3203,12 @@ const STRATEGY_CHIP_LIMIT = 12;
                   {markTypeOf(example.applicationNumber) && markTypeOf(example.applicationNumber) !== "일반상표" && <span className="gi-mark-chip">{markTypeOf(example.applicationNumber)}</span>}
                   {example.goodsEvidence.length > 0 && <small className="region-trademark-goods">{example.goodsEvidence.slice(0, 3).map((goods) => `${goods.designatedProductName}${goods.classCode ? ` (${goods.classCode}류)` : ""}`).join(", ")}</small>}
                   {example.applicationNumber && <button type="button" className="kipris-link" onClick={() => openKiprisPopup(example.applicationNumber as string)}>KIPRIS ↗</button>}
-                </li>)}</ul> : <p className="empty">이 지역의 상표 예시가 아직 수집되지 않았습니다.</p>}
+                </li>)}</ul>
+                  : local
+                    ? <p className="empty">이 지역 확인 출원 {number(local)}건이 있으나, 예시 표본(품목별 최근 {number(allExamples.length)}건)에는 포함되지 않았습니다.</p>
+                    : <p className="empty"><b>이 지역 주소로 확인된 출원이 없습니다</b> — 공백 지역입니다.</p>}
                 {examples.length > 12 && <p className="screen-note">예시 {number(examples.length)}건 중 12건 표시</p>}
+                {unrelatedCount > 0 && <p className="screen-note">같은 품목의 전국 검색 후보 {number(unrelatedCount)}건은 출원인 주소가 이 지역으로 확인되지 않아 <b>표시하지 않습니다</b> — 다른 모집단입니다.</p>}
               </section>;
             })()}
             <div className="item-card-metrics"><div><span>지역 확인 출원</span><strong>{decidedRegions ? `${number(row.trademarks)}건` : "집계 대기"}</strong><small>판정 완료 {decidedRegions}/{row.regions.length}개 지역</small></div><div><span>등록 완료</span><strong>{decidedRegions ? `${number(row.registered)}건` : "—"}</strong><small>확인 출원 중 등록 완료</small></div><div><span>등록률</span><strong className={registrationRate !== null && registrationRate >= 0.5 ? "rate-high" : undefined}>{registrationRate !== null ? percent(registrationRate) : decidedRegions ? "계산 불가" : "—"}</strong><small>{registrationRate !== null ? `${number(row.registered)}/${number(row.trademarks)}` : "지역 확인 후 계산"}</small></div></div>
