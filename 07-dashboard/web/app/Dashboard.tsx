@@ -1546,6 +1546,32 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       items: row.regions.flatMap((region) => region.items.map((item) => ({ region, item, label: officialItemLabel(item) || itemName(item) }))),
     }))
     .sort((a, b) => a.label.localeCompare(b.label, "ko-KR"));
+  // 2026-09-08 요청: "지역별 품목별 특산품 상표 출원 현황 분석"을 더 다양하게.
+  // 선택 범위(전국·시도·시군구)의 품목을 유형으로 묶어 수집·출원·등록·권리 상태를 한 표로 낸다.
+  // 출원율 분모는 수집된 지역×품목 전체이고(명칭 확인·집계 대기 포함), 등록률 분모는
+  // 지역 확인 출원 건수다 — 두 비율의 모집단이 다르므로 열을 붙여 쓰지 않는다.
+  const categoryStats = useMemo(() => {
+    const rows = new Map<string, { label: string; total: number; applied: number; pending: number; trademarks: number; registered: number; noRights: number }>();
+    for (const region of coverageAreaRegions) {
+      for (const item of region.items) {
+        const label = item.category?.label || "미분류";
+        const row = rows.get(label) || { label, total: 0, applied: 0, pending: 0, trademarks: 0, registered: 0, noRights: 0 };
+        row.total += 1;
+        const metric = item.metrics.uniqueTrademarkCount;
+        if (metric.availability !== "available") row.pending += 1;
+        else if ((metric.value || 0) > 0) {
+          row.applied += 1;
+          row.trademarks += metric.value || 0;
+          row.registered += item.metrics.registeredTrademarkCount.value || 0;
+        } else row.noRights += 1;
+        rows.set(label, row);
+      }
+    }
+    return [...rows.values()]
+      .map((row) => ({ ...row, coverageRate: row.total ? row.applied / row.total : null, registrationRate: row.trademarks ? row.registered / row.trademarks : null }))
+      .sort((a, b) => b.total - a.total);
+  }, [coverageAreaRegions]);
+  const categoryStatsMaxRate = Math.max(0.01, ...categoryStats.map((row) => row.coverageRate || 0));
   const coverageListedItemCount = coverageBreakdown.reduce((sum, row) => sum + row.items.length, 0);
   // 이슈 #117 코멘트(2026-09-03): 도 단위 시군구 미지정 행("경기도" 자체)과 실제 시군구
   // 카드(가평군 등)를 나란한 카드로 보여주면 헷갈린다는 지적 — 도 단위 항목은 "도 전체"
@@ -1862,6 +1888,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       </div>
       <p className="screen-note">전국 16개 시도의 상표 출원·등록·추이를 한눈에 비교합니다. 위 시도 목록·지도·아래 목록에서 지역이나 품목을 누르면 그 지역 상세로 들어갑니다.</p>
       {selectedProvince && !provinceHasRealMunicipalities && coverageAreaRegions.some(isUnclassifiedRegion) && <p className="unclassified-note">이 지역은 구·군별 정보가 없는 원본 자료라, 특산품이 {displayRegionName(selectedProvince)} 전체로만 집계됩니다.</p>}
+      <aside className="coverage-insight coverage-insight-strip"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
       <div className={selectedProvince ? "applications-compact-row solo" : "applications-compact-row national"}>
       {/* 이슈 #119: 전국 지도는 요약 탭에 이미 있어(같은 selectedProvince 상태 공유) 이 화면의
           기본(전국) 뷰에서는 중복이라 뺀다 — 지도는 시도/시군구를 실제로 좁혀 볼 때만(아래
@@ -1908,13 +1935,33 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
         <div className="coverage-legend quantile-legend" aria-label="출원율 색상 범례">{quantileLegendSwatches(municipalityGeometry ? municipalityCoverageBreaks : provinceCoverageBreaks, (value) => percent(value))}<b>회색은 데이터 없음</b></div>
         <p className="map-warning">특산품·상표 데이터 유무와 관계없이 모든 시군구 지명을 표시합니다. 지역을 선택하면 아래 목록도 함께 좁혀집니다.</p>
       </section>}
-      <aside className="coverage-insight"><h2>{coverageAreaDisplayName}</h2><div className="rate-hero"><RateRing value={coverageArea.rate} /><div className="rate-hero-detail"><span>특산품 출원율</span><small>전체 수집 {number(coverageArea.total)}개 중 출원 확인 {number(coverageArea.applied)}개{coverageArea.pending ? ` · 집계 대기 ${number(coverageArea.pending)}개` : ""}</small></div></div><dl className="coverage-insight-stats"><div><dt>선택 범위</dt><dd>{selectedMunicipality ? `${displayRegionName(selectedProvince || "")} 내 시군구` : selectedProvince ? "시군구별 특산품 항목 합산" : "전국 시군구별 특산품 항목 합산"}</dd></div><div><dt>전체 수집 특산품</dt><dd>{number(coverageArea.total)}개</dd></div><div><dt>출원 확인 특산품</dt><dd>{number(coverageArea.applied)}개</dd></div></dl></aside>
+      
       </div>
-      <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>특산품별 출원 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span><CsvDownloadButton onClick={() => downloadCsv(`지역별집계_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특산품 수", "출원 확인", "출원율"], coverageBreakdown.map((row) => [displayRegionName(row.label), row.coverage.total, row.coverage.applied, percent(row.coverage.rate)]))} /></div>
+      {categoryStats.length > 1 && <section className="category-stats">
+        <div className="section-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>품목 유형별 출원 현황</h2></div><span>유형 {categoryStats.length}개 · 특산품 {number(coverageArea.total)}개</span><CsvDownloadButton onClick={() => downloadCsv(`유형별출원현황_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["유형", "수집 특산품", "출원 확인", "무권리", "집계 대기", "출원율", "지역 확인 출원", "등록", "등록률"], categoryStats.map((row) => [row.label, row.total, row.applied, row.noRights, row.pending, row.coverageRate !== null ? percent(row.coverageRate) : "", row.trademarks, row.registered, row.registrationRate !== null ? percent(row.registrationRate) : ""]))} /></div>
+        <div className="tablewrap-scroll">
+          <table className="category-stats-table">
+            <thead><tr><th scope="col">유형</th><th scope="col">수집</th><th scope="col">출원 확인</th><th scope="col">무권리</th><th scope="col">출원율</th><th scope="col">지역 확인 출원</th><th scope="col">등록</th><th scope="col">등록률</th></tr></thead>
+            <tbody>{categoryStats.map((row) => <tr key={row.label} title={`${row.label} · 수집 ${number(row.total)}개 중 출원 확인 ${number(row.applied)}개${row.pending ? ` · 집계 대기 ${number(row.pending)}개` : ""}`}>
+              <th scope="row">{row.label}</th>
+              <td className="num">{number(row.total)}</td>
+              <td className="num">{number(row.applied)}</td>
+              <td className="num">{row.noRights ? number(row.noRights) : "—"}</td>
+              <td className="rate"><span className="rate-bar"><i style={{ width: `${Math.round((row.coverageRate || 0) / categoryStatsMaxRate * 100)}%` }} /></span><b>{row.coverageRate !== null ? percent(row.coverageRate) : "—"}</b></td>
+              <td className="num">{row.trademarks ? number(row.trademarks) : "—"}</td>
+              <td className="num">{row.registered ? number(row.registered) : "—"}</td>
+              <td className="num">{row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td>
+            </tr>)}</tbody>
+          </table>
+        </div>
+        {selectedProvince && !selectedMunicipality && <div className="category-stats-donuts"><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="registeredTrademarkCount" label="등록" /></article></div></div>}
+        <p className="screen-note">출원율은 수집된 특산품 중 지역 주소 일치 출원이 1건 이상 확인된 비율(분모에 명칭 확인·집계 대기 포함), 등록률은 지역 확인 출원 중 등록 완료 비율입니다 — 분모가 다르므로 두 비율을 직접 비교하지 마십시오.</p>
+      </section>}
+      <section className="coverage-directory"><div className="section-heading coverage-directory-heading"><div><span className="coverage-directory-region">{coverageAreaDisplayName}</span><h2>지자체별 특산품 현황</h2></div><span>특산품 {number(coverageListedItemCount)}개 · 출원 확인 {number(coverageArea.applied)}개 · 출원율 {percent(coverageArea.rate)}</span><CsvDownloadButton onClick={() => downloadCsv(`지역별집계_${coverageAreaDisplayName}_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "특산품 수", "출원 확인", "출원율"], coverageBreakdown.map((row) => [displayRegionName(row.label), row.coverage.total, row.coverage.applied, percent(row.coverage.rate)]))} /></div>
         {/* 이슈 #117 코멘트(2026-09-03): 도를 클릭하면 시군구 목록이 나오기 전에 그 도 전체의
             특산품 유형별 출원·등록 비중을 원그래프로 먼저 보여준다. 시군구 상세로 이미 들어간
             뒤(municipality 선택)에는 도 전체 비중이 아니라 그 시군구 항목만 봐야 하므로 뺀다. */}
-        {selectedProvince && !selectedMunicipality && <section className="province-category-shares coverage-category-shares"><div className="section-heading"><div><h2>특산품 유형별 출원·등록 비중</h2></div><span>{coverageAreaDisplayName} 전체 · 지역 주소 일치 기준</span></div><div className="province-category-share-grid"><article><h3>출원 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="uniqueTrademarkCount" label="출원" /></article><article><h3>등록 비중</h3><CategoryShareDonut items={coverageAreaRegions.flatMap((region) => region.items)} field="registeredTrademarkCount" label="등록" /></article></div></section>}
+        
         {(() => {
           const key = regionQuery.trim().toLocaleLowerCase("ko-KR");
           const matchesQuery = (row: CoverageRow) => displayRegionName(row.label).toLocaleLowerCase("ko-KR").includes(key) || row.items.some(({ label }) => label.toLocaleLowerCase("ko-KR").includes(key));
