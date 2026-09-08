@@ -203,11 +203,13 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 2026-09-07: #151 전라남도 통합 도명 중복 정리(tombstone 14건) + query.region 정규화로
   // 임산물 주산지 확장 행이 농사로 행과 병합(장흥 표고 등) → 분모 1826->1825, 확정 출원
   // 1156->1168(병합·07d metricFloor로 상향).
-  assert.equal(coverage.total, 1825);
-  assert.equal(coverage.decided, 1825);
-  assert.equal(coverage.applied, 1165);
+  // 2026-09-08(#70 재실행 dashboard-81ccc8a1): #117 콩·대추·차·커피 고시명칭 확정 +
+  // 등록원부 백로그 3000건 반영으로 분모 1825->1826, 출원 확인 1165->1180.
+  assert.equal(coverage.total, 1826);
+  assert.equal(coverage.decided, 1826);
+  assert.equal(coverage.applied, 1180);
   assert.equal(coverage.pending, 0);
-  assert.equal(Math.round(coverage.rate * 100), 64);
+  assert.equal(Math.round(coverage.rate * 100), 65);
   const localeNumber = (n) => n.toLocaleString("ko-KR");
   // 2026-09-01(#116): 요약 첫 칸에 분모(전체 수집 수)와 출원 확인 수가 모두 노출돼야
   // 한다는 요구사항. 2026-09-06 S2 재설계로 문구는 완료율("전국 특산품 수")에서
@@ -293,7 +295,8 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   const pepperCandidates = candidates.filter(({ item }) => item.noticeName?.includes("고추"));
   assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
   // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 available 0건 후보가 86 -> 211로 늘었다.
-  assert.equal(excluded.length, 226, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  // 2026-09-08(#70 재실행): #117 고시명칭 확정 + 등록원부 반영으로 226 -> 218.
+  assert.equal(excluded.length, 218, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
   assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
@@ -426,9 +429,10 @@ test("ships a valid dashboard snapshot", async () => {
   // 2026-09-04(#70 첫 풀 실행): KIPRIS 깊은 재수집으로 지역 판정이 1688->1812, 출원인 주소
   // 확인이 77,312->92,305로 늘었다.
   // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1826->1825.
-  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1825);
+  // 2026-09-08(#70 재실행): #117 + 등록원부 백로그로 1825->1826, 출원인 주소 확인 87,319->88,133.
+  assert.equal(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 1826);
   assert.equal(snapshot.pipelineStatus.collectionExperiment.outputShape, "query_facts_with_region_row_references");
-  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 87319);
+  assert.equal(snapshot.pipelineStatus.applicantRegionVerification.verifiedCount, 88133);
   assert.equal(snapshot.pipelineStatus.regionalMetricGate.coverageThreshold, 0.6);
   assert.ok(snapshot.regions.length > 0);
   assert.ok(snapshot.sources.some((source) => source.sourceId === "kipris_trademark"));
@@ -439,31 +443,37 @@ test("ships a valid dashboard snapshot", async () => {
   assert.ok(snapshot.sources.some((source) => source.sourceId === "forest_product_production_survey"));
   // 2026-09-04(#70): 지역 특산품 1805->1827(깊은 재수집) + 전국 카탈로그 132 = 1959.
   // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1933->1932, 주산지 근거 27->21(전남 6건 tombstone).
-  assert.equal(snapshot.coverage.catalogItemCount, 1932);
+  // 2026-09-08(#70 재실행): #117 콩·대추·차·커피 확정으로 1932->1933.
+  assert.equal(snapshot.coverage.catalogItemCount, 1933);
   assert.equal(snapshot.coverage.nationwideCatalogItemCount, 107);
   assert.equal(snapshot.coverage.nationwideCatalogItemsWithRegionalEvidence, 21);
   assert.equal(snapshot.coverage.regionalEvidenceRows, 21);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 203);
+  // 2026-09-08(#70 재실행): #139 완료쿼리 refresh(14일)로 일부 partial 재수집 → 203->204,
+  // requestCount 12744->12894, uniqueApplicationCount 61972->60128.
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueQueryCount, 204);
   assert.equal(snapshot.pipelineStatus.supplementalCollection.completeUniqueQueryCount, 132);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 71);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 12744);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 61972);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 61972);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.partialUniqueQueryCount, 72);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.requestCount, 12894);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.uniqueApplicationCount, 60128);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.completeApplicationCount, 60128);
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.nfqsGeographicalIndication, {
     registeredCount: 24,
     regionalizedCount: 23,
     regionReviewCount: 1,
     liveVerifiedAt: "2026-08-26",
   });
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 38);
-  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 72590);
+  // 2026-09-08(#70 재실행): 등록원부 초당제한 오분류 수정(#52) + 예산 25/캐시 250 스로틀
+  // (bd44b3e) + 법정동 CSV 메모이즈(f493c62)로 03c가 회복돼 백로그 3000건 반영 →
+  // registryComplete 38->35,537, notCollected 72,590->37,648.
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryCompleteCount, 35537);
+  assert.equal(snapshot.pipelineStatus.supplementalCollection.registryNotCollectedCount, 37648);
   // 이슈 #117(2026-08-31): 농촌진흥청 지역특화작목 69개 공식 수집원 병합 메타데이터.
   assert.deepEqual(snapshot.pipelineStatus.supplementalCollection.rdaRegionalSpecialtyCrops, {
     officialCount: 69,
     representativeCount: 9,
     intensiveCount: 18,
     selfDirectedCount: 42,
-    dashboardBadgeCount: 167,
+    dashboardBadgeCount: 161,
     regionalScope: "province",
     liveVerifiedAt: "2026-08-26",
   });
@@ -527,7 +537,8 @@ test("ships a valid dashboard snapshot", async () => {
   const blockedItems = items.filter((item) => item.metrics.uniqueTrademarkCount.availability === "blocked");
   // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 수집 완료 지역×품목이 1715 -> 1842.
   // 2026-09-07(#151): 전라남도 통합 도명 중복 정리로 1842 -> 1841.
-  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1841, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
+  // 2026-09-08(#70 재실행): #117 콩·대추·차·커피 확정으로 1841 -> 1842.
+  assert.equal(availableItems.filter(({ sources }) => !sources.includes("kofpi_forest_product")).length, 1842, "수집 완료 지역×품목은 주소 확보율과 무관하게 공개해야 함");
   const regionalForestItems = snapshot.regions
     .filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.sources.includes("forest_product_production_survey")));
@@ -535,7 +546,8 @@ test("ships a valid dashboard snapshot", async () => {
   // 유지(빠진 6건은 잔디·야생화·고사리·수액·취나물·표고로 대부분 지역 상표가 없거나 병합됨).
   assert.equal(regionalForestItems.length, 21);
   assert.equal(regionalForestItems.filter((item) => item.metrics.uniqueTrademarkCount.availability === "available").length, 21);
-  assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 297);
+  // 2026-09-08(#70 재실행): 07d metricFloor/union으로 297 -> 298.
+  assert.equal(regionalForestItems.reduce((sum, item) => sum + (item.metrics.uniqueTrademarkCount.value || 0), 0), 298);
   assert.ok(availableItems.every((item) => Number.isFinite(item.metrics.uniqueTrademarkCount.value)));
   assert.ok(blockedItems.every((item) => item.metrics.uniqueTrademarkCount.value === null), "차단된 지역 건수를 0 또는 전국 검색 건수로 노출하면 안 됨");
   assert.ok(
@@ -608,11 +620,14 @@ test("shows every region-item in the detail tabs without a name-match badge", as
 test("shows registered regional examples without nationwide keyword noise", async () => {
   const snapshot = await loadSnapshot();
   const goseong = snapshot.regions.find((region) => region.region.includes("고성군") && region.sido.includes("강원"));
-  const haeDeulMi = goseong.items.find((item) => item.itemName === "해&들米");
-  assert.ok(haeDeulMi, "해&들米 스냅샷 데이터가 있어야 함");
+  // 2026-09-08(#70 재실행): 해&들米는 승인 별칭(→쌀)으로 notice_name_and_nice_class가 되고
+  // 등록원부 반영으로 지정상품 근거가 붙어 이 테스트의 반례 조건을 잃었다. 같은 고성군의
+  // "순수미"(고시명칭 미확정, 원물명 검색 사례만)로 교체.
+  const keywordOnlyItem = goseong.items.find((item) => item.itemName === "순수미");
+  assert.ok(keywordOnlyItem, "순수미 스냅샷 데이터가 있어야 함");
   assert.ok(
-    haeDeulMi.trademarkExamples.length > 0 && haeDeulMi.trademarkExamples.every((example) => (example.goodsEvidence || []).length === 0),
-    "해&들米는 상표 사례는 있지만 지정상품 근거는 하나도 없어야 이 테스트가 의미가 있음",
+    keywordOnlyItem.trademarkExamples.length > 0 && keywordOnlyItem.trademarkExamples.every((example) => (example.goodsEvidence || []).length === 0),
+    "순수미는 상표 사례는 있지만 지정상품 근거는 하나도 없어야 이 테스트가 의미가 있음",
   );
   const chikso = goseong.items.find((item) => item.itemName === "칡소");
   assert.ok(chikso && chikso.matchingBasis === "raw_item_goods_matched" && chikso.trademarkExamples.some((example) => (example.goodsEvidence || []).length > 0),
