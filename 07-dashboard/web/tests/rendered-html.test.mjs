@@ -120,17 +120,21 @@ test("renders the data-connected Korean dashboard", async () => {
   const mapInsight = html.slice(mapInsightStart, mapInsightEnd);
   // 이슈 #116(2026-09-01): 요약 상단의 전체 폭 지표 바를 지도 옆 왼쪽 열로 옮겼다. 특산품 수·
   // 상표 건수 단독 카드(metric-count-hero)는 그 지표 바가 이미 보여주므로 제거했다.
-  // 2026-09-08: 그 자리를 권리 상태 네 칸이 대신한다(컨셉 4판의 대표 지표).
-  assert.match(mapInsight, /class="rights-board"/, "요약 핵심 지표는 지도 옆 왼쪽 열에 권리 상태 네 칸으로 있어야 함");
+  // 2026-09-08(사용자 "구석으로 보내줄래"): 권리 상태 네 칸은 좁은 왼쪽 열에서 세로로 길게
+  // 쌓여 요약 첫 화면을 차지했다 — 요약 맨 아래 전체 너비 띠로 내렸다. 지표는 그대로 있고
+  // 자리만 바뀌었으므로, 왼쪽 열에는 없고 요약 화면 안에는 있어야 한다.
+  assert.doesNotMatch(mapInsight, /class="rights-board"/, "권리 상태는 좁은 왼쪽 열이 아니라 요약 맨 아래에 있어야 함");
+  assert.match(html, /class="rights-board"/, "권리 상태 네 칸 자체는 요약 화면에 계속 있어야 함");
   assert.doesNotMatch(mapInsight, /class="metric-count-hero"/, "특산품 수·상표 건수 단독 카드는 지표 바와 중복되므로 제거");
   // UI 검토(3차, 2026-09-06) S2: KPI 4장 → 2장(항상 100%에 가까운 "전국 특산품 수"·
   // "지역별 출원 수 표시 가능"은 정보량이 적어 제거).
   assert.doesNotMatch(mapInsight, /전국 특산품 수|지역별 출원 수 표시 가능/, "정보량이 적은 KPI 2장은 요약에서 빠져야 함");
   // 2026-09-08: KPI 카드 2장을 권리 상태 네 칸 하나로 바꿨다. 네 칸은 각각 다른 지표가
   // 아니라 한 모집단(지역×특산품)을 네 상태로 가른 것이라 카드가 아니라 한 덩어리다.
-  const rightsSegmentCount = (mapInsight.match(/class="seg seg-/g) || []).length;
+  // 권리 상태는 왼쪽 열이 아니라 요약 맨 아래로 내려갔으므로 화면 전체에서 센다.
+  const rightsSegmentCount = (html.match(/class="seg seg-/g) || []).length;
   assert.ok(rightsSegmentCount >= 2 && rightsSegmentCount <= 4, `권리 상태 막대는 값이 있는 칸만 그린다(현재 ${rightsSegmentCount}칸)`);
-  const rightsLegendCount = (mapInsight.match(/<li class="seg-/g) || []).length;
+  const rightsLegendCount = (html.match(/<li class="seg-/g) || []).length;
   assert.equal(rightsLegendCount, 4, "권리 상태 범례는 네 칸 모두 표시해야 함(0건이어도)");
   assert.doesNotMatch(html.split('class="summary-row"')[0], /class="metrics"/, "요약 상단의 전체 폭 지표 바는 더 이상 summary-row 앞에 없어야 함");
   const standaloneHtml = await readFile(new URL("../../dashboard.html", import.meta.url), "utf8");

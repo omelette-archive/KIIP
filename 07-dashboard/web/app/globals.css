@@ -143,6 +143,12 @@ a { color: inherit; text-decoration: none; }
 
 .expansion-caveat { margin: 14px 0 0; padding-top: 12px; border-top: 1px dashed var(--line); color: var(--muted); font-size: 11px; line-height: 1.65; }
 .expansion-caveat b { color: var(--ink); }
+/* 2026-09-08(사용자): 진단 목적에 맞춰 두 목록의 기본 정렬을 공백 우선으로 바꿨다. 정렬
+   기준이 화면에 보이지 않으면 순서가 자의적으로 읽히므로 공백 수를 함께 적는다. */
+.coverage-gap-flag { padding: 2px 8px; border-radius: 999px; background: var(--amber-soft); color: var(--amber); font-size: 11px; font-weight: 800; }
+.item-list-gap { color: var(--amber); font-weight: 800; white-space: nowrap; }
+.item-gap-filter { display: inline-flex; align-items: center; gap: 6px; padding: 0 10px; color: var(--ink); font-size: 12.5px; font-weight: 700; white-space: nowrap; cursor: pointer; }
+.item-gap-filter input { accent-color: var(--green); }
 /* 다출원 특산품 토글 + 품목·지역 직접 입력. 지역을 고르면 보고서에 ⑤ 지역 관점 절이 붙는다. */
 .strategy-picker-group { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .strategy-picker-label { font-size: 11px; font-weight: 800; letter-spacing: .02em; color: var(--muted); }
@@ -722,7 +728,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 @media (max-width: 760px) { .coverage-insight-strip .coverage-insight-stats { margin-left: 0; } }
 /* 2026-09-08: 권리 상태 네 칸을 요약 첫 지표로. 네 칸은 순서가 있는 진단 단계라
    순차가 아니라 상태 색(위험→양호)을 쓰고, 값은 숫자로 함께 적는다. */
-.rights-board { padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
+/* 2026-09-08(사용자 "구석으로 보내줄래"): 좁은 왼쪽 열에서 요약 맨 아래 전체 너비 띠로
+   내렸다. 넓은 칸에서는 네 칸이 가로로 붙어 세로 높이가 크게 줄어든다. */
+.rights-board { margin-top: 16px; padding: 16px 18px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); box-shadow: var(--shadow); }
 .rights-board-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
 .rights-board-head strong { font-size: 14px; }
 .rights-board-head span { color: var(--muted); font-size: 11.5px; white-space: nowrap; }
@@ -732,7 +740,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .seg-service-only { background: var(--amber); }
 .seg-goods { background: var(--green); }
 .seg-unknown { background: repeating-linear-gradient(135deg, #dfe5ee, #dfe5ee 5px, #eef2f7 5px, #eef2f7 6px); }
-.rights-board-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(118px, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
+.rights-board-legend { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 10px; margin: 12px 0 0; padding: 0; list-style: none; }
 .rights-board-legend li { padding-left: 10px; border-left: 3px solid var(--line); }
 .rights-board-legend li.seg-none { border-left-color: var(--red); background: none; }
 .rights-board-legend li.seg-service-only { border-left-color: var(--amber); background: none; }
