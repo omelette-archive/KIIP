@@ -1219,7 +1219,6 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-window button:hover, .leader-metric button:hover { color: var(--ink); }
 .leader-window button.active, .leader-metric button.active { border-color: var(--green); background: var(--green-soft); color: var(--green-dark); }
 .leader-metric { padding-left: 8px; border-left: 1px solid var(--line); }
-.leader-window-range { margin: 7px 0 0; color: var(--faint); font-size: 11px; }
 .leader-grid { display: grid; gap: 12px; margin-top: 12px; }
 .leader-grid-primary { grid-template-columns: repeat(3, minmax(0, 1fr)); }
 .leader-grid-secondary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
@@ -1231,8 +1230,7 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-list { list-style: none; margin: 0; padding: 0; }
 .leader-list li + li { border-top: 1px solid var(--line); }
 /* 이슈 #136(2026-09-08): 게이지 바를 맨 오른쪽 고정 열에 두고, 그 사이에 값을 둔다 —
-   모든 행의 바가 같은 x에서 시작해 길이 비교로 순위가 한눈에 보이게. 회색 채움만으로는
-   얼마나 찼는지 안 보여 트랙에 테두리를 준다(빈 부분이 보이도록). */
+   모든 행의 바가 같은 x에서 시작해 길이 비교로 순위가 한눈에 보이게. */
 .leader-list button { display: grid; grid-template-columns: 16px minmax(0, 1fr) 52px 76px; align-items: center; column-gap: 10px; width: 100%; padding: 6px 2px; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer; }
 .leader-list button:hover { background: var(--green-soft); }
 .leader-rank { color: var(--faint); font-size: 11px; font-weight: 800; text-align: center; }
@@ -1240,7 +1238,9 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .leader-tag { margin-left: 5px; padding: 0 5px; border-radius: 5px; background: #eef2f7; color: var(--muted); font-size: 9px; font-style: normal; font-weight: 700; vertical-align: 1px; }
 .leader-val { font-size: 12px; font-weight: 800; text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .leader-val-wide { grid-column: 3 / 5; }
-.leader-bar { height: 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; overflow: hidden; }
+/* 트랙은 앱의 다른 게이지(.rate-bar·.match-bars)와 같은 solid 채움 — 투명+테두리로는
+   흰 카드 위에서 빈 부분이 안 보인다는 지적(사용자 2026-09-08). */
+.leader-bar { height: 9px; border-radius: 99px; background: #e3e6ec; overflow: hidden; }
 .leader-bar i { display: block; height: 100%; border-radius: inherit; background: var(--green); min-width: 2px; }
 .leader-bar-low i { background: var(--amber); }
 /* 급증 카드(사용자 2026-09-08): 게이지 바 없앰 — priorApp→app 전이와 배수(×N)/신규 표식만
