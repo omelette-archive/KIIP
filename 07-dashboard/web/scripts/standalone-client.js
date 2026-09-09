@@ -980,14 +980,20 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       : surgingBy((row) => row.reg, (row) => row.priorReg);
     // 확장 방향 제안의 "출원이 급증한다" 문구는 토글과 무관하게 출원 기준이어야 한다.
     const surgingApplications = surgingBy((row) => row.app, (row) => row.priorApp);
+    // 등록 전환: 지역 확인 확정 건수(누적) 기준(2026-09-09) — 전국 키워드 검색 합계는
+    // 동음이의어·무관 상품까지 잡아 "밀감 97%인데 지역 확인 0/0" 같은 노이즈가 순위를
+    // 채웠다. metrics.uniqueTrademarkCount/registeredTrademarkCount로 바꾼다.
     const lifetime = new Map();
     for (const region of regionalRegions) {
       for (const item of region.items) {
         const label = officialItemLabel(item);
         if (!label) continue;
+        const app = item.metrics.uniqueTrademarkCount.value || 0;
+        const reg = item.metrics.registeredTrademarkCount.value || 0;
+        if (!app && !reg) continue;
         const row = lifetime.get(label) || { name: label, category: item.category || null, lifeApp: 0, lifeReg: 0 };
-        for (const v of Object.values(item.applicationYearCounts || {})) row.lifeApp += v;
-        for (const v of Object.values(item.registrationYearCounts || {})) row.lifeReg += v;
+        row.lifeApp += app;
+        row.lifeReg += reg;
         lifetime.set(label, row);
       }
     }

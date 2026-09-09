@@ -2394,16 +2394,23 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
       : surgingBy((row) => row.reg, (row) => row.priorReg);
     // 확장 방향 제안의 "출원이 급증한다" 문구는 토글과 무관하게 출원 기준이어야 한다.
     const surgingApplications = surgingBy((row) => row.app, (row) => row.priorApp);
-    // 등록 전환: 누적(연 단위) 출원·등록 기준. 창 안의 등록/출원은 서로 다른 시점 코호트라
-    // 비율로 쓰기 어렵다 — 리더보드에서 "정착이 잘/안 되는 품목"은 전체 이력으로 본다.
+    // 등록 전환: 지역 확인 확정 건수(누적) 기준. 처음엔 전국 키워드 검색 연도별 합계
+    // (applicationYearCounts)를 썼는데, 이건 동음이의어·무관 상품까지 다 잡는 값이라
+    // "밀감 97%(777/797)인데 실제 지역 확인은 0/0", "비파 92%(242/264)인데 지역 확인은
+    // 4/6"처럼 실측과 완전히 다른 품목이 순위를 채웠다(사용자 지적, 2026-09-09). 지역
+    // 확인 확정 출원·등록(metrics.uniqueTrademarkCount/registeredTrademarkCount)으로
+    // 바꾸면 노이즈 품목은 20건 미만이라 자동 탈락하고, 실제 지역 브랜드만 남는다.
     const lifetime = new Map<string, { name: string; category: ItemCategory | null; lifeApp: number; lifeReg: number }>();
     for (const region of regionalRegions) {
       for (const item of region.items) {
         const label = officialItemLabel(item);
         if (!label) continue;
+        const app = item.metrics.uniqueTrademarkCount.value || 0;
+        const reg = item.metrics.registeredTrademarkCount.value || 0;
+        if (!app && !reg) continue;
         const row = lifetime.get(label) || { name: label, category: item.category || null, lifeApp: 0, lifeReg: 0 };
-        for (const v of Object.values(item.applicationYearCounts || {})) row.lifeApp += v;
-        for (const v of Object.values(item.registrationYearCounts || {})) row.lifeReg += v;
+        row.lifeApp += app;
+        row.lifeReg += reg;
         lifetime.set(label, row);
       }
     }
