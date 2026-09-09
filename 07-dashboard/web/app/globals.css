@@ -1295,8 +1295,12 @@ footer { display: flex; align-items: center; justify-content: space-between; gap
 .applications-compact-row .province-composition .composition-list { flex: 1; min-height: 0; overflow-y: auto; align-content: flex-start; }
 /* national(전국, 지역 미선택): 이슈 #119 지도 중복 정리 — 전국 지도는 요약 탭에 이미
    있어 이 화면엔 안 그린다. 광역 구성표가 행1 전체 폭을 쓰고, 추이·요약은 그대로 행2. */
-.applications-compact-row.national .province-composition { grid-column: 1 / span 2; grid-row: 1; max-height: none; }
-.applications-compact-row.national .trend-chart { grid-column: 1 / span 2; grid-row: 2; }
+/* 2026-09-09(사용자): "위 아래꺼를 하나의 행으로 넣어줘" — 전국 뷰에서 광역별 구성과
+   연도별 추이가 각각 2열을 차지하며 위아래로 쌓여, 둘 다 보려면 스크롤해야 했다. 시도를
+   고른 화면(.solo)은 이미 한 행이므로 전국 뷰만 같은 배치로 맞춘다. 목록은 칸 안에서
+   스크롤하고, 추이 그래프는 가로가 더 필요하므로 넓은 쪽(1.15fr) 칸에 둔다. */
+.applications-compact-row.national .province-composition { grid-column: 1; grid-row: 1; max-height: 560px; }
+.applications-compact-row.national .trend-chart { grid-column: 2; grid-row: 1; }
 .applications-compact-row.national .composition-list { max-height: 420px; }
 .composition-map-link { align-self: flex-start; margin-top: 10px; }
 /* solo(지역 선택): 광역 구성 없음 → 왼쪽에 추이·요약, 오른쪽에 시군구 지도(두 행) */
