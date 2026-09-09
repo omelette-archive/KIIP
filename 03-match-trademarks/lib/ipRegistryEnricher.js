@@ -114,16 +114,20 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
     if (producerInside) {
       return { match: "inside", confidence: "producer_org_coapplicant_inside", evidence };
     }
-    // 2026-09-09(사용자): "기업인 경우 집계에 편중 문제가 있다고 해서, 협단체 등 얘가
-    // 정한 기준일 경우 공동출원인은 카운트해달라고." 2026-09-08에 공동출원인이면 무조건
-    // 그 지역으로 세도록 넓혔는데, 그러면 전국 유통기업이 산지 조합과 공동출원한 건이
-    // 기업 본사 지역에도 그대로 얹혀 큰 지역으로 쏠린다. 위 producerOrg 규칙(생산자
-    // 단체형이 그 지역일 때만 인정)으로 되돌린다 — 더블 카운트는 산지 주체가 실제로
-    // 걸쳐 있을 때만 일어난다.
-    // 외부로 확정하는 건 아무도 이 지역이 아닐 때뿐이다. 이 지역 출원인이 섞여 있는데
-    // (생산자 단체형이 아니라 인정은 못 해도) 외부라고 단정하면 없는 사실을 만드는 것이라
-    // 보류한다. 주소를 못 읽은 출원인이 남은 경우도 그가 이 지역일 수 있으므로 보류한다.
-    if (!matches.includes("inside") && !matches.includes("unverified")) {
+    // 2026-09-09(사용자 재확인): 한 차례(#192) "기업 편중" 우려로 producerOrg가 아닌
+    // 공동출원인은 unverified로 되돌렸으나, 사용자가 다시 확인 — "일반 기업 공동출원인의
+    // 경우에도 미분류하지 말고 이것도 그 지역으로 해줘. 건수가 늘어나는 게 맞다." 미분류로
+    // 남기지 않는 쪽이 우선이다. 공동출원인은 그 상표가 여러 지역에 실제로 걸쳐 있는
+    // 것이지 주소가 틀린 게 아니므로, 출원인 중 하나라도 이 지역이면 이 지역 출원으로
+    // 센다(#187 원안 복원). 같은 상표가 여러 지역에서 집계되지만(의도된 더블 카운트),
+    // 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
+    if (matches.includes("inside")) {
+      return { match: "inside", confidence: "coapplicant_inside", evidence };
+    }
+    // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
+    // 남아 있으면 그가 이 지역일 수 있으므로 보류하고, 전원 주소가 읽혔는데 아무도
+    // 이 지역이 아닐 때만 외부로 확정한다.
+    if (!matches.includes("unverified")) {
       return { match: "outside", confidence: "coapplicant_outside", evidence };
     }
     return {
