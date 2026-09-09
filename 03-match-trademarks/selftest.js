@@ -1228,6 +1228,16 @@ async function run() {
       <nationalCode>KR</nationalCode><applicantCode>456</applicantCode><seq>1</seq>
       </trademarkApplicantInfo></items></body></response>`);
     assert.strictEqual(producerParsed.applicants[0].producerOrg, true, "<nameKoreanLong>이 영농조합이면 producerOrg=true");
+    // 2026-09-09(사용자 "넣어줘"): 목록이 농업 쪽으로만 채워져 있어 수산 산지 주체가 빠져
+    // 있었다. 법정 생산자 조직 셋을 넣었고, 일반 회사명은 여전히 걸리지 않아야 한다.
+    // (한 번 넣었다가 #193 머지가 옛 기준으로 덮어써 사라졌다 — 테스트로 다시 못박는다.)
+    const { isProducerLikeApplicant } = require("./lib/producerApplicant");
+    for (const name of ["완도전복영어조합법인", "기장어업회사법인", "구룡포어촌계"]) {
+      assert.strictEqual(isProducerLikeApplicant(name), true, `${name}은 생산자 주체형이어야 함`);
+    }
+    for (const name of ["주식회사 바다유통", "㈜한국수산", "대한수산물유통 주식회사"]) {
+      assert.strictEqual(isProducerLikeApplicant(name), false, `${name}은 생산자 주체형이 아니어야 함`);
+    }
 
     let requestedUrl = null;
     let applicantRequestCount = 0;
