@@ -263,14 +263,16 @@ test("keeps item totals, registration denominator, and pending states explicit",
   assert.equal(driedPersimmon.length, 3);
   // 2026-09-04(#70 첫 풀 실행): 깊은 재수집 + #12(normalized_exact만 확정)로 감말랭이
   // 세 지역 주소 일치 출원 합계가 이전 66건에서 갱신됐다.
+  // 2026-09-09(전체 파이프라인 재실행): 등록원부 신규 3,000건 수집 + 공동출원인 완화로
+  // 38 -> 40건.
   assert.equal(
     driedPersimmon.reduce((sum, { item }) => sum + item.metrics.uniqueTrademarkCount.value, 0),
-    38,
+    40,
     "감말랭이는 세 지역의 주소 일치 출원 합계여야 함",
   );
   assert.equal(
     driedPersimmon.reduce((sum, { item }) => sum + item.metrics.registeredTrademarkCount.value, 0),
-    22,
+    24,
     "감말랭이 등록 건수는 같은 출원 중 등록 상태 합계여야 함",
   );
   // 2026-09-04(#116 partial 게이트 + #70): 전국 검색이 상한(#50 노이즈 억제)에 걸린 품목은
@@ -336,7 +338,9 @@ test("publishes only goods-confirmed regional application gaps", async () => {
   assert.equal(publishable.length, 0, "현재 스냅샷에는 지정상품 근거까지 충족한 지역 출원 미확인 항목이 없어야 함");
   // 2026-09-04(#70): 깊은 재수집 + #116 partial 게이트로 available 0건 후보가 86 -> 211로 늘었다.
   // 2026-09-08(#70 재실행): #117 고시명칭 확정 + 등록원부 반영으로 226 -> 218.
-  assert.equal(excluded.length, 218, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
+  // 2026-09-09(전체 파이프라인 재실행): 등록원부 신규 3,000건 수집으로 일부가 지정상품
+  // 근거를 확보해 공개 목록으로 넘어가면서 218 -> 196.
+  assert.equal(excluded.length, 196, "지정상품 근거가 없는 0건 후보는 공개 목록에서 제외해야 함");
   assert.ok(pepperCandidates.length > 0, "고추 관련 0건 후보가 실제로 있어야 감사 조건이 유효함");
   assert.ok(pepperCandidates.every((entry) => !hasGoodsEvidence(entry)), "고추 후보를 지정상품 근거 없이 미출원으로 표시하면 안 됨");
 });
