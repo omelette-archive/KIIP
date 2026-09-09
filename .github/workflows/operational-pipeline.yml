@@ -1,6 +1,6 @@
 name: Operational data pipeline
 
-# #70: 실데이터 수집(①)부터 대시보드 게시(⑦)까지 주 1회 정기 실행.
+# #70: 실데이터 수집(①)부터 대시보드 게시(⑦)까지 매일 정기 실행(2026-09-09부터).
 # 자체 호스트 러너(고정 IP·영구 디스크)에서만 동작한다 — GitHub 호스티드 러너는
 # 매 실행 워크스페이스를 비워 KIPRIS 검색 체크포인트·등록원부 캐시·일별 예산 상태를
 # 이어갈 수 없다. 러너에는 `self-hosted` + `kiip-operational` 라벨을 붙이고,
@@ -8,13 +8,10 @@ name: Operational data pipeline
 
 on:
   schedule:
-    # 매주 월요일 02:00 KST (일요일 17:00 UTC)
-    - cron: "0 17 * * 0"
-    # 2026-09-08(사용자 "정기 수집해줘"): 출원인 주소가 168,367건 중 88,133건(52%)만
-    # 붙어 있고, 주 1회 5,000건씩으로는 남은 80,234건을 소화하는 데 16주가 걸린다.
-    # 수요일 02:00 KST를 한 번 더 넣어 주 2회로 돌린다(약 8주). 더 늘리려면 계정
-    # 일일 한도(#52)를 먼저 확인해야 한다 — 429가 나면 실행이 통째로 중단된다.
-    - cron: "0 17 * * 2"
+    # 2026-09-09(사용자 "예약워크플로는 매일로 해줘"): 주 2회(월/수)로는 남는 날의
+    # 등록원부 하루 한도(실측 ~10,000건/일, 2026-09-09 처음 확인)를 그냥 흘려보낸다.
+    # 매일 02:00 KST(17:00 UTC 전날)로 바꿔 매일 한도까지 밀어붙인다.
+    - cron: "0 17 * * *"
   workflow_dispatch:
     inputs:
       max_requests:
@@ -24,13 +21,21 @@ on:
       applicant_limit:
         description: "③b 출원인 주소 보강 신규 호출 상한"
         required: false
-        # 2026-09-08: 5,000 → 12,000. 미확보 80,234건을 주 2회 × 12,000으로 약 4주에
-        # 소화한다. 한 번에 더 올리지 않는 이유는 위 cron 주석과 같다.
+        # 2026-09-08: 5,000 → 12,000. KIPRIS Plus 실제 하루 한도는 아직 정확히 모른다
+        # (자주 SERVICE_ACCESS_DENIED — 회로차단으로 안전하게 스킵됨).
         default: "12000"
       ip_registry_daily_budget:
         description: "③c 등록원부 하루 누적 호출 상한"
         required: false
-        default: "100"
+        # 2026-09-09: 100 → 50000. data.go.kr 등록원부 실제 하루 한도를 처음
+        # 확인(~10,000건, daily rate limit). 100은 그 1%만 쓰던 셈이라 매일 실제
+        # 한도까지 밀어붙이도록 여유 있게 올린다 — 진짜 한도에서 클라이언트가
+        # 안전하게 회로차단한다(scripts에 이미 구현됨).
+        default: "50000"
+      ip_registry_limit:
+        description: "③c 등록원부 이번 실행 신규 호출 상한"
+        required: false
+        default: "20000"
 
 # 전역 잠금: 같은 시점에 두 번 실행되지 않는다. 진행 중 실행을 취소하지 않는다
 # (외부 API 호출·체크포인트 정합성 보호).
@@ -91,7 +96,20 @@ jobs:
             --state-dir "${KIIP_OPERATIONAL_ROOT}/state" \
             --max-requests "${{ github.event.inputs.max_requests || '400' }}" \
             --applicant-limit "${{ github.event.inputs.applicant_limit || '12000' }}" \
-            --ip-registry-daily-budget "${{ github.event.inputs.ip_registry_daily_budget || '100' }}"
+            --ip-registry-daily-budget "${{ github.event.inputs.ip_registry_daily_budget || '50000' }}" \
+            --ip-registry-limit "${{ github.event.inputs.ip_registry_limit || '20000' }}"
+
+      # 2026-09-09: 매일 무인 실행이라 npm test 없이 바로 커밋하면 데이터 지문 회귀를
+      # main에 그대로 밀어넣고서야 알아챈다(오늘 두 번 겪음). 게시 전에 여기서 걸러
+      # 실패하면 커밋하지 않고 실패 이슈로 안내한다 — 다음 실행이 이어서 시도한다.
+      - name: Validate dashboard-web contract before publishing
+        id: dashboardtest
+        if: success()
+        shell: bash
+        run: |
+          cd 07-dashboard/web
+          npm install --no-audit --no-fund
+          npm test
 
       - name: Commit and push promoted dashboard
         id: commit
