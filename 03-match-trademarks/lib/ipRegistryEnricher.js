@@ -82,6 +82,47 @@ function classifyApplicantRegionMatch(queryRegion, applicantRegion) {
   return { match: "inside", confidence: "exact_registry_address_sido" };
 }
 
+// 2026-09-09: 공동출원인 여러 명의 개별 match/confidence를 하나로 합치는 규칙.
+// evaluateApplicantRegions(출원번호·등록번호 최초 평가)와 regionEvaluatedHitSources
+// (storageMode=query_facts 재판정 — 아래 참고) 둘 다 이 규칙을 써야 한다. 예전엔
+// 이 규칙이 두 곳에 따로 구현돼 있었는데, evaluateApplicantRegions만 고치고
+// regionEvaluatedHitSources는 옛 규칙(불일치=무조건 unverified) 그대로 남아 있어서
+// query_facts 저장 방식(③ 기본값)에서는 공동출원인 완화가 실제로 반영되지 않는 회귀가
+// 있었다(재계산 전후 delta 0으로 발견). 이제 한 곳만 고치면 된다.
+function combineApplicantMatches(rows) {
+  if (!rows || rows.length === 0) {
+    return { match: "unverified", confidence: "no_applicant_address" };
+  }
+  const matches = [...new Set(rows.map((row) => row.match))];
+  const confidences = [...new Set(rows.map((row) => row.confidence))];
+  if (matches.length === 1 && confidences.length === 1) {
+    return { match: matches[0], confidence: confidences[0] };
+  }
+  // #118(2026-09-02): 공동출원인 중 지역 생산 주체형(영농조합·협동조합·지자체)이
+  // inside면 그 지역 출원으로 인정한다.
+  const producerInside = rows.find((row) => row.producerOrg && row.match === "inside");
+  if (producerInside) {
+    return { match: "inside", confidence: "producer_org_coapplicant_inside" };
+  }
+  // 2026-09-09(사용자 재확인): 한 차례(#192) "기업 편중" 우려로 producerOrg가 아닌
+  // 공동출원인은 unverified로 되돌렸으나, 사용자가 다시 확인 — "일반 기업 공동출원인의
+  // 경우에도 미분류하지 말고 이것도 그 지역으로 해줘. 건수가 늘어나는 게 맞다." 미분류로
+  // 남기지 않는 쪽이 우선이다. 공동출원인은 그 상표가 여러 지역에 실제로 걸쳐 있는
+  // 것이지 주소가 틀린 게 아니므로, 출원인 중 하나라도 이 지역이면 이 지역 출원으로
+  // 센다(#187 원안 복원). 같은 상표가 여러 지역에서 집계되지만(의도된 더블 카운트),
+  // 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
+  if (matches.includes("inside")) {
+    return { match: "inside", confidence: "coapplicant_inside" };
+  }
+  // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
+  // 남아 있으면 그가 이 지역일 수 있으므로 보류하고, 전원 주소가 읽혔는데 아무도
+  // 이 지역이 아닐 때만 외부로 확정한다.
+  if (!matches.includes("unverified")) {
+    return { match: "outside", confidence: "coapplicant_outside" };
+  }
+  return { match: "unverified", confidence: "multiple_conflicting_applicant_addresses" };
+}
+
 function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes()) {
   const queryRegion = normalizeAreaBrandRegion(queryRegionText, adminList);
   const evidence = (applicants || []).map((applicant) => {
@@ -102,41 +143,8 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
       confidence: result.confidence,
     };
   });
-  if (evidence.length === 0) {
-    return { match: "unverified", confidence: "no_applicant_address", evidence: [] };
-  }
-  const matches = [...new Set(evidence.map((row) => row.match))];
-  const confidences = [...new Set(evidence.map((row) => row.confidence))];
-  if (matches.length !== 1 || confidences.length !== 1) {
-    // #118(2026-09-02): 공동출원인 중 지역 생산 주체형(영농조합·협동조합·지자체)이
-    // inside면 그 지역 출원으로 인정한다.
-    const producerInside = evidence.find((row) => row.producerOrg && row.match === "inside");
-    if (producerInside) {
-      return { match: "inside", confidence: "producer_org_coapplicant_inside", evidence };
-    }
-    // 2026-09-09(사용자 재확인): 한 차례(#192) "기업 편중" 우려로 producerOrg가 아닌
-    // 공동출원인은 unverified로 되돌렸으나, 사용자가 다시 확인 — "일반 기업 공동출원인의
-    // 경우에도 미분류하지 말고 이것도 그 지역으로 해줘. 건수가 늘어나는 게 맞다." 미분류로
-    // 남기지 않는 쪽이 우선이다. 공동출원인은 그 상표가 여러 지역에 실제로 걸쳐 있는
-    // 것이지 주소가 틀린 게 아니므로, 출원인 중 하나라도 이 지역이면 이 지역 출원으로
-    // 센다(#187 원안 복원). 같은 상표가 여러 지역에서 집계되지만(의도된 더블 카운트),
-    // 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
-    if (matches.includes("inside")) {
-      return { match: "inside", confidence: "coapplicant_inside", evidence };
-    }
-    // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
-    // 남아 있으면 그가 이 지역일 수 있으므로 보류하고, 전원 주소가 읽혔는데 아무도
-    // 이 지역이 아닐 때만 외부로 확정한다.
-    if (!matches.includes("unverified")) {
-      return { match: "outside", confidence: "coapplicant_outside", evidence };
-    }
-    return {
-      match: "unverified",
-      confidence: "multiple_conflicting_applicant_addresses",
-      evidence,
-    };
-  }
-  return { match: matches[0], confidence: confidences[0], evidence };
+  const combined = combineApplicantMatches(evidence);
+  return { ...combined, evidence };
 }
 
 function queryClassCodes(value) {
@@ -326,20 +334,18 @@ function regionEvaluatedHitSources(document, adminList = loadAdminCodes()) {
       if (match === undefined || match === null) return hit; // not_collected 등 — 판정 시도 안 함
       const evidence = hit.applicantRegionEvidence;
       if (!Array.isArray(evidence) || evidence.length === 0) return hit; // 주소 없음 — 지역 무관 unverified
-      const rows = evidence.map((row) =>
-        classifyApplicantRegionMatch(queryRegion, {
+      // combineApplicantMatches와 같은 규칙을 쓴다(producerOrg·공동출원인 완화 포함) —
+      // 예전엔 이 재판정 블록만 옛 규칙(불일치=무조건 unverified)에 남아 있었다.
+      const rows = evidence.map((row) => ({
+        ...classifyApplicantRegionMatch(queryRegion, {
           status: row.regionStatus,
           sido: row.sido,
           sigungu: row.sigungu,
           level: row.regionLevel,
-        })
-      );
-      const matches = [...new Set(rows.map((row) => row.match))];
-      const confidences = [...new Set(rows.map((row) => row.confidence))];
-      const reevaluated =
-        matches.length !== 1 || confidences.length !== 1
-          ? { match: "unverified", confidence: "multiple_conflicting_applicant_addresses" }
-          : { match: matches[0], confidence: confidences[0] };
+        }),
+        producerOrg: Boolean(row.producerOrg),
+      }));
+      const reevaluated = combineApplicantMatches(rows);
       return {
         ...hit,
         applicantRegionMatch: reevaluated.match,
@@ -833,6 +839,7 @@ module.exports = {
   APPLICANT_REGION_MATCH_VERSION,
   GOODS_MATCH_VERSION,
   classifyApplicantRegionMatch,
+  combineApplicantMatches,
   createIpRegistryContext,
   enrichDocument,
   enrichHit,

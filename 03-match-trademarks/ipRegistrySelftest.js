@@ -12,6 +12,7 @@ const {
   evaluateApplicantRegions,
   evaluateGoods,
   normalizeApplicantAddress,
+  regionEvaluatedHitSources,
 } = require("./lib/ipRegistryEnricher");
 const {
   kstDateString,
@@ -208,6 +209,31 @@ async function runIpRegistryTests() {
       ADMIN_LIST
     );
     assert.strictEqual(coApplicantProducerOutside.match, "unverified");
+
+    // 2026-09-09(회귀 방지): storageMode=query_facts 재판정 경로(regionEvaluatedHitSources)가
+    // evaluateApplicantRegions와 별도로 공동출원인 조합 규칙을 구현하고 있었다 — 한쪽만
+    // 고치고 잊어서 재계산 전후 delta가 0으로 나온 사고가 있었다(2026-09-09). 이제
+    // combineApplicantMatches를 공유하므로 두 경로가 항상 같은 결론을 내야 한다.
+    const queryFactsPlain = {
+      storageMode: "query_facts",
+      results: [{ queryKey: "q1", query: { region: "경상북도 안동시" } }],
+      queryFacts: {
+        q1: {
+          hits: [
+            {
+              applicantRegionMatch: "unverified",
+              applicantRegionEvidence: coApplicantPlain.evidence,
+            },
+          ],
+        },
+      },
+    };
+    const reevaluatedHits = regionEvaluatedHitSources(queryFactsPlain, ADMIN_LIST);
+    assert.strictEqual(
+      reevaluatedHits[0].hits[0].applicantRegionMatch,
+      coApplicantPlain.match,
+      "query_facts 재판정도 evaluateApplicantRegions와 같은 결론이어야 함(회귀 방지)"
+    );
 
     // 2026-09-08(사용자): "동명지역인 경우 광역지자체 단위를 우선 체크해줘."
     // 시군구를 못 고르더라도 주소에 시도가 들어 있으면 광역 단위로는 확정한다 —
