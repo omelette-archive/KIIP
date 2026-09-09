@@ -1,6 +1,7 @@
 "use strict";
 
 const { isProducerLikeApplicant } = require("../../03-match-trademarks/lib/producerApplicant");
+const { combineApplicantMatches } = require("../../03-match-trademarks/lib/ipRegistryEnricher");
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
@@ -58,17 +59,33 @@ function statusCategory(value) {
   return "unknown";
 }
 
+// 2026-09-09: 공동출원인 조합 규칙(#118/#187/#193)이 ipRegistryEnricher.js에
+// evaluateApplicantRegions·regionEvaluatedHitSources 두 곳으로 갈라져 있었는데, 이
+// 함수가 그 규칙의 세 번째 독립 구현이라 앞의 두 곳을 고쳐도 04_analyze/대시보드에는
+// 반영되지 않는 사고가 있었다(analyzer.regionCategory가 hit.applicantRegionMatch보다
+// 이 함수를 우선한다). 재판정 자체(주소 vs bucket.sido/sigungu 비교)는 그대로 두고,
+// 여러 공동출원인 결과를 하나로 합치는 마지막 단계만 공유 헬퍼로 위임해 같은 규칙을
+// 세 곳이 함께 쓰게 한다.
 function evidenceRegionCategory(evidence, bucket) {
   if (!bucket?.sido || !Array.isArray(evidence) || evidence.length === 0) return null;
-  const values = evidence.map((row) => {
-    if (clean(row.regionStatus) !== "matched" || !clean(row.sido)) return "unverified";
-    if (clean(row.sido) !== clean(bucket.sido)) return "outside";
-    if (clean(bucket.sigungu) && clean(row.regionLevel) === "sigungu") {
-      return clean(row.sigungu) === clean(bucket.sigungu) ? "inside" : "outside";
+  const rows = evidence.map((row) => {
+    const producerOrg = Boolean(row.producerOrg);
+    if (clean(row.regionStatus) !== "matched" || !clean(row.sido)) {
+      return { match: "unverified", confidence: "unverified_registry_address", producerOrg };
     }
-    return "inside";
+    if (clean(row.sido) !== clean(bucket.sido)) {
+      return { match: "outside", confidence: "exact_registry_address_sido", producerOrg };
+    }
+    if (clean(bucket.sigungu) && clean(row.regionLevel) === "sigungu") {
+      return {
+        match: clean(row.sigungu) === clean(bucket.sigungu) ? "inside" : "outside",
+        confidence: "exact_registry_address_sigungu",
+        producerOrg,
+      };
+    }
+    return { match: "inside", confidence: "exact_registry_address_sido", producerOrg };
   });
-  return new Set(values).size === 1 ? values[0] : "unverified";
+  return combineApplicantMatches(rows).match;
 }
 
 function regionCategory(hit, bucket) {
