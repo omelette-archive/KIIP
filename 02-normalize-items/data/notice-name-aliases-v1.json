@@ -1,0 +1,1868 @@
+{
+  "version": "notice-name-aliases-v1",
+  "dictionaryVersion": "고시상품명칭 13판(2026)",
+  "scope": "상위 30개 다출원 품목",
+  "curatedAt": "2026-09-10",
+  "items": [
+    {
+      "noticeName": "신선한 배",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 배",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "보존처리한 배",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동배",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "배음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "배주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "음료용 배즙",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "배 주스 음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "배술",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "돌배주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "쌀",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G020101",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "통밀쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G020101",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "현미찹쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G020101",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "찹쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G020101",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "탈곡한 쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G020101",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀가루",
+          "niceClass": "30",
+          "similarGroupCode": "G020102",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "찐 쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 가공된 천연 쌀",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "천연 쌀 플레이크",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀엿",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀빵",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀과자",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀조청",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "찹쌀떡",
+          "niceClass": "30",
+          "similarGroupCode": "G0303",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀떡",
+          "niceClass": "30",
+          "similarGroupCode": "G0303",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀국수",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀라면",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀을 주원료로 한 스낵식품",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀을 주원료로 하는 음료(우유대용품은 제외)",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "아와모리(쌀소주)",
+          "niceClass": "33",
+          "similarGroupCode": "G0601",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀로 빚은 술",
+          "niceClass": "33",
+          "similarGroupCode": "G0601",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "쌀의 발효 가공업",
+          "niceClass": "40",
+          "similarGroupCode": "S100113",
+          "stage": "service"
+        },
+        {
+          "noticeName": "쌀 가공업",
+          "niceClass": "40",
+          "similarGroupCode": "S100113",
+          "stage": "service"
+        },
+        {
+          "noticeName": "타인을 위한 쌀 술 양조업",
+          "niceClass": "40",
+          "similarGroupCode": "S100113",
+          "stage": "service"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 사과",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 사과",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "미가공 사과",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "사과퓌레",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "보존처리한 사과",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 사과",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과 버터",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동사과",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "설탕이 코팅된 사과",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과식초",
+          "niceClass": "30",
+          "similarGroupCode": "G0403",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과향 차(비의료용)",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과주스(음료)",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "비알코올성 사과즙",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0290",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "사과주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 토마토",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 토마토",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "미가공 토마토",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 체리토마토",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 포도토마토",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 플럼토마토",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "통조림 토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토 페이스트",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "보존처리된 토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토 퓌레",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "껍질 벗긴 토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "벗긴 기다란 토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 토마토",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토진액",
+          "niceClass": "29",
+          "similarGroupCode": "\"G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "요리용 토마토주스",
+          "niceClass": "29",
+          "similarGroupCode": "\"G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토케첩",
+          "niceClass": "30",
+          "similarGroupCode": "G0403",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토소스",
+          "niceClass": "30",
+          "similarGroupCode": "G0403",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "통조림된 스파게티용 토마토소스",
+          "niceClass": "30",
+          "similarGroupCode": "G0403",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "토마토주스음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "소고기",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "소고기",
+          "niceClass": "29",
+          "similarGroupCode": "G0701",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "소고기 국물",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "소고기 패티",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 소고기 힘줄",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "다진 소고기가 포함된 샌드위치",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 고추",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 고추",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동고추",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추절임",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추장아찌",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추로 채운 올리브",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 고추씨기름",
+          "niceClass": "29",
+          "similarGroupCode": "G0705",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추장",
+          "niceClass": "30",
+          "similarGroupCode": "G0401",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가루고추장",
+          "niceClass": "30",
+          "similarGroupCode": "G0401",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "초고추장",
+          "niceClass": "30",
+          "similarGroupCode": "G0401",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추가루",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "고추 향신료",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 포도",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 포도",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 양조용 포도(釀造用葡萄)",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "보존처리한 포도",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "건포도",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "씨없는 건포도",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동포도",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 포도씨유",
+          "niceClass": "29",
+          "similarGroupCode": "G0705",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도씨 오일",
+          "niceClass": "29",
+          "similarGroupCode": "G0705",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "비탄산 포도음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "음료용 포도즙",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "비발효 포도액",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도 에일",
+          "niceClass": "32",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "강화포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "천연 발포성 포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "막포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "스파클링포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "발포성 포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식탁용 포도주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "포도주 양조 관련 정보제공업",
+          "niceClass": "40",
+          "similarGroupCode": "S100113",
+          "stage": "service"
+        },
+        {
+          "noticeName": "포도 재배업",
+          "niceClass": "44",
+          "similarGroupCode": "S120102",
+          "stage": "service"
+        },
+        {
+          "noticeName": "포도재배 분야의 상담업",
+          "niceClass": "44",
+          "similarGroupCode": "S120102",
+          "stage": "service"
+        }
+      ]
+    },
+    {
+      "noticeName": "생버섯",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "생버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "미가공 버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 식용 버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "건조된 식용 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "보존처리된 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯 퓌레",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "브레디드버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯가루(향신료)",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯주",
+          "niceClass": "33",
+          "similarGroupCode": "G0603",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 수박",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 수박",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "수박껍질 절임",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 딸기",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 딸기",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "보존처리한 딸기",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "통조림된 딸기",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동딸기",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "딸기음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "딸기주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "딸기주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 표고버섯",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 표고버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동표고버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 표고버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "미가공 버섯",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "미가공 버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "생버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 식용 버섯",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "건조된 식용 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "보존처리된 버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯 퓌레",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "브레디드버섯",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯가루(향신료)",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "버섯주",
+          "niceClass": "33",
+          "similarGroupCode": "G0603",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "미가공 감자",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "미가공 감자",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "생 감자",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "튀김감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자칩",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자만두",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자 프레이크",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자튀김",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자퍼프",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "으깬 감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인스턴트 으깬 감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "구운 감자",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "갈아서 만든 감자너겟",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자 샐러드",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자를 주원료로 한 뇨끼",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자로 만든 덤플링",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자스낵",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자탕",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 감자가루",
+          "niceClass": "30",
+          "similarGroupCode": "G020102",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자옹심이",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "납작모양의 감자빵",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "감자떡",
+          "niceClass": "30",
+          "similarGroupCode": "G0303",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "생밤",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "생밤",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "보존처리한 밤",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "군밤",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 밤",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "꿀",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "천연 꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "천연 숙성 꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "허브 꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 아카시아 꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 꿀",
+          "niceClass": "30",
+          "similarGroupCode": "G0302",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "꿀떡",
+          "niceClass": "30",
+          "similarGroupCode": "G0303",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "꿀차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "꿀을 주성분으로 하는 비알코올음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "벌꿀주",
+          "niceClass": "33",
+          "similarGroupCode": "G0603",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 복숭아",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 복숭아",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "보존처리한 복숭아",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 복숭아",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동복숭아",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "복숭아음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "복숭아주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "복숭아주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 참외",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 참외",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "참외(신선한 것)",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        }
+      ]
+    },
+    {
+      "noticeName": "오미자",
+      "keyInDictionary": false,
+      "aliases": [
+        {
+          "noticeName": "요리용 오미자즙",
+          "niceClass": "29",
+          "similarGroupCode": "\"G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오미자차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오미자주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오미자음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오미자주",
+          "niceClass": "33",
+          "similarGroupCode": "G0603",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "곶감",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "곶감",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "보존처리한 대추",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "보존처리한 대추",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "대추를 주원료로 하는 건강보조식품",
+          "niceClass": "29",
+          "similarGroupCode": "\"G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "대추차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "대추음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "대추주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 키위",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 키위",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 키위프루트",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "키위주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "키위 과일주스음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 블루베리",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 블루베리",
+          "niceClass": "31",
+          "similarGroupCode": "G0211",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "가공된 블루베리",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "냉동블루베리",
+          "niceClass": "29",
+          "similarGroupCode": "G0211",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "블루베리 파이",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "블루베리주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 고구마",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 고구마",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동고구마",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 고구마",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "식용 고구마가루",
+          "niceClass": "30",
+          "similarGroupCode": "G020102",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 부추",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 부추",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "부추김치",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "돼지고기",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "돼지고기",
+          "niceClass": "29",
+          "similarGroupCode": "G0701",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "돼지고기 미트볼",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 돼지고기",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "튀긴 돼지고기 껍질",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "통조림된 돼지고기",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "햄버거용 돼지고기",
+          "niceClass": "29",
+          "similarGroupCode": "G0703",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 호박",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 호박",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 폐포호박",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "가공된 호박",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "페포호박 페이스트",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "요리용 호박즙",
+          "niceClass": "29",
+          "similarGroupCode": "\"G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "단호박죽",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "호박죽",
+          "niceClass": "30",
+          "similarGroupCode": "G0206",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "호박파이",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "호박떡",
+          "niceClass": "30",
+          "similarGroupCode": "G0303",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "호박차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 오이",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 오이",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동오이",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오이소박이",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "절임 오이",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오이장아찌",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "오이절임",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "매실",
+      "keyInDictionary": false,
+      "aliases": [
+        {
+          "noticeName": "매실장아찌",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실식초",
+          "niceClass": "30",
+          "similarGroupCode": "G0403",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "훈제된 매실 주스음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실주스",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실진액으로 만든 일본술",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "매실주",
+          "niceClass": "33",
+          "similarGroupCode": "G0602",
+          "stage": "processed"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 인삼",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 인삼",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동인삼",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼잼",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼젤리",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 인삼",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼 가공식품",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼젤리과자",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼정과",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼캔디",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼과자",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼차",
+          "niceClass": "30",
+          "similarGroupCode": "G0501",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "비알코올성 인삼넥타",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼주스(음료)",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼넥타",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "음료용 인삼진액",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "음료용 인삼 분말",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼주",
+          "niceClass": "33",
+          "similarGroupCode": "G0603",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "인삼 가공업",
+          "niceClass": "40",
+          "similarGroupCode": "S100113",
+          "stage": "service"
+        }
+      ]
+    },
+    {
+      "noticeName": "신선한 마늘",
+      "keyInDictionary": true,
+      "aliases": [
+        {
+          "noticeName": "신선한 마늘",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "신선한 마늘종(마늘속대)",
+          "niceClass": "31",
+          "similarGroupCode": "G0202",
+          "stage": "raw"
+        },
+        {
+          "noticeName": "냉동마늘",
+          "niceClass": "29",
+          "similarGroupCode": "G0202",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "다진마늘",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "보존처리된 마늘",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 마늘",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘 버터",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "요리용 마늘 페이스트",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘 퓌레",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘스프레드",
+          "niceClass": "29",
+          "similarGroupCode": "G0204",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘빵",
+          "niceClass": "30",
+          "similarGroupCode": "G0301",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘가루",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "다진 마늘(향신료)",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "가공된 마늘(향신료)",
+          "niceClass": "30",
+          "similarGroupCode": "G0404",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "마늘음료",
+          "niceClass": "32",
+          "similarGroupCode": "G0503",
+          "stage": "processed"
+        },
+        {
+          "noticeName": "음료용 마늘진액",
+          "niceClass": "32",
+          "similarGroupCode": "\"G0503",
+          "stage": "processed"
+        }
+      ]
+    }
+  ]
+}
