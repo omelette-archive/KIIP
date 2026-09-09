@@ -4,6 +4,10 @@ const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes"
 const { resolveRegion } = require("../../01-collect-specialties/lib/normalize");
 const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
 const { normalizeClassCode } = require("./filters");
+const { specialtyStageOf } = require("../../02-normalize-items/lib/derivedRawItems");
+// 원물이면 생산자 주체형만 인정한다(위 combineApplicantMatches 주석 참고). 판정 못 한
+// 이름은 완화 쪽이므로 raw일 때만 true.
+const isRawSpecialty = (noticeName) => specialtyStageOf(noticeName) === "raw";
 const {
   IP_REGISTRY_SOURCE_METADATA,
   normalizeRegistrationNumber,
@@ -89,7 +93,7 @@ function classifyApplicantRegionMatch(queryRegion, applicantRegion) {
 // regionEvaluatedHitSources는 옛 규칙(불일치=무조건 unverified) 그대로 남아 있어서
 // query_facts 저장 방식(③ 기본값)에서는 공동출원인 완화가 실제로 반영되지 않는 회귀가
 // 있었다(재계산 전후 delta 0으로 발견). 이제 한 곳만 고치면 된다.
-function combineApplicantMatches(rows) {
+function combineApplicantMatches(rows, options = {}) {
   if (!rows || rows.length === 0) {
     return { match: "unverified", confidence: "no_applicant_address" };
   }
@@ -111,7 +115,11 @@ function combineApplicantMatches(rows) {
   // 것이지 주소가 틀린 게 아니므로, 출원인 중 하나라도 이 지역이면 이 지역 출원으로
   // 센다(#187 원안 복원). 같은 상표가 여러 지역에서 집계되지만(의도된 더블 카운트),
   // 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
-  if (matches.includes("inside")) {
+  // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+  // 특산품의 경우 일반 기업 등 모두 가능해." 원물은 위 producerOrg 규칙까지만 인정하고
+  // 여기서 멈춘다 — 산지 귀속이 핵심이라 유통기업 본사 지역에 얹히면 안 된다. 가공품은
+  // 기업이 가공·판매 주체이므로 그대로 완화한다. 원물인지 판정 못 한 이름은 완화 쪽이다.
+  if (!options.rawSpecialty && matches.includes("inside")) {
     return { match: "inside", confidence: "coapplicant_inside" };
   }
   // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
@@ -123,7 +131,7 @@ function combineApplicantMatches(rows) {
   return { match: "unverified", confidence: "multiple_conflicting_applicant_addresses" };
 }
 
-function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes()) {
+function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes(), options = {}) {
   const queryRegion = normalizeAreaBrandRegion(queryRegionText, adminList);
   const evidence = (applicants || []).map((applicant) => {
     const region = normalizeApplicantAddress(applicant.address, adminList);
@@ -143,7 +151,9 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
       confidence: result.confidence,
     };
   });
-  const combined = combineApplicantMatches(evidence);
+  const combined = combineApplicantMatches(evidence, {
+    rawSpecialty: isRawSpecialty(options.itemName),
+  });
   return { ...combined, evidence };
 }
 
@@ -345,7 +355,9 @@ function regionEvaluatedHitSources(document, adminList = loadAdminCodes()) {
         }),
         producerOrg: Boolean(row.producerOrg),
       }));
-      const reevaluated = combineApplicantMatches(rows);
+      const reevaluated = combineApplicantMatches(rows, {
+        rawSpecialty: isRawSpecialty(entry.query && entry.query.item),
+      });
       return {
         ...hit,
         applicantRegionMatch: reevaluated.match,

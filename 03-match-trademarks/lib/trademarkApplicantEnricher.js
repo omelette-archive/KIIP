@@ -141,7 +141,9 @@ async function enrichApplicantRegions(document, client, options = {}) {
     return lean;
   };
 
-  const enrichHitForRegion = (hit, queryRegion) => {
+  // 2026-09-09(사용자): 원물 특산품은 생산자 주체형 공동출원인만 인정한다 — 판정에
+  // 고시명칭이 필요해 질의의 품목명을 함께 넘긴다.
+  const enrichHitForRegion = (hit, queryRegion, queryItem) => {
       const number = normalizeApplicationNumber(hit.applicationNumber);
       if (!number) {
         counts.noApplicationNumber++;
@@ -155,7 +157,8 @@ async function enrichApplicantRegions(document, client, options = {}) {
       const evaluated = evaluateApplicantRegions(
         queryRegion || "",
         cached.applicants,
-        adminList
+        adminList,
+        { itemName: queryItem || "" }
       );
       counts[evaluated.match]++;
       return {
@@ -180,7 +183,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
       key,
       {
         ...fact,
-        hits: (fact.hits || []).map((hit) => enrichHitForRegion(hit, "")),
+        hits: (fact.hits || []).map((hit) => enrichHitForRegion(hit, "", fact.query?.item || "")),
       },
     ]));
     counts.inside = 0;
@@ -198,7 +201,8 @@ async function enrichApplicantRegions(document, client, options = {}) {
           const evaluated = evaluateApplicantRegions(
             entry.query?.region || "",
             available.get(number).applicants,
-            adminList
+            adminList,
+            { itemName: entry.query?.item || "" }
           );
           counts[evaluated.match]++;
         }
@@ -208,7 +212,7 @@ async function enrichApplicantRegions(document, client, options = {}) {
   } else {
     results = document.results.map((entry) => ({
       ...entry,
-      hits: (entry.hits || []).map((hit) => enrichHitForRegion(hit, entry.query?.region || "")),
+      hits: (entry.hits || []).map((hit) => enrichHitForRegion(hit, entry.query?.region || "", entry.query?.item || "")),
     }));
   }
   const requested = fetched.filter((row) => row.requested).length;

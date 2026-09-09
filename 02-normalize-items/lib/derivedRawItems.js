@@ -133,7 +133,28 @@ function deriveRawItemRows(rows, dictionary) {
   return { rows: derived, notes };
 }
 
+// 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+// 특산품의 경우 일반 기업 등 모두 가능해." 원물의 산지 귀속은 생산 주체가 그 지역에
+// 있어야 뜻이 있고, 가공품은 기업이 가공·판매 주체라 기업 소재지도 정당한 귀속처다.
+// ③단계 공동출원인 판정이 이 구분을 쓰도록 여기 있는 목록을 그대로 공용화한다.
+//
+// 판정할 수 없으면 null이다 — 「쌀」·「소고기」·「굴」처럼 수식어도 가공 접미어도 없는
+// 이름이 여기 해당한다(대시보드 goodsStageOf도 같은 한계를 가진다). 호출부는 null을
+// 원물로 단정하지 말고 완화 쪽(모든 공동출원인 인정)으로 처리한다 — 판정 못 한 것을
+// 근거로 건수를 깎지 않는다.
+function specialtyStageOf(noticeName) {
+  const name = compact(noticeName);
+  if (!name) return null;
+  if (WHOLE_ITEM_NAMES.has(name)) return "processed";
+  if (FRESH_PREFIX_RE.test(String(noticeName || "").trim())) return "raw";
+  if (PROCESSED_SUFFIXES.some((suffix) => name.endsWith(suffix) && name.length > suffix.length)) {
+    return "processed";
+  }
+  return null;
+}
+
 module.exports = {
+  specialtyStageOf,
   PROCESSED_SUFFIXES,
   WHOLE_ITEM_NAMES,
   dictionaryRawNames,

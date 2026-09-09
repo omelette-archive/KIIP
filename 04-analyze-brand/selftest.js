@@ -843,6 +843,43 @@ console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론
   ok("outputHitCap이 잘린 품목에만 결과 행까지 그대로 전달됨");
 }
 
+{
+  // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+  // 특산품의 경우 일반 기업 등 모두 가능해." analyzer의 evidenceRegionCategory는 공동출원인
+  // 조합 규칙의 세 번째 사용처라, ③단계만 고치고 여기를 잊으면 대시보드 숫자가 안 바뀐다.
+  const evidence = [
+    { regionStatus: "matched", sido: "경상북도", sigungu: "안동시", regionLevel: "sigungu" },
+    { regionStatus: "matched", sido: "경상남도", sigungu: "사천시", regionLevel: "sigungu" },
+  ];
+  const bucketOf = (noticeName) => ({ sido: "경상북도", sigungu: "안동시", noticeName });
+  const withEvidence = { applicantRegionEvidence: evidence, applicantRegionMatch: "unverified" };
+  assert.strictEqual(
+    regionCategory(withEvidence, bucketOf("신선한 인삼")),
+    "outside",
+    "원물은 일반 기업 공동출원인만으로 지역 출원으로 세지 않는다"
+  );
+  assert.strictEqual(
+    regionCategory(withEvidence, bucketOf("인삼차")),
+    "inside",
+    "가공품은 일반 기업 공동출원인도 인정한다"
+  );
+  assert.strictEqual(
+    regionCategory(withEvidence, bucketOf("쌀")),
+    "inside",
+    "원물/가공품 판정 불가 이름은 완화 쪽"
+  );
+  const producerEvidence = [
+    { regionStatus: "matched", sido: "경상북도", sigungu: "안동시", regionLevel: "sigungu", producerOrg: true },
+    { regionStatus: "matched", sido: "경상남도", sigungu: "사천시", regionLevel: "sigungu" },
+  ];
+  assert.strictEqual(
+    regionCategory({ applicantRegionEvidence: producerEvidence }, bucketOf("신선한 인삼")),
+    "inside",
+    "원물이라도 산지 생산자 주체형 공동출원인은 인정한다"
+  );
+  ok("원물 특산품은 생산자 주체형 공동출원인만, 가공품은 일반 기업 공동출원인도 인정");
+}
+
 runNationwideFlowTests()
   .then(() => console.log("\n모든 자체 테스트 통과"))
   .catch((err) => {

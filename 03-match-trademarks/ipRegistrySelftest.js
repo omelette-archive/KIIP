@@ -210,6 +210,48 @@ async function runIpRegistryTests() {
     );
     assert.strictEqual(coApplicantProducerOutside.match, "unverified");
 
+    // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+    // 특산품의 경우 일반 기업 등 모두 가능해." 원물의 산지 귀속은 생산 주체가 그 지역에
+    // 있어야 뜻이 있으므로 위 producerOrg 규칙까지만 인정하고, 가공품은 기업이 가공·판매
+    // 주체이므로 일반 공동출원인도 인정한다.
+    const firmCoapplicant = [
+      { address: "경상북도 안동시 비공개" },
+      { address: "경상남도 사천시 비공개" },
+    ];
+    const rawFirm = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "신선한 인삼",
+    });
+    // 주소를 전원 읽었고 산지 주체가 없으므로 보류가 아니라 외부로 확정된다 —
+    // 원물 규칙이 미확인을 늘리지 않는다.
+    assert.strictEqual(rawFirm.match, "outside", "원물은 일반 기업 공동출원인만으로 인정하지 않는다");
+    assert.strictEqual(rawFirm.confidence, "coapplicant_outside");
+    const rawProducer = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [{ address: "경상북도 안동시 비공개", producerOrg: true }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST,
+      { itemName: "신선한 인삼" }
+    );
+    assert.strictEqual(rawProducer.match, "inside", "원물이라도 산지 생산자 주체형은 인정한다");
+    assert.strictEqual(rawProducer.confidence, "producer_org_coapplicant_inside");
+    const processedFirm = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "인삼차",
+    });
+    assert.strictEqual(processedFirm.match, "inside", "가공품은 일반 기업 공동출원인도 인정한다");
+    assert.strictEqual(processedFirm.confidence, "coapplicant_inside");
+    // 「쌀」·「소고기」처럼 수식어도 가공 접미어도 없어 판정 못 하는 이름은 완화 쪽이다 —
+    // 판정 못 한 것을 근거로 건수를 깎지 않는다.
+    const unknownStage = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "쌀",
+    });
+    assert.strictEqual(unknownStage.match, "inside", "원물/가공품 판정 불가 이름은 완화 쪽");
+    // 원물 판정에도 지역 밖 기업만 있으면 결론은 그대로 외부다.
+    assert.strictEqual(
+      evaluateApplicantRegions("강원특별자치도 양양군", firmCoapplicant, ADMIN_LIST, {
+        itemName: "신선한 인삼",
+      }).match,
+      "outside"
+    );
+
     // 2026-09-09(회귀 방지): storageMode=query_facts 재판정 경로(regionEvaluatedHitSources)가
     // evaluateApplicantRegions와 별도로 공동출원인 조합 규칙을 구현하고 있었다 — 한쪽만
     // 고치고 잊어서 재계산 전후 delta가 0으로 나온 사고가 있었다(2026-09-09). 이제
