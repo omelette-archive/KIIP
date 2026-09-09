@@ -7,10 +7,13 @@ const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const {
+  acquireLock,
   buildPlan,
   executePlan,
+  lockFilePath,
   parseArgs,
   publicPlan,
+  releaseLock,
   validateRunId,
 } = require("./runOperationalPipeline");
 
@@ -213,6 +216,33 @@ try {
     /같은 run-id 실행 디렉터리가 이미 있습니다/,
     "같은 runDir을 두 번째로 만들려고 하면 EEXIST 기반으로 즉시 거부해야 함"
   );
+
+  console.log(
+    "7) 파일 락 — GH Actions·로컬 스케줄러처럼 트리거가 달라도 겹치는 실행은 건너뛴다(2026-09-09)"
+  );
+  const lockStateDir = path.join(tempDir, "lock-state");
+  const first = acquireLock(lockStateDir, "run-a");
+  assert.strictEqual(first.acquired, true, "락이 비어 있으면 첫 실행은 획득해야 함");
+  const second = acquireLock(lockStateDir, "run-b");
+  assert.strictEqual(second.acquired, false, "이미 실행 중인 락이 있으면 두 번째는 건너뛰어야 함");
+  assert.strictEqual(second.existing.pid, process.pid);
+  assert.strictEqual(second.existing.runId, "run-a");
+  releaseLock(lockStateDir);
+  assert.strictEqual(fs.existsSync(lockFilePath(lockStateDir)), false, "우리 프로세스의 락은 해제 시 지워져야 함");
+  const third = acquireLock(lockStateDir, "run-c");
+  assert.strictEqual(third.acquired, true, "해제 후에는 다시 획득할 수 있어야 함");
+  releaseLock(lockStateDir);
+
+  console.log("7b) 죽은 프로세스가 남긴 락은 회수해서 다음 실행이 이어받는다");
+  fs.mkdirSync(lockStateDir, { recursive: true });
+  // 존재할 수 없는 PID(운영체제 예약 범위 밖의 큰 값)로 "죽은 프로세스의 락"을 흉내낸다.
+  fs.writeFileSync(
+    lockFilePath(lockStateDir),
+    JSON.stringify({ pid: 999999, runId: "stale-run", startedAt: new Date().toISOString(), host: "x" })
+  );
+  const afterStale = acquireLock(lockStateDir, "run-d");
+  assert.strictEqual(afterStale.acquired, true, "죽은 PID가 남긴 락은 회수하고 새로 획득해야 함");
+  releaseLock(lockStateDir);
 
   console.log("운영 실행기 자체 테스트 통과");
 } finally {

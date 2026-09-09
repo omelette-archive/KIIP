@@ -7,12 +7,20 @@
  */
 
 const fs = require("fs");
+const os = require("os");
 const path = require("path");
 const { spawnSync } = require("child_process");
 const { writeFileAtomic } = require("./lib/atomicWrite");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_OPERATION_ROOT = path.join(ROOT, ".kiip-operations");
+// 2026-09-09: GitHub Actions self-hosted 러너(cron 02:00 KST)와 이 기계의 Windows
+// 작업 스케줄러(00:30 KST)가 같은 --state-dir을 쓰는 별도의 무인 실행 경로다.
+// 트리거만 다를 뿐 실행기는 같아서, 앞 실행이 90분을 넘기면(등록원부 일일 한도를
+// 실측치까지 올린 뒤로는 충분히 가능) 두 실행이 겹쳐 같은 캐시·체크포인트를 동시에
+// 써 손상시킬 수 있다(2026-09-09 오전 PID 20872/10888 캐시 경합 사고 재현 위험).
+// 트리거 경로와 무관하게 프로세스 하나만 실행 중이도록 파일 락으로 막는다.
+const LOCK_STALE_MS = 12 * 60 * 60 * 1000; // GH Actions 잡 타임아웃(720분)과 맞춘 여유
 const DEFAULT_RAW_GOODS_REVIEW = path.join(
   ROOT,
   "04-analyze-brand",
@@ -700,6 +708,64 @@ function executePlan(plan, options = {}) {
   return { ok: true, manifest };
 }
 
+function lockFilePath(stateDir) {
+  return path.join(stateDir, "pipeline.lock");
+}
+
+function isPidAlive(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    // 권한이 없어 확인 못 하는 경우(EPERM)는 살아있다고 간주 — 잘못 회수하는 것보다 안전.
+    return error.code === "EPERM";
+  }
+}
+
+// 락을 못 얻으면 { acquired: false, existing } 반환. existing이 죽었거나
+// LOCK_STALE_MS보다 오래됐으면(비정상 종료로 못 지운 락) 회수하고 새로 쓴다.
+function acquireLock(stateDir, runId) {
+  fs.mkdirSync(stateDir, { recursive: true });
+  const lockPath = lockFilePath(stateDir);
+  if (fs.existsSync(lockPath)) {
+    let existing = null;
+    try {
+      existing = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    } catch (error) {
+      existing = null;
+    }
+    if (existing && typeof existing.pid === "number") {
+      const startedAtMs = Date.parse(existing.startedAt || "");
+      const age = Number.isNaN(startedAtMs) ? Infinity : Date.now() - startedAtMs;
+      if (isPidAlive(existing.pid) && age < LOCK_STALE_MS) {
+        return { acquired: false, existing };
+      }
+    }
+  }
+  writeFileAtomic(
+    lockPath,
+    JSON.stringify(
+      { pid: process.pid, runId, startedAt: new Date().toISOString(), host: os.hostname() },
+      null,
+      2
+    )
+  );
+  return { acquired: true };
+}
+
+// 우리 프로세스가 쓴 락일 때만 지운다 — 회수 경합으로 남의 새 락을 지우지 않는다.
+function releaseLock(stateDir) {
+  const lockPath = lockFilePath(stateDir);
+  try {
+    const existing = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+    if (existing.pid === process.pid) {
+      fs.unlinkSync(lockPath);
+    }
+  } catch (error) {
+    // 락 파일이 없거나 이미 정리됐으면 조용히 넘어간다.
+  }
+}
+
 function main() {
   const options = parseArgs(process.argv.slice(2));
   if (options.help) {
@@ -711,13 +777,26 @@ function main() {
     console.log(JSON.stringify(publicPlan(plan), null, 2));
     return;
   }
-  const result = executePlan(plan);
-  if (!result.ok) {
-    console.error(`[operational-pipeline] ${result.failedStage} 실패; 후속 단계와 게시는 실행하지 않았습니다.`);
-    process.exitCode = 1;
+  const lock = acquireLock(plan.stateDir, plan.runId);
+  if (!lock.acquired) {
+    const startedAtMs = Date.parse(lock.existing.startedAt || "");
+    const ageMinutes = Number.isNaN(startedAtMs) ? "?" : Math.round((Date.now() - startedAtMs) / 60000);
+    console.log(
+      `[operational-pipeline] 이미 실행 중(PID ${lock.existing.pid}, run=${lock.existing.runId}, ${ageMinutes}분 전 시작)이라 이번 실행은 건너뜁니다.`
+    );
     return;
   }
-  console.log(`[operational-pipeline] run=${plan.runId} 성공; 게시 전 후보=${plan.files.dashboardCandidate}`);
+  try {
+    const result = executePlan(plan);
+    if (!result.ok) {
+      console.error(`[operational-pipeline] ${result.failedStage} 실패; 후속 단계와 게시는 실행하지 않았습니다.`);
+      process.exitCode = 1;
+      return;
+    }
+    console.log(`[operational-pipeline] run=${plan.runId} 성공; 게시 전 후보=${plan.files.dashboardCandidate}`);
+  } finally {
+    releaseLock(plan.stateDir);
+  }
 }
 
 if (require.main === module) {
@@ -731,12 +810,16 @@ if (require.main === module) {
 
 module.exports = {
   ROOT,
+  acquireLock,
   buildPlan,
   defaultRunId,
   executePlan,
+  isPidAlive,
+  lockFilePath,
   nodeStage,
   parseArgs,
   publicPlan,
+  releaseLock,
   runStageCommand,
   validateRunId,
   writeManifest,
