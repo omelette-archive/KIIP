@@ -61,11 +61,29 @@ flowchart LR
 3. 검색 버킷의 지역과 출원인 지역을 비교해 `applicantRegionMatch` =
    `inside|outside|unverified`를 결정한다.
 4. 복수 출원인이 모두 같은 결과일 때 그 결과를 사용한다. 지역이 서로 다르면
-   기본은 `multiple_conflicting_applicant_addresses`로 보류하되, **공동출원인 중
-   지역 생산 주체형(영농조합·협동조합·생산자단체·지자체 단독표기 등 —
-   `03-match-trademarks/lib/producerApplicant.js`)이 해당 지역(`inside`)이면**
-   `producer_org_coapplicant_inside`로 그 지역 출원으로 인정한다(#118, 2026-09-02).
-   판정은 이름 문자열만 쓰고 이름 자체는 저장하지 않으며 불리언 `producerOrg`만 남는다.
+   `03-match-trademarks/lib/ipRegistryEnricher.js`의 `combineApplicantMatches(rows)`가
+   다음 순서로 하나로 합친다(2026-09-09 최종 정리):
+   1. **지역 생산 주체형**(영농조합·협동조합·생산자단체·지자체 단독표기 등 —
+      `03-match-trademarks/lib/producerApplicant.js`)이 해당 지역(`inside`)이면
+      `producer_org_coapplicant_inside`로 인정한다(#118, 2026-09-02).
+      판정은 이름 문자열만 쓰고 이름 자체는 저장하지 않으며 불리언 `producerOrg`만 남긴다.
+   2. 그 외 **공동출원인 중 누구든 하나라도 `inside`**면 `coapplicant_inside`로 인정한다
+      (2026-09-09 최종 결정 — "미분류로 남기지 않는 쪽이 우선, 건수가 늘어나는 게 맞다".
+      한때(#192, 2026-09-09 오전) producerOrg가 아닌 공동출원인은 기업 편중 우려로
+      `unverified`로 되돌렸으나(#193으로 다시 뒤집힘), 최종적으로는 완화 쪽으로 확정됐다).
+      같은 상표가 여러 지역에서 집계되는 의도된 더블 카운트이며, 지역 안 집계는 출원번호
+      기준 고유 집계라 부풀지 않는다.
+   3. 아무도 `inside`가 아니고 미확인 출원인도 안 남아 있으면(전원 주소 확인) `outside`로
+      확정한다(`coapplicant_outside`). 미확인 출원인이 하나라도 남아 있으면 보류한다.
+   4. 위 어디에도 해당 안 되면 `multiple_conflicting_applicant_addresses`로 보류한다.
+
+   **주의(2026-09-09 사고 기록)**: 이 조합 규칙이 한때 `evaluateApplicantRegions`·
+   `regionEvaluatedHitSources`(storageMode=query_facts 재판정 경로)·
+   `04-analyze-brand/lib/analyzer.js`의 `evidenceRegionCategory` **세 곳에 따로
+   구현**돼 있었다. 한 곳만 고치고 나머지 둘을 잊어서, 완화 규칙이 실제 스냅샷에
+   반영되지 않는 사고가 있었다(재계산 전후 delta가 0으로 나와서 발견). 이제
+   `combineApplicantMatches`를 세 곳이 공유하므로, **이 판정 규칙을 다시 바꿀 때는
+   이 함수 하나만 고치면 된다** — 별도 구현을 새로 만들지 않는다.
 5. ④은 `applicantRegionEvidence` 안의 `regionStatus=matched` 근거만 지역 통계에 사용한다.
    `regionalBrandEvidence`는 농사로 지역브랜드 연관성이며 출원인 주소로 승격하지 않는다.
 
@@ -278,6 +296,14 @@ node 03-match-trademarks/refreshStaleRegistryEntries.js `
   각 `entry.query.region`에 대해 관계를 다시 판정한다. `entry.query.region`이 없는
   전국 카탈로그 행은 지역 귀속 모집단에서 제외한다(안 그러면 그 hit이 전부 unverified로
   들어가 비율을 압도).
+
+  **주의(2026-09-09)**: `summarizeRegionMatchCoverage.js`의 `--before`/`--after`는
+  두 파일 모두 raw evidence를 **현재 코드로 다시 판정**해서 센다 — "저장된 옛 값"과
+  비교하는 게 아니다. 그래서 같은 캐시(새 API 호출 없음)로 만든 두 ③ 산출물을 비교하면,
+  판정 규칙이 방금 바뀌었어도 두 파일의 raw evidence 자체가 사실상 동일해 **delta가
+  항상 0으로 나온다**. 규칙 변경의 실제 효과를 확인하려면 이 델타 대신 ④ 분석 산출물
+  (`regionItems[].regionCounts` 등)을 직접 비교하거나, 정식 파이프라인(`runOperationalPipeline.js`)
+  실행 전후의 라이브 스냅샷을 비교한다.
 - 재조회·캐시 재적용을 마친 ③ 산출물 하나로 ④→⑦ 재생성을 한 번에 수행하는 실행기도
   구현됐다(`scripts/regenerateAnalysisFromMatch.js`, 2026-09-01, [#73](https://github.com/omelette-archive/KIIP/issues/73)).
   `--input <③ 최종 보강 JSON> [--before <기준선 ③ JSON>]`으로 부르면 지역매칭 비율 집계 →
