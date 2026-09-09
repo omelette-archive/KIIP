@@ -138,18 +138,27 @@ async function runIpRegistryTests() {
     assert.strictEqual(outside.match, "outside");
     assert.strictEqual(outside.confidence, "exact_registry_address_sido");
 
-    // 2026-09-09(사용자): "기업인 경우 집계에 편중 문제가 있다고 해서, 협단체 등 얘가 정한
-    // 기준일 경우 공동출원인은 카운트해달라고." 공동출원인이면 무조건 세면 전국 유통기업이
-    // 산지 조합과 공동출원한 건이 기업 본사 지역에도 얹혀 큰 지역으로 쏠린다. 생산자 단체형
-    // (producerOrg)이 그 지역일 때만 인정한다.
+    // 2026-09-09(사용자 재확인): #192에서 producerOrg 아닌 공동출원인은 잠시 unverified로
+    // 되돌렸으나, "일반 기업 공동출원인도 미분류로 남기지 말고 그 지역으로 인정해달라 —
+    // 건수가 늘어나는 게 맞다"고 재확인받아 #187 원안(출원인 중 하나라도 이 지역이면
+    // 이 지역 출원)으로 복원한다. 공동출원인은 그 상표가 여러 지역에 실제로 걸쳐 있는
+    // 것이지 주소가 틀린 게 아니다.
     const coApplicantPlain = evaluateApplicantRegions(
       "경상북도 안동시",
       [{ address: "경상북도 안동시 비공개" }, { address: "경상남도 사천시 비공개" }],
       ADMIN_LIST
     );
-    assert.strictEqual(coApplicantPlain.match, "unverified", "일반 공동출원인만으로는 지역 출원으로 세지 않는다");
-    assert.strictEqual(coApplicantPlain.confidence, "multiple_conflicting_applicant_addresses");
-    // 생산자 단체형이 두 지역에 걸쳐 있으면 양쪽에서 집계된다 — 의도된 더블 카운트.
+    assert.strictEqual(coApplicantPlain.match, "inside", "공동출원인 중 하나가 이 지역이면 이 지역 출원");
+    assert.strictEqual(coApplicantPlain.confidence, "coapplicant_inside");
+    // 반대편 지역에서 같은 상표를 봐도 inside다 — 의도된 더블 카운트. 각 지역의 건수는
+    // 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
+    const coApplicantOtherSide = evaluateApplicantRegions(
+      "경상남도 사천시",
+      [{ address: "경상북도 안동시 비공개" }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST
+    );
+    assert.strictEqual(coApplicantOtherSide.match, "inside", "같은 상표가 양쪽 지역에서 집계돼야 함");
+    // 생산자 단체형이 두 지역에 걸쳐 있어도 마찬가지로 양쪽에서 집계된다.
     const producerBoth = [
       { address: "경상북도 안동시 비공개", producerOrg: true },
       { address: "경상남도 사천시 비공개", producerOrg: true },
@@ -160,16 +169,17 @@ async function runIpRegistryTests() {
       "inside",
       "산지 주체가 양쪽에 있으면 두 지역 모두에서 집계돼야 함"
     );
-    // 기업이 산지 조합과 공동출원해도 기업 지역에는 얹히지 않는다.
+    // 기업이 산지 조합과 공동출원해도, 기업 소재지 자체도 이제 이 지역 출원으로 인정한다
+    // (위 재확인 — 기업 편중보다 미분류 방지가 우선).
     const firmAndCoop = [
       { address: "경상북도 안동시 비공개", producerOrg: true },
       { address: "경상남도 사천시 비공개" },
     ];
     assert.strictEqual(evaluateApplicantRegions("경상북도 안동시", firmAndCoop, ADMIN_LIST).match, "inside");
-    assert.notStrictEqual(
+    assert.strictEqual(
       evaluateApplicantRegions("경상남도 사천시", firmAndCoop, ADMIN_LIST).match,
       "inside",
-      "기업 소재지에 산지 출원이 얹히면 안 됨"
+      "기업 소재지도 공동출원 근거로 이 지역 출원으로 인정한다"
     );
     // 이 지역 출원인이 하나도 없고 전원 주소가 읽혔으면 외부로 확정한다.
     const coApplicantNone = evaluateApplicantRegions(
