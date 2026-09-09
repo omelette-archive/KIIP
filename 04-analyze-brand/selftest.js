@@ -865,8 +865,8 @@ console.log("10) 원물명 지정상품 검토 결과를 ④ 분석에 결정론
   );
   assert.strictEqual(
     regionCategory(withEvidence, bucketOf("쌀")),
-    "inside",
-    "원물/가공품 판정 불가 이름은 완화 쪽"
+    "outside",
+    "가공 표지 없는 이름(「쌀」)은 원물로 본다 — 2026-09-10 사용자"
   );
   const producerEvidence = [
     { regionStatus: "matched", sido: "경상북도", sigungu: "안동시", regionLevel: "sigungu", producerOrg: true },

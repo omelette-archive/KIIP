@@ -138,19 +138,46 @@ function deriveRawItemRows(rows, dictionary) {
 // 있어야 뜻이 있고, 가공품은 기업이 가공·판매 주체라 기업 소재지도 정당한 귀속처다.
 // ③단계 공동출원인 판정이 이 구분을 쓰도록 여기 있는 목록을 그대로 공용화한다.
 //
-// 판정할 수 없으면 null이다 — 「쌀」·「소고기」·「굴」처럼 수식어도 가공 접미어도 없는
-// 이름이 여기 해당한다(대시보드 goodsStageOf도 같은 한계를 가진다). 호출부는 null을
-// 원물로 단정하지 말고 완화 쪽(모든 공동출원인 인정)으로 처리한다 — 판정 못 한 것을
-// 근거로 건수를 깎지 않는다.
+// 2026-09-10(사용자): "쌀도 원물이라고 봐야지 — 탈곡 전의 쌀은 지정상품으로 안 쓰니."
+// 처음에는 「쌀」·「소고기」·「굴」처럼 수식어도 가공 접미어도 없는 이름을 판정 불가(null)로
+// 두고 완화 쪽으로 넘겼는데, 지정상품에 오르는 이름이 이미 유통 형태를 전제한다는 지적이
+// 맞다 — 벼가 아니라 쌀, 소가 아니라 소고기가 지정상품이다. 그래서 **가공 표지가 없으면
+// 원물**이 기본값이고, 판정 불가(null)는 이름 자체가 비었을 때만 남는다.
+//
+// 가공 표지는 셋이다. (1) WHOLE_ITEM_NAMES — 그 자체가 완성 가공품인 이름, (2)
+// PROCESSED_SUFFIXES — 원물명 뒤에 붙는 가공 형태, (3) PROCESSED_MARKERS — 이름 어디에
+// 있어도 가공을 뜻하는 낱말. (3)은 아래 주석 참고.
+
+// (1)(2)는 원물 파생용이라 "접미어를 떼면 원물이 남는" 형태만 담겨 있어, 「절임깻잎」
+// (접두)·「사과가공식품」(중간)·「요구르트&치즈」(병기)처럼 접미어로 안 걸리는 가공품을
+// 놓친다. 여기 목록은 실제 카탈로그의 고시명칭 792개 중 (1)(2)에 안 걸린 것을 훑어
+// 오탐 없이 걸러지는 낱말만 골라 넣은 것이다(2026-09-10 실측). 「죽순」·「참죽나무」가
+// 걸리지 않도록 「죽」 같은 한 글자는 넣지 않는다. 카탈로그가 늘면 다시 훑어야 한다.
+const PROCESSED_MARKERS = [
+  "가공", "식품", "절임", "훈제", "발효", "염장", "조미", "세트", "소스", "요구르트",
+  "치즈", "순대", "육포", "젤리", "죽염", "국수", "송편", "빼떼기", "쫀득이", "백반",
+  "볶음탕", "다시마장", "분말", "밀키트", "두부", "어묵", "피클", "통조림", "건조",
+];
+
+// 낱말로는 못 잡는데 그 자체가 가공품인 이름. WHOLE_ITEM_NAMES에 넣으면 원물 파생까지
+// 막혀 「고등어」·「미역」 원물 행이 사라지므로 여기 따로 둔다.
+const PROCESSED_WHOLE_NAMES = new Set(["간고등어", "간미역", "아이스홍시", "알밤묵"]);
+
+/**
+ * 특산품 이름이 원물인지 가공품인지 판정한다.
+ * @param {string} noticeName 고시명칭(없으면 수집 원문 품목명)
+ * @returns {"raw"|"processed"|null} 이름이 비었을 때만 null
+ */
 function specialtyStageOf(noticeName) {
   const name = compact(noticeName);
   if (!name) return null;
-  if (WHOLE_ITEM_NAMES.has(name)) return "processed";
+  if (WHOLE_ITEM_NAMES.has(name) || PROCESSED_WHOLE_NAMES.has(name)) return "processed";
   if (FRESH_PREFIX_RE.test(String(noticeName || "").trim())) return "raw";
   if (PROCESSED_SUFFIXES.some((suffix) => name.endsWith(suffix) && name.length > suffix.length)) {
     return "processed";
   }
-  return null;
+  if (PROCESSED_MARKERS.some((marker) => name.includes(marker))) return "processed";
+  return "raw";
 }
 
 module.exports = {

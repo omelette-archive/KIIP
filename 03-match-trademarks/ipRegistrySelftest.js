@@ -238,12 +238,17 @@ async function runIpRegistryTests() {
     });
     assert.strictEqual(processedFirm.match, "inside", "가공품은 일반 기업 공동출원인도 인정한다");
     assert.strictEqual(processedFirm.confidence, "coapplicant_inside");
-    // 「쌀」·「소고기」처럼 수식어도 가공 접미어도 없어 판정 못 하는 이름은 완화 쪽이다 —
-    // 판정 못 한 것을 근거로 건수를 깎지 않는다.
-    const unknownStage = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+    // 2026-09-10(사용자): "쌀도 원물이라고 봐야지 — 탈곡 전의 쌀은 지정상품으로 안 쓰니."
+    // 지정상품에 오르는 이름은 이미 유통 형태를 전제하므로, 가공 표지가 없으면 원물이다.
+    const bareName = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
       itemName: "쌀",
     });
-    assert.strictEqual(unknownStage.match, "inside", "원물/가공품 판정 불가 이름은 완화 쪽");
+    assert.strictEqual(bareName.match, "outside", "가공 표지 없는 이름(「쌀」)은 원물로 본다");
+    // 품목명을 아예 못 넘긴 호출부는 조용히 엄격해지지 않도록 완화 쪽으로 남긴다.
+    const noItemName = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "",
+    });
+    assert.strictEqual(noItemName.match, "inside", "품목명이 없으면 완화 쪽");
     // 원물 판정에도 지역 밖 기업만 있으면 결론은 그대로 외부다.
     assert.strictEqual(
       evaluateApplicantRegions("강원특별자치도 양양군", firmCoapplicant, ADMIN_LIST, {

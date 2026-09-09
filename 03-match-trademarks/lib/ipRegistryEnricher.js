@@ -5,8 +5,9 @@ const { resolveRegion } = require("../../01-collect-specialties/lib/normalize");
 const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
 const { normalizeClassCode } = require("./filters");
 const { specialtyStageOf } = require("../../02-normalize-items/lib/derivedRawItems");
-// 원물이면 생산자 주체형만 인정한다(위 combineApplicantMatches 주석 참고). 판정 못 한
-// 이름은 완화 쪽이므로 raw일 때만 true.
+// 원물이면 생산자 주체형만 인정한다(아래 combineApplicantMatches 주석 참고).
+// specialtyStageOf는 가공 표지가 없으면 원물로 보고, 이름이 비었을 때만 null이다 —
+// 품목명을 못 넘긴 호출부가 조용히 엄격해지지 않도록 null은 완화 쪽으로 남긴다.
 const isRawSpecialty = (noticeName) => specialtyStageOf(noticeName) === "raw";
 const {
   IP_REGISTRY_SOURCE_METADATA,
@@ -118,7 +119,8 @@ function combineApplicantMatches(rows, options = {}) {
   // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
   // 특산품의 경우 일반 기업 등 모두 가능해." 원물은 위 producerOrg 규칙까지만 인정하고
   // 여기서 멈춘다 — 산지 귀속이 핵심이라 유통기업 본사 지역에 얹히면 안 된다. 가공품은
-  // 기업이 가공·판매 주체이므로 그대로 완화한다. 원물인지 판정 못 한 이름은 완화 쪽이다.
+  // 기업이 가공·판매 주체이므로 그대로 완화한다. 2026-09-10(사용자) "쌀도 원물이라고
+  // 봐야지"로, 가공 표지가 없는 이름은 원물이 기본값이다 — 즉 완화는 가공품에만 적용된다.
   if (!options.rawSpecialty && matches.includes("inside")) {
     return { match: "inside", confidence: "coapplicant_inside" };
   }

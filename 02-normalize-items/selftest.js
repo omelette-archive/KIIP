@@ -508,6 +508,28 @@ async function run() {
     ok("원물 행은 추가로만 만들고 원문·파생 근거를 함께 남김");
   }
 
+  {
+    console.log("11) 원물/가공품 판정 — 가공 표지가 없으면 원물");
+    const { specialtyStageOf, deriveRawItemName } = require("./lib/derivedRawItems");
+    // 2026-09-10(사용자): "쌀도 원물이라고 봐야지 — 탈곡 전의 쌀은 지정상품으로 안 쓰니."
+    // 지정상품에 오르는 이름은 이미 유통 형태를 전제한다(벼가 아니라 쌀, 소가 아니라 소고기).
+    for (const name of ["쌀", "소고기", "굴", "신선한 인삼", "죽순", "참죽나무", "고사리"]) {
+      assert.strictEqual(specialtyStageOf(name), "raw", `${name}은 원물`);
+    }
+    // 접미어(인삼차)·완성 가공품명(고추장)뿐 아니라 접두(절임깻잎)·중간(사과가공식품)·
+    // 병기(요구르트&치즈)로 붙는 가공 표지도 잡아야 한다 — 접미어 목록만으로는 놓쳤다.
+    for (const name of ["인삼차", "고추장", "절임깻잎", "사과가공식품", "요구르트&치즈", "간고등어"]) {
+      assert.strictEqual(specialtyStageOf(name), "processed", `${name}은 가공품`);
+    }
+    // 이름이 비었을 때만 null이다 — 호출부(공동출원인 판정)가 완화 쪽으로 처리한다.
+    assert.strictEqual(specialtyStageOf(""), null);
+    assert.strictEqual(specialtyStageOf(null), null);
+    // 가공 표지를 원물 파생 목록(WHOLE_ITEM_NAMES)에 얹었으면 「고등어」 원물 행이
+    // 사라졌을 것이다 — 판정용 목록을 따로 둔 이유이므로 파생이 그대로인지 확인한다.
+    assert.strictEqual(deriveRawItemName("간고등어", new Set(["고등어"])), null, "파생 규칙은 그대로");
+    ok("가공 표지가 없으면 원물, 빈 이름만 판정 보류");
+  }
+
   console.log("\n모든 자체 테스트 통과");
 }
 
