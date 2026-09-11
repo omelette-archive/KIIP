@@ -569,11 +569,13 @@ test("ships a valid dashboard snapshot", async () => {
   // regionalEvidence로 붙는다. 지역 행이라 regionalMetricEligible=true.
   // 2026-09-07(#151): 전라남도 통합 도명 tombstone 6건(장흥 표고·광양 고사리/수액·고흥 취나물·
   //   장성 잔디·해남 야생화) + query.region 정규화로 장흥 표고가 농사로 행과 병합 → 27행 -> 21행.
+  // 2026-09-11(매일 자동 파이프라인 계속 진행): 등록원부 백로그가 계속 채워지며 21 -> 22.
   const forestEvidenceItems = snapshot.regions.filter((region) => region.sido !== "전국")
     .flatMap((region) => region.items.filter((item) => item.regionalEvidence?.length).map((item) => ({ region: region.region, item })));
-  assert.equal(forestEvidenceItems.length, 21);
+  assert.equal(forestEvidenceItems.length, 22);
+  // 충청북도 보은군에 "대추" 행이 두 개(같은 이름, 다른 specialtyId)라 length(22)보다 하나 적다.
   assert.equal(new Set(forestEvidenceItems.map(({ item }) => item.itemName)).size, 21);
-  assert.equal(forestEvidenceItems.reduce((sum, { item }) => sum + item.regionalEvidence.length, 0), 21);
+  assert.equal(forestEvidenceItems.reduce((sum, { item }) => sum + item.regionalEvidence.length, 0), 22);
   assert.deepEqual(forestEvidenceItems.filter(({ item }) => item.itemName === "밤").map(({ region }) => region), ["충청남도 부여군"]);
   assert.deepEqual(
     forestEvidenceItems.filter(({ item }) => item.itemName === "표고").map(({ region }) => region).sort(),
