@@ -27,6 +27,7 @@ const {
   loadAreaBrandDocument,
   summarizeRegionalBrandMatches,
 } = require("./lib/areaBrandEnricher");
+const { aliasClassesFor } = require("../02-normalize-items/lib/noticeNameAliases");
 const { createClient: createIpRegistryClient } = require("./lib/ipRegistryClient");
 const {
   createIpRegistryContext,
@@ -204,7 +205,7 @@ function makeBatchQuery(row, options = {}) {
   if (row.status === "ok") {
     if (!notice) return { skipReason: "② 단계 고시명칭 미확정" };
     if (!String(row.niceClass || "").trim()) return { skipReason: "② 단계 NICE류 미확정" };
-    return { region, item: notice, classCode: row.niceClass };
+    return { region, item: notice, classCode: queryClassesForNotice(notice, row.niceClass) };
   }
 
   // 고시명칭이 아직 확정되지 않은(검토대기) 원물명도, 실제로 그 이름으로 출원된 상표가
@@ -221,6 +222,20 @@ function makeBatchQuery(row, options = {}) {
 
 function countSearchableRows(rows, options = {}) {
   return rows.reduce((count, row) => count + (makeBatchQuery(row, options).skipReason ? 0 : 1), 0);
+}
+
+// 2026-09-09(사용자): "품목 1개에 n개의 관련 고시명칭이 있는 거고, 그 중 하나가
+// 출원되어도 해당 품목은 출원된 것으로." 별칭 세트가 있는 품목은 세트가 걸쳐 있는
+// 류까지 남긴다 — 31류만 남기면 「인삼차」(30류)·「인삼주」(33류) 출원이 수집 단계에서
+// 사라져 지정상품 대조까지 가지도 못한다. 검색어(searchString)는 그대로 하나여서
+// API 호출 수는 늘지 않고, 받아온 결과에서 버리는 범위만 줄어든다.
+function queryClassesForNotice(noticeName, niceClass) {
+  const own = String(niceClass || "").trim();
+  const aliasClasses = aliasClassesFor(noticeName);
+  if (aliasClasses.length === 0) return own;
+  return [...new Set([own, ...aliasClasses].filter(Boolean))]
+    .sort((a, b) => Number(a) - Number(b))
+    .join("|");
 }
 
 function normalizeQueryClasses(classCode) {

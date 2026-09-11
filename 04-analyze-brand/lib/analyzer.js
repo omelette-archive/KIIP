@@ -2,6 +2,7 @@
 
 const { isProducerLikeApplicant } = require("../../03-match-trademarks/lib/producerApplicant");
 const { combineApplicantMatches } = require("../../03-match-trademarks/lib/ipRegistryEnricher");
+const { specialtyStageOf } = require("../../02-normalize-items/lib/derivedRawItems");
 
 const INACTIVE_STATUS_WORDS = ["거절", "취하", "포기", "소멸", "무효", "취소"];
 const PENDING_STATUS_WORDS = ["출원", "심사", "공고"];
@@ -85,7 +86,10 @@ function evidenceRegionCategory(evidence, bucket) {
     }
     return { match: "inside", confidence: "exact_registry_address_sido", producerOrg };
   });
-  return combineApplicantMatches(rows).match;
+  // 원물이면 생산자 주체형 공동출원인만 인정한다(#118/2026-09-09 사용자 기준).
+  return combineApplicantMatches(rows, {
+    rawSpecialty: specialtyStageOf(bucket.noticeName) === "raw",
+  }).match;
 }
 
 function regionCategory(hit, bucket) {

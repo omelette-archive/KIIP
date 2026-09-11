@@ -4,6 +4,12 @@ const { loadAdminCodes } = require("../../01-collect-specialties/lib/adminCodes"
 const { resolveRegion } = require("../../01-collect-specialties/lib/normalize");
 const { normalizeAreaBrandRegion } = require("./areaBrandEnricher");
 const { normalizeClassCode } = require("./filters");
+const { specialtyStageOf } = require("../../02-normalize-items/lib/derivedRawItems");
+const { aliasesFor } = require("../../02-normalize-items/lib/noticeNameAliases");
+// 원물이면 생산자 주체형만 인정한다(아래 combineApplicantMatches 주석 참고).
+// specialtyStageOf는 가공 표지가 없으면 원물로 보고, 이름이 비었을 때만 null이다 —
+// 품목명을 못 넘긴 호출부가 조용히 엄격해지지 않도록 null은 완화 쪽으로 남긴다.
+const isRawSpecialty = (noticeName) => specialtyStageOf(noticeName) === "raw";
 const {
   IP_REGISTRY_SOURCE_METADATA,
   normalizeRegistrationNumber,
@@ -89,7 +95,7 @@ function classifyApplicantRegionMatch(queryRegion, applicantRegion) {
 // regionEvaluatedHitSources는 옛 규칙(불일치=무조건 unverified) 그대로 남아 있어서
 // query_facts 저장 방식(③ 기본값)에서는 공동출원인 완화가 실제로 반영되지 않는 회귀가
 // 있었다(재계산 전후 delta 0으로 발견). 이제 한 곳만 고치면 된다.
-function combineApplicantMatches(rows) {
+function combineApplicantMatches(rows, options = {}) {
   if (!rows || rows.length === 0) {
     return { match: "unverified", confidence: "no_applicant_address" };
   }
@@ -111,7 +117,12 @@ function combineApplicantMatches(rows) {
   // 것이지 주소가 틀린 게 아니므로, 출원인 중 하나라도 이 지역이면 이 지역 출원으로
   // 센다(#187 원안 복원). 같은 상표가 여러 지역에서 집계되지만(의도된 더블 카운트),
   // 각 지역의 건수는 출원번호 기준 고유 집계라 지역 안에서는 부풀지 않는다.
-  if (matches.includes("inside")) {
+  // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+  // 특산품의 경우 일반 기업 등 모두 가능해." 원물은 위 producerOrg 규칙까지만 인정하고
+  // 여기서 멈춘다 — 산지 귀속이 핵심이라 유통기업 본사 지역에 얹히면 안 된다. 가공품은
+  // 기업이 가공·판매 주체이므로 그대로 완화한다. 2026-09-10(사용자) "쌀도 원물이라고
+  // 봐야지"로, 가공 표지가 없는 이름은 원물이 기본값이다 — 즉 완화는 가공품에만 적용된다.
+  if (!options.rawSpecialty && matches.includes("inside")) {
     return { match: "inside", confidence: "coapplicant_inside" };
   }
   // 이 지역 출원인이 없을 때는 보수적으로 간다. 주소를 못 읽은 출원인이 하나라도
@@ -123,7 +134,7 @@ function combineApplicantMatches(rows) {
   return { match: "unverified", confidence: "multiple_conflicting_applicant_addresses" };
 }
 
-function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes()) {
+function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadAdminCodes(), options = {}) {
   const queryRegion = normalizeAreaBrandRegion(queryRegionText, adminList);
   const evidence = (applicants || []).map((applicant) => {
     const region = normalizeApplicantAddress(applicant.address, adminList);
@@ -143,7 +154,9 @@ function evaluateApplicantRegions(queryRegionText, applicants, adminList = loadA
       confidence: result.confidence,
     };
   });
-  const combined = combineApplicantMatches(evidence);
+  const combined = combineApplicantMatches(evidence, {
+    rawSpecialty: isRawSpecialty(options.itemName),
+  });
   return { ...combined, evidence };
 }
 
@@ -156,8 +169,26 @@ function queryClassCodes(value) {
   );
 }
 
+// 2026-09-09(사용자): "품목 1개에 n개의 관련 고시명칭이 있는 거고, 그 중 하나가 출원되어도
+// 해당 품목은 출원된 것으로." 지금까지 질의 고시명칭 하나와만 대조해서, 인삼을 실제로 쓴
+// 「인삼차」·「인삼주」 출원이 특산품 활용으로 안 잡혔다. 별칭 세트가 있는 품목은 세트 전부와
+// 대조하고, 어느 이름으로 걸렸는지(goodsMatchAlias)와 그 단계(원물/가공/서비스)를 남긴다.
+// 세트가 없는 품목은 종전대로 고시명칭 하나와만 대조한다 — 범위는 데이터 파일이 정한다.
+function goodsTargets(query) {
+  const primary = normalizeGoodsText(query?.item);
+  const targets = new Map();
+  if (primary) targets.set(primary, { noticeName: clean(query?.item), stage: null, primary: true });
+  for (const alias of aliasesFor(query?.item)) {
+    const normalized = normalizeGoodsText(alias.noticeName);
+    if (!normalized || targets.has(normalized)) continue;
+    targets.set(normalized, { noticeName: alias.noticeName, stage: alias.stage, primary: false });
+  }
+  return targets;
+}
+
 function evaluateGoods(query, products) {
   const target = normalizeGoodsText(query?.item);
+  const targets = goodsTargets(query);
   const wantedClasses = queryClassCodes(query?.classCode);
   const normalizedProducts = (products || []).map((product) => ({
     classCode: product.classCode ? normalizeClassCode(product.classCode) : null,
@@ -167,17 +198,18 @@ function evaluateGoods(query, products) {
   const classMatched = normalizedProducts.filter(
     (product) => wantedClasses.size === 0 || (product.classCode && wantedClasses.has(product.classCode))
   );
-  const exact = target
-    ? classMatched.filter((product) => product.normalizedName === target)
-    : [];
-  const contains = target
-    ? classMatched.filter(
-        (product) =>
-          product.normalizedName &&
-          product.normalizedName !== target &&
-          (product.normalizedName.includes(target) || target.includes(product.normalizedName))
+  const exact = classMatched.filter((product) => targets.has(product.normalizedName));
+  const contains = classMatched.filter(
+    (product) =>
+      product.normalizedName &&
+      !targets.has(product.normalizedName) &&
+      [...targets.keys()].some(
+        (name) => product.normalizedName.includes(name) || name.includes(product.normalizedName)
       )
-    : [];
+  );
+  // 어느 고시명칭으로 걸렸는지 남긴다 — 「인삼」 품목이 「인삼차」로 잡혔다는 사실이
+  // 대시보드에서 보이지 않으면 숫자만 늘고 근거는 사라진다.
+  const matchedTarget = exact.length ? targets.get(exact[0].normalizedName) : null;
   let method = "unverified";
   let confidence = "unverified";
   let reviewRequired = true;
@@ -204,6 +236,10 @@ function evaluateGoods(query, products) {
     confidence,
     reviewRequired,
     targetNormalized: target || null,
+    // 질의 고시명칭 자신으로 걸렸으면 null이다(종전 동작과 같음).
+    matchedNoticeName: matchedTarget && !matchedTarget.primary ? matchedTarget.noticeName : null,
+    matchedNoticeStage: matchedTarget && !matchedTarget.primary ? matchedTarget.stage : null,
+    aliasCount: targets.size,
     productCount: normalizedProducts.length,
     classMatchedProductCount: classMatched.length,
     evidence: [...exact, ...contains]
@@ -221,7 +257,11 @@ function evaluateGoods(query, products) {
 }
 
 function enrichHit(hit, query, record, fetchedAt) {
-  const applicant = evaluateApplicantRegions(query?.region, record.applicants);
+  // 등록원부 경로(경로 B)도 원물/가공품 구분이 필요하다 — 품목명을 안 넘기면 이 경로만
+  // 조용히 완화된다.
+  const applicant = evaluateApplicantRegions(query?.region, record.applicants, loadAdminCodes(), {
+    itemName: query?.item || "",
+  });
   const goods = evaluateGoods(query, record.products);
   return {
     ...hit,
@@ -240,6 +280,8 @@ function enrichHit(hit, query, record, fetchedAt) {
     goodsMatchVersion: GOODS_MATCH_VERSION,
     goodsReviewRequired: goods.reviewRequired,
     goodsEvidence: goods.evidence,
+    goodsMatchNoticeName: goods.matchedNoticeName,
+    goodsMatchNoticeStage: goods.matchedNoticeStage,
     registryEvidence: {
       registrationNumber: record.registrationNumber || hit.registrationNumber || null,
       applicationNumber: record.applicationNumber || hit.applicationNumber || null,
@@ -345,7 +387,9 @@ function regionEvaluatedHitSources(document, adminList = loadAdminCodes()) {
         }),
         producerOrg: Boolean(row.producerOrg),
       }));
-      const reevaluated = combineApplicantMatches(rows);
+      const reevaluated = combineApplicantMatches(rows, {
+        rawSpecialty: isRawSpecialty(entry.query && entry.query.item),
+      });
       return {
         ...hit,
         applicantRegionMatch: reevaluated.match,

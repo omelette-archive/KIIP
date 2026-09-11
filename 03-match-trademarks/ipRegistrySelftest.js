@@ -210,6 +210,53 @@ async function runIpRegistryTests() {
     );
     assert.strictEqual(coApplicantProducerOutside.match, "unverified");
 
+    // 2026-09-09(사용자): "협동조합은 원물일 경우에만 공동출원인 인정해주고, 가공품인
+    // 특산품의 경우 일반 기업 등 모두 가능해." 원물의 산지 귀속은 생산 주체가 그 지역에
+    // 있어야 뜻이 있으므로 위 producerOrg 규칙까지만 인정하고, 가공품은 기업이 가공·판매
+    // 주체이므로 일반 공동출원인도 인정한다.
+    const firmCoapplicant = [
+      { address: "경상북도 안동시 비공개" },
+      { address: "경상남도 사천시 비공개" },
+    ];
+    const rawFirm = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "신선한 인삼",
+    });
+    // 주소를 전원 읽었고 산지 주체가 없으므로 보류가 아니라 외부로 확정된다 —
+    // 원물 규칙이 미확인을 늘리지 않는다.
+    assert.strictEqual(rawFirm.match, "outside", "원물은 일반 기업 공동출원인만으로 인정하지 않는다");
+    assert.strictEqual(rawFirm.confidence, "coapplicant_outside");
+    const rawProducer = evaluateApplicantRegions(
+      "경상북도 안동시",
+      [{ address: "경상북도 안동시 비공개", producerOrg: true }, { address: "경상남도 사천시 비공개" }],
+      ADMIN_LIST,
+      { itemName: "신선한 인삼" }
+    );
+    assert.strictEqual(rawProducer.match, "inside", "원물이라도 산지 생산자 주체형은 인정한다");
+    assert.strictEqual(rawProducer.confidence, "producer_org_coapplicant_inside");
+    const processedFirm = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "인삼차",
+    });
+    assert.strictEqual(processedFirm.match, "inside", "가공품은 일반 기업 공동출원인도 인정한다");
+    assert.strictEqual(processedFirm.confidence, "coapplicant_inside");
+    // 2026-09-10(사용자): "쌀도 원물이라고 봐야지 — 탈곡 전의 쌀은 지정상품으로 안 쓰니."
+    // 지정상품에 오르는 이름은 이미 유통 형태를 전제하므로, 가공 표지가 없으면 원물이다.
+    const bareName = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "쌀",
+    });
+    assert.strictEqual(bareName.match, "outside", "가공 표지 없는 이름(「쌀」)은 원물로 본다");
+    // 품목명을 아예 못 넘긴 호출부는 조용히 엄격해지지 않도록 완화 쪽으로 남긴다.
+    const noItemName = evaluateApplicantRegions("경상북도 안동시", firmCoapplicant, ADMIN_LIST, {
+      itemName: "",
+    });
+    assert.strictEqual(noItemName.match, "inside", "품목명이 없으면 완화 쪽");
+    // 원물 판정에도 지역 밖 기업만 있으면 결론은 그대로 외부다.
+    assert.strictEqual(
+      evaluateApplicantRegions("강원특별자치도 양양군", firmCoapplicant, ADMIN_LIST, {
+        itemName: "신선한 인삼",
+      }).match,
+      "outside"
+    );
+
     // 2026-09-09(회귀 방지): storageMode=query_facts 재판정 경로(regionEvaluatedHitSources)가
     // evaluateApplicantRegions와 별도로 공동출원인 조합 규칙을 구현하고 있었다 — 한쪽만
     // 고치고 잊어서 재계산 전후 delta가 0으로 나온 사고가 있었다(2026-09-09). 이제
@@ -290,6 +337,36 @@ async function runIpRegistryTests() {
       ).method,
       "normalized_exact"
     );
+    // 2026-09-09(사용자): "품목 1개에 n개의 관련 고시명칭이 있는 거고, 그 중 하나가
+    // 출원되어도 해당 품목은 출원된 것으로." 「신선한 인삼」으로 검색한 품목이라도
+    // 지정상품이 「인삼차」면 인삼을 실제로 쓴 출원이므로 특산품 활용으로 인정한다.
+    const aliasQuery = { item: "신선한 인삼", classCode: "29|30|31|32|33|40" };
+    const aliasHit = evaluateGoods(aliasQuery, [
+      { classCode: "30", designatedProductName: "인삼차" },
+    ]);
+    assert.strictEqual(aliasHit.method, "normalized_exact", "별칭 고시명칭도 완전일치로 인정");
+    assert.strictEqual(aliasHit.matchedNoticeName, "인삼차", "어느 이름으로 걸렸는지 남긴다");
+    assert.strictEqual(aliasHit.matchedNoticeStage, "processed");
+    // 질의 고시명칭 자신으로 걸리면 종전과 같이 별칭 정보는 비어 있다.
+    const selfHit = evaluateGoods(aliasQuery, [
+      { classCode: "31", designatedProductName: "신선한 인삼" },
+    ]);
+    assert.strictEqual(selfHit.method, "normalized_exact");
+    assert.strictEqual(selfHit.matchedNoticeName, null);
+    // 별칭 세트가 없는 품목은 종전대로 고시명칭 하나와만 대조한다 — 확대 범위는
+    // 데이터 파일이 정하고, 코드가 임의로 넓히지 않는다.
+    const noAlias = evaluateGoods({ item: "신선한 유자", classCode: "30" }, [
+      { classCode: "30", designatedProductName: "유자차" },
+    ]);
+    // 「신선한유자」와 「유자차」는 서로 포함 관계도 아니라 류만 맞는 후보로 남는다 —
+    // 별칭 세트가 메우려는 구멍이 바로 이것이다.
+    assert.strictEqual(noAlias.method, "class_only", "별칭 없는 품목은 류만 맞는 후보로 남는다");
+    assert.strictEqual(noAlias.matchedNoticeName, null);
+    // 류가 다르면 여전히 안 센다 — 별칭은 이름을 넓히는 것이지 류 대조를 없애지 않는다.
+    const wrongClass = evaluateGoods({ item: "신선한 인삼", classCode: "31" }, [
+      { classCode: "30", designatedProductName: "인삼차" },
+    ]);
+    assert.strictEqual(wrongClass.method, "mismatch");
     const containsResult = evaluateGoods(
         { item: "미가공사과", classCode: "31" },
         [{ classCode: "31", designatedProductName: "미가공사과(강원도양양군에서생산된사과에한함)" }]

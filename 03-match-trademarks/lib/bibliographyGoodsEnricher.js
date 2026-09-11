@@ -52,6 +52,8 @@ function applyBibliographyGoods(hit, query, designatedGoods, fetchedAt) {
     goodsMatchVersion: GOODS_MATCH_VERSION,
     goodsReviewRequired: goods.reviewRequired,
     goodsEvidence: goods.evidence,
+    goodsMatchNoticeName: goods.matchedNoticeName,
+    goodsMatchNoticeStage: goods.matchedNoticeStage,
     goodsSource: "bibliography",
     bibliographyGoodsFetchedAt: fetchedAt,
   };

@@ -850,9 +850,25 @@ async function run() {
       // classCode는 공식 분류가 없어 null(식품 기본류 fallback).
       assert.deepStrictEqual(plan.map((row) => row.status), ["planned", "planned"]);
       assert.strictEqual(plan[0].query.item, "신선한 사과");
-      assert.strictEqual(plan[0].query.classCode, "31");
+      // 2026-09-09(사용자): "품목 1개에 n개의 관련 고시명칭이 있는 거고, 그 중 하나가
+      // 출원되어도 해당 품목은 출원된 것으로." 별칭 세트가 있는 품목은 세트가 걸쳐 있는
+      // 류까지 남긴다 — 31류만 남기면 「사과주스」(32류)·「사과주」(33류) 출원이 수집
+      // 단계에서 사라진다. 검색어는 그대로 하나여서 API 호출 수는 늘지 않는다.
+      assert.strictEqual(plan[0].query.classCode, "29|30|31|32|33");
       assert.strictEqual(plan[1].query.item, "하회탈");
       assert.strictEqual(plan[1].query.classCode, null);
+      // 별칭 세트가 없는 품목은 종전대로 자기 류만 쓴다 — 확대 범위는 데이터 파일이
+      // 정하고, 코드가 임의로 넓히지 않는다.
+      fs.writeFileSync(
+        normalizedInputPath,
+        [
+          "sido,sigungu,rawItemName,itemName,noticeName,niceClass,excluded,status",
+          "전라남도,고흥군,고흥유자,유자,신선한 유자,31,false,ok",
+        ].join("\n") + "\n",
+        "utf8"
+      );
+      const noAliasPlan = buildBatchPlan(readNormalizedCsv(normalizedInputPath), {});
+      assert.strictEqual(noAliasPlan[0].query.classCode, "31");
     } finally {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
@@ -1228,6 +1244,16 @@ async function run() {
       <nationalCode>KR</nationalCode><applicantCode>456</applicantCode><seq>1</seq>
       </trademarkApplicantInfo></items></body></response>`);
     assert.strictEqual(producerParsed.applicants[0].producerOrg, true, "<nameKoreanLong>이 영농조합이면 producerOrg=true");
+    // 2026-09-09(사용자 "넣어줘"): 목록이 농업 쪽으로만 채워져 있어 수산 산지 주체가 빠져
+    // 있었다. 법정 생산자 조직 셋을 넣었고, 일반 회사명은 여전히 걸리지 않아야 한다.
+    // (한 번 넣었다가 #193 머지가 옛 기준으로 덮어써 사라졌다 — 테스트로 다시 못박는다.)
+    const { isProducerLikeApplicant } = require("./lib/producerApplicant");
+    for (const name of ["완도전복영어조합법인", "기장어업회사법인", "구룡포어촌계"]) {
+      assert.strictEqual(isProducerLikeApplicant(name), true, `${name}은 생산자 주체형이어야 함`);
+    }
+    for (const name of ["주식회사 바다유통", "㈜한국수산", "대한수산물유통 주식회사"]) {
+      assert.strictEqual(isProducerLikeApplicant(name), false, `${name}은 생산자 주체형이 아니어야 함`);
+    }
 
     let requestedUrl = null;
     let applicantRequestCount = 0;
