@@ -738,6 +738,59 @@ async function run() {
     ok("완료 쿼리는 기본적으로 영구 재사용되지만, refreshCompleteAfterDays를 지정하면 기한이 지난 뒤 다시 수집해 신규 출원을 반영하고 예전 hit도 보존함");
   }
 
+  console.log("9-2c) runBatch — 새로고침이 예산 부족으로 한 페이지도 못 가져오면 complete 지위를 잃지 않음(2026-09-15 회귀)");
+  {
+    // #137 재발: initial=null로 처음부터 다시 수집하다 요청 예산이 바닥나면(request_budget)
+    // collectSearchPages는 페이지를 하나도 못 가져온 채 자기 기본값("partial")을 그대로
+    // 돌려준다. mergeRefreshedCollection이 이걸 spread로 덮어쓰면, hits는 그대로인데(새로
+    // 찾은 게 없을 뿐 잃은 것도 없음) 상태만 "complete"→"partial"로 떨어진다. 한 파이프라인
+    // 실행에서 이렇게 수백 개가 한꺼번에 떨어져 verifyArchiveIntegrity가 잡아냈다.
+    const rows = [
+      { sido: "충청남도", sigungu: "금산군", rawItemName: "금산인삼", noticeName: "인삼", niceClass: "31", status: "ok" },
+    ];
+    const firstRunClient = {
+      trademarkSearch: async () => ({
+        totalCount: 1,
+        hits: [{ applicationNumber: "2000000001", title: "기존상표", classificationCode: "31" }],
+      }),
+    };
+    const checkpointQueries = {};
+    const first = await runBatch(rows, firstRunClient, {
+      pageNo: 1, numOfRows: 10, maxPages: 3, maxHitsPerQuery: 10, maxRequests: 5, concurrency: 1,
+      checkpointQueries, saveCheckpoint: () => {},
+    });
+    assert.strictEqual(first.results[0].collectionStatus, "complete");
+    const [queryKey] = Object.keys(checkpointQueries);
+    checkpointQueries[queryKey].fetchedAt = new Date(Date.now() - 40 * 86400000).toISOString();
+
+    // 두 번째 실행: 새로고침 대상이지만 요청 예산이 0이라 API를 한 번도 못 부른다
+    // (SERVICE_ACCESS_DENIED로 회로차단된 상황과 동일한 결과 모양).
+    const starvedClient = {
+      trademarkSearch: async () => {
+        throw new Error("호출되면 안 됨 — 예산이 0이어야 함");
+      },
+    };
+    const refreshed = await runBatch(rows, starvedClient, {
+      pageNo: 1, numOfRows: 10, maxPages: 3, maxHitsPerQuery: 10, maxRequests: 0, concurrency: 1,
+      resume: true,
+      refreshCompleteAfterDays: 14,
+      checkpointQueries,
+      saveCheckpoint: () => {},
+    });
+    assert.strictEqual(refreshed.requestCountThisRun, 0, "예산이 0이면 API를 한 번도 부르면 안 됨");
+    assert.strictEqual(
+      refreshed.results[0].collectionStatus,
+      "complete",
+      "새로고침이 한 페이지도 못 가져와도 예전 complete 지위를 잃으면 안 됨"
+    );
+    assert.deepStrictEqual(
+      refreshed.results[0].hits.map((hit) => hit.applicationNumber),
+      ["2000000001"],
+      "새로고침이 새 hit를 못 찾아도 예전 hit는 그대로 남아야 함"
+    );
+    ok("새로고침이 예산 부족·접근 거부로 한 페이지도 못 가져와도 complete 지위와 예전 hit를 그대로 보존함");
+  }
+
   console.log("9-3) 부분 체크포인트 — 상한을 늘려 이어서 더 깊게 재개");
   {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), "kipris-checkpoint-"));

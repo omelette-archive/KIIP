@@ -416,8 +416,25 @@ function mergeRefreshedCollection(saved, refreshed, maxHitsPerQuery) {
   const capped = Number.isFinite(maxHitsPerQuery) && merged.length > maxHitsPerQuery
     ? merged.slice(0, maxHitsPerQuery)
     : merged;
+  // 2026-09-15(#137 재발): 새로고침이 처음부터(initial=null) 다시 수집하다 요청 예산이나
+  // 접근 거부로 한 페이지도 못 가져오면(fetchedCount=0) collectSearchPages는 자기 자신의
+  // 기본값("partial")을 그대로 돌려준다. 예전엔 이걸 spread(...refreshed)로 덮어써서
+  // "complete"였던 쿼리가 hits는 그대로인 채 상태만 "partial"로 떨어졌다 — 같은 실행에서
+  // 588개가 한꺼번에 이렇게 떨어져 verifyArchiveIntegrity가 잡아냈다(complete 838→250).
+  // hits는 합집합이라 안 줄었으니(새로고침이 새 hit를 하나도 못 찾았을 뿐), 새로고침
+  // 자체가 끝까지 가서 "complete"를 새로 확인했을 때만 그 값을 쓰고, 아니면 예전
+  // "complete" 지위를 유지한다 — 정보가 늘거나 그대로일 뿐 줄어든 적이 없기 때문이다.
+  const collectionStatus =
+    refreshed.collectionStatus === "complete" ? "complete" : saved.collectionStatus;
   return {
     ...refreshed,
+    collectionStatus,
+    stopReason: collectionStatus === "complete" && refreshed.collectionStatus !== "complete"
+      ? saved.stopReason
+      : refreshed.stopReason,
+    pages: collectionStatus === "complete" && refreshed.collectionStatus !== "complete"
+      ? { ...refreshed.pages, hasMore: false }
+      : refreshed.pages,
     hits: capped,
     keywordTotalCount: Math.max(Number(refreshed.keywordTotalCount) || 0, Number(saved.keywordTotalCount) || 0),
   };
