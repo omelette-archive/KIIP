@@ -453,4 +453,28 @@ console.log("8) 공개 뷰에 collectedCount + cap 표시(#137) — ④의 outpu
   ok("전국 검색 결과가 저장 상한에 걸린 품목만 collectedCount/cap을 노출, 나머지는 null");
 }
 
+console.log("9) 회사·법인명 등 품목이 아닌 이름은 실제로 스냅샷에서 빠져야 함(2026-09-18 회귀)");
+{
+  // assertInputs가 excludedRows 필터링 결과를 지역 변수에만 만들고 반환하지 않아,
+  // 호출부(buildDashboardSnapshot)는 원래(미필터) analysis를 계속 썼다 — 2026-09-09
+  // 도입된 item-exclusions-v1.json 필터가 이 시점부터 실제로는 한 번도 동작한 적이
+  // 없었다(라이브 스냅샷에 제외 대상 74건 전량 잔존, #195 조사 중 발견).
+  const excludedInput = fixture();
+  const orgRow = bucket({
+    sido: "경상남도",
+    sigungu: "진주시",
+    region: "경상남도 진주시",
+    itemName: "우엉마영농조합법인",
+    noticeName: "우엉마영농조합법인",
+    niceClass: null,
+  });
+  excludedInput.analysis.regionItems = [...excludedInput.analysis.regionItems, orgRow];
+  excludedInput.analysis.regions = [...excludedInput.analysis.regions, { region: "경상남도 진주시", sido: "경상남도", sigungu: "진주시" }];
+  const excludedSnapshot = buildDashboardSnapshot(excludedInput, { mode: "sample", generatedAt: "2026-09-18T00:00:00Z" });
+  const allItemNames = excludedSnapshot.regions.flatMap((region) => region.items.map((item) => item.itemName));
+  assert.ok(!allItemNames.includes("우엉마영농조합법인"), "item-exclusions-v1.json에 있는 이름은 스냅샷에 남으면 안 됨");
+  assert.ok(allItemNames.includes("사과"), "정상 품목은 그대로 유지되어야 함");
+  ok("item-exclusions-v1.json에 걸리는 이름이 buildDashboardSnapshot 결과에서 실제로 빠짐");
+}
+
 console.log("\n모든 자체 테스트 통과");

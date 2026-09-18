@@ -295,10 +295,17 @@ function assertInputs(analysis, gap, strategy) {
   ) {
     throw new Error("⑤ inputAnalysisVersion과 ④ analysisVersion이 일치하지 않습니다.");
   }
+  // 2026-09-18(#195 조사 중 발견): 이 함수는 excludedRows가 있으면 지역 아래에서
+  // analysis를 필터링된 새 객체로 재할당했지만, 그 결과를 반환하지 않아 호출부
+  // (buildDashboardSnapshot)가 원래(미필터) analysis를 그대로 계속 썼다 — 2026-09-09
+  // 도입된 "회사·법인·시설명 삭제" 요구사항이 이 시점부터 한 번도 실제로 동작한 적이
+  // 없었다(74건 전량 라이브 스냅샷에 그대로 남아있었음, reconcile의 되살리기 버그와는
+  // 별개의 더 근본적인 원인). 필터링된 analysis를 반환해 호출부가 실제로 쓰게 한다.
+  return analysis;
 }
 
 function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
-  assertInputs(analysis, gap, strategy);
+  analysis = assertInputs(analysis, gap, strategy);
   const mode = options.mode || "sample";
   if (!new Set(["sample", "full"]).has(mode)) {
     throw new Error("mode는 sample 또는 full이어야 합니다.");
