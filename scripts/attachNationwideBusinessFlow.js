@@ -73,6 +73,12 @@ function attachNationwideBusinessFlow(snap, flow) {
       if (includeRegion) confirmedCount++;
       item.businessFlow = {
         totalCount: flowItem.totalCount,
+        // 2026-09-18: totalCount는 KIPRIS 단어검색 API가 보고하는 전국 원시 매치 수다.
+        // "무"·"김"·"감"처럼 짧고 흔한 음절은 무관한 상표까지 다 걸려 totalCount가
+        // 수백만까지 치솟는다("무" 2,818,248 vs 실제 수집 1,500) — 이 값으로 "다출원
+        // 특산품" 순위를 매기면 노이즈가 1위를 차지한다. fetchedCount(실제 수집,
+        // maxHits 상한)를 함께 넘겨 화면에서 totalCount 대신 쓸 수 있게 한다.
+        fetchedCount: flowItem.fetchedCount,
         hasRegionalSignal: includeRegion,
         stages: {
           raw: stageSummary(flowItem.stages.raw, includeRegion),

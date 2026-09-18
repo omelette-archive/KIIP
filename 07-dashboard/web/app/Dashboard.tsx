@@ -13,7 +13,7 @@ type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceI
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
 type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[]; source?: "designated_goods" | "trademark_title" } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
-type NationwideFlow = { totalCount: number; hasRegionalSignal?: boolean; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
+type NationwideFlow = { totalCount: number; fetchedCount?: number; hasRegionalSignal?: boolean; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; localApplicantCount?: Metric; producerApplicantShare?: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
 type Region = { regionCode: string | null; regionCodeStatus: string; region: string; sido: string | null; sigungu: string | null; dataState: string; items: Item[] };
 type Source = { sourceId: string; sourceLabel: string | null; sourceContractVersion: string | null; sourceFetchedAt: string | null; sourceUrl: string | null; sourceLastVerifiedAt: string | null };
@@ -1754,10 +1754,19 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
   const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
   const hasExamples = (["raw", "processed", "service"] as const).some((key) => flow.stages[key].examples && (flow.stages[key].examples!.representative.length || flow.stages[key].examples!.unusual.length));
   const hasDesignatedGoods = (["raw", "processed", "service"] as const).some((key) => flow.stages[key].examples?.source === "designated_goods");
+  // 2026-09-18: "전체" 기준을 totalCount(전국 검색 원시 매치 수)에서 fetchedCount(실제
+  // 수집한 표본)로 바꾼다. "무" 같은 한 글자 품목명은 무관한 상표까지 다 걸려 totalCount가
+  // 2,818,248까지 치솟는데 실제 수집·분석 표본은 1,500건뿐이라, "전체 2,818,248건 중
+  // 분류 가능 874건"은 오독을 부른다. totalCount가 수집 표본보다 훨씬 크면(노이즈가
+  // 많은 짧은 이름) 그 사실만 괄호로 짧게 덧붙인다.
+  const analyzedBase = flow.fetchedCount ?? flow.totalCount;
+  const rawMatchNote = flow.fetchedCount != null && flow.totalCount > flow.fetchedCount * 3
+    ? `(전국 검색은 ${number(flow.totalCount)}건 · 상위 ${number(analyzedBase)}건만 수집) `
+    : "";
   return (
     <section className="nationwide-flow-card">
       <div className="section-heading"><div><h2>{itemLabel} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
-      <p className="nationwide-flow-reach">현재 <strong>{furthestStage}</strong> 상표 활동이 확인됩니다 · 전체 {number(flow.totalCount)}건 중 단계 분류 가능 {number(classified)}건</p>
+      <p className="nationwide-flow-reach">현재 <strong>{furthestStage}</strong> 상표 활동이 확인됩니다 · {rawMatchNote}수집 {number(analyzedBase)}건 중 단계 분류 가능 {number(classified)}건</p>
       <div className="nationwide-flow-stages">
         {(["raw", "processed", "service"] as const).map((key, index) => { const stage = flow.stages[key]; return <Fragment key={key}>
           {index > 0 && <i className="nationwide-flow-arrow" aria-hidden="true">→</i>}
@@ -2694,7 +2703,13 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
     // 전국 흐름(businessFlow)이 아직 스냅샷에 없어도(현재 프로덕션 상태, #137 회귀) 화면을
     // 막지 않는다 — 지금 있는 데이터(지역 확인 출원·광역 비중·브리핑·추이)로 먼저 보여주고,
     // 흐름 배치가 반영되면 단계별 카드·지정상품 예시·확장 제안이 그 위에 붙는다.
-    return [...rows.values()].sort((a, b) => ((b.flow?.totalCount || 0) - (a.flow?.totalCount || 0)) || b.trademarks - a.trademarks);
+    //
+    // 2026-09-18: 정렬을 flow.totalCount(전국 검색 원시 매치 수) 기준에서 지역 확인
+    // 출원(trademarks) 기준으로 바꾼다. "무"·"김"·"감"처럼 짧고 흔한 음절은 무관한
+    // 상표까지 다 걸려 totalCount가 수백만까지 치솟아("무" 2,818,248건, 실제 수집은
+    // 1,500건 상한) "다출원 특산품" 1~2위를 노이즈가 차지했다. trademarks는 출원인
+    // 주소로 그 지역이 확인된 확정 건수라 짧은 이름이라고 부풀지 않는다.
+    return [...rows.values()].sort((a, b) => b.trademarks - a.trademarks);
   }, [regionalRegions]);
   const strategyFlowFiltered = useMemo(() => {
     const keyword = strategyItemQuery.trim().toLocaleLowerCase("ko-KR");
@@ -3364,7 +3379,7 @@ const STRATEGY_CHIP_LIMIT = 12;
             <div className="strategy-picker-group">
             <span className="strategy-picker-label">다출원 특산품 {number(STRATEGY_CHIP_LIMIT)}선</span>
             <div className="strategy-item-chips" role="group" aria-label="다출원 특산품 선택">
-              {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.flow ? row.flow.totalCount : row.trademarks)}</small></button>)}
+              {strategyFlowRows.slice(0, STRATEGY_CHIP_LIMIT).map((row) => <button type="button" key={row.name} className={strategySelectedFlow?.name === row.name ? "active" : ""} onClick={() => { setStrategyItemQuery(""); setStrategyItem(row.name); }}>{row.name}<small>{number(row.trademarks)}</small></button>)}
             </div>
             </div>
             <div className="strategy-picker-inputs">

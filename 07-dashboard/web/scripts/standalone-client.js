@@ -595,6 +595,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 단계 성격을 함께 표시한다. 단계별 대표·특이 지정상품 예시는 상표 단어검색 API에 지정상품이
     // 없어 별도 등록원부 수집이 끝난 뒤 붙인다(analyzeNationwideFlow.js 재실행 필요).
     const furthestStage = service.count > 0 ? "서비스·확장까지" : processed.count > 0 ? "가공품까지" : "원물 단계";
+    // 2026-09-18: "전체" 기준을 totalCount(전국 검색 원시 매치 수)에서 fetchedCount(실제
+    // 수집한 표본)로 바꾼다. "무" 같은 한 글자 품목명은 무관한 상표까지 다 걸려 totalCount가
+    // 2,818,248까지 치솟는데 실제 수집·분석 표본은 1,500건뿐이다. totalCount가 수집
+    // 표본보다 훨씬 크면(노이즈가 많은 짧은 이름) 그 사실만 괄호로 짧게 덧붙인다.
+    const analyzedBase = flow.fetchedCount != null ? flow.fetchedCount : flow.totalCount;
+    const rawMatchNote = flow.fetchedCount != null && flow.totalCount > flow.fetchedCount * 3
+      ? `(전국 검색은 ${number(flow.totalCount)}건 · 상위 ${number(analyzedBase)}건만 수집) `
+      : "";
     const hasExamples = ["raw", "processed", "service"].some((key) => { const eg = flow.stages[key].examples; return eg && ((eg.representative || []).length || (eg.unusual || []).length); });
     const hasDesignatedGoods = ["raw", "processed", "service"].some((key) => flow.stages[key].examples && flow.stages[key].examples.source === "designated_goods");
     const stagesHtml = ["raw", "processed", "service"].map((key, index) => {
@@ -614,7 +622,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const originsHtml = Array.isArray(origins) && origins.length ? `<p class="nationwide-flow-origins"><strong>주요 원산지</strong> ${esc(origins.map(displayRegionName).join(", "))}</p>` : "";
     return `<section class="nationwide-flow-card">
       <div class="section-heading"><div><h2>${esc(itemLabel)} 비즈니스 확장 흐름</h2></div><span>전국 상표 검색 · 참고 지표</span></div>
-      <p class="nationwide-flow-reach">현재 <strong>${furthestStage}</strong> 상표 활동이 확인됩니다 · 전체 ${number(flow.totalCount)}건 중 단계 분류 가능 ${number(classified)}건</p>
+      <p class="nationwide-flow-reach">현재 <strong>${furthestStage}</strong> 상표 활동이 확인됩니다 · ${rawMatchNote}수집 ${number(analyzedBase)}건 중 단계 분류 가능 ${number(classified)}건</p>
       <div class="nationwide-flow-stages">${stagesHtml}</div>
       ${chainHtml}
       ${donutsHtml}
@@ -1634,7 +1642,12 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     }
     // 전국 흐름(businessFlow)이 아직 스냅샷에 없어도 화면을 막지 않는다 — 지금 있는
     // 데이터로 먼저 보여주고, 배치가 반영되면 단계별 카드가 그 위에 붙는다.
-    return [...rows.values()].sort((a, b) => ((b.flow ? b.flow.totalCount : 0) - (a.flow ? a.flow.totalCount : 0)) || b.trademarks - a.trademarks);
+    //
+    // 2026-09-18: 정렬을 flow.totalCount(전국 검색 원시 매치 수) 기준에서 지역 확인
+    // 출원(trademarks) 기준으로 바꾼다. "무"·"김"·"감"처럼 짧고 흔한 음절은 무관한
+    // 상표까지 다 걸려 totalCount가 수백만까지 치솟아 "다출원 특산품" 1~2위를 노이즈가
+    // 차지했다. trademarks는 출원인 주소로 그 지역이 확인된 확정 건수라 부풀지 않는다.
+    return [...rows.values()].sort((a, b) => b.trademarks - a.trademarks);
   }
   // 2026-09-08(사용자): "쌀로 어디까지 비즈니스를 확장할 수 있을까? 토마토는? 이색적인
   // 비즈니스는? 서비스나 지역 창업은?" — 이 네 질문에 답하는 확장 경로 진단 보고서.
@@ -2386,7 +2399,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const filtered = keyword ? all.filter((row) => row.name.toLocaleLowerCase("ko-KR").includes(keyword) || (row.category?.label || "").toLocaleLowerCase("ko-KR").includes(keyword)) : all;
     const selected = filtered.find((row) => row.name === state.strategyItem) || filtered[0] || null;
     // 목록은 출원이 많은 순이다(strategyFlowRows). 무슨 기준의 토글인지 이름으로 밝힌다.
-    const chips = `<div class="strategy-picker-group"><span class="strategy-picker-label">다출원 특산품 ${number(STRATEGY_CHIP_LIMIT)}선</span><div class="strategy-item-chips" role="group" aria-label="다출원 특산품 선택">${all.slice(0, STRATEGY_CHIP_LIMIT).map((row) => `<button type="button" data-strategy-item="${esc(row.name)}" class="${selected && selected.name === row.name ? "active" : ""}">${esc(row.name)}<small>${number(row.flow ? row.flow.totalCount : row.trademarks)}</small></button>`).join("")}</div></div>`;
+    const chips = `<div class="strategy-picker-group"><span class="strategy-picker-label">다출원 특산품 ${number(STRATEGY_CHIP_LIMIT)}선</span><div class="strategy-item-chips" role="group" aria-label="다출원 특산품 선택">${all.slice(0, STRATEGY_CHIP_LIMIT).map((row) => `<button type="button" data-strategy-item="${esc(row.name)}" class="${selected && selected.name === row.name ? "active" : ""}">${esc(row.name)}<small>${number(row.trademarks)}</small></button>`).join("")}</div></div>`;
     // 지역을 함께 고르면 보고서에 ⑤ 지역 관점 절이 붙는다.
     const regionPicker = `<label class="search-field strategy-region-select"><span class="sr-only">지역 선택</span><select id="strategy-region"><option value="">지역 선택 안 함 (전국 기준)</option>${strategyProvinces().map((province) => `<option value="${esc(province)}" ${state.strategyRegion === province ? "selected" : ""}>${esc(displayRegionName(province))}</option>`).join("")}</select></label>`;
     const picker = `<div class="strategy-item-picker">${chips}<div class="strategy-picker-inputs"><label class="search-field strategy-item-search"><span class="sr-only">품목 직접 검색</span><input type="search" id="strategy-item-search" value="${esc(state.strategyItemQuery)}" placeholder="품목명 직접 입력 · 전체 ${all.length}개 · 엔터로 검색"></label>${regionPicker}</div></div>`;
