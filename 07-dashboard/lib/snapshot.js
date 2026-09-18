@@ -280,6 +280,16 @@ function assertInputs(analysis, gap, strategy) {
   const excludedRows = analysis.regionItems.filter(isDropped);
   if (excludedRows.length > 0) {
     analysis = { ...analysis, regionItems: analysis.regionItems.filter((row) => !isDropped(row)) };
+    // 2026-09-18(#196): analysis.regionItems만 거르고 gap.rows/gap.ranking·
+    // strategy.briefings는 그대로 두면 두 가지 문제가 생긴다 — (1) 아래 조인 검증이
+    // "⑤ 행을 ④ 지역×품목에 연결할 수 없습니다"로 죽는다(제외된 행이 gap.rows에는
+    // 남아있는데 analysisRows에는 없어서 — 실제로 "우리가"/함양군에서 재현됨). (2)
+    // gap.ranking·strategy.briefings는 region.items[]를 거치지 않고
+    // snapshot.rankings/snapshot.briefings에 직접 들어가서(843·862번 줄), region.items
+    // 에서는 빠진 제외 대상이 그 목록에는 그대로 남는다. 세 군데 다 같은 기준으로
+    // 걸러야 "화면 어디에도 안 보인다"가 실제로 성립한다.
+    gap = { ...gap, rows: gap.rows.filter((row) => !isDropped(row)), ranking: gap.ranking.filter((row) => !isDropped(row)) };
+    strategy = { ...strategy, briefings: strategy.briefings.filter((row) => !isDropped(row)) };
   }
   if (
     strategy.sourceScoreVersion &&
@@ -301,11 +311,11 @@ function assertInputs(analysis, gap, strategy) {
   // 도입된 "회사·법인·시설명 삭제" 요구사항이 이 시점부터 한 번도 실제로 동작한 적이
   // 없었다(74건 전량 라이브 스냅샷에 그대로 남아있었음, reconcile의 되살리기 버그와는
   // 별개의 더 근본적인 원인). 필터링된 analysis를 반환해 호출부가 실제로 쓰게 한다.
-  return analysis;
+  return { analysis, gap, strategy };
 }
 
 function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
-  analysis = assertInputs(analysis, gap, strategy);
+  ({ analysis, gap, strategy } = assertInputs(analysis, gap, strategy));
   const mode = options.mode || "sample";
   if (!new Set(["sample", "full"]).has(mode)) {
     throw new Error("mode는 sample 또는 full이어야 합니다.");

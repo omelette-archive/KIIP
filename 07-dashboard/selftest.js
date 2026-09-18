@@ -477,4 +477,32 @@ console.log("9) 회사·법인명 등 품목이 아닌 이름은 실제로 스�
   ok("item-exclusions-v1.json에 걸리는 이름이 buildDashboardSnapshot 결과에서 실제로 빠짐");
 }
 
+console.log("10) 제외 대상이 gap.rows/gap.ranking·strategy.briefings에도 있으면 조인 검증이 죽으면 안 됨(#196 회귀)");
+{
+  // #196 실측: "우리가"(경상남도 함양군)가 analysis.regionItems에서는 제외됐는데
+  // gap.rows/strategy.briefings에는 그대로 남아있어 "⑤ 행을 ④ 지역×품목에 연결할 수
+  // 없습니다"로 07_snapshot 자체가 죽었다(9번 테스트를 추가하면서 analysis만 거르고
+  // gap/strategy는 안 걸렀을 때 새로 드러난 회귀).
+  const excludedInput = fixture();
+  const orgRow = bucket({
+    sido: "경상남도",
+    sigungu: "함양군",
+    region: "경상남도 함양군",
+    itemName: "우리가",
+    noticeName: "우리가",
+    niceClass: null,
+  });
+  excludedInput.analysis.regionItems = [...excludedInput.analysis.regionItems, orgRow];
+  excludedInput.analysis.regions = [...excludedInput.analysis.regions, { region: "경상남도 함양군", sido: "경상남도", sigungu: "함양군" }];
+  // ⑤·⑥은 04의 모든 행(제외 대상 포함)을 그대로 옮겨 적는 게 정상 동작이다 — 필터링은
+  // ⑦(buildDashboardSnapshot)의 책임이라 5·6단계 산출물엔 우리가가 남아있는 게 맞다.
+  excludedInput.gap.rows = [...excludedInput.gap.rows, { ...orgRow, representative: false, gapScore: null, gapReason: "대표 특산품 아님" }];
+  excludedInput.strategy.briefings = [...excludedInput.strategy.briefings, { region: orgRow.region, itemName: orgRow.itemName, niceClass: null, gapScore: null, isGapAlert: false, sentences: [], evidence: null }];
+  assert.doesNotThrow(
+    () => buildDashboardSnapshot(excludedInput, { mode: "sample", generatedAt: "2026-09-18T00:00:00Z" }),
+    "제외 대상이 ⑤·⑥ 산출물에 남아있어도 ⑦ 조인 검증이 죽으면 안 됨"
+  );
+  ok("제외 대상은 analysis·gap·strategy 세 군데 모두에서 같은 기준으로 걸러 조인 검증이 안 죽음");
+}
+
 console.log("\n모든 자체 테스트 통과");
