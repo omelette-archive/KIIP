@@ -612,6 +612,9 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         ? {
             templateVersion: strategy.templateVersion || null,
             isGapAlert: Boolean(briefing.isGapAlert),
+            // 2026-09-18(#12/#29 재검토): isGapAlert를 켠 게 "미개척"(unclaimed)인지
+            // "저효율"(low_conversion)인지 — 대시보드가 배지·문구를 다르게 낼 수 있게 보존.
+            gapAlertKind: briefing.gapAlertKind || null,
             sentences: Array.isArray(briefing.sentences) ? briefing.sentences : [],
             evidence: briefing.evidence || null,
             aiReviewApplied: false,
@@ -855,6 +858,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
     itemName: clean(row.itemName) || null,
     templateVersion: strategy.templateVersion || null,
     isGapAlert: Boolean(row.isGapAlert),
+    gapAlertKind: row.gapAlertKind || null,
     sentences: Array.isArray(row.sentences) ? row.sentences : [],
     evidence: row.evidence || null,
     aiReviewApplied: false,

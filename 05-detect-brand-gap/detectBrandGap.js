@@ -86,6 +86,10 @@ function detectGaps(analysis, options = {}) {
       partialQueryCount: bucket.partialQueryCount || 0,
       regionMatchVerified: regionalMetricAvailable(bucket),
       localApplicantShare: bucket.localApplicantShare,
+      // 2026-09-18: outsideShareSentence(06)이 localApplicantShare만으로 판단하면 511건 중
+      // 71%가 발동한다(실측) — 생산자단체가 지역 밖 주소로 등록됐을 뿐인 93건까지 "외부
+      // 상업 선점"으로 오분류하기 때문. producerApplicantShare를 같이 넘겨 06에서 교차검증한다.
+      producerApplicantShare: bucket.producerApplicantShare,
       goodsMatchCounts: bucket.goodsMatchCounts || null,
       goodsConfirmedHitCount: bucket.goodsConfirmedHitCount || 0,
       goodsReviewRequiredHitCount: bucket.goodsReviewRequiredHitCount || 0,
@@ -126,6 +130,14 @@ function detectGaps(analysis, options = {}) {
   if (nonRepresentativeCount > 0) {
     warnings.push(
       `${nonRepresentativeCount}개 지역×품목은 대표 특산품 판정 기준을 충족하지 않아 순위에서 제외됨.`
+    );
+  }
+  const lowConversionCount = rows.filter((row) => row.lowConversionAlert).length;
+  if (lowConversionCount > 0) {
+    warnings.push(
+      `${lowConversionCount}개 지역×품목은 상표 출원 활동은 충분한데(5건 이상) 등록률이 낮습니다(30% 미만) ` +
+        "— gapScore(공백 알림)와는 다른 신호입니다(#12/#29 이후 재검토, 2026-09-18): gapScore는 " +
+        "활동량이 포화되면(5건 이상) 등록률과 무관하게 0.5를 넘을 수 없어 이 문제를 못 잡습니다."
     );
   }
 

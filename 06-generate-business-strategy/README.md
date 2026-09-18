@@ -27,7 +27,16 @@
 `lib/templates.js`가 project-plan.md의 예시 문장 두 개를 고정 템플릿화한다.
 
 - **공백 문장** ("○○군은 대표 특산품 대비 상표 출원이 부족하여..."): ⑤의 `gapScore`가
-  `GAP_ALERT_THRESHOLD`(예시값 `0.5`) 이상이면 공백 문장, 아니면 "양호함" 문장.
+  `GAP_ALERT_THRESHOLD`(예시값 `0.5`) 이상이면 공백 문장, `lowConversionAlert`가 켜져
+  있으면(아래 참고) "양호함" 대신 중립 문장, 둘 다 아니면 "양호함" 문장.
+- **저효율 문장(2026-09-18 신규)** ("○○군은 대표 특산품 상표 출원은 활발하지만 등록률이
+  낮아..."): ⑤의 `lowConversionAlert`가 `true`일 때만 만든다 — `gapScore`는 활동량이
+  포화(≥5건)되면 등록률과 무관하게 절대 0.5를 못 넘어서(수학적으로 증명됨, 05 README 참고)
+  "출원은 활발한데 등록이 안 되는" 문제를 놓친다. 이 문장이 그 사각지대를 메운다.
+  "미개척"(공백 문장)과 "저효율"은 처방이 다르므로(전자는 신규 출원 권장, 후자는 상표
+  명세·전략 보완 지원) `isGapAlert = gapScore≥임계값 OR lowConversionAlert`로 알림 자체는
+  합치되, `gapAlertKind`(`"unclaimed" | "low_conversion" | null`)로 어느 신호인지 구분해
+  둔다.
 - **지역외 비중 문장** ("△△시는 지역 출원인 비중이 낮아..."): ⑤의
   `regionMatchVerified`가 `true`이고 지역 외 비중(`1 - localApplicantShare`)이
   `OUTSIDE_SHARE_ALERT_THRESHOLD`(예시값 `0.5`) 이상일 때만 만든다. **미검증이면 이 문장
@@ -37,9 +46,20 @@
   동일 값) — 판정 조건(임계값 비교)에만 역수(`1 - localApplicantShare`)를 쓰고, 문장에
   별도로 계산한 값을 새로 노출하지 않는다(UI 검토 #136 06번, 서로 다른 지표처럼 보이는
   문제 방지).
+  - **2026-09-18 재검토**: 라이브 스냅샷 511행 실측 결과 이 조건이 **71.2%**에서 발동해
+    변별력이 없었다(`localApplicantShare` 중앙값이 4.6%라 "지역 외 비중 높음"이 사실상
+    기본값). `producerApplicantShare`(생산자단체·지자체 판정)가
+    `OUTSIDE_SHARE_PRODUCER_LED_THRESHOLD`(`0.5`) 이상이면 "지역 밖 주소로 등록된
+    생산자단체"로 보고 다른(완화된) 문장을 낸다 — 실측 반영 후 발동률 **42.5%**로 줄어
+    진짜 외부 상업 선점 사례만 남는다.
+- **지역 주도형 문장(2026-09-18 신규)** ("◇◇시는 지역 출원인이 주도하고 있습니다..."):
+  `localApplicantShare ≥ LOCAL_DOMINANT_SHARE_THRESHOLD`(`0.5`)일 때 — 지역외 비중
+  문장이 안 나올 때만 대신 나온다. 실측 511행 중 29.7%로, 부정적 경고만 있던 것에서
+  대칭적인 긍정 신호를 추가했다.
 
 임계값도 ⑤의 가중치처럼 예시값이다. 실제 기준이 정해지면 `lib/templates.js`만 바꾸면 되고,
-산출물의 `templateVersion`으로 어떤 기준의 문장인지 항상 구분할 수 있다.
+산출물의 `templateVersion`(`strategy-template-v1-low-conversion-and-share-crosscheck`)으로
+어떤 기준의 문장인지 항상 구분할 수 있다.
 
 문장은 `evidence` 필드에 담긴 ⑤의 수치(고유 상표 건수, 등록률, 지역 내·외 비중)에서만
 만들어지며, 그 밖의 사실을 추가하지 않는다 — ⑥-2 없이도 환각 걱정 없이 쓸 수 있는 이유다.
@@ -63,7 +83,7 @@ node 06-generate-business-strategy/generateStrategy.js \
   sourceGeneratedAt,
   warnings,
   summary,               // { briefingCount, alertCount }
-  briefings              // ⑤ ranking의 각 행 -> { region, itemName, gapScore, isGapAlert, sentences, evidence }
+  briefings              // ⑤ ranking의 각 행 -> { region, itemName, gapScore, isGapAlert, gapAlertKind, sentences, evidence }
 }
 ```
 

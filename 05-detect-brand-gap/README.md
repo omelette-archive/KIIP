@@ -25,8 +25,27 @@
 |---|---|---|---|
 | `REPRESENTATIVE_SOURCES` | `["지리적표시"]` | "대표 특산품" 판정 조건 1 — ①단계 수집 출처가 지리적표시(GI) 등록 | ✅ 확정(#29, 2026-08-11) |
 | `REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD` | `1` | "대표 특산품" 판정 조건 2 — 고유 상표 출원 1건 이상(조건 1과 OR) | ✅ 확정(#29, 2026-08-31 — 3건에서 완화) |
-| `ACTIVITY_SATURATION_COUNT` | `5` | 고유 상표 건수가 이 값 이상이면 "활용도 충분(1.0)"으로 간주 | 🟡 예시값, 미확정 |
+| `ACTIVITY_SATURATION_COUNT` | `5` | 고유 상표 건수가 이 값 이상이면 "활용도 충분(1.0)"으로 간주 | 🟡 예시값, 미확정(실측상 p73 부근이라 크게 무리는 없음, 아래 참고) |
 | `ACTIVITY_WEIGHT` / `REGISTRATION_WEIGHT` | `0.7` / `0.3` | 최종 점수에서 출원 활동량 대 등록 성사율의 비중 | 🟡 예시값, 미확정 |
+| `LOW_CONVERSION_REGISTRATION_THRESHOLD` | `0.3` | `lowConversionAlert` — 활동량이 포화(≥5건)됐는데 등록률이 이 값 미만이면 별도 신호 | 🟡 예시값(2026-09-18 실측 registrationRate p25=0.333 근거) |
+
+### 2026-09-18 발견 — gapScore는 활동량 포화(count≥5) 시 절대 공백 알림을 못 켠다
+
+`gapScore = 1 - (0.7×activity + 0.3×registration)`이고 `activity = min(1, count/5)`라서,
+count≥5면 registration이 0이어도 `gapScore ≤ 0.3`이다(count=4도 최댓값 0.44) — 즉
+`GAP_ALERT_THRESHOLD`(0.5, 06단계)를 **수학적으로 절대 못 넘는다**. 라이브 스냅샷 실측
+(대표 특산품 511행)으로도 `gapScore≥0.5`인 205건 중 **92.7%가 표본 3건 미만**이었다.
+
+반대로 "출원은 활발한데 등록으로 안 이어지는" 진짜 문제(예: 전남광주 우리밀 46건 출원·
+등록률 28%, 대구 취나물 22건·등록률 10%)는 count≥5로 활동량이 포화돼 있어 gapScore로는
+구조적으로 절대 못 잡는다(실측 511행 중 23건, 4.5%). `lowConversionAlert`(위 표)가 이
+사각지대를 별도 신호로 잡는다 — "미개척"(활동량 자체가 적음, 처방: 출원 자체를 권장)과
+"저효율"(활동은 활발한데 등록이 안 됨, 처방: 상표 명세·전략 보완 지원)은 처방이 다르므로
+하나의 점수로 뭉개지 않고 `06-generate-business-strategy`의 `gapAlertKind`
+(`"unclaimed" | "low_conversion"`)로 구분해 화면·문장까지 다르게 낸다.
+`GAP_SCORE_VERSION`이 `gap-score-v4-low-conversion-signal`로 바뀐 배경이 이것이다.
+기존 `gapScore` 계산·`GAP_ALERT_THRESHOLD` 자체(#29 확정 절차)는 건드리지 않았다 —
+`lowConversionAlert`는 별도 boolean 필드로만 추가된다.
 
 GI 미등록이어도 상표 출원 활동이 활발한 품목을 놓치지 않기 위해 조건 1·2는 OR로 결합한다
 (둘 중 하나만 충족해도 대표). `gapReason`과 `methodology.representativeBasis`에 판정 근거를
@@ -84,6 +103,8 @@ node 05-detect-brand-gap/selftest.js
 - [x] 파이프라인 배선(④ 출력 → 결정론적 점수 → 랭킹) — 판정 기준은 예시값으로 우선 완주
 - [x] "대표 특산품"의 실제 판정 기준 확정(#29, 2026-08-31 최종) — GI 출처 또는 상표 출원 1건 이상(OR)
 - [ ] "상표 활용도" 지표(포화 건수)·가중치 실제 기준 확정(#29 잔여 범위)
+- [x] gapScore가 활동량 포화(count≥5) 구간에서 절대 못 잡는 "저효율"(출원 활발·등록 저조)
+      신호를 `lowConversionAlert`로 분리(2026-09-18, 실측 511행 중 23건)
 - [ ] `collectionStatus=partial` 데이터를 점수에 포함할지 결정(#29 잔여 범위)
 - [ ] 지역 내·외 비중(`localApplicantShare`)을 점수에 포함할지 — #11은 연결됐지만
       `--enrich-registry`가 파이프라인 기본 실행에 포함되기 전까지는 대부분 unverified라 보류

@@ -662,7 +662,14 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   // 배지에 이 판정 기준을 그대로 풀어서 설명한다. 분모가 작을 때(5건 미만)는 100%·0% 같은
   // 백분율 대신 분수(N/M건) + "표본 적음" 표식을 덧붙인다.
   const SMALL_SAMPLE_TRADEMARK_COUNT = 5;
-  const GAP_BADGE_CRITERIA = "상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합 평가합니다 — 출원 건수가 적으면 등록률이 높아도 공백 알림으로 표시될 수 있습니다.";
+  // 2026-09-18: 단일 공식만 설명하던 이전 문구는 활동량이 포화(5건 이상)되면 등록률과
+  // 무관하게 절대 "공백 알림"을 못 켠다는 사실을 놓쳤다 — "출원은 활발한데 등록이 안 되는"
+  // 저효율 신호를 별도로 추가했다(Dashboard.tsx와 동일).
+  const GAP_BADGE_CRITERIA = "두 신호 중 하나라도 켜지면 알림입니다: ① 미개척 — 상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합해 낮으면(출원 건수가 적으면 등록률이 높아도 해당될 수 있음). ② 저효율 — 출원이 5건 이상으로 활발한데 등록률이 30% 미만.";
+  const alertKindLabel = (isGapAlert, gapAlertKind) => {
+    if (!isGapAlert) return "양호";
+    return gapAlertKind === "low_conversion" ? "저효율 알림" : "미개척 알림";
+  };
   const businessStrategyCardHtml = (briefing, title, footerHtml = "", nationwide = {}) => {
     const evidence = briefing.evidence || {};
     const uniqueCount = evidence.uniqueTrademarkCount;
@@ -679,7 +686,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
       typeof evidence.localApplicantShare === "number" ? `<div class="strategy-stat"><span>지역 출원인 비중</span><strong>${percent(evidence.localApplicantShare)}</strong></div>` : "",
     ].join("");
     return `<section class="business-strategy${briefing.isGapAlert ? " alert" : ""}">
-      <div class="strategy-head"><div class="strategy-head-title"><span class="strategy-status-icon" aria-hidden="true">${briefing.isGapAlert ? "!" : "✓"}</span><strong>${esc(title)}</strong></div><span class="strategy-status-badge" title="${esc(GAP_BADGE_CRITERIA)}">${briefing.isGapAlert ? "공백 알림" : "양호"}</span></div>
+      <div class="strategy-head"><div class="strategy-head-title"><span class="strategy-status-icon" aria-hidden="true">${briefing.isGapAlert ? "!" : "✓"}</span><strong>${esc(title)}</strong></div><span class="strategy-status-badge" title="${esc(GAP_BADGE_CRITERIA)}">${alertKindLabel(briefing.isGapAlert, briefing.gapAlertKind)}</span></div>
       ${stats ? `<div class="strategy-stat-row">${stats}</div>` : ""}
       <ul class="business-strategy-list">${briefing.sentences.map((sentence) => `<li>${esc(displayRegionName(sentence))}</li>`).join("")}</ul>
       ${footerHtml ? `<p class="business-strategy-footer">${footerHtml}</p>` : ""}
@@ -1587,6 +1594,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
           policyTier: policyBadge?.tier || null,
           isTopPriority: topPriority,
           isGapAlert: item.briefing?.isGapAlert ?? true,
+          gapAlertKind: item.briefing?.gapAlertKind ?? null,
         });
       }
     }
@@ -2430,11 +2438,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     // 528건 표를 한 번에 다 그리면 상세 패널이 축소 화면(1단 적층)에서 한참 아래로 밀린다.
     // S5(품목별 조회)와 같은 방식으로 상위 100건만 먼저 보여주고 "전체 보기"로 확장한다.
     const visibleRows = state.strategyShowAll ? filteredRows : filteredRows.slice(0, STRATEGY_ROW_LIMIT);
-    currentCsvExporters.strategyTable = () => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], filteredRows.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", row.isGapAlert ? "공백 알림" : "양호"]));
+    currentCsvExporters.strategyTable = () => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], filteredRows.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", alertKindLabel(row.isGapAlert, row.gapAlertKind)]));
     const headHtml = STRATEGY_COLUMNS.map(([key, label]) => `<th aria-sort="${state.strategySortKey !== key ? "none" : state.strategySortDir === "asc" ? "ascending" : "descending"}"><button type="button" data-strategy-sort="${key}" class="${state.strategySortKey === key ? "active" : ""}">${esc(label)}${state.strategySortKey === key ? `<span aria-hidden="true">${state.strategySortDir === "asc" ? " ▲" : " ▼"}</span>` : ""}</button></th>`).join("");
     const bodyRowsHtml = filteredRows.length === 0
       ? `<tr><td colspan="8" class="empty">검색 결과가 없습니다.</td></tr>`
-      : visibleRows.map((row) => `<tr data-strategy-row="${esc(row.key)}" class="${selected?.key === row.key ? "active" : ""}" tabindex="0" role="button" aria-pressed="${selected?.key === row.key}"><td>${esc(row.regionLabel)}</td><td>${esc(row.itemLabel)}${row.policyTier ? `<em class="crop-badge crop-badge-${esc(row.policyTier)}" title="농촌진흥청 지역특화작목">${esc(row.policyTier)}</em>` : ""}</td><td>${row.uniqueTrademarkCount !== null ? `${number(row.uniqueTrademarkCount)}건` : "—"}</td><td class="strategy-nationwide"${row.nationwideCapped ? ` title="${esc("검색 상한(1,800건)에 걸려 실제 전국 건수는 이보다 많습니다")}"` : ""}>${nationwideCountLabel(row.nationwideCount, row.nationwideCapped)}</td><td class="strategy-nationwide"${row.nationwideCapped ? ` title="${esc("분모가 검색 상한에 걸려 실제 비중은 이보다 작습니다")}"` : ""}>${nationwideShareLabel(row.nationwideShare, row.nationwideCapped)}</td><td>${row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td><td>${row.localApplicantShare !== null ? percent(row.localApplicantShare) : "—"}</td><td>${row.isTopPriority ? `<span class="strategy-table-badge priority" title="${esc("정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건입니다")}">최우선</span>` : `<span class="${row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}">${row.isGapAlert ? "공백 알림" : "양호"}</span>`}</td></tr>`).join("");
+      : visibleRows.map((row) => `<tr data-strategy-row="${esc(row.key)}" class="${selected?.key === row.key ? "active" : ""}" tabindex="0" role="button" aria-pressed="${selected?.key === row.key}"><td>${esc(row.regionLabel)}</td><td>${esc(row.itemLabel)}${row.policyTier ? `<em class="crop-badge crop-badge-${esc(row.policyTier)}" title="농촌진흥청 지역특화작목">${esc(row.policyTier)}</em>` : ""}</td><td>${row.uniqueTrademarkCount !== null ? `${number(row.uniqueTrademarkCount)}건` : "—"}</td><td class="strategy-nationwide"${row.nationwideCapped ? ` title="${esc("검색 상한(1,800건)에 걸려 실제 전국 건수는 이보다 많습니다")}"` : ""}>${nationwideCountLabel(row.nationwideCount, row.nationwideCapped)}</td><td class="strategy-nationwide"${row.nationwideCapped ? ` title="${esc("분모가 검색 상한에 걸려 실제 비중은 이보다 작습니다")}"` : ""}>${nationwideShareLabel(row.nationwideShare, row.nationwideCapped)}</td><td>${row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td><td>${row.localApplicantShare !== null ? percent(row.localApplicantShare) : "—"}</td><td>${row.isTopPriority ? `<span class="strategy-table-badge priority" title="${esc("정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건입니다")}">최우선</span>` : `<span class="${row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}">${alertKindLabel(row.isGapAlert, row.gapAlertKind)}</span>`}</td></tr>`).join("");
     const showAllButtonHtml = !state.strategyShowAll && filteredRows.length > STRATEGY_ROW_LIMIT ? `<button type="button" id="strategy-show-all" class="item-list-show-all">전체 ${number(filteredRows.length)}건 보기 →</button>` : "";
     const countNoteHtml = !state.strategyShowAll && filteredRows.length > STRATEGY_ROW_LIMIT ? `상위 ${STRATEGY_ROW_LIMIT}건 표시 · 전체 ${filteredRows.length}건` : `전체 ${filteredRows.length}건`;
     const tableHtml = `<div class="strategy-table-wrap"><table class="strategy-table"><thead><tr>${headHtml}</tr></thead><tbody>${bodyRowsHtml}</tbody></table><p class="screen-note">${countNoteHtml} 중 행을 고르면 오른쪽에 상세가 열립니다.</p>${showAllButtonHtml}</div>`;

@@ -7,8 +7,10 @@ const {
   isRepresentative,
   activityScore,
   registrationScore,
+  lowConversionAlert,
   ACTIVITY_SATURATION_COUNT,
   REPRESENTATIVE_TRADEMARK_COUNT_THRESHOLD,
+  LOW_CONVERSION_REGISTRATION_THRESHOLD,
   GAP_SCORE_VERSION,
 } = require("./lib/scorer");
 const { detectGaps } = require("./detectBrandGap");
@@ -205,14 +207,14 @@ console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 
     }],
   };
   const defaultResult = detectGaps(analysis);
-  assert.strictEqual(defaultResult.scoreVersion, "gap-score-v3-representative-count1");
+  assert.strictEqual(defaultResult.scoreVersion, "gap-score-v4-low-conversion-signal");
   assert.strictEqual(defaultResult.ranking.length, 1, "기본 1건 기준에서는 1건짜리도 대표 특산품으로 인정됨(#29 2026-08-31 완화 확정)");
 
   // 실험용으로 예전 기준(3건)을 다시 돌려볼 때도 안전조건이 지켜지는지 확인한다.
   const stricter = detectGaps(analysis, { representativeThreshold: 3 });
   assert.strictEqual(
     stricter.scoreVersion,
-    "gap-score-v3-representative-count1-threshold3-experiment",
+    "gap-score-v4-low-conversion-signal-threshold3-experiment",
     "기본값과 다른 기준을 쓰면 scoreVersion에 드러나 결과를 절대 혼동하지 않아야 함(안전조건)"
   );
   assert.strictEqual(stricter.ranking.length, 0, "3건 기준으로 되돌리면 1건짜리는 다시 대표성 미충족");
@@ -227,6 +229,29 @@ console.log("7) detectGaps — representativeThreshold 옵션(#29 후속 비교 
     "다른 기준으로 호출한 뒤에도 기본 호출 결과 자체가 조용히 달라지면 안 됨(순수 함수 재확인)"
   );
   ok("threshold를 생략하면 확정 기준(1건) 그대로, 다른 값을 주면 scoreVersion에 반영되어 결과가 섞이지 않음");
+}
+
+console.log("8) lowConversionAlert — gapScore가 구조적으로 못 잡는 '활동은 충분한데 등록이 안 됨' 신호(2026-09-18)");
+{
+  // gapScore = 1 - (0.7*activity + 0.3*registration). count>=ACTIVITY_SATURATION_COUNT(5)면
+  // activity=1이라 registration=0이어도 gapScore = 0.3 <= GAP_ALERT_THRESHOLD(0.5) — 이 케이스를
+  // lowConversionAlert가 별도로 잡아야 한다.
+  const highVolumeLowReg = { regionalUniqueTrademarkCount: 46, regionalRegistrationRate: 0.28, regionalMetricAvailability: "available" };
+  assert.strictEqual(lowConversionAlert(highVolumeLowReg), true, "출원 46건·등록률 28%는 저효율 신호로 잡아야 함");
+  assert.strictEqual(scoreBucket(highVolumeLowReg).gapScore <= 0.5, true, "같은 케이스가 gapScore 공백 알림 기준은 못 넘는다는 걸 재확인");
+
+  const highVolumeHighReg = { regionalUniqueTrademarkCount: 20, regionalRegistrationRate: 0.8, regionalMetricAvailability: "available" };
+  assert.strictEqual(lowConversionAlert(highVolumeHighReg), false, "등록률이 임계값 이상이면 저효율 아님");
+
+  const lowVolumeLowReg = { regionalUniqueTrademarkCount: 2, regionalRegistrationRate: 0, regionalMetricAvailability: "available" };
+  assert.strictEqual(lowConversionAlert(lowVolumeLowReg), false, "활동 자체가 포화 전(5건 미만)이면 '저효율'이 아니라 '미개척'이라 별도 신호로 안 잡음");
+
+  const noRegistrationData = { regionalUniqueTrademarkCount: 10, regionalRegistrationRate: null, regionalMetricAvailability: "available" };
+  assert.strictEqual(lowConversionAlert(noRegistrationData), false, "등록률 정보가 없으면 저효율로 단정하지 않음(정보 없음과 저효율은 다름)");
+
+  assert.strictEqual(scoreBucket(highVolumeLowReg).lowConversionAlert, true, "scoreBucket 결과에도 lowConversionAlert가 실림");
+  assert.strictEqual(LOW_CONVERSION_REGISTRATION_THRESHOLD, 0.3, "2026-09-18 실측(전체 대표 행 registrationRate p25=0.333) 기준 임계값");
+  ok("gapScore로는 절대 못 잡는 '출원은 많은데 등록이 안 되는' 케이스를 별도 신호로 분리");
 }
 
 console.log("\n모든 자체 테스트 통과");

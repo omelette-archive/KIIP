@@ -11,7 +11,12 @@ type ItemVerdict = { source: string; method: string | null; confidence: number |
 type ItemCategory = { code: string; label: string; provisional?: boolean };
 type RegionalEvidence = { region: string; sido: string; sigungu: string; sourceItemName: string; referenceYear: number; evidenceType: string; evidenceStrength: string; regionalMetricEligible: boolean; regionalMetricValidatedAt?: string | null };
 type ItemBriefingEvidence = { uniqueTrademarkCount?: number | null; registrationRate?: number | null; localApplicantShare?: number | null };
-type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; sentences: string[]; evidence: ItemBriefingEvidence | null };
+// 2026-09-18(#12/#29 재검토): gapAlertKind는 isGapAlert를 켠 두 신호 중 어느 쪽인지 구분한다 —
+// "unclaimed"(활동량 자체가 적음, 미개척)와 "low_conversion"(출원은 활발한데 등록이 안 됨,
+// 저효율)은 처방이 다르므로(전자는 신규 출원 권장, 후자는 상표 명세·전략 보완 지원) 화면에서도
+// 같은 배지로 뭉개지 않는다.
+type GapAlertKind = "unclaimed" | "low_conversion" | null;
+type ItemBriefing = { templateVersion: string | null; isGapAlert: boolean; gapAlertKind?: GapAlertKind; sentences: string[]; evidence: ItemBriefingEvidence | null };
 type NationwideFlowStage = { count: number; topRegion: string | null; topApplicant: string | null; examples?: { representative: string[]; unusual: string[]; source?: "designated_goods" | "trademark_title" } | null; classes?: { classCode: string; count: number; share: number }[] | null; topRegions?: { region: string; count: number; share: number }[] | null };
 type NationwideFlow = { totalCount: number; fetchedCount?: number; hasRegionalSignal?: boolean; stages: { raw: NationwideFlowStage; processed: NationwideFlowStage; service: NationwideFlowStage } };
 type Item = { specialtyId: string | null; itemName: string | null; noticeName: string | null; niceClass: string | null; sources?: string[]; matchingBasis?: string | null; category?: ItemCategory | null; regionalSpecialtyCropBadge?: { tier: string; officialItemName: string; referenceYear: number } | null; businessFlow?: NationwideFlow | null; dataState: string; itemVerdict?: ItemVerdict; trademarkExamples?: TrademarkExample[]; regionalEvidence?: RegionalEvidence[]; applicationYearCounts?: Record<string, number> | null; registrationYearCounts?: Record<string, number> | null; applicationMonthCounts?: Record<string, number> | null; registrationMonthCounts?: Record<string, number> | null; briefing?: ItemBriefing | null; outputHitCap?: { cap: number; collectedCount: number } | null; metrics: { uniqueTrademarkCount: Metric; nationwideSearchTrademarkCount?: Metric; registeredTrademarkCount: Metric; registrationRate: Metric; localApplicantShare: Metric; localApplicantCount?: Metric; producerApplicantShare?: Metric; confirmedGoodsMatchCount: Metric; goodsReviewCandidateCount: Metric; gapScore: Metric } };
@@ -1854,7 +1859,18 @@ function ExpansionSuggestionsCard({ flow, itemLabel, surging }: { flow: Nationwi
 // 지침), 배지에 이 판정 기준을 그대로 풀어서 설명한다. 또한 분모가 작을 때(5건 미만)
 // 100%·0% 같은 백분율은 과대해석을 부르므로 분수(N/M건) + "표본 적음" 표식을 덧붙인다.
 const SMALL_SAMPLE_TRADEMARK_COUNT = 5;
-const GAP_BADGE_CRITERIA = "상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합 평가합니다 — 출원 건수가 적으면 등록률이 높아도 공백 알림으로 표시될 수 있습니다.";
+// 2026-09-18: 기존 문구는 단일 공식만 설명했는데, 그 공식은 활동량이 포화(5건 이상)되면
+// 등록률과 무관하게 절대 "공백 알림"을 못 켠다(0.7*1+0.3*reg가 항상 0.5를 넘어 gapScore가
+// 0.5 밑으로 못 내려감) — 그래서 "출원은 활발한데 등록이 안 되는" 저효율 신호를 별도로 추가했다.
+const GAP_BADGE_CRITERIA = "두 신호 중 하나라도 켜지면 알림입니다: ① 미개척 — 상표 출원 건수(5건 도달 시 활동량 포화)와 등록률을 7:3 비율로 종합해 낮으면(출원 건수가 적으면 등록률이 높아도 해당될 수 있음). ② 저효율 — 출원이 5건 이상으로 활발한데 등록률이 30% 미만.";
+function alertKindLabel(isGapAlert: boolean, gapAlertKind?: GapAlertKind): string {
+  if (!isGapAlert) return "양호";
+  if (gapAlertKind === "low_conversion") return "저효율 알림";
+  return "미개척 알림";
+}
+function gapAlertBadgeLabel(briefing: ItemBriefing): string {
+  return alertKindLabel(briefing.isGapAlert, briefing.gapAlertKind);
+}
 function BusinessStrategyCard({ briefing, title, footer, nationwideCount = null, nationwideShare = null, nationwideCapped = false }: { briefing: ItemBriefing; title: string; footer?: ReactNode; nationwideCount?: number | null; nationwideShare?: number | null; nationwideCapped?: boolean }) {
   const evidence = briefing.evidence;
   const hasStats = Boolean(evidence && (
@@ -1874,7 +1890,7 @@ function BusinessStrategyCard({ briefing, title, footer, nationwideCount = null,
           <span className="strategy-status-icon" aria-hidden="true">{briefing.isGapAlert ? "!" : "✓"}</span>
           <strong>{title}</strong>
         </div>
-        <span className="strategy-status-badge" title={GAP_BADGE_CRITERIA}>{briefing.isGapAlert ? "공백 알림" : "양호"}</span>
+        <span className="strategy-status-badge" title={GAP_BADGE_CRITERIA}>{gapAlertBadgeLabel(briefing)}</span>
       </div>
       {hasStats && <div className="strategy-stat-row">
         {typeof evidence?.uniqueTrademarkCount === "number" && <div className="strategy-stat"><span>지역 확인 출원</span><strong>{number(evidence.uniqueTrademarkCount)}건</strong></div>}
@@ -2720,7 +2736,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
   const expansionIndex = useMemo(() => buildExpansionIndex(regionalRegions), [regionalRegions]);
   const strategyProvinces = useMemo(() => [...new Set(regionalRegions.map(provinceOf))].sort((a, b) => a.localeCompare(b, "ko-KR")), [regionalRegions]);
   const strategyRows = useMemo(() => {
-    const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; policyTier: string | null; isTopPriority: boolean; isGapAlert: boolean }[] = [];
+    const rows: { key: string; region: Region; item: Item; regionLabel: string; itemLabel: string; uniqueTrademarkCount: number | null; registrationRate: number | null; localApplicantShare: number | null; nationwideCount: number | null; nationwideShare: number | null; nationwideCapped: boolean; policyTier: string | null; isTopPriority: boolean; isGapAlert: boolean; gapAlertKind: GapAlertKind }[] = [];
     for (const region of regionalRegions) {
       for (const item of region.items) {
         const policyBadge = item.regionalSpecialtyCropBadge;
@@ -2748,6 +2764,7 @@ export default function Dashboard({ snapshot, geometry, registrationExamples }: 
           policyTier: policyBadge?.tier || null,
           isTopPriority: topPriority,
           isGapAlert: item.briefing?.isGapAlert ?? true,
+          gapAlertKind: item.briefing?.gapAlertKind ?? null,
         });
       }
     }
@@ -3410,7 +3427,7 @@ const STRATEGY_CHIP_LIMIT = 12;
       {strategyRows.length > 0 && <>
         <div className="strategy-table-toolbar">
           <label className="strategy-filter-field" htmlFor="strategy-filter-input"><span>지역·품목 검색</span><StrategyFilterInput id="strategy-filter-input" value={strategyFilter} onSubmit={setStrategyFilter} /></label>
-          <label className="strategy-policy-filter"><input type="checkbox" checked={strategyPolicyOnly} onChange={(event) => setStrategyPolicyOnly(event.target.checked)} /><span>특화작목만</span><b>{number(strategyRows.filter((row) => row.isTopPriority).length)}건 최우선</b></label><CsvDownloadButton onClick={() => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], strategyRowsFiltered.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", row.isGapAlert ? "공백 알림" : "양호"]))} />
+          <label className="strategy-policy-filter"><input type="checkbox" checked={strategyPolicyOnly} onChange={(event) => setStrategyPolicyOnly(event.target.checked)} /><span>특화작목만</span><b>{number(strategyRows.filter((row) => row.isTopPriority).length)}건 최우선</b></label><CsvDownloadButton onClick={() => downloadCsv(`비즈니스전략_${csvDateStamp(dashboardUpdatedAt)}`, ["지역", "품목", "지역 확인 출원", "전국 검색", "전국 대비", "등록률", "지역 출원인 비중", "판정"], strategyRowsFiltered.map((row) => [row.regionLabel, row.itemLabel, row.uniqueTrademarkCount, nationwideCountLabel(row.nationwideCount, row.nationwideCapped), nationwideShareLabel(row.nationwideShare, row.nationwideCapped), row.registrationRate !== null ? percent(row.registrationRate) : "", row.localApplicantShare !== null ? percent(row.localApplicantShare) : "", alertKindLabel(row.isGapAlert, row.gapAlertKind)]))} />
         </div>
         <div className="strategy-table-layout">
           <div className="strategy-table-wrap">
@@ -3438,7 +3455,7 @@ const STRATEGY_CHIP_LIMIT = 12;
                   <td className="strategy-nationwide" title={row.nationwideCapped ? "분모가 검색 상한에 걸려 실제 비중은 이보다 작습니다" : undefined}>{nationwideShareLabel(row.nationwideShare, row.nationwideCapped)}</td>
                   <td>{row.registrationRate !== null ? percent(row.registrationRate) : "—"}</td>
                   <td>{row.localApplicantShare !== null ? percent(row.localApplicantShare) : "—"}</td>
-                  <td>{row.isTopPriority ? <span className="strategy-table-badge priority" title="정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건입니다">최우선</span> : <span className={row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}>{row.isGapAlert ? "공백 알림" : "양호"}</span>}</td>
+                  <td>{row.isTopPriority ? <span className="strategy-table-badge priority" title="정책이 육성하기로 지정한 작목인데 지역 확인 출원이 0건입니다">최우선</span> : <span className={row.isGapAlert ? "strategy-table-badge alert" : "strategy-table-badge"}>{alertKindLabel(row.isGapAlert, row.gapAlertKind)}</span>}</td>
                 </tr>)}
               </tbody>
             </table>

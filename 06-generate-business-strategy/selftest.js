@@ -6,6 +6,8 @@ const {
   buildBriefing,
   gapSentence,
   outsideShareSentence,
+  localDominantSentence,
+  lowConversionSentence,
   unverifiedRegionNote,
   attachTopicMarker,
   GAP_ALERT_THRESHOLD,
@@ -54,6 +56,47 @@ console.log("2) outsideShareSentence — 지역매칭 검증 여부에 따라 �
   assert.match(unverifiedRegionNote(unverified), /검증되지 않아/);
   assert.strictEqual(unverifiedRegionNote(verifiedHighOutside), null);
   ok("검증된 지역 내·외 비중이 있을 때만 project-plan.md의 두 번째 예시 문장을 만들고, 미검증이면 대신 보류 문구를 남김");
+}
+
+console.log("2-1) outsideShareSentence — producerApplicantShare 교차검증(2026-09-18, 실측 71%→42.5% 재현)");
+{
+  const outsideCommercial = { region: "△△시", regionMatchVerified: true, localApplicantShare: 0.1, producerApplicantShare: 0.1 };
+  const outsideButProducerLed = { region: "○○군", regionMatchVerified: true, localApplicantShare: 0.09, producerApplicantShare: 0.83 };
+  const noProducerData = { region: "□□구", regionMatchVerified: true, localApplicantShare: 0.1, producerApplicantShare: null };
+  assert.match(outsideShareSentence(outsideCommercial), /지역 브랜드 보호 전략 검토 필요/, "생산자단체 비중도 낮으면 기존 경고 문장 그대로");
+  assert.match(outsideShareSentence(outsideButProducerLed), /외부 상업적 선점 위험은 낮습니다/, "지역 밖 주소라도 생산자단체 비중이 높으면 다른 문장");
+  assert.doesNotMatch(outsideShareSentence(outsideButProducerLed), /보호 전략 검토 필요/, "생산자단체 주도면 상업적 선점 경고를 내지 않음");
+  assert.match(outsideShareSentence(noProducerData), /지역 브랜드 보호 전략 검토 필요/, "producerApplicantShare 정보가 없으면 안전하게 기존 경고 유지");
+  ok("localApplicantShare 단독(71% 발동)이 아니라 producerApplicantShare 교차검증(42.5%)으로 진짜 외부 상업 선점만 경고");
+}
+
+console.log("2-2) localDominantSentence — 지역 주도형(29.7%)은 긍정 신호로 별도 노출(2026-09-18)");
+{
+  const localLed = { region: "◇◇시", regionMatchVerified: true, localApplicantShare: 0.7 };
+  const outsideLed = { region: "☆☆군", regionMatchVerified: true, localApplicantShare: 0.2 };
+  assert.match(localDominantSentence(localLed), /지역 출원인이 주도/);
+  assert.strictEqual(localDominantSentence(outsideLed), null, "지역 외 비중이 더 크면 긍정 문장을 만들지 않음");
+  ok("outsideShareSentence가 null일 때만 나오는 대칭 긍정 신호");
+}
+
+console.log("2-3) lowConversionSentence/isGapAlert — gapScore가 구조적으로 못 잡는 신호를 별도 문장·알림으로 승격(2026-09-18)");
+{
+  const lowConversionRow = { region: "우리밀 지역", itemName: "우리밀", gapScore: 0.2152, uniqueTrademarkCount: 46, registrationRate: 0.28, lowConversionAlert: true, regionMatchVerified: true, localApplicantShare: 0.4 };
+  assert.match(lowConversionSentence(lowConversionRow), /상표 명세·전략 보완 지원이 필요/);
+  assert.match(lowConversionSentence(lowConversionRow), /46건/);
+  assert.strictEqual(lowConversionSentence({ ...lowConversionRow, lowConversionAlert: false }), null, "신호가 꺼져 있으면 문장도 없음");
+
+  const briefing = buildBriefing(lowConversionRow);
+  assert.strictEqual(briefing.isGapAlert, true, "gapScore(0.2152)는 낮아도 lowConversionAlert가 켜지면 isGapAlert가 true여야 함(OR)");
+  assert.strictEqual(briefing.gapAlertKind, "low_conversion", "어느 신호로 알림이 켜졌는지 구분해야 함");
+  assert.ok(briefing.sentences.some((s) => s.includes("상표 명세·전략 보완 지원")), "저효율 문장이 브리핑 문장 목록에 포함됨");
+
+  const unclaimedRow = { region: "안성시", itemName: "배", gapScore: 1, uniqueTrademarkCount: 0, registrationRate: null, regionMatchVerified: false };
+  assert.strictEqual(buildBriefing(unclaimedRow).gapAlertKind, "unclaimed", "기존 gapScore 경로는 unclaimed로 구분됨");
+
+  assert.doesNotMatch(gapSentence(lowConversionRow), /비교적 양호함/, "저효율 행은 gapScore만 보면 '양호' 구간이라도 그렇게 단정하지 않음(바로 뒤 저효율 문장과 모순 방지)");
+  assert.match(gapSentence(lowConversionRow), /상표 활동량은 충분함/);
+  ok("두 track(미개척/저효율)을 하나의 isGapAlert로 합치되 gapAlertKind로 구분해 처방 문장이 안 섞임");
 }
 
 console.log("3) buildBriefing — 문장·근거를 함께 담고 환각 없이 evidence 수치만 사용");

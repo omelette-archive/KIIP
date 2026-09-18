@@ -26,7 +26,20 @@ const ACTIVITY_SATURATION_COUNT = 5;
 const ACTIVITY_WEIGHT = 0.7;
 const REGISTRATION_WEIGHT = 0.3;
 
-const GAP_SCORE_VERSION = "gap-score-v3-representative-count1";
+const GAP_SCORE_VERSION = "gap-score-v4-low-conversion-signal";
+
+// 2026-09-18 실측(라이브 스냅샷, representative 511행): gapScore = 1 - (0.7*activity + 0.3*registration)
+// 공식은 activity가 count/5로 포화되므로, count>=5면 registration이 0이어도
+// gapScore = 0.3*(1-registration) <= 0.3이라 GAP_ALERT_THRESHOLD(0.5)를 절대 못 넘는다
+// (count=4도 최댓값 0.44로 못 넘음 — 산술적으로 증명됨). 실측으로도 gapScore>=0.5인
+// 205건 중 92.7%가 표본 3건 미만이었다. 즉 기존 "공백 알림"은 사실상 "표본이 적어
+// 아직 활동량이 안 쌓인 지역" 감지기이고, "출원은 많이 하는데 등록으로 안 이어지는"
+// 진짜 문제(예: 전남광주 우리밀 46건 출원·등록률 28%, 대구 취나물 22건·10%)는
+// 구조적으로 절대 못 잡는다. 기존 gapScore/GAP_ALERT_THRESHOLD 의미는 그대로 두고
+// (하위 호환), 표본이 활동 포화 수준(count>=ACTIVITY_SATURATION_COUNT) 이상인데
+// 등록률이 낮은 건을 별도 신호로 추가한다 — "미개척"과 "저효율"은 처방이 다르므로
+// (전자는 출원 자체를 권장, 후자는 상표 전략·서류 보완 지원) 하나로 뭉개지 않는다.
+const LOW_CONVERSION_REGISTRATION_THRESHOLD = 0.3;
 
 function clean(value) {
   return value === undefined || value === null ? "" : String(value).trim();
@@ -70,6 +83,16 @@ function activityScore(bucket) {
   return Math.min(1, count / ACTIVITY_SATURATION_COUNT);
 }
 
+// 활동은 이미 포화(count>=ACTIVITY_SATURATION_COUNT)됐는데 등록률이 낮은 경우 —
+// "출원은 하는데 등록으로 안 이어진다"는, gapScore로는 못 잡는 별도 문제다.
+// registrationRate가 null(분모 0)이면 "정보 없음"이지 "저효율"이 아니므로 false.
+function lowConversionAlert(bucket) {
+  const count = regionalTrademarkCount(bucket);
+  const rate = regionalRegistrationRate(bucket);
+  if (count < ACTIVITY_SATURATION_COUNT || rate === null) return false;
+  return rate < LOW_CONVERSION_REGISTRATION_THRESHOLD;
+}
+
 // registrationRate가 null인 경우(상표가 아예 없어 분모가 0인 경우 등)는 "등록 성사 실적
 // 없음"으로 간주해 0으로 채운다 — 공백 방향으로 점수가 기운다.
 function registrationScore(bucket) {
@@ -111,6 +134,7 @@ function scoreBucket(bucket, options = {}) {
     gapScore,
     gapReason: null,
     scoreAvailability: "preview",
+    lowConversionAlert: lowConversionAlert(bucket),
     scoreInputs: {
       regionalUniqueTrademarkCount: regionalTrademarkCount(bucket),
       regionalRegistrationRate: regionalRegistrationRate(bucket),
@@ -127,12 +151,14 @@ module.exports = {
   ACTIVITY_SATURATION_COUNT,
   ACTIVITY_WEIGHT,
   REGISTRATION_WEIGHT,
+  LOW_CONVERSION_REGISTRATION_THRESHOLD,
   regionalMetricAvailable,
   regionalTrademarkCount,
   regionalRegistrationRate,
   isRepresentative,
   activityScore,
   registrationScore,
+  lowConversionAlert,
   scoreBucket,
   clean,
 };
