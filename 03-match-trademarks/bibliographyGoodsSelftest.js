@@ -143,6 +143,46 @@ async function runBibliographyGoodsTests() {
     ok("접근 거부는 회로 차단, '결과 없음'으로 위장 안 함");
   }
 
+  console.log("7) enrichDocument — limit은 신규 조회에만 걸리고, 캐시된 출원번호는 limit과 무관하게 전부 적용된다(2026-09-18 병목 수정)");
+  {
+    const calls = [];
+    const fakeClient = {
+      async designatedGoods(appNo) {
+        calls.push(appNo);
+        return { found: true, resultCode: "00", designatedGoods: [{ classCode: "31", name: "신선한 블루베리" }] };
+      },
+    };
+    // 미리 캐시에 3건(1,2,3) 채워둔다 — 실제로는 이전 실행에서 쌓인 goodsCache.
+    const cache = new Map([
+      ["1", { status: "complete", designatedGoods: [{ classCode: "31", name: "신선한 블루베리" }], fetchedAt: "2026-09-01T00:00:00.000Z" }],
+      ["2", { status: "complete", designatedGoods: [{ classCode: "31", name: "신선한 블루베리" }], fetchedAt: "2026-09-01T00:00:00.000Z" }],
+      ["3", { status: "complete", designatedGoods: [{ classCode: "31", name: "신선한 블루베리" }], fetchedAt: "2026-09-01T00:00:00.000Z" }],
+    ]);
+    // candidates는 캐시된 1,2,3 뒤에 신규 출원 4,5가 이어지는 순서(실제로도 후보가
+    // 캐시 히트보다 훨씬 많을 수 있음을 재현).
+    const doc = docOf({
+      q1: {
+        query: { item: "신선한 블루베리", classCode: "31" },
+        hits: [
+          hit({ applicationNumber: "1", registrationNumber: "" }),
+          hit({ applicationNumber: "2", registrationNumber: "" }),
+          hit({ applicationNumber: "3", registrationNumber: "" }),
+          hit({ applicationNumber: "4", registrationNumber: "" }),
+          hit({ applicationNumber: "5", registrationNumber: "" }),
+        ],
+      },
+    });
+    // limit=1인데도(옛 버그라면 candidates.slice(0,1) → 출원번호 "1"만 보고 캐시 2,3도 버려짐)
+    // 캐시된 1,2,3은 전부 적용되고, 신규(4,5)는 1건만 조회돼야 한다.
+    const { document, summary } = await enrichDocument(doc, fakeClient, { limit: 1, concurrency: 2, goodsCache: cache });
+    assert.strictEqual(document.queryFacts.q1.hits[0].goodsMatchMethod, "normalized_exact", "캐시 히트 1 적용");
+    assert.strictEqual(document.queryFacts.q1.hits[1].goodsMatchMethod, "normalized_exact", "캐시 히트 2도 limit=1과 무관하게 적용");
+    assert.strictEqual(document.queryFacts.q1.hits[2].goodsMatchMethod, "normalized_exact", "캐시 히트 3도 limit=1과 무관하게 적용");
+    assert.strictEqual(calls.length, 1, "신규 조회만 limit(1)만큼 API 호출");
+    assert.strictEqual(summary.appliedExactCount, 3 + calls.length, "캐시 3건 + 이번에 새로 완료된 신규 건이 함께 반영");
+    ok("캐시 적용은 limit과 무관, 신규 API 호출만 limit으로 제한");
+  }
+
   console.log("\n모든 bibliographyGoodsEnricher 자체 검증 통과.");
 }
 

@@ -95,16 +95,26 @@ async function enrichDocument(document, kiprisClient, options = {}) {
   const goodsCache = options.goodsCache instanceof Map ? options.goodsCache : new Map();
 
   const candidates = collectCandidates(document);
-  const selected = limit > 0 ? candidates.slice(0, limit) : candidates;
 
+  // 2026-09-18(#12 병목 발견): limit을 전체 candidates에 먼저 적용하면(예전 코드,
+  // `candidates.slice(0, limit)`) 이미 캐시에 있는 출원번호까지 슬라이스 밖으로 밀려나
+  // 적용을 못 받는다 — limit=1이면 후보 324,308건 중 첫 1건만 보고, 이미 쌓여있던
+  // 캐시 300건은 순서상 그 뒤에 있으면 한 번도 안 쓰였다(운영 중 실제로 이렇게
+  // 됐었다 — 재승격을 여러 번 해도 캐시가 반영 안 됨). ipRegistryEnricher·
+  // trademarkApplicantEnricher와 같은 패턴으로 맞춘다: 캐시에 이미 있는 출원번호는
+  // 무제한 적용하고, limit은 신규로 조회할 출원번호 수에만 건다.
   const byAppNo = new Map();
-  for (const candidate of selected) {
+  for (const candidate of candidates) {
     const no = normalizeApplicationNumber(candidate.hit.applicationNumber);
     if (!no) continue;
     if (!byAppNo.has(no)) byAppNo.set(no, []);
     byAppNo.get(no).push(candidate);
   }
-  const appNos = [...byAppNo.keys()];
+  const allAppNos = [...byAppNo.keys()];
+  const cachedAppNos = allAppNos.filter((no) => goodsCache.get(no)?.status === "complete");
+  const uncachedAppNos = allAppNos.filter((no) => goodsCache.get(no)?.status !== "complete");
+  const selectedUncached = limit > 0 ? uncachedAppNos.slice(0, limit) : uncachedAppNos;
+  const appNos = [...cachedAppNos, ...selectedUncached];
 
   let requestedCount = 0;
   let newlyCompleteCount = 0;
@@ -159,8 +169,8 @@ async function enrichDocument(document, kiprisClient, options = {}) {
     summary: {
       contractVersion: GOODS_MATCH_VERSION,
       candidateCount: candidates.length,
-      selectedCount: selected.length,
-      uniqueApplicationCount: appNos.length,
+      selectedCount: appNos.length,
+      uniqueApplicationCount: allAppNos.length,
       requestedCount,
       newlyCompleteCount,
       errorCount,
