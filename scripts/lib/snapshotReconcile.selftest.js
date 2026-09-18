@@ -232,6 +232,42 @@ console.log("snapshotReconcile 자체 테스트");
   ok("부가 필드가 사유 없이 비면 last-known-good을 이어 붙이고, 새 값이 있으면 그대로 씀");
 }
 
+// 9) isExcludedItem — 제외 목록에 걸리는 이름은 tombstone 없이도 되살리지 않는다(#195,
+// 2026-09-18: item-exclusions-v1.json 74건 전부가 tombstone이 없어 매 배포마다 부활하던 버그)
+{
+  const previous = snapshot("prev", [
+    { region: "경상남도 진주시", sido: "경상남도", sigungu: "진주시", items: [
+      item("우엉마영농조합법인", { niceClass: null, unique: 0, matchingBasis: "raw_item_name_unclassified" }),
+      item("사과", { niceClass: "31", unique: 12, registered: 5 }),
+    ] },
+  ]);
+  // 이번 실행에서 신선한 04 분석이 이미 회사명 행을 걸러내(07-dashboard/lib/snapshot.js의
+  // assertInputs) 사과만 남아 있는 상태를 재현한다.
+  const next = snapshot("next", [
+    { region: "경상남도 진주시", sido: "경상남도", sigungu: "진주시", items: [
+      item("사과", { niceClass: "31", unique: 12, registered: 5 }),
+    ] },
+  ]);
+  const isExcludedItem = (row) => row.itemName === "우엉마영농조합법인";
+
+  const withoutFix = reconcilePublicSnapshot(
+    JSON.parse(JSON.stringify(next)),
+    previous,
+    [],
+    { massRevivalLimit: 50 }
+  );
+  assert.strictEqual(withoutFix.report.counts.revivedLastKnownGood, 1, "isExcludedItem 없이 호출하면 기존처럼(버그 재현) 되살아남");
+
+  const { report } = reconcilePublicSnapshot(next, previous, [], { massRevivalLimit: 50, isExcludedItem });
+  const jinju = next.regions.find((r) => r.region === "경상남도 진주시");
+  assert.strictEqual(jinju.items.length, 1, "제외 대상 이름은 되살아나지 않아야 함");
+  assert.strictEqual(jinju.items[0].itemName, "사과", "정상 품목은 그대로 유지");
+  assert.strictEqual(report.counts.revivedLastKnownGood, 0, "제외 대상은 revivedLastKnownGood으로 집계되지 않음");
+  assert.strictEqual(report.counts.removedAsExcludedName, 1, "제외 대상은 별도 카운트로 집계됨");
+  assert.deepStrictEqual(report.removedAsExcludedName, [{ key: "경상남도 / 진주시 / 우엉마영농조합법인", reason: "item_name_exclusion_list" }]);
+  ok("item-exclusions-v1.json에 걸리는 이름은 tombstone 없이도 되살리지 않고 별도 집계함");
+}
+
 // unionYearCounts 단위
 assert.deepStrictEqual(unionYearCounts({ "2020": 5, "2021": 3 }, { "2021": 7, "2022": 1 }), { "2020": 5, "2021": 7, "2022": 1 });
 assert.strictEqual(regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣(청정)" }), regionItemKey({ sido: "경기도", sigungu: "가평군" }, { itemName: "잣" }));

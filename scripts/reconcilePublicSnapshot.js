@@ -16,6 +16,10 @@
 const fs = require("fs");
 const path = require("path");
 const { reconcilePublicSnapshot } = require("./lib/snapshotReconcile");
+// 2026-09-18(#195): item-exclusions-v1.json(회사명·총칭 등)에 걸린 이름은 07-dashboard/
+// lib/snapshot.js가 매 실행 걸러내도 tombstone이 없으면 여기서 계속 되살아났다(74건
+// 전부 매 배포마다 부활). 같은 판정 함수를 그대로 재사용해 되살리지 않게 한다.
+const { isExcludedItemName } = require("../07-dashboard/lib/snapshot");
 
 const ROOT = path.resolve(__dirname, "..");
 const DEFAULT_PREVIOUS = path.join(ROOT, "07-dashboard", "web", "public", "data", "dashboard-snapshot.json");
@@ -57,6 +61,7 @@ function main() {
 
   const { report, blocked } = reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones, {
     massRevivalLimit: args["mass-revival-limit"] ? Number(args["mass-revival-limit"]) : undefined,
+    isExcludedItem: isExcludedItemName,
   });
 
   const outPath = path.resolve(args.out);

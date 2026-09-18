@@ -206,13 +206,20 @@ function retainMetricFloor(previousItem, nextItem, context) {
  * @param {object} nextSnapshot 이번 실행 스냅샷(파괴적으로 수정됨)
  * @param {object|null} previousSnapshot 직전 공개 스냅샷(없으면 첫 배포로 간주)
  * @param {{key:string, reason:string, runId?:string, tombstonedAt?:string}[]} tombstones
- * @param {{massRevivalLimit?: number}} [options] revive가 이 수를 넘으면 배포 차단(대량
- *   실종 = 재수집 실패 신호, 사람이 봐야 함). 기본 50.
- * @returns {{report: object, blocked: boolean}}
+ * @param {{massRevivalLimit?: number, isExcludedItem?: (item: object) => boolean}} [options]
+ *   massRevivalLimit: revive가 이 수를 넘으면 배포 차단(대량 실종 = 재수집 실패 신호, 사람이
+ *   봐야 함). 기본 50.
+ *   isExcludedItem: 2026-09-18(#195) 발견 — 07-dashboard/lib/snapshot.js가
+ *   item-exclusions-v1.json(회사명·총칭 등 "품목이 아닌 이름")을 매 실행 걸러내도, 그
+ *   목록에 개별 tombstone이 없으면 이 함수가 "실종"으로 보고 계속 되살렸다(2026-09-09
+ *   제외 목록 도입 이후 74건 전부가 매 배포마다 좀비처럼 부활). 제외 목록 자체가 이미
+ *   "이 이름은 품목이 아니다"라는 영구 사유이므로, 개별 tombstone을 매번 만들 필요 없이
+ *   여기서 되살리지 않는다.
  */
 function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = [], options = {}) {
   const retainedAt = new Date().toISOString();
   const massRevivalLimit = Number.isInteger(options.massRevivalLimit) ? options.massRevivalLimit : 50;
+  const isExcludedItem = typeof options.isExcludedItem === "function" ? options.isExcludedItem : () => false;
   const tombstoneByKey = new Map(tombstones.map((entry) => [clean(entry.key), entry]));
 
   if (!previousSnapshot) {
@@ -224,7 +231,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
         previousSnapshotId: null,
         nextSnapshotId: nextSnapshot.snapshotId || null,
         firstPublication: true,
-        counts: { added: countItems(nextSnapshot), retained: 0, metricFloorRetained: 0, revivedLastKnownGood: 0, removedWithTombstone: 0 },
+        counts: { added: countItems(nextSnapshot), retained: 0, metricFloorRetained: 0, revivedLastKnownGood: 0, removedWithTombstone: 0, removedAsExcludedName: 0 },
         revivedLastKnownGood: [],
         removedWithTombstone: [],
       },
@@ -240,6 +247,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
   let methodologyUpgraded = 0;
   const revivedLastKnownGood = [];
   const removedWithTombstone = [];
+  const removedAsExcludedName = [];
 
   // 1) 양쪽에 있는 키: 지표 floor 유지(절대 감소 금지). 단 판정 기준이 원물명 검색 →
   //    고시명칭 확정으로 승격된 건 모집단이 좁아진 것이라 감소를 허용한다(#117).
@@ -267,6 +275,10 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
         runId: tombstone.runId || null,
         tombstonedAt: tombstone.tombstonedAt || null,
       });
+      continue;
+    }
+    if (isExcludedItem(prev.item)) {
+      removedAsExcludedName.push({ key: keyToLabel(key), reason: "item_name_exclusion_list" });
       continue;
     }
     // "전국" 카탈로그 항목이 이번엔 특정 지역 행으로 이동했으면(KOFPI 주산지 확장 등)
@@ -317,6 +329,7 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
     relocatedNationwideToRegional: relocatedNationwide,
     relocatedSpecialtyRename,
     removedWithTombstone: removedWithTombstone.length,
+    removedAsExcludedName: removedAsExcludedName.length,
   };
 
   // 정상 상황이면 revive는 소수(재랭킹·slice 경계). 대량 실종은 재수집이 깨진 것이라
@@ -336,18 +349,20 @@ function reconcilePublicSnapshot(nextSnapshot, previousSnapshot, tombstones = []
         ? `last-known-good로 되살린 지역×품목 ${revivedLastKnownGood.length}개가 한계(${massRevivalLimit})를 넘음 — 재수집 이상 여부를 확인하세요`
         : null,
       counts: {
-        retained: prevIndex.size - removedWithTombstone.length - revivedLastKnownGood.length - relocated.length,
+        retained: prevIndex.size - removedWithTombstone.length - removedAsExcludedName.length - revivedLastKnownGood.length - relocated.length,
         added: [...nextIndex.keys()].filter((key) => !prevIndex.has(key)).length,
         metricFloorRetained,
         methodologyUpgraded,
         revivedLastKnownGood: revivedLastKnownGood.length,
         relocatedNationwideToRegional: relocatedNationwide,
         relocatedSpecialtyRename,
+        removedAsExcludedName: removedAsExcludedName.length,
         removedWithTombstone: removedWithTombstone.length,
       },
       revivedLastKnownGood,
       relocated,
       removedWithTombstone,
+      removedAsExcludedName,
     },
   };
 }
