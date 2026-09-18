@@ -19,6 +19,7 @@ const {
   GOODS_CLASSES,
   SERVICE_CLASSES,
   stageClassDistribution,
+  stageRegistrationStats,
   stageTopRegions,
   collectNationwideHits,
   resolveApplicantRegion,
@@ -160,6 +161,7 @@ async function processTerm(term, mode, { kiprisClient, applicantClient, adminLis
     }
     stageSummary[key] = {
       count: stages[key].length,
+      ...stageRegistrationStats(stages[key]),
       topApplicants: withRegion,
       examples,
       // 이슈 #119(2026-09-02): 단계별 주요 상품류(NICE), 상위 지역·점유율.

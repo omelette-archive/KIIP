@@ -240,6 +240,18 @@ function stageClassDistribution(stageHits, limit = 5) {
     .map(([classCode, count]) => ({ classCode, count, share: total ? count / total : 0 }));
 }
 
+// 2026-09-18(비즈니스 확장 방법론 강화 — kiip-58과 역할분담): 단계별 등록률. 단어검색
+// hit에는 registrationNumber가 이미 담겨있고(TRADEMARK_FIELDS), 등록번호 유무로
+// 등록/미등록을 가르는 규약은 03-match-trademarks/lib/bibliographyGoodsEnricher.js의
+// isRegistryUnreachable과 동일하다 — 새 API 호출 없이 기존 hit만으로 계산 가능.
+// 원물 대비 가공품/서비스 단계의 등록률 차이는(예: 원물은 식별력 부족으로 등록이
+// 어렵고 가공품은 상대적으로 쉬운 경우) "확장 방향 제안"에 근거를 하나 더 보탤 수 있다.
+function stageRegistrationStats(stageHits) {
+  const count = stageHits.length;
+  const registeredCount = stageHits.filter((hit) => String(hit.registrationNumber || "").trim()).length;
+  return { registeredCount, registrationRate: count ? registeredCount / count : null };
+}
+
 // 이슈 #119: 단계별 상표 출원 상위 지역과 점유율(특산품 관리 지역 고려 X). 전체 hit의
 // 주소를 조회할 예산은 없으므로 상위 출원인(withRegion)이 이미 주소가 붙은 것을 지역별로
 // 합산한다 — 상위 출원인 기준 근사치다.
@@ -359,6 +371,7 @@ module.exports = {
   designatedGoodsExamples,
   collectStageDesignatedGoods,
   stageClassDistribution,
+  stageRegistrationStats,
   stageTopRegions,
   topApplicantsByStage,
   collectNationwideHits,

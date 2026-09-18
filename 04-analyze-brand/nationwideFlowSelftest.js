@@ -13,6 +13,7 @@ const {
   designatedGoodsExamples,
   collectStageDesignatedGoods,
   stageClassDistribution,
+  stageRegistrationStats,
   stageTopRegions,
   collectNationwideHits,
   resolveApplicantRegion,
@@ -272,6 +273,20 @@ async function runNationwideFlowTests() {
     assert.strictEqual(regions[0].count, 7);
     assert.ok(Math.abs(regions[0].share - 7 / 10) < 1e-9);
     ok("상품류는 등장 횟수, 상위 지역은 상위 출원인 count 합산·점유율로 계산");
+  }
+
+  console.log("7f) stageRegistrationStats — 등록번호 유무로 단계별 등록률 계산(새 API 호출 없이 기존 hit만 사용)");
+  {
+    const hits = [
+      { ...hit({ title: "인삼", classificationCode: "31" }), registrationNumber: "4012345670000" },
+      { ...hit({ title: "인삼차", classificationCode: "30" }), registrationNumber: "" },
+      { ...hit({ title: "인삼음료", classificationCode: "30" }), registrationNumber: "4012345670001" },
+    ];
+    const stats = stageRegistrationStats(hits);
+    assert.strictEqual(stats.registeredCount, 2);
+    assert.ok(Math.abs(stats.registrationRate - 2 / 3) < 1e-9);
+    assert.deepStrictEqual(stageRegistrationStats([]), { registeredCount: 0, registrationRate: null }, "빈 단계는 등록률을 0이 아니라 null로(분모 없음을 구분)");
+    ok("등록번호 있는 hit 수 / 전체로 등록률 계산, 빈 배열은 null");
   }
 
   console.log("8b) topApplicantsByStage — 출원번호가 비어있는 첫 히트가 있어도 이후 정상 값으로 채움");
