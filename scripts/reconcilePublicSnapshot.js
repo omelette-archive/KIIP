@@ -41,6 +41,43 @@ function readJson(file) {
   return JSON.parse(fs.readFileSync(file, "utf8").replace(/^﻿/, ""));
 }
 
+// 2026-09-18 발견: coverage.regionItemCount/catalogItemCount·pipelineStatus.
+// regionalMetricGate.availableRegionItemCount는 07_snapshot(07-dashboard/lib/snapshot.js
+// :733)이 ③입력(analysis.regionItems) 기준으로 한 번만 계산한다. reconcile은 그 뒤
+// revived/relocated/methodologyUpgraded로 행을 추가·재배치하지만 이 카운트를 다시 안 써서
+// 최종 스냅샷 자체가 자기모순에 빠진다(scripts/auditDashboardSnapshot.js가 실제 행 수와
+// 대조해 차단 — region_item_item_count_mismatch 등). 여기서 최종 regions[].items[]를 직접
+// 세어 갱신한다 — auditDashboardSnapshot.js의 판정 기준(region.sido!=="전국",
+// metrics.uniqueTrademarkCount.availability==="available")과 정확히 맞춘다.
+function recomputeRowDependentCoverage(snapshot) {
+  let catalogItemCount = 0;
+  let regionItemCount = 0;
+  let nationwideCatalogItemCount = 0;
+  let availableRegionItemCount = 0;
+  for (const region of snapshot.regions || []) {
+    const isNationwide = region.sido === "전국";
+    for (const item of region.items || []) {
+      catalogItemCount++;
+      if (isNationwide) {
+        nationwideCatalogItemCount++;
+        continue;
+      }
+      regionItemCount++;
+      if (item?.metrics?.uniqueTrademarkCount?.availability === "available") availableRegionItemCount++;
+    }
+  }
+  if (snapshot.coverage) {
+    if (snapshot.coverage.regionItemCount !== undefined) snapshot.coverage.regionItemCount = regionItemCount;
+    if (snapshot.coverage.catalogItemCount !== undefined) snapshot.coverage.catalogItemCount = catalogItemCount;
+    if (snapshot.coverage.nationwideCatalogItemCount !== undefined) {
+      snapshot.coverage.nationwideCatalogItemCount = nationwideCatalogItemCount;
+    }
+  }
+  if (snapshot.pipelineStatus?.regionalMetricGate?.availableRegionItemCount !== undefined) {
+    snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount = availableRegionItemCount;
+  }
+}
+
 function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || args.h || !args.input || !args.out) {
@@ -63,6 +100,8 @@ function main() {
     massRevivalLimit: args["mass-revival-limit"] ? Number(args["mass-revival-limit"]) : undefined,
     isExcludedItem: isExcludedItemName,
   });
+
+  recomputeRowDependentCoverage(nextSnapshot);
 
   const outPath = path.resolve(args.out);
   fs.mkdirSync(path.dirname(outPath), { recursive: true });
@@ -97,4 +136,4 @@ if (require.main === module) {
   }
 }
 
-module.exports = { parseArgs, main };
+module.exports = { parseArgs, main, recomputeRowDependentCoverage };

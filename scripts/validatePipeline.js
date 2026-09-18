@@ -301,6 +301,7 @@ function main() {
   runNode("운영 프리플라이트 자체 테스트", ["scripts/checkOperationalEnv.selftest.js"]);
   runNode("③→⑦ 재생성 실행기 자체 테스트", ["scripts/regenerateAnalysisFromMatch.selftest.js"]);
   runNode("공개 스냅샷 reconcile 자체 테스트", ["scripts/lib/snapshotReconcile.selftest.js"]);
+  runNode("공개 스냅샷 reconcile CLI(coverage 재계산) 자체 테스트", ["scripts/reconcilePublicSnapshot.selftest.js"]);
   runNode("보완 스코프 정규화 자체 테스트", ["scripts/lib/supplementalScopes.selftest.js"]);
   runNode("archive 무결성 자체 테스트", ["scripts/verifyArchiveIntegrity.selftest.js"]);
   runNode("원자적 파일 쓰기 자체 테스트", ["scripts/lib/atomicWrite.selftest.js"]);
