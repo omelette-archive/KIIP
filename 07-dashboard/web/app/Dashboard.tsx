@@ -1816,6 +1816,13 @@ function NationwideFlowCard({ flow, itemLabel, origins }: { flow: NationwideFlow
 // 줄 수는 없어?" — 전국 흐름(businessFlow)의 단계별 건수·상품류·지역 분포에서 규칙으로
 // 확장 방향을 파생한다. 문장은 흐름 데이터에서 바로 나오는 사실이라 caveat 없이 조용히
 // 보여준다([[feedback_no_ai_labels_on_dashboard]] — "AI 판정"류 표기 금지).
+// 2026-09-18 실측(businessFlow 완료 품목, 협업자 감사): service/raw 비율(raw>=20 대상,
+// n=58)은 p25 0.107·중앙값 0.193·p75 0.611 — 기존 임계값 0.15가 36.2%에서 발동해 선별적.
+// 반면 processed/raw 비율(raw>=30 대상, n=56)은 p25 0.017·중앙값 0.032·p75 0.065로
+// 전체 분포 자체가 낮아서(가공품 브랜딩 자체가 원물 대비 원래 드묾), 기존 임계값 0.3은
+// 98.2%에서 발동해 변별력이 없었다 — 거의 모든 품목이 "가공품 브랜딩 부족"으로 뜬 셈.
+// 임계값을 실측 하위 25%(p25≈0.017) 근처로 낮춰 진짜 유별나게 낮은 품목만 남긴다.
+const PROCESSED_GAP_RATIO_THRESHOLD = 0.02;
 function expansionSuggestions(flow: NationwideFlow, opts: { surging?: boolean } = {}): { kind: string; text: string }[] {
   const { raw, processed, service } = flow.stages;
   const out: { kind: string; text: string }[] = [];
@@ -1825,7 +1832,7 @@ function expansionSuggestions(flow: NationwideFlow, opts: { surging?: boolean } 
   if (raw.count >= 20 && service.count / Math.max(1, raw.count) < 0.15) {
     out.push({ kind: "service_gap", text: `서비스·확장 단계 상표가 원물 대비 ${Math.round(service.count / Math.max(1, raw.count) * 100)}%뿐입니다 — 체험·유통·식음(41·43·44류) 진출 여지가 큽니다.` });
   }
-  if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < 0.3) {
+  if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < PROCESSED_GAP_RATIO_THRESHOLD) {
     out.push({ kind: "processed_gap", text: `가공품 브랜딩(${number(processed.count)}건)이 원물(${number(raw.count)}건)에 비해 적습니다 — 가공식품·음료류(29·30·32) 상표가 아직 미개척입니다.` });
   }
   if (topRawClass && topRawClass.share > 0.6) {

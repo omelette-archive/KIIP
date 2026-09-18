@@ -633,6 +633,11 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
   };
   // 이슈 #136(협업자 2026-09-06): 전국 흐름에서 규칙 파생한 확장 방향 제안. Dashboard.tsx
   // expansionSuggestions와 동일 로직. caveat 없이 조용히("AI 판정" 표기 금지).
+  // 2026-09-18 실측(협업자 감사, businessFlow 완료 품목): processed/raw 비율(raw>=30
+  // 대상, n=56)은 p25 0.017·중앙값 0.032·p75 0.065로 전체 분포 자체가 낮아서(가공품
+  // 브랜딩이 원래 원물 대비 드묾), 기존 임계값 0.3은 98.2%에서 발동해 변별력이 없었다.
+  // 하위 25%(p25≈0.017) 근처로 낮춰 진짜 유별나게 낮은 품목만 남긴다.
+  const PROCESSED_GAP_RATIO_THRESHOLD = 0.02;
   function expansionSuggestions(flow, opts) {
     opts = opts || {};
     const { raw, processed, service } = flow.stages;
@@ -641,7 +646,7 @@ function dashboardClient(snapshot, geometry, registrationExamples) {
     const processedRegion = processed.topRegions && processed.topRegions[0] && processed.topRegions[0].region;
     const topRawClass = raw.classes && raw.classes[0];
     if (raw.count >= 20 && service.count / Math.max(1, raw.count) < 0.15) out.push({ kind: "service_gap", text: `서비스·확장 단계 상표가 원물 대비 ${Math.round(service.count / Math.max(1, raw.count) * 100)}%뿐입니다 — 체험·유통·식음(41·43·44류) 진출 여지가 큽니다.` });
-    if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < 0.3) out.push({ kind: "processed_gap", text: `가공품 브랜딩(${number(processed.count)}건)이 원물(${number(raw.count)}건)에 비해 적습니다 — 가공식품·음료류(29·30·32) 상표가 아직 미개척입니다.` });
+    if (raw.count >= 30 && processed.count / Math.max(1, raw.count) < PROCESSED_GAP_RATIO_THRESHOLD) out.push({ kind: "processed_gap", text: `가공품 브랜딩(${number(processed.count)}건)이 원물(${number(raw.count)}건)에 비해 적습니다 — 가공식품·음료류(29·30·32) 상표가 아직 미개척입니다.` });
     if (topRawClass && topRawClass.share > 0.6) out.push({ kind: "class_concentration", text: `원물 상표가 ${niceClassLabel(topRawClass.classCode)}에 ${Math.round(topRawClass.share * 100)}% 집중돼 있습니다 — 인접 상품류로 포트폴리오를 넓힐 여지가 있습니다.` });
     if (flow.hasRegionalSignal && rawRegion && processedRegion && rawRegion !== processedRegion) out.push({ kind: "cluster_split", text: `원물 상표 활동은 ${displayRegionName(rawRegion)}, 가공은 ${displayRegionName(processedRegion)}에서 두드러집니다 — 산지에서 가공 브랜드를 키울 때 산지 연계 스토리를 활용할 수 있습니다.` });
     if (opts.surging) out.push({ kind: "momentum", text: "최근 출원이 급증하는 품목입니다 — 선점 경쟁이 빨라지고 있어 조기 출원 전략이 필요합니다." });
