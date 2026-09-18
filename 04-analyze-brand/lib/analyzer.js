@@ -421,6 +421,10 @@ function finalizeBucket(bucket, options) {
   const producerApplicantKeys = new Set();
   let rawGoodsNationwideCandidateCount = 0;
   let rawGoodsRegionalAddressMatchCount = 0;
+  // #12 경로C(서지상세): 등록원부(경로B)가 도달 못 하는 미등록 출원까지 지정상품을
+  // 확보한 건수. goodsMatchCounts는 경로 구분 없이 판정 결과만 세므로, "얼마나 서지상세로
+  // 새로 풀렸는지"는 별도로 세야 경고 문구에서 #12 진행 상황을 정확히 알릴 수 있다.
+  let goodsSourceBibliographyCount = 0;
   const recentBrands = [];
   const trademarkExamples = [];
 
@@ -456,6 +460,7 @@ function finalizeBucket(bucket, options) {
       else regionalBrandCounts[category]++;
     }
     goodsMatchCounts[goodsMatchCategory(hit)]++;
+    if (hit.goodsSource === "bibliography") goodsSourceBibliographyCount++;
     ipRegistryStatusCounts[ipRegistryStatusCategory(hit)]++;
     if (applicantRegion === "inside") {
       const applicantName = clean(hit.applicant);
@@ -681,6 +686,7 @@ function finalizeBucket(bucket, options) {
       ? safeRate(regionalBrandCounts.inside, regionalBrandVerifiedHitCount)
       : null,
     goodsMatchCounts,
+    goodsSourceBibliographyCount,
     goodsConfirmedHitCount,
     goodsReviewRequiredHitCount,
     goodsMismatchHitCount: goodsMatchCounts.mismatch,
@@ -899,10 +905,15 @@ function analyzeEntries(parsed, providedOptions = {}) {
     }
     const notApplicableCount = registry.counts?.noRegistrationHitCount ?? summary.ipRegistryStatusCounts?.not_applicable ?? 0;
     if (notApplicableCount > 0) {
+      // 2026-09-18(#12): 서지상세(getBibliographyDetailInfoSearch, 경로 C)가 출원번호만으로
+      // 미등록 출원의 지정상품을 준다는 게 확인·구현됐다(33da44c). 등록원부(경로 B)만
+      // authoritative였을 때 쓴 "조회 수단이 확인되지 않았다"는 문구는 더 이상 사실이 아니라
+      // 지운다 — 대신 경로 C로 실제 몇 건이 풀렸는지를 알린다.
+      const bibliographyResolvedCount = summary.goodsSourceBibliographyCount || 0;
       warnings.push(
-        `${notApplicableCount}개 상표는 등록번호가 없는 출원중·거절 등 건이라 등록원부 지정상품 조회 대상이 아닙니다(#12). ` +
-          "이 건들은 지정상품 근거 없이 NICE류·주소 매칭에만 의존하며, 현재 KIPRIS 응답에는 " +
-          "출원번호 기준 지정상품 조회 수단이 확인되지 않았습니다."
+        `${notApplicableCount}개 상표는 등록번호가 없는 출원중·거절 등 건이라 등록원부(경로 B) 지정상품 조회 대상이 아닙니다. ` +
+          `서지상세 API(경로 C, #12)로 출원번호 기준 지정상품 조회가 가능해 이 중 ${bibliographyResolvedCount}개는 이미 지정상품 근거를 확보했고, ` +
+          "나머지는 KIPRIS Plus 접근 제한·일일 예산에 따라 순차적으로 채워집니다."
       );
     }
   }

@@ -557,11 +557,57 @@ console.log("7-2) 등록번호 없는 출원(미등록·심사중)은 지정상�
   }, { asOfYear: 2026 });
   assert.ok(
     r.warnings.some(
-      (warning) => warning.includes("42개 상표") && warning.includes("등록원부 지정상품 조회 대상이 아닙니다")
+      (warning) => warning.includes("42개 상표") && warning.includes("등록원부(경로 B) 지정상품 조회 대상이 아닙니다")
     ),
     "등록번호 없는 출원 건수를 지정상품 미평가 경고로 명시해야 함"
   );
-  ok("등록번호 없는 출원(미등록·심사중)이 지정상품 근거 없이 매칭됐다는 사실을 명시적으로 경고");
+  assert.ok(
+    r.warnings.some((warning) => warning.includes("서지상세 API(경로 C, #12)") && warning.includes("이 중 0개는 이미")),
+    "서지상세 미적용(0건) 상태도 경로 C 존재를 알리는 문구여야 함(구 문구 '조회 수단이 확인되지 않았다'는 지움)"
+  );
+  ok("등록번호 없는 출원(미등록·심사중)이 지정상품 근거 없이 매칭됐다는 사실과, 경로 C(서지상세)로 해소 가능함을 함께 경고");
+}
+
+console.log("7-3) 서지상세(경로 C) 적용분은 미평가 경고 문구에 해소 건수로 반영(#12)");
+{
+  const r = analyzeEntries({
+    schemaVersion: "1.1",
+    ipRegistryEnrichment: {
+      enabled: true,
+      status: "partial",
+      completeRegistrationCount: 1,
+      errorRegistrationCount: 0,
+      notCollectedRegistrationCount: 0,
+      counts: { noRegistrationHitCount: 42 },
+      sourceMetadata: { sourceId: "ip_registry", contractVersion: "ip-registry-mark-history-v1" },
+      policy: {
+        applicantRegionMatchVersion: "ip-registry-applicant-region-v1",
+        goodsMatchVersion: "ip-registry-designated-goods-v0-review",
+      },
+    },
+    results: [
+      {
+        sido: "충청남도",
+        sigungu: "금산군",
+        itemName: "인삼",
+        noticeName: "인삼",
+        niceClass: "30",
+        query: { region: "충청남도 금산군", searchString: "인삼" },
+        hits: [
+          {
+            ...hit("40-2020-1", "금산인삼", "20200102", "출원", "unverified"),
+            goodsMatchMethod: "normalized_exact",
+            goodsSource: "bibliography",
+          },
+        ],
+      },
+    ],
+  }, { asOfYear: 2026 });
+  assert.ok(
+    r.warnings.some((warning) => warning.includes("서지상세 API(경로 C, #12)") && warning.includes("이 중 1개는 이미")),
+    "goodsSource=bibliography로 확정된 hit 수가 경고에 반영돼야 함"
+  );
+  ok("서지상세로 실제 확정된 건수를 미평가 경고에 정확히 반영");
 }
 
 console.log("8) 지역브랜드 조인 검증용 자료는 고시명칭 유무와 무관하게 집계 제외");
