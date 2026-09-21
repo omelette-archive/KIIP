@@ -455,7 +455,7 @@ function buildPlan(options = {}) {
         "--mode",
         "full",
         "--stage",
-        "alpha",
+        "production",
         "--geometry",
         path.join(ROOT, "07-dashboard/web/public/data/map-geometry.json"),
         "--out",

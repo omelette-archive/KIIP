@@ -486,7 +486,10 @@ test("ships a valid dashboard snapshot", async () => {
   const snapshot = await loadSnapshot();
   assert.equal(snapshot.schemaVersion, "dashboard-snapshot-v1");
   assert.equal(snapshot.mode, "full");
-  assert.equal(snapshot.pipelineStatus.stage, "alpha");
+  // 2026-09-21(사용자 결정): "정식" 전환 기준은 버그·파이프라인 안정성만이라 기본값을
+  // production으로 올렸다(07-dashboard/lib/snapshot.js) — 데이터 완성도(주소검증·부분수집
+  // 등)는 별도로 게이트하지 않는다.
+  assert.equal(snapshot.pipelineStatus.stage, "production");
   assert.ok(snapshot.pipelineStatus.uniqueQueryCounts.total > 0);
   assert.ok(
     snapshot.pipelineStatus.uniqueQueryCounts.total

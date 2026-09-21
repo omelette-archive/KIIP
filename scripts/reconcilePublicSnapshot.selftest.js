@@ -11,6 +11,10 @@
 const assert = require("assert");
 const { recomputeRowDependentCoverage } = require("./reconcilePublicSnapshot");
 
+// 2026-09-21 회귀: blockedRegionItemCount가 전국(nationwide) 포함 스코프로 남아있어
+// rendered-html.test.mjs의 "coverage.pending === regionalMetricGate.blockedRegionItemCount"
+// 자기정합성 검증이 깨졌었다(#region-item-count-mismatch 계열 재발).
+
 function ok(label) {
   console.log(`  ok - ${label}`);
 }
@@ -19,7 +23,7 @@ console.log("1) recomputeRowDependentCoverage — 지역/전국·availability �
 {
   const snapshot = {
     coverage: { regionItemCount: 10, catalogItemCount: 12, nationwideCatalogItemCount: 2 },
-    pipelineStatus: { regionalMetricGate: { availableRegionItemCount: 5 } },
+    pipelineStatus: { regionalMetricGate: { availableRegionItemCount: 5, blockedRegionItemCount: 0 } },
     regions: [
       {
         sido: "강원특별자치도",
@@ -40,7 +44,12 @@ console.log("1) recomputeRowDependentCoverage — 지역/전국·availability �
     1,
     "전국 제외 + availability=available만(blocked 제외) 카운트"
   );
-  ok("region/전국 분리, availability=available만 집계");
+  assert.strictEqual(
+    snapshot.pipelineStatus.regionalMetricGate.blockedRegionItemCount,
+    1,
+    "전국 제외 + availability!==available(blocked)만 카운트 — available과 같은 스코프"
+  );
+  ok("region/전국 분리, availability=available/blocked 둘 다 같은 스코프로 집계");
 }
 
 console.log("2) recomputeRowDependentCoverage — reconcile로 행이 늘어도(예: revived) 최종 스냅샷과 일치");
@@ -49,7 +58,7 @@ console.log("2) recomputeRowDependentCoverage — reconcile로 행이 늘어도(
   // regions[].items[]는 이미 revived/relocated로 늘어난 최종 상태.
   const snapshot = {
     coverage: { regionItemCount: 1, catalogItemCount: 1 },
-    pipelineStatus: { regionalMetricGate: { availableRegionItemCount: 0 } },
+    pipelineStatus: { regionalMetricGate: { availableRegionItemCount: 0, blockedRegionItemCount: 0 } },
     regions: [
       {
         sido: "전북특별자치도",
@@ -65,7 +74,14 @@ console.log("2) recomputeRowDependentCoverage — reconcile로 행이 늘어도(
   assert.strictEqual(snapshot.coverage.regionItemCount, 3);
   assert.strictEqual(snapshot.coverage.catalogItemCount, 3);
   assert.strictEqual(snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount, 2);
-  ok("reconcile이 추가한 행까지 반영해 실제 행 수와 다시 맞춰짐");
+  assert.strictEqual(snapshot.pipelineStatus.regionalMetricGate.blockedRegionItemCount, 1);
+  assert.strictEqual(
+    snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount +
+      snapshot.pipelineStatus.regionalMetricGate.blockedRegionItemCount,
+    snapshot.coverage.regionItemCount,
+    "available+blocked는 항상 regionItemCount와 일치해야 함(자기정합성)"
+  );
+  ok("reconcile이 추가한 행까지 반영해 실제 행 수와 다시 맞춰짐, available+blocked 자기정합성 유지");
 }
 
 console.log("3) recomputeRowDependentCoverage — 필드가 원래 없으면(undefined) 새로 만들지 않음");

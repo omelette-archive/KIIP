@@ -782,7 +782,11 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
   const nationwideTrademarkCount = count(summary, "uniqueTrademarkCount");
   const regionalCoverageThreshold = Number(analysis.parameters?.regionalCoverageThreshold ?? 1);
   const pipelineStatus = {
-    stage: clean(options.stage) || (mode === "full" ? "alpha" : "sample"),
+    // 2026-09-21(사용자 결정): "정식" 전환 기준은 버그·파이프라인 안정성만이다 — 주소
+    // 검증률·부분수집 등 데이터 완성도는 별도로 게이트하지 않는다(구조적으로 100% 불가능한
+    // 항목이 있어 그걸로 막으면 영원히 전환 못 함). 알려진 버그가 없는 지금부터 기본값을
+    // production으로 올린다. 이전 "alpha"는 --stage로 여전히 명시 가능.
+    stage: clean(options.stage) || (mode === "full" ? "production" : "sample"),
     inputScope: mode,
     units: {
       row: "region_item_input_rows",
@@ -830,7 +834,7 @@ function buildDashboardSnapshot({ analysis, gap, strategy }, options = {}) {
         : 1,
       policy:
         regionalCoverageThreshold < 1
-          ? "alpha_collection_coverage_preview_address_rate_is_advisory"
+          ? "partial_collection_coverage_preview_address_rate_is_advisory"
           : "collection_complete_address_rate_is_advisory",
     },
     collectionExperiment: {

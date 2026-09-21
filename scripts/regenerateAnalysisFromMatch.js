@@ -63,7 +63,7 @@ const VALUE_FLAGS = new Map([
 ]);
 
 function parseArgs(argv) {
-  const options = { dryRun: false, mode: "full", stage: "alpha" };
+  const options = { dryRun: false, mode: "full", stage: "production" };
   for (let index = 0; index < argv.length; index++) {
     const arg = argv[index];
     if (arg === "--dry-run") options.dryRun = true;
@@ -102,7 +102,7 @@ function printUsage() {
       "  --raw-goods-review <json>   ④ 승인 원물명 지정상품 검토본(기본: 저장소 검토본)",
       "  --as-of-year <year>         ④ 분석 기준 연도(기본: 현재 UTC 연도)",
       "  --mode <sample|full>        ⑦ 스냅샷 데이터 범위(기본: full)",
-      "  --stage <sample|alpha|production>  ⑦ 실행 단계 표시(기본: alpha)",
+      "  --stage <sample|alpha|production>  ⑦ 실행 단계 표시(기본: production)",
       "  --dry-run                   실행 계획만 출력(파일 변경 없음)",
       "",
       "외부 API를 호출하지 않는다. 입력 ③ 산출물의 지역 근거를 그대로 ④~⑦에 흘려보낸다.",

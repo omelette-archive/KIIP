@@ -392,7 +392,7 @@ function main() {
     briefings: [],
     warnings: [],
   };
-  const extra = buildDashboardSnapshot({ analysis, gap, strategy }, { mode: "full", stage: "alpha" });
+  const extra = buildDashboardSnapshot({ analysis, gap, strategy }, { mode: "full", stage: "production" });
   const regions = mergeRegions(
     stripPreviouslyMergedSupplementalRows(base.regions, nfqsFacilityRegionItemKeys),
     extra.regions

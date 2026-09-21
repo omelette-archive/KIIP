@@ -49,11 +49,23 @@ function readJson(file) {
 // 대조해 차단 — region_item_item_count_mismatch 등). 여기서 최종 regions[].items[]를 직접
 // 세어 갱신한다 — auditDashboardSnapshot.js의 판정 기준(region.sido!=="전국",
 // metrics.uniqueTrademarkCount.availability==="available")과 정확히 맞춘다.
+// 2026-09-21 추가 발견: blockedRegionItemCount도 같은 문제였다 — snapshot.js가
+// `analysis.regionItems.length - availableRegionItemCount`로 전국 포함 전체 기준
+// 계산하는데, availableRegionItemCount는 이후 여기서 지역 전용으로 재계산되면서 두
+// 값의 스코프가 어긋나 rendered-html.test.mjs의 "coverage.pending ===
+// regionalMetricGate.blockedRegionItemCount" 자기정합성 검증이 깨졌다(13 vs 21,
+// 전국 특산품류 항목 수만큼 차이). blockedRegionItemCount도 지역 전용으로 같이
+// 재계산해 둘을 다시 맞춘다. partialRegionItemCount는 분석 단계의
+// regionalMetricAvailability="partial"(수집 상한에 걸렸지만 표시는 하는 상태) 세분류가
+// 필요한데 최종 스냅샷의 metrics.availability는 available/blocked 두 값으로만
+// 축약돼 있어 이 수준에서는 재계산할 수 없다 — 그대로 둔다(과소평가 방향이라
+// 안전 쪽 오차).
 function recomputeRowDependentCoverage(snapshot) {
   let catalogItemCount = 0;
   let regionItemCount = 0;
   let nationwideCatalogItemCount = 0;
   let availableRegionItemCount = 0;
+  let blockedRegionItemCount = 0;
   for (const region of snapshot.regions || []) {
     const isNationwide = region.sido === "전국";
     for (const item of region.items || []) {
@@ -64,6 +76,7 @@ function recomputeRowDependentCoverage(snapshot) {
       }
       regionItemCount++;
       if (item?.metrics?.uniqueTrademarkCount?.availability === "available") availableRegionItemCount++;
+      else blockedRegionItemCount++;
     }
   }
   if (snapshot.coverage) {
@@ -75,6 +88,9 @@ function recomputeRowDependentCoverage(snapshot) {
   }
   if (snapshot.pipelineStatus?.regionalMetricGate?.availableRegionItemCount !== undefined) {
     snapshot.pipelineStatus.regionalMetricGate.availableRegionItemCount = availableRegionItemCount;
+  }
+  if (snapshot.pipelineStatus?.regionalMetricGate?.blockedRegionItemCount !== undefined) {
+    snapshot.pipelineStatus.regionalMetricGate.blockedRegionItemCount = blockedRegionItemCount;
   }
 }
 
