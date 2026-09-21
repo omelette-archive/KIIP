@@ -227,7 +227,12 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 등록원부 백로그 3000건 반영으로 분모 1825->1826, 출원 확인 1165->1180.
   // 운영 재수집으로 품목과 지역 출원 판정은 늘 수 있으므로 특정 스냅샷의 숫자에 고정하지
   // 않는다. 대신 기존 확인량이 후퇴하지 않고 현재 스냅샷 계약과 일치하는지를 검증한다.
-  assert.ok(coverage.total >= 1826);
+  // 2026-09-21: 2026-09-09 사용자 요청("회사·법인·시설명 삭제")이 assertInputs 반환값
+  // 누락 버그(07-dashboard/lib/snapshot.js)로 9일간 실제로는 한 번도 반영 안 되고 있다가
+  // 이번에 처음 실제로 반영됨(b2ff128) — 회사명 74건 + 재배치 9건이 분모에서 정상적으로
+  // 빠져 1826->1763로 줄었다. 재수집 축소가 아니라 의도된 버그 수정이라 예외적으로 분모
+  // 하한을 낮춘다(applied 하한은 그대로 유지 — 그쪽은 줄지 않았음).
+  assert.ok(coverage.total >= 1763);
   assert.equal(coverage.decided + coverage.pending, coverage.total);
   assert.ok(coverage.applied >= 1180);
   assert.ok(coverage.applied <= coverage.total);
@@ -670,8 +675,10 @@ test("shows every region-item in the detail tabs without a name-match badge", as
   const officialGoseongItems = goseong.items.filter((item) => item.matchingBasis === "notice_name_and_nice_class" && item.noticeName);
   const rawGoseongItems = goseong.items.filter((item) => item.matchingBasis === "raw_item_name_unclassified");
   assert.ok(officialGoseongItems.length > 0, "고성군에는 공식 특산품이 있어야 함");
+  // 2026-09-21: "왕곡한과"는 ②단계 정규화 별칭 9차(approved-aliases.json "한과" 규칙)로
+  // 확정돼 더 이상 raw가 아니게 됨 — 예시를 여전히 raw인 항목으로 교체.
   assert.ok(
-    rawGoseongItems.some((item) => item.itemName === "꿀다림 데일리허니") && rawGoseongItems.some((item) => item.itemName === "왕곡한과"),
+    rawGoseongItems.some((item) => item.itemName === "아로니아") && rawGoseongItems.some((item) => item.itemName === "생강청"),
     "고성군에는 검토대기 원물명·상호가 실제로 섞여 있어야 이 테스트가 의미가 있음",
   );
   const regionsWithoutOfficialItems = snapshot.regions.filter(
