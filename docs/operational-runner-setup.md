@@ -1,8 +1,15 @@
 # 운영 파이프라인 러너 설정 (#70)
 
-`operational-pipeline.yml`이 주 1회 실데이터 수집→게시를 돌리려면 자체 호스트 러너와
+`operational-pipeline.yml`이 실데이터 수집→게시를 돌리려면 자체 호스트 러너와
 저장소 시크릿·변수가 필요하다. GitHub 설정은 저장소 관리자만 할 수 있다. 이 문서는
 그 절차와 첫 실행·복구 방법을 정리한다.
+
+**2026-09-21 현재 상태**: 예약(cron) 트리거는 제거돼 있다. 등록된 러너
+(`kiip-local-runner`)는 offline이고, 사용자가 "자동화 강제 기동 없이 내가 말할 때만
+진행"을 결정해 지금은 의도적으로 수동 트리거(`workflow_dispatch`)만 쓴다 — 실제
+파이프라인 실행은 전부 사용자 세션이 데스크탑에서 `node scripts/runOperationalPipeline.js`를
+직접 실행하는 방식이다. 아래 절차는 필요 시 러너를 다시 온라인으로 만들어 GitHub
+Actions에서 수동/예약 실행하고 싶을 때를 위한 참고용이다.
 
 ## 1. 자체 호스트 러너 등록
 
@@ -77,15 +84,16 @@ node scripts/checkOperationalEnv.js --state-dir "$KIIP_OPERATIONAL_ROOT/state"
    기존 `publish-artifacts.yml`이 공개 페이지를 갱신한다.
 3. 실패하면 `operational-pipeline-failure` 라벨 이슈가 열린다. 원인을 고친 뒤 같은
    워크플로를 재실행하면 `state/`의 체크포인트 덕분에 미완료 지점부터 이어간다.
-4. 이후 매주 월요일 02:00 KST에 자동 실행된다(`concurrency: operational-pipeline`로
-   중복 실행 차단).
+4. 예약 실행은 없다(위 "2026-09-21 현재 상태" 참고) — 필요할 때마다
+   **Actions → Operational data pipeline → Run workflow**로 수동 트리거한다
+   (`concurrency: operational-pipeline`로 중복 실행은 여전히 차단됨).
 
 ## 6. 완료 조건(#70) 대응
 
 | 조건 | 방법 |
 |---|---|
 | 수동 전체 실행 1회 성공 | 5번 1단계 |
-| 예약 실행 1회 성공 | cron 대기 또는 임시로 cron 간격 단축 후 원복 |
+| 예약 실행 1회 성공 | 해당 없음(2026-09-21 cron 제거, 수동 트리거만 — 위 "현재 상태" 참고) |
 | 중간 실패 후 체크포인트 재개 | 실행 중 러너 중단 → 재실행이 `--resume`으로 이어감 |
 | 실행 ID·기준일 추적 | `runs/<run-id>/run-manifest.json`, 스냅샷 `snapshotId`·`generatedAt` |
 | 실패 알림·복구 검증 | 일부러 잘못된 시크릿으로 1회 → 이슈 생성 확인 → 원복 후 재실행 |
