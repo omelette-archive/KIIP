@@ -232,7 +232,9 @@ test("uses every collected region-item specialty as the application-rate denomin
   // 이번에 처음 실제로 반영됨(b2ff128) — 회사명 74건 + 재배치 9건이 분모에서 정상적으로
   // 빠져 1826->1763로 줄었다. 재수집 축소가 아니라 의도된 버그 수정이라 예외적으로 분모
   // 하한을 낮춘다(applied 하한은 그대로 유지 — 그쪽은 줄지 않았음).
-  assert.ok(coverage.total >= 1763);
+  // 2026-09-22: 회사명 제외 목록에 "㈜장생도라지" 1건 추가(e98e212)로 1763->1762,
+  // 같은 성격의 의도된 감소.
+  assert.ok(coverage.total >= 1762);
   assert.equal(coverage.decided + coverage.pending, coverage.total);
   assert.ok(coverage.applied >= 1180);
   assert.ok(coverage.applied <= coverage.total);
