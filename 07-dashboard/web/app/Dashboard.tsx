@@ -1688,7 +1688,7 @@ function ExpansionReportCard({ index, name, category, province, regions }: { ind
     <p className="expansion-lede"><b>{name}</b>{withTopicJosa(name).slice(name.length)} {serviceCodes.length
       ? `제품 ${productCodes.length}개 류와 서비스·확산 ${serviceCodes.length}개 류에서 지정상품이 확인됐습니다.`
       : <>제품 {productCodes.length}개 류에서만 지정상품이 확인됐고, <b>서비스·확산(35류 이상)은 확인된 것이 없습니다</b>.</>}</p>
-    <p className="expansion-limit"><b>이 진단이 보는 범위</b> 지정상품 근거는 <b>고시명칭과 문자열이 맞물리는 출원</b>에만 붙습니다(정확 일치·부분 포함). 그래서 「신선한 인삼」은 「인삼소매업」(35류)을 잡아내지 못하고, 「신선한 곰취」는 「신선한곰취소매업」을 잡아냅니다 — 보이는 범위가 <b>이름 형태에 따라</b> 달라집니다. 아래에서 비어 있는 칸은 “권리가 없다”가 아니라 <b>“이 방법으로는 확인되지 않았다”</b>로 읽으십시오.</p>
+    <p className="expansion-limit">지정상품 명칭이 일치하는 출원만 확인됩니다. 빈 칸은 권리가 없다는 뜻이 아니라 아직 확인되지 않았다는 뜻입니다.</p>
     <div className="expansion-grid">
       <article>
         <h3>① 지정상품이 확인된 범위</h3>
@@ -2981,7 +2981,7 @@ const STRATEGY_CHIP_LIMIT = 12;
             <li className="seg-goods"><b>{number(rightsBoard.goods)}</b><span>상품류 보유</span><small>파는 물건에 권리 있음</small></li>
             <li className="seg-unknown"><b>{number(rightsBoard.unknown + rightsBoard.pending)}</b><span>권리 내용 미확인</span><small>지정상품 미확인 · 실사 필요</small></li>
           </ul>
-          <p className="rights-board-note">출원 건수만으로는 &ldquo;상표는 있는데 정작 파는 물건에 권리가 없는&rdquo; 상태가 드러나지 않습니다. 지정상품의 상품류(1~34류)와 서비스류(35류 이상)로 갈라 네 칸으로 봅니다.</p>
+          <p className="rights-board-note">출원 건수만으로는 실제 판매 상품에 대한 권리 여부가 드러나지 않아, 상품(1~34류)과 서비스(35류 이상)로 나눠 봅니다.</p>
         </section>
     </section>}
 
