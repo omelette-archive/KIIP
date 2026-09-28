@@ -341,6 +341,7 @@ async function runNationwideFlowTests() {
             { matchingBasis: "notice_name_and_nice_class", category: { label: "과일" }, noticeName: "신선한 배 / 사과" },
             { matchingBasis: "notice_name_and_nice_class", category: { label: "공예품" }, noticeName: "도자기" },
             { matchingBasis: "rule_unresolved", category: { label: "곡물" }, noticeName: "미확정품목" },
+            { matchingBasis: "notice_name_and_nice_class", category: { label: "수산물" }, noticeName: "붕장어(살아있지 않은 것)" },
           ],
         },
       ],
@@ -352,7 +353,11 @@ async function runNationwideFlowTests() {
     assert.ok(terms.includes("사과")); // "배 / 사과" 분리
     assert.ok(!terms.includes("도자기")); // 공예품은 농수임산물이 아니므로 제외
     assert.ok(!terms.includes("미확정품목")); // matchingBasis 미확정은 제외
-    ok("브랜드 수식어 병합, 복합 표시명 분리, 공예품·미확정 품목 제외가 모두 동작함");
+    // 2026-09-28 회귀: 끝 괄호 수식어("(살아있지 않은 것)")는 실제 상표명에 없어 검색어에서
+    // 제거해야 한다 — 남아있으면 전국 검색이 사실상 0건이 될 위험이 있다.
+    assert.ok(terms.includes("붕장어"));
+    assert.ok(!terms.includes("붕장어(살아있지 않은 것)"));
+    ok("브랜드 수식어 병합, 복합 표시명 분리, 공예품·미확정 품목 제외, 끝 괄호 수식어 제거가 모두 동작함");
   }
 
   console.log("11) isProducerLikeApplicant/rawSignalConfidence — 176개 파일럿 실측 기반 신뢰도 필터");

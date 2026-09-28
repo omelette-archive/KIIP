@@ -337,6 +337,11 @@ function deriveAgriCoreItems(snapshot) {
       if (!item.matchingBasis || !OFFICIAL_MATCHING_BASES.has(item.matchingBasis)) continue;
       if (!item.category || !AGRI_CATEGORIES.has(item.category.label)) continue;
       let name = item.noticeName || "";
+      // 2026-09-28 발견: "붕장어(살아있지 않은 것)"·"뱀장어(살아있지 않은 것)"처럼 끝에 붙는
+      // 괄호 수식어는 실제 상표명에 그대로 나타나지 않는다(예: "완도붕장어") — 접두어만
+      // 벗기던 기존 로직은 이런 괄호를 그대로 검색어에 남겨 전국 검색이 사실상 0건이 될
+      // 위험이 있었다. 핵심 명칭만 남기도록 끝 괄호를 먼저 제거한다.
+      name = name.replace(/\s*[（(][^）)]*[）)]\s*$/, "");
       for (const prefix of DISPLAY_PREFIXES) if (name.startsWith(prefix)) name = name.slice(prefix.length);
       if (name) rawNames.add(name);
     }
