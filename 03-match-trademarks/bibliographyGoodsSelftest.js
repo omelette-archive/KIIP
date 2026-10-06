@@ -35,12 +35,15 @@ async function runBibliographyGoodsTests() {
     ok("등록원부 확정(등록원부 출처만) 제외, 등록번호 없으면 도달불가로 분류");
   }
 
-  console.log("2) isAccessDeniedError — KiprisApiError의 SERVICE_ACCESS_DENIED만 인식");
+  console.log("2) isAccessDeniedError — SERVICE_ACCESS_DENIED·인증키 만료(resultCode 31)를 회로차단 신호로 인식(2026-10-06)");
   {
     assert.strictEqual(isAccessDeniedError({ code: "SERVICE_ACCESS_DENIED" }), true);
+    assert.strictEqual(isAccessDeniedError({ resultCode: "20" }), true);
+    assert.strictEqual(isAccessDeniedError({ code: "DEADLINE_EXPIRED" }), true);
+    assert.strictEqual(isAccessDeniedError({ resultCode: "31" }), true);
     assert.strictEqual(isAccessDeniedError({ code: "INVALID_PARAMETER" }), false);
     assert.strictEqual(isAccessDeniedError(null), false);
-    ok("SERVICE_ACCESS_DENIED만 회로차단 신호로 인식");
+    ok("접근거부·인증키 만료 둘 다 회로차단 신호로 인식, 나머지는 통과");
   }
 
   console.log("3) collectCandidates — 등록원부 도달불가(pending) 먼저, 확정건 제외, 출원번호 없으면 제외");

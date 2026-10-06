@@ -32,8 +32,19 @@ function isRegistryUnreachable(hit) {
 
 // SERVICE_ACCESS_DENIED(일일 한도 등, xmlLite.isResultCode20AccessError → KiprisApiError)를
 // 03c와 같은 방식으로 회로차단 신호로 본다 — "0건 완료"로 삼키지 않는다(7dd502d 교훈).
+// 2026-10-06 발견: resultCode 31(DEADLINE_HAS_EXPIRED_ERROR, "인증키 사용기한 만료")은
+// 일일 한도 초과가 아니라 서지상세 서비스 활용신청 승인기간 자체가 만료된 것이다(사용자가
+// KIPRIS 포털에서 직접 갱신해야 함 — 코드로 복구 불가). 접근거부와 똑같이 즉시 회로
+// 차단해야 한다 — 안 그러면 매 실행마다 --limit 전체를 헛되이 재시도한다(실측: 300건
+// 전부 이 오류로 낭비됨).
 function isAccessDeniedError(error) {
-  return Boolean(error) && (error.code === "SERVICE_ACCESS_DENIED" || error.resultCode === "20");
+  return (
+    Boolean(error) &&
+    (error.code === "SERVICE_ACCESS_DENIED" ||
+      error.resultCode === "20" ||
+      error.code === "DEADLINE_EXPIRED" ||
+      error.resultCode === "31")
+  );
 }
 
 function mapDesignatedGoodsToProducts(designatedGoods) {
